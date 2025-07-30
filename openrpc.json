@@ -1,0 +1,591 @@
+{
+  "openrpc": "1.2.6",
+  "info": {
+    "title": "Simple RPC AI Backend",
+    "description": "Platform-agnostic JSON-RPC server for AI integration in VS Code extensions, web apps, and CLI tools. Provides secure system prompt protection and corporate proxy bypass.",
+    "version": "0.1.0",
+    "contact": {
+      "name": "Simple RPC AI Backend",
+      "url": "https://github.com/AWolf81/simple-rpc-ai-backend"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "name": "Local Development Server",
+      "url": "http://localhost:8000/rpc",
+      "description": "Default local development server"
+    }
+  ],
+  "methods": [
+    {
+      "name": "health",
+      "description": "Check server health and availability status",
+      "params": [],
+      "result": {
+        "name": "healthResult",
+        "description": "Server health status information",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["healthy", "degraded", "unhealthy"],
+              "description": "Overall server health status"
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO timestamp of health check"
+            },
+            "uptime": {
+              "type": "number",
+              "description": "Server uptime in seconds"
+            }
+          },
+          "required": ["status", "timestamp"]
+        }
+      },
+      "examples": [
+        {
+          "name": "Basic health check",
+          "params": [],
+          "result": {
+            "status": "healthy",
+            "timestamp": "2024-01-15T10:30:00Z",
+            "uptime": 3600
+          }
+        }
+      ]
+    },
+    {
+      "name": "executeAIRequest",
+      "description": "Execute AI analysis request with system prompt protection. The system prompt is resolved server-side to protect proprietary prompts.",
+      "params": [
+        {
+          "name": "content",
+          "description": "Code or text content to analyze",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100000
+          },
+          "required": true
+        },
+        {
+          "name": "systemPrompt",
+          "description": "System prompt identifier (e.g., 'security_review', 'code_quality', 'architecture_review')",
+          "schema": {
+            "type": "string",
+            "enum": ["security_review", "code_quality", "architecture_review"]
+          },
+          "required": true
+        },
+        {
+          "name": "aiOptions",
+          "description": "Optional AI provider configuration",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": ["anthropic", "openai", "google"],
+                "description": "AI provider to use"
+              },
+              "model": {
+                "type": "string",
+                "description": "Specific model name"
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Creativity setting (0-1)"
+              },
+              "maxTokens": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8192,
+                "description": "Maximum response tokens"
+              }
+            }
+          },
+          "required": false
+        }
+      ],
+      "result": {
+        "name": "aiAnalysisResult",
+        "description": "AI analysis response",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "analysis": {
+              "type": "string",
+              "description": "AI analysis response text"
+            },
+            "provider": {
+              "type": "string",
+              "description": "AI provider used"
+            },
+            "model": {
+              "type": "string",
+              "description": "Specific model used"
+            },
+            "tokensUsed": {
+              "type": "integer",
+              "description": "Number of tokens consumed"
+            },
+            "processingTime": {
+              "type": "number",
+              "description": "Processing time in milliseconds"
+            }
+          },
+          "required": ["analysis"]
+        }
+      },
+      "examples": [
+        {
+          "name": "Security review example",
+          "params": [
+            "function add(a, b) { return a + b; }",
+            "security_review"
+          ],
+          "result": {
+            "analysis": "The function appears secure with no obvious vulnerabilities. It uses simple arithmetic operations without external dependencies or user input validation concerns.",
+            "provider": "anthropic",
+            "model": "claude-3-5-sonnet-20241022",
+            "tokensUsed": 45,
+            "processingTime": 1250
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeSession",
+      "description": "Create device session for progressive authentication",
+      "params": [
+        {
+          "name": "deviceId",
+          "description": "Unique device identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
+        },
+        {
+          "name": "deviceName",
+          "description": "Human-readable device name",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "sessionResult",
+        "description": "Session initialization result",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "description": "Session identifier"
+            },
+            "authLevel": {
+              "type": "string",
+              "enum": ["anonymous", "oauth", "pro"],
+              "description": "Current authentication level"
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Available features for this auth level"
+            }
+          },
+          "required": ["sessionId", "authLevel"]
+        }
+      }
+    },
+    {
+      "name": "listCustomFunctions",
+      "description": "List all available custom AI functions",
+      "params": [],
+      "result": {
+        "name": "functionsResult",
+        "description": "Available custom functions",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Function name"
+              },
+              "description": {
+                "type": "string",
+                "description": "Function description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Function category"
+              },
+              "parameters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "default": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "required": ["name", "description"]
+          }
+        }
+      }
+    },
+    {
+      "name": "analyzeCode",
+      "description": "Built-in function to analyze code for issues and improvements",
+      "params": [
+        {
+          "name": "content",
+          "description": "Code content to analyze",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
+        },
+        {
+          "name": "language",
+          "description": "Programming language",
+          "schema": {
+            "type": "string",
+            "enum": ["javascript", "typescript", "python", "java", "go", "rust", "php", "auto"]
+          },
+          "required": false
+        }
+      ],
+      "result": {
+        "name": "codeAnalysisResult",
+        "description": "Code analysis response",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "analysis": {
+              "type": "string",
+              "description": "Detailed code analysis"
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "severity": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "critical"]
+                  },
+                  "line": {
+                    "type": "integer"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "suggestions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["analysis"]
+        }
+      }
+    },
+    {
+      "name": "generateTests",
+      "description": "Built-in function to generate test cases for code",
+      "params": [
+        {
+          "name": "content",
+          "description": "Code content to generate tests for",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
+        },
+        {
+          "name": "framework",
+          "description": "Testing framework preference",
+          "schema": {
+            "type": "string",
+            "enum": ["vitest", "jest", "mocha", "pytest", "junit", "go-test", "auto"]
+          },
+          "required": false
+        }
+      ],
+      "result": {
+        "name": "testGenerationResult",
+        "description": "Generated test code",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "testCode": {
+              "type": "string",
+              "description": "Generated test code"
+            },
+            "framework": {
+              "type": "string",
+              "description": "Testing framework used"
+            },
+            "testCount": {
+              "type": "integer",
+              "description": "Number of test cases generated"
+            }
+          },
+          "required": ["testCode"]
+        }
+      }
+    },
+    {
+      "name": "securityReview",
+      "description": "Built-in function to review code for security vulnerabilities",
+      "params": [
+        {
+          "name": "content",
+          "description": "Code content to review for security issues",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "securityReviewResult",
+        "description": "Security analysis response",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "securityAnalysis": {
+              "type": "string",
+              "description": "Detailed security analysis"
+            },
+            "vulnerabilities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "severity": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "critical"]
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": ["injection", "authentication", "authorization", "cryptography", "input-validation", "business-logic"]
+                  },
+                  "line": {
+                    "type": "integer"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "remediation": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "riskLevel": {
+              "type": "string",
+              "enum": ["low", "medium", "high", "critical"]
+            }
+          },
+          "required": ["securityAnalysis"]
+        }
+      }
+    },
+    {
+      "name": "storeUserKey",
+      "description": "Store encrypted API key for user (BYOK - Bring Your Own Key)",
+      "params": [
+        {
+          "name": "userId",
+          "description": "User identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
+        },
+        {
+          "name": "provider",
+          "description": "AI provider name",
+          "schema": {
+            "type": "string",
+            "enum": ["anthropic", "openai", "google"]
+          },
+          "required": true
+        },
+        {
+          "name": "apiKey",
+          "description": "API key to store (encrypted server-side)",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "storeKeyResult",
+        "description": "Key storage result",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether key was stored successfully"
+            },
+            "keyId": {
+              "type": "string",
+              "description": "Identifier for the stored key"
+            }
+          },
+          "required": ["success"]
+        }
+      }
+    },
+    {
+      "name": "validateUserKey",
+      "description": "Validate user's stored API key by testing with provider",
+      "params": [
+        {
+          "name": "userId",
+          "description": "User identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
+        },
+        {
+          "name": "provider",
+          "description": "AI provider name",
+          "schema": {
+            "type": "string",
+            "enum": ["anthropic", "openai", "google"]
+          },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "validateKeyResult",
+        "description": "Key validation result",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "isValid": {
+              "type": "boolean",
+              "description": "Whether the API key is valid"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if validation failed"
+            },
+            "lastValidated": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp of validation"
+            }
+          },
+          "required": ["isValid"]
+        }
+      }
+    },
+    {
+      "name": "rpc.discover",
+      "description": "OpenRPC service discovery method - returns this OpenRPC schema",
+      "params": [],
+      "result": {
+        "name": "openrpcDocument",
+        "description": "The OpenRPC schema document for this service",
+        "schema": {
+          "type": "object",
+          "description": "Complete OpenRPC specification document"
+        }
+      },
+      "examples": [
+        {
+          "name": "Service discovery",
+          "params": [],
+          "result": {
+            "openrpc": "1.2.6",
+            "info": {
+              "title": "Simple RPC AI Backend",
+              "version": "0.1.0"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "JSON-RPC error code"
+          },
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "data": {
+            "description": "Additional error data"
+          }
+        },
+        "required": ["code", "message"]
+      },
+      "AIProvider": {
+        "type": "string",
+        "enum": ["anthropic", "openai", "google"],
+        "description": "Supported AI providers"
+      },
+      "AuthLevel": {
+        "type": "string",
+        "enum": ["anonymous", "oauth", "pro"],
+        "description": "Authentication levels"
+      }
+    }
+  }
+}

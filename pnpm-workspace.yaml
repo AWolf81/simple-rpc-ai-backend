@@ -1,0 +1,6 @@
+packages:
+  # Main package
+  - "."
+  # Example packages
+  - "examples/servers"
+  - "examples/extensions"

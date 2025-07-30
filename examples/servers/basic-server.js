@@ -19,7 +19,8 @@ console.log(`
 This example shows centralized AI key management.
 For BYOK (Bring Your Own Key) support, see ai-server-example.js
 
-Make sure to set: ANTHROPIC_API_KEY=your-key
+⚠️  REQUIRED: Set environment variable ANTHROPIC_API_KEY=your-key
+   Get your API key from: https://console.anthropic.com/
 `);
 
 // System prompts - keep these secure on your server!
@@ -92,9 +93,14 @@ Focus on high-level design improvements.
 // Create and start the server with service provider keys
 const server = createAIServer({
   mode: 'simple', // Service provider keys only
-  prompts,
+  systemPrompts: prompts,
   // Simple single provider (uses ANTHROPIC_API_KEY env var)
-  serviceProviders: ['anthropic'],
+  serviceProviders: process.env.ANTHROPIC_API_KEY ? {
+    anthropic: {
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      priority: 1
+    }
+  } : undefined, // No AI providers if no API key - will show helpful error
   requirePayment: {
     enabled: false // Allow free usage for prototyping
   },

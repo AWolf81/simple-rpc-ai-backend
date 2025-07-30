@@ -5,37 +5,28 @@
  * Using SQLite for development and testing - can be swapped for PostgreSQL/MySQL in production
  */
 
-import { Database } from 'sqlite3';
-import { promisify } from 'util';
+import Database from 'better-sqlite3';
 import { DatabaseAdapter, User, UserDevice } from '../auth/user-manager.js';
 import { KeyStorageAdapter, UserKey } from '../auth/key-manager.js';
 
 export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
-  private db: Database;
-  private dbRun: (sql: string, params?: any[]) => Promise<any>;
-  private dbGet: (sql: string, params?: any[]) => Promise<any>;
-  private dbAll: (sql: string, params?: any[]) => Promise<any[]>;
+  private db: Database.Database;
 
   constructor(databasePath: string = ':memory:') {
     this.db = new Database(databasePath);
-    
-    // Promisify database methods
-    this.dbRun = promisify(this.db.run.bind(this.db));
-    this.dbGet = promisify(this.db.get.bind(this.db));
-    this.dbAll = promisify(this.db.all.bind(this.db));
   }
 
   /**
    * Initialize database schema
    */
   async initialize(): Promise<void> {
-    await this.createTables();
-    await this.createIndexes();
+    this.createTables();
+    this.createIndexes();
   }
 
-  private async createTables(): Promise<void> {
+  private createTables(): void {
     // Users table
-    await this.dbRun(`
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
         is_anonymous BOOLEAN DEFAULT 1,
@@ -50,7 +41,7 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
     `);
 
     // User devices table
-    await this.dbRun(`
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS user_devices (
         device_id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -64,7 +55,7 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
     `);
 
     // User API keys table
-    await this.dbRun(`
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS user_keys (
         user_id TEXT NOT NULL,
         provider TEXT NOT NULL,
@@ -80,7 +71,7 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
     `);
 
     // Passkey credentials table (for future use)
-    await this.dbRun(`
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS passkey_credentials (
         credential_id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -94,12 +85,12 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
     `);
   }
 
-  private async createIndexes(): Promise<void> {
-    await this.dbRun('CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id)');
-    await this.dbRun('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
-    await this.dbRun('CREATE INDEX IF NOT EXISTS idx_devices_user ON user_devices(user_id, is_active)');
-    await this.dbRun('CREATE INDEX IF NOT EXISTS idx_keys_user ON user_keys(user_id)');
-    await this.dbRun('CREATE INDEX IF NOT EXISTS idx_passkey_user ON passkey_credentials(user_id)');
+  private createIndexes(): void {
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id)');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_devices_user ON user_devices(user_id, is_active)');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_keys_user ON user_keys(user_id)');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_passkey_user ON passkey_credentials(user_id)');
   }
 
   // User operations
@@ -116,11 +107,12 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
       updatedAt: userData.updatedAt ?? new Date()
     };
 
-    await this.dbRun(`
+    const stmt = this.db.prepare(`
       INSERT INTO users (
         user_id, is_anonymous, oauth_provider, oauth_id, email, plan, features, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
+    `);
+    stmt.run(
       user.userId,
       user.isAnonymous ? 1 : 0,
       user.oauthProvider,
@@ -130,21 +122,20 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
       JSON.stringify(user.features),
       user.createdAt.toISOString(),
       user.updatedAt.toISOString()
-    ]);
+    );
 
     return user;
   }
 
   async findUserById(userId: string): Promise<User | null> {
-    const row = await this.dbGet('SELECT * FROM users WHERE user_id = ?', [userId]);
+    const stmt = this.db.prepare('SELECT * FROM users WHERE user_id = ?');
+    const row = stmt.get(userId);
     return row ? this.mapRowToUser(row) : null;
   }
 
   async findUserByOAuth(provider: string, oauthId: string): Promise<User | null> {
-    const row = await this.dbGet(
-      'SELECT * FROM users WHERE oauth_provider = ? AND oauth_id = ?',
-      [provider, oauthId]
-    );
+    const stmt = this.db.prepare('SELECT * FROM users WHERE oauth_provider = ? AND oauth_id = ?');
+    const row = stmt.get(provider, oauthId);
     return row ? this.mapRowToUser(row) : null;
   }
 
@@ -181,10 +172,8 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
     values.push(new Date().toISOString());
     values.push(userId);
 
-    await this.dbRun(
-      `UPDATE users SET ${setParts.join(', ')} WHERE user_id = ?`,
-      values
-    );
+    const stmt = this.db.prepare(`UPDATE users SET ${setParts.join(', ')} WHERE user_id = ?`);
+    stmt.run(...values);
 
     const updatedUser = await this.findUserById(userId);
     if (!updatedUser) {
@@ -206,11 +195,12 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
       createdAt: deviceData.createdAt ?? new Date()
     };
 
-    await this.dbRun(`
+    const stmt = this.db.prepare(`
       INSERT INTO user_devices (
         device_id, user_id, device_name, device_fingerprint, is_active, last_seen, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [
+    `);
+    stmt.run(
       device.deviceId,
       device.userId,
       device.deviceName,
@@ -218,21 +208,20 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
       device.isActive ? 1 : 0,
       device.lastSeen.toISOString(),
       device.createdAt.toISOString()
-    ]);
+    );
 
     return device;
   }
 
   async findDeviceById(deviceId: string): Promise<UserDevice | null> {
-    const row = await this.dbGet('SELECT * FROM user_devices WHERE device_id = ?', [deviceId]);
+    const stmt = this.db.prepare('SELECT * FROM user_devices WHERE device_id = ?');
+    const row = stmt.get(deviceId);
     return row ? this.mapRowToDevice(row) : null;
   }
 
   async findUserDevices(userId: string): Promise<UserDevice[]> {
-    const rows = await this.dbAll(
-      'SELECT * FROM user_devices WHERE user_id = ? ORDER BY last_seen DESC',
-      [userId]
-    );
+    const stmt = this.db.prepare('SELECT * FROM user_devices WHERE user_id = ? ORDER BY last_seen DESC');
+    const rows = stmt.all(userId);
     return rows.map(row => this.mapRowToDevice(row));
   }
 
@@ -255,10 +244,8 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
 
     values.push(deviceId);
 
-    await this.dbRun(
-      `UPDATE user_devices SET ${setParts.join(', ')} WHERE device_id = ?`,
-      values
-    );
+    const stmt = this.db.prepare(`UPDATE user_devices SET ${setParts.join(', ')} WHERE device_id = ?`);
+    stmt.run(...values);
 
     const updatedDevice = await this.findDeviceById(deviceId);
     if (!updatedDevice) {
@@ -270,11 +257,12 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
 
   // Key storage operations
   async storeKey(keyData: UserKey): Promise<void> {
-    await this.dbRun(`
+    const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO user_keys (
         user_id, provider, encrypted_api_key, nonce, is_valid, last_validated, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
+    `);
+    stmt.run(
       keyData.userId,
       keyData.provider,
       keyData.encryptedApiKey,
@@ -283,22 +271,18 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
       keyData.lastValidated?.toISOString(),
       keyData.createdAt.toISOString(),
       keyData.updatedAt.toISOString()
-    ]);
+    );
   }
 
   async getKey(userId: string, provider: string): Promise<UserKey | null> {
-    const row = await this.dbGet(
-      'SELECT * FROM user_keys WHERE user_id = ? AND provider = ?',
-      [userId, provider]
-    );
+    const stmt = this.db.prepare('SELECT * FROM user_keys WHERE user_id = ? AND provider = ?');
+    const row = stmt.get(userId, provider);
     return row ? this.mapRowToKey(row) : null;
   }
 
   async getUserKeys(userId: string): Promise<UserKey[]> {
-    const rows = await this.dbAll(
-      'SELECT * FROM user_keys WHERE user_id = ? ORDER BY updated_at DESC',
-      [userId]
-    );
+    const stmt = this.db.prepare('SELECT * FROM user_keys WHERE user_id = ? ORDER BY updated_at DESC');
+    const rows = stmt.all(userId);
     return rows.map(row => this.mapRowToKey(row));
   }
 
@@ -327,10 +311,8 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
     values.push(new Date().toISOString());
     values.push(userId, provider);
 
-    await this.dbRun(
-      `UPDATE user_keys SET ${setParts.join(', ')} WHERE user_id = ? AND provider = ?`,
-      values
-    );
+    const stmt = this.db.prepare(`UPDATE user_keys SET ${setParts.join(', ')} WHERE user_id = ? AND provider = ?`);
+    stmt.run(...values);
 
     const updatedKey = await this.getKey(userId, provider);
     if (!updatedKey) {
@@ -341,10 +323,8 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
   }
 
   async deleteKey(userId: string, provider: string): Promise<void> {
-    await this.dbRun(
-      'DELETE FROM user_keys WHERE user_id = ? AND provider = ?',
-      [userId, provider]
-    );
+    const stmt = this.db.prepare('DELETE FROM user_keys WHERE user_id = ? AND provider = ?');
+    stmt.run(userId, provider);
   }
 
   // Helper methods for mapping database rows to objects
@@ -391,11 +371,6 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
    * Close database connection
    */
   async close(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db.close((err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    this.db.close();
   }
 }

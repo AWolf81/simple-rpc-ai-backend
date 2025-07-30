@@ -9,6 +9,9 @@ export { UserManager } from './user-manager.js';
 export { SimpleKeyManager } from './key-manager.js';
 export { AuthManager } from './auth-manager.js';
 
+// OAuth authentication (recommended secure approach)
+export { OAuthAuthManager } from './oauth-auth-manager.js';
+
 // Interfaces
 export type { 
   User, 
@@ -30,6 +33,14 @@ export type {
   PasskeyCredential,
   AuthUpgradeOptions
 } from './auth-manager.js';
+
+// Private key authentication types removed for security reasons
+// Use OAuth authentication instead
+
+export type {
+  OAuthSession,
+  OAuthConfig
+} from './oauth-auth-manager.js';
 
 // Database and validation
 export { SQLiteAdapter } from '../database/sqlite-adapter.js';

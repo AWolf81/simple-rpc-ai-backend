@@ -138,6 +138,8 @@ export class AIService {
       }
       // Sort by priority descending (higher first)
       this.providers.sort((a, b) => b.priority - a.priority);
+    } else {
+      throw new Error('No AI service providers configured. Please set ANTHROPIC_API_KEY environment variable or configure serviceProviders.');
     }
     this.config = config;
 

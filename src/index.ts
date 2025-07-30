@@ -9,7 +9,11 @@
 export { RPCClient } from './client.js';          // Basic JSON-RPC client (platform-agnostic)
 export { AIClient } from './client.js';           // Enhanced client with BYOK
 export { AIService } from './services/ai-service.js';      // Direct AI service usage
-export { createAIServer } from './server.js';     // Server factory
+export { createAIServer, createAIServerAsync } from './server.js';     // Server factories
+
+// Custom function system
+export { FunctionRegistry } from './services/function-registry.js';
+export { PromptManager, promptManager } from './services/prompt-manager.js';
 
 // Authentication system exports
 export {
@@ -41,8 +45,21 @@ export type {
 } from './auth/index.js';
 
 export type {
-  AIServerConfig
+  AIServerConfig,
+  AIServerAsyncConfig
 } from './server.js';
 
-// Default export - progressive server for new projects
+// Custom function types
+export type {
+  PromptTemplate,
+  PromptContext
+} from './services/prompt-manager.js';
+
+export type {
+  CustomFunctionDefinition,
+  CustomFunctionRequest,
+  CustomFunctionResult
+} from './services/function-registry.js';
+
+// Default export - progressive server for new projects (now async)
 export { createAIServer as default } from './server.js';

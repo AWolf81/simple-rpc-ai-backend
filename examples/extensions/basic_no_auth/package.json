@@ -1,18 +1,17 @@
 {
-  "name": "ai-backend-extension-example",
+  "name": "@simple-rpc-ai-backend/examples-extensions",
   "displayName": "AI Backend Extension Example",
   "description": "Example VS Code extension using simple-rpc-ai-backend",
   "version": "0.1.0",
+  "publisher": "simple-rpc-ai-backend",
+  "private": true,
   "engines": {
     "vscode": "^1.74.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "*"
-  ],
-  "main": "./vscode-extension.js",
+  "main": "./out/vscode-extension.js",
   "contributes": {
     "commands": [
       {
@@ -117,17 +116,19 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "echo 'No compilation needed for JavaScript example'",
-    "watch": "echo 'No watch needed for JavaScript example'",
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
     "package": "vsce package",
-    "deploy": "vsce publish"
+    "deploy": "vsce publish",
+    "dev": "pnpm run watch"
   },
   "devDependencies": {
     "@types/vscode": "^1.74.0",
-    "@vscode/vsce": "^2.15.0"
+    "@vscode/vsce": "^2.15.0",
+    "typescript": "^5.0.0"
   },
   "dependencies": {
-    "simple-rpc-ai-backend": "file:../../"
+    "simple-rpc-ai-backend": "workspace:*"
   }
 }

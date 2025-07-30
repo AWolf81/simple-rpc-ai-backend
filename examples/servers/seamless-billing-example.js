@@ -6,7 +6,7 @@
  * Platform fees handled entirely in OpenSaaS
  */
 
-import { createProgressiveAIServer, SeamlessOpenSaaSIntegration } from '../dist/index.js';
+import { createAIServer, SeamlessOpenSaaSIntegration } from '../dist/index.js';
 
 // 🎯 SUPER SIMPLE: Just webhook URL + secret!
 const openSaasIntegration = new SeamlessOpenSaaSIntegration({
@@ -29,7 +29,7 @@ const openSaasIntegration = new SeamlessOpenSaaSIntegration({
 });
 
 // Create server with seamless billing
-const server = createProgressiveAIServer({
+const server = createAIServer({
   port: 8000,
   
   database: {

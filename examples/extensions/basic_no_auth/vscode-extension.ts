@@ -6,10 +6,10 @@
  */
 
 import * as vscode from 'vscode';
-import { AIClient, DeviceInfo } from '../../dist/index.js';
+import { RPCClient, AIClient, DeviceInfo } from 'simple-rpc-ai-backend';
 
 export class CodeReviewAIExtension {
-  private client: AIClient;
+  private client: AIClient | RPCClient;
   private context: vscode.ExtensionContext;
 
   constructor(context: vscode.ExtensionContext) {
@@ -41,22 +41,39 @@ export class CodeReviewAIExtension {
    */
   private async initialize() {
     try {
-      // Initialize session (anonymous or existing)
-      await this.client.initialize();
-      
-      const session = this.client.getSession();
-      console.log(`🔐 Code Review AI initialized (${session?.authLevel})`);
+      // Try to initialize with authentication first
+      if (this.client instanceof AIClient) {
+        await this.client.initialize();
+        
+        const session = this.client.getSession();
+        console.log(`🔐 Code Review AI initialized (${session?.authLevel})`);
 
-      // Check if user has valid API keys
-      const providers = await this.client.getConfiguredProviders();
-      if (providers.length === 0) {
-        this.showApiKeySetupPrompt();
+        // Check if user has valid API keys
+        const providers = await this.client.getConfiguredProviders();
+        if (providers.length === 0) {
+          this.showApiKeySetupPrompt();
+        } else {
+          this.showReadyMessage();
+        }
       } else {
+        // Simple client - just show ready message
+        console.log(`🔐 Code Review AI initialized (simple mode)`);
         this.showReadyMessage();
       }
 
     } catch (error: any) {
-      vscode.window.showErrorMessage(`Failed to initialize Code Review AI: ${error.message}`);
+      // If authentication fails, fall back to simple mode
+      if (error.message.includes('Authentication manager not initialized') || 
+          error.message.includes('status code 500')) {
+        console.log('🔄 Falling back to simple client mode...');
+        
+        // Replace with simple client
+        this.client = new RPCClient(this.getBackendUrl());
+        console.log(`🔐 Code Review AI initialized (simple mode - no auth)`);
+        this.showReadyMessage();
+      } else {
+        vscode.window.showErrorMessage(`Failed to initialize Code Review AI: ${error.message}`);
+      }
     }
   }
 
@@ -81,22 +98,30 @@ export class CodeReviewAIExtension {
    * Show ready message for existing users
    */
   private async showReadyMessage() {
-    const authStatus = await this.client.getAuthStatus();
-    
-    if (authStatus.authLevel === 'anonymous') {
-      // Suggest OAuth upgrade after some usage
-      setTimeout(() => this.suggestMultiDeviceUpgrade(), 60000); // After 1 minute
-    }
+    if (this.client instanceof AIClient) {
+      const authStatus = await this.client.getAuthStatus();
+      
+      if (authStatus.authLevel === 'anonymous') {
+        // Suggest OAuth upgrade after some usage
+        setTimeout(() => this.suggestMultiDeviceUpgrade(), 60000); // After 1 minute
+      }
 
-    vscode.window.showInformationMessage(
-      `🔍 Code Review AI ready! ${authStatus.deviceCount} device(s) connected.`
-    );
+      vscode.window.showInformationMessage(
+        `🔍 Code Review AI ready! ${authStatus.deviceCount} device(s) connected.`
+      );
+    } else {
+      vscode.window.showInformationMessage(
+        `🔍 Code Review AI ready! (Simple mode - no authentication)`
+      );
+    }
   }
 
   /**
    * Suggest multi-device upgrade for anonymous users
    */
   private async suggestMultiDeviceUpgrade() {
+    if (!(this.client instanceof AIClient)) return;
+    
     const upgrade = await this.client.checkUpgradePrompt('multi_device');
     if (!upgrade) return;
 
@@ -126,7 +151,9 @@ export class CodeReviewAIExtension {
       );
 
       if (session) {
-        await this.client.upgradeToOAuth(provider);
+        if (this.client instanceof AIClient) {
+          await this.client.upgradeToOAuth(provider);
+        }
         
         vscode.window.showInformationMessage(
           `✅ Successfully signed in with ${provider}! Your settings will now sync across devices.`
@@ -212,12 +239,16 @@ export class CodeReviewAIExtension {
     const code = customCode || editor.document.getText();
 
     try {
-      // Check if user has valid keys
-      const providers = await this.client.getConfiguredProviders();
-      if (providers.length === 0) {
-        this.showApiKeySetupPrompt();
-        return;
+      // Skip API key check for simple client - server handles keys
+      // Only check for AIClient (BYOK mode)
+      if (this.client instanceof AIClient) {
+        const providers = await this.client.getConfiguredProviders();
+        if (providers.length === 0) {
+          this.showApiKeySetupPrompt();
+          return;
+        }
       }
+      // For RPCClient (simple mode), continue directly - server has the keys
 
       // Show progress
       await vscode.window.withProgress({
@@ -227,22 +258,53 @@ export class CodeReviewAIExtension {
       }, async (progress) => {
         progress.report({ increment: 0, message: 'Analyzing code with AI...' });
 
-        const result = await this.client.executeAIRequest(
-          code,
-          `Perform ${analysisType} analysis on this code`,
-          { 
-            fileName: editor.document.fileName,
-            analysisType 
-          }
-        );
+        // Execute AI request - handle both client types
+        let response;
+        if (this.client instanceof AIClient) {
+          response = await this.client.executeAIRequest(
+            code,
+            `Perform ${analysisType} analysis on this code`,
+            { 
+              fileName: editor.document.fileName,
+              analysisType 
+            }
+          );
+        } else {
+          // Simple RPC client - call directly
+          const requestParams = {
+            content: code,
+            systemPrompt: this.getSystemPromptForAnalysis(analysisType),
+            metadata: {
+              fileName: editor.document.fileName,
+              analysisType 
+            }
+          };
+          
+          console.log('🔍 Sending AI request:', {
+            method: 'executeAIRequest',
+            contentLength: code.length,
+            systemPrompt: requestParams.systemPrompt,
+            fileName: requestParams.metadata.fileName
+          });
+          
+          response = await this.client.request('executeAIRequest', requestParams);
+          console.log('✅ AI request successful:', response);
+        }
 
         progress.report({ increment: 100, message: 'Review complete!' });
 
         // Show result in output panel and as diagnostics
-        this.showReviewResult(result, title);
+        this.showReviewResult(response, title);
       });
 
     } catch (error: any) {
+      console.error('❌ AI request failed:', {
+        error: error.message,
+        stack: error.stack,
+        code: error.code,
+        response: error.response?.data
+      });
+      
       if (error.message.includes('No valid API keys')) {
         this.showApiKeySetupPrompt();
       } else {
@@ -254,20 +316,20 @@ export class CodeReviewAIExtension {
   /**
    * Show review result in output panel and create diagnostics
    */
-  private async showReviewResult(result: any, reviewType: string) {
+  private async showReviewResult(response: any, reviewType: string) {
     // Show in output panel
     const outputChannel = vscode.window.createOutputChannel(`Code Review AI - ${reviewType}`);
     outputChannel.clear();
     outputChannel.appendLine(`${reviewType} Results:`);
     outputChannel.appendLine('='.repeat(50));
-    outputChannel.appendLine(result.analysis);
+    outputChannel.appendLine(response.result);
     outputChannel.appendLine('\n' + '='.repeat(50));
-    outputChannel.appendLine(`Analysis completed in ${result.metadata.processingTime}ms`);
-    outputChannel.appendLine(`Model: ${result.metadata.model} (${result.metadata.provider})`);
+    outputChannel.appendLine(`Analysis completed in ${response.metadata.processingTime}ms`);
+    outputChannel.appendLine(`Model: ${response.metadata.model} (${response.metadata.provider})`);
     outputChannel.show();
 
     // Try to parse structured feedback and create diagnostics
-    this.createDiagnosticsFromReview(result.analysis);
+    this.createDiagnosticsFromReview(response.result);
 
     // Show summary notification
     vscode.window.showInformationMessage(
@@ -340,7 +402,9 @@ export class CodeReviewAIExtension {
    */
   async storeApiKey(provider: string, apiKey: string) {
     try {
-      await this.client.storeApiKey(provider, apiKey);
+      if (this.client instanceof AIClient) {
+        await this.client.storeApiKey(provider, apiKey);
+      }
       vscode.window.showInformationMessage(`✅ ${provider} API key stored successfully`);
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to store API key: ${error.message}`);
@@ -362,17 +426,26 @@ export class CodeReviewAIExtension {
     return config.get('backendUrl') || 'http://localhost:8000';
   }
 
+  private getSystemPromptForAnalysis(analysisType: string): string {
+    switch (analysisType) {
+      case 'security': return 'security_review';
+      case 'quality': return 'code_quality';
+      case 'performance': return 'architecture_review';
+      default: return 'security_review';
+    }
+  }
+
   /**
    * Detect and display server type
    */
   async detectServer() {
     try {
       const response = await fetch(`${this.getBackendUrl()}/config`);
-      const config = await response.json();
+      const config: any = await response.json();
       
       const serverType = config.features?.byok ? 'BYOK Server' : 'Basic Server';
       const features = Object.entries(config.features || {})
-        .filter(([key, value]) => value)
+        .filter(([, value]) => value)
         .map(([key]) => key)
         .join(', ');
       
@@ -392,8 +465,8 @@ export class CodeReviewAIExtension {
       const healthResponse = await fetch(`${this.getBackendUrl()}/health`);
       const configResponse = await fetch(`${this.getBackendUrl()}/config`);
       
-      const health = await healthResponse.json();
-      const config = await configResponse.json();
+      const health: any = await healthResponse.json();
+      const config: any = await configResponse.json();
       
       const serverType = config.features?.byok ? 'BYOK Server' : 'Basic Server';
       

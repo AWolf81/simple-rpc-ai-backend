@@ -1,0 +1,41 @@
+{
+  "name": "simple-oauth-test",
+  "displayName": "Simple OAuth Test",
+  "description": "Test OAuth authentication with AI backend",
+  "version": "0.0.1",
+  "engines": { "vscode": "^1.74.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/simple-oauth-extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.authenticate",
+        "title": "🔐 Authenticate with GitHub",
+        "category": "OAuth Test"
+      },
+      {
+        "command": "extension.aiChat",
+        "title": "🤖 Ask AI Assistant",
+        "category": "OAuth Test"
+      },
+      {
+        "command": "extension.signOut",
+        "title": "🚪 Sign Out",
+        "category": "OAuth Test"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "^18.0.0", 
+    "typescript": "^5.0.0"
+  }
+}

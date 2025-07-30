@@ -15,6 +15,12 @@ export interface AuthSession {
   isValid: boolean;
   expiresAt?: Date;
   lastActivity: Date;
+  
+  // Extension authentication fields
+  extensionId?: string;
+  extensionVersion?: string;
+  jwtToken?: string;
+  tokenExpiresAt?: Date;
 }
 
 export interface OAuthProvider {

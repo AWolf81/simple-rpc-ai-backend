@@ -604,12 +604,171 @@ const result = await client.request('executeAIRequest', {
 - Reusable, tested infrastructure
 - Focus innovation on features, not plumbing
 
+## 🧪 **Testing with curl Examples**
+
+### Basic Server (Port 8000)
+
+Start the basic server:
+```bash
+node examples/servers/basic-server.js
+```
+
+Test with these curl commands:
+
+```bash
+# Health check
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "health", "id": 1}'
+
+# Execute AI request with system prompt
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "executeAIRequest", "params": {"content": "function add(a, b) { return a + b; }", "systemPrompt": "security_review"}, "id": 1}'
+
+# Code quality review
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "executeAIRequest", "params": {"content": "const users = data.filter(u => u.active);", "systemPrompt": "code_quality"}, "id": 2}'
+
+# Architecture review
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "executeAIRequest", "params": {"content": "class UserService { constructor(db) { this.db = db; } async getUser(id) { return this.db.findById(id); } }", "systemPrompt": "architecture_review"}, "id": 3}'
+```
+
+### Custom Functions Server
+
+Start the custom functions server:
+```bash
+node examples/servers/custom-functions-example.js
+```
+
+Test built-in and custom functions:
+
+```bash
+# List all available functions
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "listCustomFunctions", "params": {}, "id": 1}'
+
+# Built-in: Analyze code
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "analyzeCode", "params": {"content": "function fibonacci(n) { if (n <= 1) return n; return fibonacci(n-1) + fibonacci(n-2); }", "language": "javascript"}, "id": 2}'
+
+# Built-in: Generate tests
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "generateTests", "params": {"content": "export function multiply(a, b) { return a * b; }", "framework": "vitest"}, "id": 3}'
+
+# Custom: Explain code for beginners
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "explainCode", "params": {"content": "const users = await fetch('/api/users').then(r => r.json());", "level": "beginner"}, "id": 4}'
+
+# Custom: Generate commit message
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "generateCommitMessage", "params": {"content": "+ function add(a, b) { return a + b; }\n+ export { add };", "format": "conventional"}, "id": 5}'
+
+# Built-in: Security review
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "securityReview", "params": {"content": "app.get('/user/:id', (req, res) => { const query = 'SELECT * FROM users WHERE id = ' + req.params.id; db.query(query, (err, result) => res.json(result)); });"}, "id": 6}'
+```
+
+## 📋 **Available JSON-RPC Methods**
+
+### Core Methods
+| Method | Description | Parameters |
+|--------|-------------|------------|
+| `health` | Check server health and status | None |
+| `executeAIRequest` | Execute AI request with system prompt | `content`, `systemPrompt` |
+
+### Authentication Methods
+| Method | Description | Parameters |
+|--------|-------------|------------|
+| `initializeSession` | Create device session for progressive auth | `deviceId`, `deviceName` |
+| `upgradeToOAuth` | Upgrade to OAuth authentication | `deviceId`, `provider`, `oauthToken` |
+| `linkDeviceWithCode` | Link device using generated code | `newDeviceId`, `code`, `deviceName` |
+| `generateDeviceLinkCode` | Generate code for device linking | `email` |
+| `upgradeToPro` | Upgrade to Pro subscription | `deviceId` |
+| `getAuthStatus` | Get current authentication status | `deviceId` |
+| `hasFeature` | Check if user has specific feature | `deviceId`, `feature` |
+| `invalidateSession` | Invalidate user session | `deviceId` |
+| `shouldSuggestUpgrade` | Check if auth upgrade should be suggested | `deviceId` |
+
+### Key Management Methods (BYOK)
+| Method | Description | Parameters |
+|--------|-------------|------------|
+| `storeUserKey` | Store encrypted API key for user | `userId`, `provider`, `apiKey` |
+| `getUserKey` | Retrieve user's API key | `userId`, `provider` |
+| `getUserProviders` | Get configured providers for user | `userId` |
+| `validateUserKey` | Validate user's API key | `userId`, `provider` |
+| `validateAllUserKeys` | Validate all user's API keys | `userId` |
+| `rotateUserKey` | Rotate user's API key | `userId`, `provider`, `newApiKey` |
+| `deleteUserKey` | Delete user's API key | `userId`, `provider` |
+
+### Custom Function Methods
+| Method | Description | Parameters |
+|--------|-------------|------------|
+| `listCustomFunctions` | List all available custom functions | None |
+| `getCustomFunction` | Get details of a specific custom function | `name` |
+
+### Built-in AI Functions
+| Method | Description | Parameters |
+|--------|-------------|------------|
+| `analyzeCode` | Analyze code for issues and improvements | `content`, `language` |
+| `generateTests` | Generate test cases for code | `content`, `framework` |
+| `securityReview` | Review code for security vulnerabilities | `content` |
+| `explainCode`* | Explain code in simple terms | `content`, `level` |
+| `generateCommitMessage`* | Generate git commit messages | `content`, `format` |
+
+*Custom functions (available when using custom-functions-example.js)
+
 ## 🏗️ **Examples in the Wild**
 
 Check out the `/examples` directory for:
 - **`basic-server.js`** - Complete backend server setup
-- **`vscode-extension.js`** - Full VS Code extension integration
+- **`custom-functions-example.js`** - Built-in and custom function demonstrations
+- **`vscode-extension.ts`** - Full VS Code extension integration
 - **Real-world prompts** - Security review, code quality, architecture analysis
+
+## 📖 **OpenRPC Documentation & Playground**
+
+This package provides a complete **OpenRPC** specification - the JSON-RPC equivalent of OpenAPI for REST APIs.
+
+### 🔍 Get the OpenRPC Schema
+
+```bash
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "rpc.discover", "id": 1}'
+```
+
+### 🎮 Interactive Playground
+
+1. **Copy the OpenRPC schema** from `openrpc.json` or the `rpc.discover` response
+2. **Open the OpenRPC Playground:** https://playground.open-rpc.org/
+3. **Paste your schema** into the editor
+4. **Test methods interactively** with live documentation and examples
+
+The playground provides:
+- ✅ **Interactive documentation** with live examples
+- ✅ **Method testing** - send real requests to your server
+- ✅ **Schema validation** - ensure your OpenRPC document is valid
+- ✅ **Code generation** - generate client code in multiple languages
+
+### 📋 OpenRPC Features
+
+- **Complete method documentation** with parameters, results, and examples
+- **JSON Schema validation** for all inputs and outputs  
+- **Service discovery** via the standard `rpc.discover` method
+- **Type safety** with detailed parameter and result schemas
+- **Error definitions** with standard JSON-RPC error codes
+
+Learn more: https://open-rpc.org/ | https://spec.open-rpc.org/
 
 ## 🤝 **Contributing**
 
