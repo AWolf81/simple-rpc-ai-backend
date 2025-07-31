@@ -750,9 +750,33 @@ function determineMode(config) {
     return 'simple';
 }
 async function handleAIRequest(params, keyManager, aiService) {
-    const { userId, content, systemPrompt, metadata = {} } = params;
-    if (!content || !systemPrompt) {
-        throw new Error('Missing required parameters: content, systemPrompt');
+    const { userId, content, systemPrompt, promptId, promptContext = {}, metadata = {} } = params;
+    // Debug logging
+    console.log('🔍 handleAIRequest Debug:');
+    console.log(`   Params keys: ${Object.keys(params).join(', ')}`);
+    console.log(`   Prompt ID: ${promptId || 'NONE'}`);
+    console.log(`   System Prompt: ${systemPrompt ? `"${systemPrompt.substring(0, 100)}..."` : 'NONE'}`);
+    console.log(`   Content: ${content ? `"${content.substring(0, 100)}..."` : 'MISSING'}`);
+    if (!content) {
+        throw new Error('Missing required parameter: content');
+    }
+    // Resolve system prompt: promptId takes precedence over direct systemPrompt
+    let resolvedSystemPrompt;
+    if (promptId) {
+        try {
+            resolvedSystemPrompt = promptManager.getPrompt(promptId, promptContext);
+            console.log(`🎯 Using managed prompt: ${promptId}`);
+        }
+        catch (error) {
+            throw new Error(`Failed to resolve prompt ID '${promptId}': ${error.message}`);
+        }
+    }
+    else if (systemPrompt) {
+        resolvedSystemPrompt = systemPrompt;
+        console.log('📝 Using direct system prompt');
+    }
+    else {
+        throw new Error('Either promptId or systemPrompt must be provided');
     }
     if (!aiService) {
         throw new Error('AI service not available. Please configure serviceProviders with valid API keys (e.g., set ANTHROPIC_API_KEY environment variable).');
@@ -774,7 +798,7 @@ async function handleAIRequest(params, keyManager, aiService) {
     console.log(`🤖 Processing AI request`);
     const result = await aiService.execute({
         content,
-        systemPrompt,
+        systemPrompt: resolvedSystemPrompt,
         metadata
     });
     const processingTime = Date.now() - startTime;

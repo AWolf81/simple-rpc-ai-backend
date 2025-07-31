@@ -949,10 +949,34 @@ async function handleAIRequest(
   keyManager: SimpleKeyManager | null,
   aiService: AIService
 ): Promise<any> {
-  const { userId, content, systemPrompt, metadata = {} } = params;
+  const { userId, content, systemPrompt, promptId, promptContext = {}, metadata = {} } = params;
 
-  if (!content || !systemPrompt) {
-    throw new Error('Missing required parameters: content, systemPrompt');
+  // Debug logging
+  console.log('🔍 handleAIRequest Debug:');
+  console.log(`   Params keys: ${Object.keys(params).join(', ')}`);
+  console.log(`   Prompt ID: ${promptId || 'NONE'}`);
+  console.log(`   System Prompt: ${systemPrompt ? `"${systemPrompt.substring(0, 100)}..."` : 'NONE'}`);
+  console.log(`   Content: ${content ? `"${content.substring(0, 100)}..."` : 'MISSING'}`);
+
+  if (!content) {
+    throw new Error('Missing required parameter: content');
+  }
+
+  // Resolve system prompt: promptId takes precedence over direct systemPrompt
+  let resolvedSystemPrompt: string;
+  
+  if (promptId) {
+    try {
+      resolvedSystemPrompt = promptManager.getPrompt(promptId, promptContext);
+      console.log(`🎯 Using managed prompt: ${promptId}`);
+    } catch (error: any) {
+      throw new Error(`Failed to resolve prompt ID '${promptId}': ${error.message}`);
+    }
+  } else if (systemPrompt) {
+    resolvedSystemPrompt = systemPrompt;
+    console.log('📝 Using direct system prompt');
+  } else {
+    throw new Error('Either promptId or systemPrompt must be provided');
   }
 
   if (!aiService) {
@@ -977,7 +1001,7 @@ async function handleAIRequest(
 
   const result = await aiService.execute({
     content,
-    systemPrompt,
+    systemPrompt: resolvedSystemPrompt,
     metadata
   });
 

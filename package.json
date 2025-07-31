@@ -18,6 +18,7 @@
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
+    "test:integration": "node test/integration/index.js",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist coverage",
     "lint": "eslint src/**/*.ts",

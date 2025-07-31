@@ -152,6 +152,12 @@ export class AIService {
   async execute(request: ExecuteRequest): Promise<ExecuteResult> {
     const { content, systemPrompt, metadata = {}, options = {} } = request;
 
+    // Debug logging
+    console.log('🔍 AI Execute Debug:');
+    console.log(`   System Prompt: ${systemPrompt ? `"${systemPrompt.substring(0, 100)}..."` : 'MISSING'}`);
+    console.log(`   User Content: ${content ? `"${content.substring(0, 100)}..."` : 'MISSING'}`);
+    console.log(`   Provider: ${this.config.provider}`);
+
     // Get the AI model provider
     const model = this.getModel(options.model) as Parameters<typeof generateText>[0]['model'];
     
