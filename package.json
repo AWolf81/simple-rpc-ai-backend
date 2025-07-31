@@ -12,6 +12,7 @@
     "./ai": "./dist/ai-service.js"
   },
   "scripts": {
+    "postinstall": "tsc",
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest",
