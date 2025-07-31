@@ -1,10 +1,20 @@
 import express from 'express';
-import type { Express } from 'express';
+import type { Express, Request } from 'express';
 import type { Server } from 'http';
 
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+
+// Interface for Request with rate limiting properties
+interface RateLimitedRequest extends Request {
+  rateLimit?: {
+    limit: number;
+    used: number;
+    remaining: number;
+    resetTime: number;
+  };
+}
 import { 
   UserManager, 
   SimpleKeyManager, 
@@ -188,11 +198,12 @@ export function createAIServer(config: AIServerConfig): {
       return req.ip || req.connection.remoteAddress || 'unknown';
     },
     handler: (req, res) => {
+      const rateLimitedReq = req as RateLimitedRequest;
       res.status(429).json({
         error: { 
           code: -32003, 
           message: 'Too many requests from this IP, please try again later.',
-          data: { retryAfter: Math.ceil(req.rateLimit.resetTime / 1000) }
+          data: { retryAfter: Math.ceil((rateLimitedReq.rateLimit?.resetTime ?? Date.now()) / 1000) }
         }
       });
     },
@@ -208,10 +219,11 @@ export function createAIServer(config: AIServerConfig): {
     max: 10, // Limit auth attempts
     keyGenerator: (req) => req.ip || req.connection.remoteAddress || 'unknown',
     handler: (req, res) => {
+      const rateLimitedReq = req as RateLimitedRequest;
       res.status(429).json({
         success: false,
         error: 'Too many authentication attempts from this IP, please try again later.',
-        retryAfter: Math.ceil(req.rateLimit.resetTime / 1000)
+        retryAfter: Math.ceil((rateLimitedReq.rateLimit?.resetTime ?? Date.now()) / 1000)
       });
     },
     standardHeaders: true,

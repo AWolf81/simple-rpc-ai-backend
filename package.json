@@ -12,7 +12,6 @@
     "./ai": "./dist/ai-service.js"
   },
   "scripts": {
-    "postinstall": "npm run build",
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest",
@@ -76,9 +75,7 @@
     "node": ">=18.0.0"
   },
   "files": [
-    "dist/**/*",
-    "src",
-    "tsconfig.json",      
+    "dist/**/*",    
     "README.md",
     "LICENSE"
   ],
