@@ -61,5 +61,65 @@ export type {
   CustomFunctionResult
 } from './services/function-registry.js';
 
+// OpenSaaS Monetization exports
+export { createMonetizedAIServer } from './monetization/opensaas-server.js';
+export {
+  createOpenSaaSConfig,
+  mergeOpenSaaSConfig,
+  validateOpenSaaSConfig,
+  EXAMPLE_CUSTOM_TIERS,
+  DEFAULT_OPENSAAS_CONFIG
+} from './monetization/opensaas-config.js';
+
+// JWT Authentication middleware
+export {
+  JWTMiddleware,
+  DEFAULT_TIER_CONFIGS,
+  getTierConfig,
+  mergeWithDefaultTiers
+} from './auth/jwt-middleware.js';
+
+// Rate limiting
+export { RateLimiter, DEFAULT_TIER_LIMITS } from './middleware/rate-limiter.js';
+
+// Usage tracking and billing
+export { UsageTracker, PROVIDER_PRICING } from './billing/usage-tracker.js';
+export { BillingEngine } from './billing/billing-engine.js';
+
+// Export monetization types
+export type {
+  OpenSaaSJWTPayload,
+  AuthenticatedRequest,
+  SubscriptionTierConfig,
+  JWTMiddlewareConfig
+} from './auth/jwt-middleware.js';
+
+export type {
+  RateLimits,
+  RateLimitConfig,
+  RateLimitResult
+} from './middleware/rate-limiter.js';
+
+export type {
+  UsageEvent,
+  UsageSummary,
+  QuotaStatus
+} from './billing/usage-tracker.js';
+
+export type {
+  BillingEvent,
+  BillingConfig,
+  SubscriptionInfo
+} from './billing/billing-engine.js';
+
+export type {
+  OpenSaaSMonetizationConfig,
+  MonetizedAIServerConfig
+} from './monetization/opensaas-config.js';
+
+export type {
+  MonetizedServerInstance
+} from './monetization/opensaas-server.js';
+
 // Default export - progressive server for new projects (now async)
 export { createAIServer as default } from './server.js';

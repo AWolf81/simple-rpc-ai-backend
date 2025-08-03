@@ -5,14 +5,74 @@
  * No private keys, no complex signatures - just standard OAuth!
  */
 
-import axios from 'axios';
 import * as vscode from 'vscode';
+import * as https from 'https';
+import * as http from 'http';
 
 export interface SimpleAuthConfig {
   serverUrl: string;
   extensionId: string;
   authProvider: 'github' | 'microsoft'; // VS Code has built-in support for these
   scopes: string[];
+}
+
+/**
+ * Make HTTP request using Node.js built-in modules
+ */
+function makeHttpRequest(url: string, data: any = null, headers: Record<string, string> = {}, method: string = 'POST'): Promise<any> {
+  return new Promise((resolve, reject) => {
+    console.log(`🚀 Making HTTP request to: ${url}`);
+    const urlObj = new URL(url);
+    const postData = JSON.stringify(data);
+    
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+      path: urlObj.pathname,
+      method: method,
+      headers: {
+        ...(data ? {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        } : {}),
+        ...headers
+      }
+    };
+
+    const httpModule = urlObj.protocol === 'https:' ? https : http;
+    
+    const req = httpModule.request(options, (res) => {
+      let responseData = '';
+      
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      
+      res.on('end', () => {
+        try {
+          const parsedData = JSON.parse(responseData);
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({ data: parsedData, status: res.statusCode });
+          } else {
+            console.error(`❌ HTTP Error ${res.statusCode}:`, responseData);
+            reject(new Error(`Request failed with status code ${res.statusCode}: ${responseData}`));
+          }
+        } catch (error) {
+          reject(new Error(`Invalid JSON response: ${responseData}`));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('🔥 HTTP Request Error:', error);
+      reject(error);
+    });
+
+    if (data) {
+      req.write(postData);
+    }
+    req.end();
+  });
 }
 
 export class SimpleOAuthClient {
@@ -25,11 +85,32 @@ export class SimpleOAuthClient {
   }
 
   /**
+   * Test server connectivity
+   */
+  async testServerConnection(): Promise<boolean> {
+    try {
+      console.log('🔍 Testing server connectivity...');
+      const response = await makeHttpRequest(`${this.config.serverUrl}/health`, null, {}, 'GET');
+      console.log('✅ Server connectivity test passed:', response.data);
+      return true;
+    } catch (error) {
+      console.error('❌ Server connectivity test failed:', error);
+      return false;
+    }
+  }
+
+  /**
    * Authenticate using VS Code's built-in OAuth providers
    * On first use, opens browser for OAuth flow
    */
   async authenticate(): Promise<void> {
     try {
+      // First test server connectivity
+      const serverReachable = await this.testServerConnection();
+      if (!serverReachable) {
+        throw new Error('Cannot connect to server at ' + this.config.serverUrl);
+      }
+
       console.log(`🔄 Starting OAuth authentication with ${this.config.authProvider}...`);
 
       // Step 1: Get OAuth session from VS Code
@@ -49,8 +130,14 @@ export class SimpleOAuthClient {
       const deviceId = this.generateDeviceId();
       
       console.log(`🔄 Sending OAuth token to server (token: ${this.oauthSession.accessToken.substring(0, 10)}...)`);
+      console.log(`🌐 Server URL: ${this.config.serverUrl}/auth/oauth`);
+      console.log(`📦 Request payload:`, {
+        extensionId: this.config.extensionId,
+        provider: this.config.authProvider,
+        deviceId
+      });
       
-      const response = await axios.post(`${this.config.serverUrl}/auth/oauth`, {
+      const response = await makeHttpRequest(`${this.config.serverUrl}/auth/oauth`, {
         extensionId: this.config.extensionId,
         provider: this.config.authProvider,
         accessToken: this.oauthSession.accessToken,
@@ -97,16 +184,13 @@ export class SimpleOAuthClient {
     }
 
     try {
-      const response = await axios.post(`${this.config.serverUrl}/rpc`, {
+      const response = await makeHttpRequest(`${this.config.serverUrl}/rpc`, {
         jsonrpc: '2.0',
         id: Math.floor(Math.random() * 1000000),
         method,
         params
       }, {
-        headers: {
-          'Authorization': `Bearer ${this.serverSession}`,
-          'Content-Type': 'application/json'
-        }
+        'Authorization': `Bearer ${this.serverSession}`
       });
 
       if (response.data.error) {
@@ -116,7 +200,7 @@ export class SimpleOAuthClient {
       return response.data.result;
 
     } catch (error: any) {
-      if (error.response?.status === 401) {
+      if (error.message.includes('status code 401')) {
         console.warn('⚠️ Session expired. Re-authenticating...');
         
         // Clear sessions and retry
@@ -153,7 +237,7 @@ export class SimpleOAuthClient {
     try {
       // Invalidate server session
       if (this.serverSession) {
-        await axios.post(`${this.config.serverUrl}/auth/signout`, {
+        await makeHttpRequest(`${this.config.serverUrl}/auth/signout`, {
           sessionToken: this.serverSession
         });
       }
@@ -245,12 +329,12 @@ async function waitForAuthProvider(providerId: string, timeoutMs: number = 10000
 export function activate(context: vscode.ExtensionContext) {
   console.log('🚀 Activating simple OAuth extension...');
 
-  // Create OAuth client
+  // Create OAuth client with GitHub (Microsoft requires Azure AD app registration)
   const authClient = new SimpleOAuthClient({
     serverUrl: 'http://localhost:8000',
     extensionId: context.extension.id,
-    authProvider: 'github', // or 'microsoft'
-    scopes: ['read:user', 'user:email'] // GitHub scopes - read:user for basic profile
+    authProvider: 'github', // GitHub works out of the box
+    scopes: ['read:user', 'user:email'] // GitHub scopes
   });
 
   // Register authentication command
@@ -382,7 +466,7 @@ export function activate(context: vscode.ExtensionContext) {
       // Try to get existing session without prompting user
       const existingSession = await vscode.authentication.getSession(
         'github',
-        ['user:email'],
+        ['read:user', 'user:email'],
         { createIfNone: false, silent: true }
       );
       

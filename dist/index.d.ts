@@ -17,5 +17,17 @@ export type { User, UserDevice, OAuthData, UserKey, AuthSession, DeviceInfo, Aut
 export type { AIServerConfig, AIServerAsyncConfig } from './server.js';
 export type { PromptTemplate, PromptContext } from './services/prompt-manager.js';
 export type { CustomFunctionDefinition, CustomFunctionRequest, CustomFunctionResult } from './services/function-registry.js';
+export { createMonetizedAIServer } from './monetization/opensaas-server.js';
+export { createOpenSaaSConfig, mergeOpenSaaSConfig, validateOpenSaaSConfig, EXAMPLE_CUSTOM_TIERS, DEFAULT_OPENSAAS_CONFIG } from './monetization/opensaas-config.js';
+export { JWTMiddleware, DEFAULT_TIER_CONFIGS, getTierConfig, mergeWithDefaultTiers } from './auth/jwt-middleware.js';
+export { RateLimiter, DEFAULT_TIER_LIMITS } from './middleware/rate-limiter.js';
+export { UsageTracker, PROVIDER_PRICING } from './billing/usage-tracker.js';
+export { BillingEngine } from './billing/billing-engine.js';
+export type { OpenSaaSJWTPayload, AuthenticatedRequest, SubscriptionTierConfig, JWTMiddlewareConfig } from './auth/jwt-middleware.js';
+export type { RateLimits, RateLimitConfig, RateLimitResult } from './middleware/rate-limiter.js';
+export type { UsageEvent, UsageSummary, QuotaStatus } from './billing/usage-tracker.js';
+export type { BillingEvent, BillingConfig, SubscriptionInfo } from './billing/billing-engine.js';
+export type { OpenSaaSMonetizationConfig, MonetizedAIServerConfig } from './monetization/opensaas-config.js';
+export type { MonetizedServerInstance } from './monetization/opensaas-server.js';
 export { createAIServer as default } from './server.js';
 //# sourceMappingURL=index.d.ts.map

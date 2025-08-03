@@ -49,6 +49,7 @@ export interface AIServerConfig {
         requireVerifiedEmail?: boolean;
         sessionExpirationMs?: number;
     };
+    requireAuth?: boolean;
     systemPrompts?: {
         [promptId: string]: string | {
             content?: string;

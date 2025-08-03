@@ -294,6 +294,31 @@ export class SQLiteAdapter {
         };
     }
     /**
+     * Execute a SQL statement (for CREATE, INSERT, UPDATE, DELETE)
+     */
+    async execute(sql, params = []) {
+        const stmt = this.db.prepare(sql);
+        const result = stmt.run(...params);
+        return {
+            changes: result.changes,
+            lastInsertRowid: result.lastInsertRowid
+        };
+    }
+    /**
+     * Get a single row from a SQL query
+     */
+    async get(sql, params = []) {
+        const stmt = this.db.prepare(sql);
+        return stmt.get(...params);
+    }
+    /**
+     * Get all rows from a SQL query
+     */
+    async all(sql, params = []) {
+        const stmt = this.db.prepare(sql);
+        return stmt.all(...params);
+    }
+    /**
      * Close database connection
      */
     async close() {

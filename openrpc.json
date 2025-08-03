@@ -52,7 +52,6 @@
       "examples": [
         {
           "name": "Basic health check",
-          "params": [],
           "result": {
             "status": "healthy",
             "timestamp": "2024-01-15T10:30:00Z",
@@ -68,25 +67,26 @@
         {
           "name": "content",
           "description": "Code or text content to analyze",
+          "required": true,
           "schema": {
             "type": "string",
             "minLength": 1,
             "maxLength": 100000
-          },
-          "required": true
+          }
         },
         {
           "name": "systemPrompt",
           "description": "System prompt identifier (e.g., 'security_review', 'code_quality', 'architecture_review')",
+          "required": true,
           "schema": {
             "type": "string",
             "enum": ["security_review", "code_quality", "architecture_review"]
-          },
-          "required": true
+          }
         },
         {
           "name": "aiOptions",
           "description": "Optional AI provider configuration",
+          "required": false,
           "schema": {
             "type": "object",
             "properties": {
@@ -112,8 +112,7 @@
                 "description": "Maximum response tokens"
               }
             }
-          },
-          "required": false
+          }
         }
       ],
       "result": {
@@ -150,8 +149,14 @@
         {
           "name": "Security review example",
           "params": [
-            "function add(a, b) { return a + b; }",
-            "security_review"
+            {
+              "name": "content",
+              "value": "function add(a, b) { return a + b; }"
+            },
+            {
+              "name": "systemPrompt", 
+              "value": "security_review"
+            }
           ],
           "result": {
             "analysis": "The function appears secure with no obvious vulnerabilities. It uses simple arithmetic operations without external dependencies or user input validation concerns.",
@@ -170,20 +175,20 @@
         {
           "name": "deviceId",
           "description": "Unique device identifier",
+          "required": true,
           "schema": {
             "type": "string",
             "minLength": 1
-          },
-          "required": true
+          }
         },
         {
           "name": "deviceName",
           "description": "Human-readable device name",
+          "required": true,
           "schema": {
             "type": "string",
             "minLength": 1
-          },
-          "required": true
+          }
         }
       ],
       "result": {
@@ -264,7 +269,24 @@
             "required": ["name", "description"]
           }
         }
-      }
+      },
+      "examples": [
+        {
+          "name": "List available functions",
+          "result": [
+            {
+              "name": "analyzeCode",
+              "description": "Analyze code for issues and improvements",
+              "category": "code-analysis"
+            },
+            {
+              "name": "generateTests", 
+              "description": "Generate test cases for code",
+              "category": "testing"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "analyzeCode",
@@ -273,20 +295,20 @@
         {
           "name": "content",
           "description": "Code content to analyze",
+          "required": true,
           "schema": {
             "type": "string",
             "minLength": 1
-          },
-          "required": true
+          }
         },
         {
           "name": "language",
           "description": "Programming language",
+          "required": false,
           "schema": {
             "type": "string",
             "enum": ["javascript", "typescript", "python", "java", "go", "rust", "php", "auto"]
-          },
-          "required": false
+          }
         }
       ],
       "result": {
@@ -335,20 +357,20 @@
         {
           "name": "content",
           "description": "Code content to generate tests for",
+          "required": true,
           "schema": {
             "type": "string",
             "minLength": 1
-          },
-          "required": true
+          }
         },
         {
           "name": "framework",
           "description": "Testing framework preference",
+          "required": false,
           "schema": {
             "type": "string",
             "enum": ["vitest", "jest", "mocha", "pytest", "junit", "go-test", "auto"]
-          },
-          "required": false
+          }
         }
       ],
       "result": {
@@ -381,11 +403,11 @@
         {
           "name": "content",
           "description": "Code content to review for security issues",
+          "required": true,
           "schema": {
             "type": "string",
             "minLength": 1
-          },
-          "required": true
+          }
         }
       ],
       "result": {
@@ -439,29 +461,29 @@
         {
           "name": "userId",
           "description": "User identifier",
+          "required": true,
           "schema": {
             "type": "string",
             "minLength": 1
-          },
-          "required": true
+          }
         },
         {
           "name": "provider",
           "description": "AI provider name",
+          "required": true,
           "schema": {
             "type": "string",
             "enum": ["anthropic", "openai", "google"]
-          },
-          "required": true
+          }
         },
         {
           "name": "apiKey",
           "description": "API key to store (encrypted server-side)",
+          "required": true,
           "schema": {
             "type": "string",
             "minLength": 1
-          },
-          "required": true
+          }
         }
       ],
       "result": {
@@ -490,20 +512,20 @@
         {
           "name": "userId",
           "description": "User identifier",
+          "required": true,
           "schema": {
             "type": "string",
             "minLength": 1
-          },
-          "required": true
+          }
         },
         {
           "name": "provider",
           "description": "AI provider name",
+          "required": true,
           "schema": {
             "type": "string",
             "enum": ["anthropic", "openai", "google"]
-          },
-          "required": true
+          }
         }
       ],
       "result": {
@@ -545,7 +567,6 @@
       "examples": [
         {
           "name": "Service discovery",
-          "params": [],
           "result": {
             "openrpc": "1.2.6",
             "info": {

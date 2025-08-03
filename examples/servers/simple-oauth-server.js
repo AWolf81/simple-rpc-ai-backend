@@ -12,22 +12,60 @@ console.log('🚀 Starting Simple OAuth Server...');
 const serverConfig = {
   port: 8000,
   mode: 'simple', // Simple mode - no user key management needed for OAuth demo
+  requireAuth: true, // Require authentication for all AI requests
   
   // Simplified OAuth authentication (recommended approach)
   oauthAuth: {
-    allowedProviders: ['github'], // VS Code has built-in support
+    allowedProviders: ['github', 'microsoft'], // Support both providers
+    
+    // Access control mode - choose one:
+    accessMode: 'open',              // 'open' | 'allowlist' | 'development'
+    
+    // For development mode: Only these users can access
     allowedUsers: [
-      // Add your email addresses here to restrict access
-      // 'your-email@example.com',
-      // 'team-member@company.com'
+      // 'developer1@company.com',
+      // 'developer2@company.com'
     ],
+    
     allowedOrgs: [
       // Add GitHub organization names to restrict access
       // 'your-company',
       // 'your-team'
     ],
+    
     requireVerifiedEmail: true,
-    sessionExpirationMs: 24 * 60 * 60 * 1000 // 24 hours
+    sessionExpirationMs: 24 * 60 * 60 * 1000, // 24 hours
+    
+    // Admin security controls (runtime manageable)
+    blacklistedUsers: [
+      // Initial blocked users (can add more via RPC)
+      // 'spam@example.com'
+    ],
+    
+    rateLimiting: {
+      maxRequestsPerHour: 100,        // Max auth attempts per user per hour
+      maxSessionsPerUser: 5,          // Max concurrent sessions per user
+      autoBlacklistThreshold: 3       // Auto-blacklist after 3 violations
+    },
+    
+    persistUserManagement: true,      // Store user management in database
+    
+    // User limits for public beta launches
+    userLimits: {
+      maxUsers: 1000,              // Maximum 1000 total users (set to 0 to disable)
+      maxActiveUsers: 100,         // Maximum 100 concurrent active users (optional)
+      waitlistEnabled: true,       // Enable waiting list when limit reached
+      adminBypassLimits: true      // Allow admins to bypass user limits (default: true)
+    },
+    
+    // Role-based access control
+    superAdmins: [
+      // 'founder@company.com'         // Initial super admin (can create other admins)
+    ],
+    initialAdmins: [
+      // 'admin1@company.com',         // Initial admins (can manage users, not create admins)
+      // 'admin2@company.com'
+    ]
   },
 
   // AI service configuration
@@ -42,9 +80,9 @@ const serverConfig = {
 
   // No database needed in simple mode with OAuth
 
-  // CORS for local development
+  // CORS for local development - temporarily allow all origins for debugging
   cors: {
-    origin: ['vscode-webview://*', 'http://localhost:*'],
+    origin: true, // Allow all origins temporarily
     credentials: true
   }
 };
@@ -88,6 +126,11 @@ console.log('   • allowedUsers: email addresses that can authenticate');
 console.log('   • allowedOrgs: GitHub organizations for team access');
 console.log('   • requireVerifiedEmail: ensure users have verified emails');
 
+console.log('\n👥 User Limits (Public Beta):');
+console.log('   • maxUsers: Maximum total users allowed to register');
+console.log('   • waitlistEnabled: Add users to waitlist when limit reached');
+console.log('   • adminBypassLimits: Allow admins to bypass user limits');
+
 // Show configuration details
 const oauthConfig = serverConfig.oauthAuth;
 console.log('\n⚙️ Current OAuth Configuration:');
@@ -96,6 +139,16 @@ console.log(`   👥 User restrictions: ${oauthConfig.allowedUsers?.length ? oau
 console.log(`   🏢 Org restrictions: ${oauthConfig.allowedOrgs?.length ? oauthConfig.allowedOrgs.join(', ') : 'None'}`);
 console.log(`   📧 Require verified email: ${oauthConfig.requireVerifiedEmail ? 'Yes' : 'No'}`);
 console.log(`   ⏱️  Session duration: ${oauthConfig.sessionExpirationMs / (1000 * 60 * 60)} hours`);
+
+// Show user limits configuration
+const userLimits = oauthConfig.userLimits;
+if (userLimits?.maxUsers && userLimits.maxUsers > 0) {
+  console.log(`   👥 User limits: ${userLimits.maxUsers} max users`);
+  console.log(`   📝 Waitlist: ${userLimits.waitlistEnabled ? 'Enabled' : 'Disabled'}`);
+  console.log(`   👑 Admin bypass: ${userLimits.adminBypassLimits !== false ? 'Enabled' : 'Disabled'}`);
+} else {
+  console.log(`   👥 User limits: Disabled (unlimited users)`);
+}
 
 // Example API test
 console.log('\n🔬 Example OAuth authentication test:');
@@ -125,6 +178,97 @@ curl -X POST http://localhost:8000/rpc \\
       "content": "Hello, how are you?",
       "systemPrompt": "You are a helpful AI assistant."
     }
+  }'
+`);
+
+console.log('\n🔧 User Limits Admin Examples:');
+console.log(`
+# Get user statistics (admin required)
+curl -X POST http://localhost:8000/rpc \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ADMIN_SESSION_TOKEN" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "admin.getUserStats",
+    "id": 1
+  }'
+
+# Set user limit to 100 users (admin required)
+curl -X POST http://localhost:8000/rpc \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ADMIN_SESSION_TOKEN" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "admin.setUserLimit",
+    "params": {"limit": 100},
+    "id": 2
+  }'
+
+# Add 50 more user slots (admin required)
+curl -X POST http://localhost:8000/rpc \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ADMIN_SESSION_TOKEN" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "admin.addUserSlots",
+    "params": {"slots": 50},
+    "id": 3
+  }'
+
+# View waitlist (admin required)
+curl -X POST http://localhost:8000/rpc \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ADMIN_SESSION_TOKEN" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "admin.getWaitlist",
+    "id": 4
+  }'
+
+# Grant special access to coworker (above limit)
+curl -X POST http://localhost:8000/rpc \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ADMIN_SESSION_TOKEN" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "admin.grantSpecialAccess",
+    "params": {"email": "coworker@company.com", "reason": "Team member"},
+    "id": 5
+  }'
+
+# Promote specific user from waitlist
+curl -X POST http://localhost:8000/rpc \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ADMIN_SESSION_TOKEN" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "admin.promoteFromWaitlist",
+    "params": {"email": "friend@example.com"},
+    "id": 6
+  }'
+
+# Bulk grant access to multiple friends
+curl -X POST http://localhost:8000/rpc \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ADMIN_SESSION_TOKEN" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "admin.bulkGrantSpecialAccess",
+    "params": {
+      "emails": ["friend1@example.com", "friend2@example.com", "family@example.com"],
+      "reason": "Friends and family beta access"
+    },
+    "id": 7
+  }'
+
+# View users with special access
+curl -X POST http://localhost:8000/rpc \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ADMIN_SESSION_TOKEN" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "admin.getSpecialAccessUsers",
+    "id": 8
   }'
 `);
 

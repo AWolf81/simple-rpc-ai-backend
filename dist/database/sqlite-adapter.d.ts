@@ -32,6 +32,21 @@ export declare class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter
     private mapRowToDevice;
     private mapRowToKey;
     /**
+     * Execute a SQL statement (for CREATE, INSERT, UPDATE, DELETE)
+     */
+    execute(sql: string, params?: any[]): Promise<{
+        changes: number;
+        lastInsertRowid: number;
+    }>;
+    /**
+     * Get a single row from a SQL query
+     */
+    get(sql: string, params?: any[]): Promise<any>;
+    /**
+     * Get all rows from a SQL query
+     */
+    all(sql: string, params?: any[]): Promise<any[]>;
+    /**
      * Close database connection
      */
     close(): Promise<void>;

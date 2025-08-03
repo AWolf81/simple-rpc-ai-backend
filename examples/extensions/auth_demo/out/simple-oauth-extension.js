@@ -38,15 +38,66 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SimpleOAuthClient = void 0;
 exports.activate = activate;
 exports.deactivate = deactivate;
-const axios_1 = __importDefault(require("axios"));
 const vscode = __importStar(require("vscode"));
+const https = __importStar(require("https"));
+const http = __importStar(require("http"));
+/**
+ * Make HTTP request using Node.js built-in modules
+ */
+function makeHttpRequest(url, data = null, headers = {}, method = 'POST') {
+    return new Promise((resolve, reject) => {
+        console.log(`🚀 Making HTTP request to: ${url}`);
+        const urlObj = new URL(url);
+        const postData = JSON.stringify(data);
+        const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+            path: urlObj.pathname,
+            method: method,
+            headers: {
+                ...(data ? {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(postData)
+                } : {}),
+                ...headers
+            }
+        };
+        const httpModule = urlObj.protocol === 'https:' ? https : http;
+        const req = httpModule.request(options, (res) => {
+            let responseData = '';
+            res.on('data', (chunk) => {
+                responseData += chunk;
+            });
+            res.on('end', () => {
+                try {
+                    const parsedData = JSON.parse(responseData);
+                    if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve({ data: parsedData, status: res.statusCode });
+                    }
+                    else {
+                        console.error(`❌ HTTP Error ${res.statusCode}:`, responseData);
+                        reject(new Error(`Request failed with status code ${res.statusCode}: ${responseData}`));
+                    }
+                }
+                catch (error) {
+                    reject(new Error(`Invalid JSON response: ${responseData}`));
+                }
+            });
+        });
+        req.on('error', (error) => {
+            console.error('🔥 HTTP Request Error:', error);
+            reject(error);
+        });
+        if (data) {
+            req.write(postData);
+        }
+        req.end();
+    });
+}
 class SimpleOAuthClient {
     constructor(config) {
         this.serverSession = null;
@@ -54,11 +105,31 @@ class SimpleOAuthClient {
         this.config = config;
     }
     /**
+     * Test server connectivity
+     */
+    async testServerConnection() {
+        try {
+            console.log('🔍 Testing server connectivity...');
+            const response = await makeHttpRequest(`${this.config.serverUrl}/health`, null, {}, 'GET');
+            console.log('✅ Server connectivity test passed:', response.data);
+            return true;
+        }
+        catch (error) {
+            console.error('❌ Server connectivity test failed:', error);
+            return false;
+        }
+    }
+    /**
      * Authenticate using VS Code's built-in OAuth providers
      * On first use, opens browser for OAuth flow
      */
     async authenticate() {
         try {
+            // First test server connectivity
+            const serverReachable = await this.testServerConnection();
+            if (!serverReachable) {
+                throw new Error('Cannot connect to server at ' + this.config.serverUrl);
+            }
             console.log(`🔄 Starting OAuth authentication with ${this.config.authProvider}...`);
             // Step 1: Get OAuth session from VS Code
             // This handles the entire OAuth flow automatically!
@@ -69,7 +140,14 @@ class SimpleOAuthClient {
             console.log(`✅ Got OAuth session for ${this.oauthSession.account.label}`);
             // Step 2: Exchange OAuth token with your server
             const deviceId = this.generateDeviceId();
-            const response = await axios_1.default.post(`${this.config.serverUrl}/auth/oauth`, {
+            console.log(`🔄 Sending OAuth token to server (token: ${this.oauthSession.accessToken.substring(0, 10)}...)`);
+            console.log(`🌐 Server URL: ${this.config.serverUrl}/auth/oauth`);
+            console.log(`📦 Request payload:`, {
+                extensionId: this.config.extensionId,
+                provider: this.config.authProvider,
+                deviceId
+            });
+            const response = await makeHttpRequest(`${this.config.serverUrl}/auth/oauth`, {
                 extensionId: this.config.extensionId,
                 provider: this.config.authProvider,
                 accessToken: this.oauthSession.accessToken,
@@ -108,16 +186,13 @@ class SimpleOAuthClient {
             await this.authenticate();
         }
         try {
-            const response = await axios_1.default.post(`${this.config.serverUrl}/rpc`, {
+            const response = await makeHttpRequest(`${this.config.serverUrl}/rpc`, {
                 jsonrpc: '2.0',
                 id: Math.floor(Math.random() * 1000000),
                 method,
                 params
             }, {
-                headers: {
-                    'Authorization': `Bearer ${this.serverSession}`,
-                    'Content-Type': 'application/json'
-                }
+                'Authorization': `Bearer ${this.serverSession}`
             });
             if (response.data.error) {
                 throw new Error(`RPC Error: ${response.data.error.message}`);
@@ -125,7 +200,7 @@ class SimpleOAuthClient {
             return response.data.result;
         }
         catch (error) {
-            if (error.response?.status === 401) {
+            if (error.message.includes('status code 401')) {
                 console.warn('⚠️ Session expired. Re-authenticating...');
                 // Clear sessions and retry
                 this.serverSession = null;
@@ -158,7 +233,7 @@ class SimpleOAuthClient {
         try {
             // Invalidate server session
             if (this.serverSession) {
-                await axios_1.default.post(`${this.config.serverUrl}/auth/signout`, {
+                await makeHttpRequest(`${this.config.serverUrl}/auth/signout`, {
                     sessionToken: this.serverSession
                 });
             }
@@ -235,12 +310,12 @@ async function waitForAuthProvider(providerId, timeoutMs = 10000) {
  */
 function activate(context) {
     console.log('🚀 Activating simple OAuth extension...');
-    // Create OAuth client
+    // Create OAuth client with GitHub (Microsoft requires Azure AD app registration)
     const authClient = new SimpleOAuthClient({
         serverUrl: 'http://localhost:8000',
         extensionId: context.extension.id,
-        authProvider: 'github', // or 'microsoft'
-        scopes: ['user:email'] // GitHub scopes, adjust as needed
+        authProvider: 'github', // GitHub works out of the box
+        scopes: ['read:user', 'user:email'] // GitHub scopes
     });
     // Register authentication command
     const authenticateCommand = vscode.commands.registerCommand('extension.authenticate', async () => {
@@ -332,7 +407,7 @@ function activate(context) {
             // Wait for GitHub authentication provider to be available
             await waitForAuthProvider('github', 10000); // Wait up to 10 seconds
             // Try to get existing session without prompting user
-            const existingSession = await vscode.authentication.getSession('github', ['user:email'], { createIfNone: false, silent: true });
+            const existingSession = await vscode.authentication.getSession('github', ['read:user', 'user:email'], { createIfNone: false, silent: true });
             if (existingSession) {
                 console.log('🔄 Found existing OAuth session, authenticating...');
                 await authClient.authenticate();

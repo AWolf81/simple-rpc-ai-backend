@@ -62,6 +62,11 @@ export function createAIServer(config) {
             console.log(`   🏢 Allowed orgs: ${config.oauthAuth.allowedOrgs.join(', ')}`);
         }
     }
+    // Add request logging middleware first
+    app.use((req, res, next) => {
+        console.log(`📥 ${req.method} ${req.path} from ${req.headers.origin || 'unknown'}`);
+        next();
+    });
     app.use(helmet());
     app.use(cors({
         origin: config.cors?.origin ?? ['vscode-webview://*', 'http://localhost:*', 'https://localhost:*'],
@@ -138,12 +143,17 @@ export function createAIServer(config) {
                 error: { code: -32600, message: 'Invalid Request - method contains invalid characters' }
             });
         }
-        // Params validation - must be object or undefined
-        if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
+        // Params validation - must be object, array, or undefined
+        // For methods that don't require parameters, allow both [] and {}
+        if (params !== undefined && (typeof params !== 'object' || params === null)) {
             return res.status(400).json({
                 id,
-                error: { code: -32600, message: 'Invalid Request - params must be an object' }
+                error: { code: -32600, message: 'Invalid Request - params must be an object or array' }
             });
+        }
+        // Convert empty arrays to empty objects for consistency
+        if (Array.isArray(params) && params.length === 0) {
+            req.body.params = {};
         }
         next();
     };
@@ -152,6 +162,11 @@ export function createAIServer(config) {
     if (config.oauthAuth && oauthAuthManager) {
         app.post('/auth/oauth', async (req, res) => {
             try {
+                console.log('🔐 OAuth authentication request received');
+                console.log(`   📱 Extension: ${req.body.extensionId}`);
+                console.log(`   🌐 Provider: ${req.body.provider}`);
+                console.log(`   🔑 Token: ${req.body.accessToken?.substring(0, 10)}...`);
+                console.log(`   📟 Device: ${req.body.deviceId}`);
                 const { extensionId, provider, accessToken, deviceId } = req.body;
                 if (!extensionId || !provider || !accessToken || !deviceId) {
                     res.status(400).json({
@@ -161,9 +176,8 @@ export function createAIServer(config) {
                     return;
                 }
                 // Authenticate with OAuth manager
-                const session = await oauthAuthManager.authenticateWithOAuth(extensionId, provider, accessToken, deviceId);
-                // Generate session token
-                const sessionToken = `oauth_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                const { session, sessionToken } = await oauthAuthManager.authenticateWithOAuth(extensionId, provider, accessToken, deviceId);
+                console.log(`🎫 Created session token: ${sessionToken.substring(0, 16)}...`);
                 res.json({
                     success: true,
                     sessionToken,
@@ -173,6 +187,8 @@ export function createAIServer(config) {
                 });
             }
             catch (error) {
+                console.error('❌ OAuth authentication failed:', error.message);
+                console.error('   Stack:', error.stack);
                 res.status(401).json({
                     success: false,
                     error: error.message
@@ -320,8 +336,168 @@ export function createAIServer(config) {
                     await keyManager.deleteUserKey(params.userId, params.provider);
                     result = { success: true };
                     break;
+                // Admin user management methods (require admin role)
+                case 'admin.blacklistUser':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    oauthAuthManager.blacklistUser(params.emailOrId, params.reason);
+                    result = { success: true, message: `User ${params.emailOrId} blacklisted` };
+                    break;
+                case 'admin.allowUser':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    oauthAuthManager.allowUser(params.emailOrId, params.reason);
+                    result = { success: true, message: `User ${params.emailOrId} added to allowlist` };
+                    break;
+                case 'admin.setAccessMode':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    oauthAuthManager.setAccessMode(params.mode);
+                    result = { success: true, message: `Access mode set to ${params.mode}` };
+                    break;
+                case 'admin.getSecurityStats':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    result = oauthAuthManager.getSecurityStats();
+                    break;
+                // Role management methods (require super admin)
+                case 'admin.grantRole':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext)
+                        throw new Error('Authentication required');
+                    oauthAuthManager.grantRole(params.targetEmail, params.role, req.authContext.userInfo.email);
+                    result = { success: true, message: `Role '${params.role}' granted to ${params.targetEmail}` };
+                    break;
+                case 'admin.revokeRole':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext)
+                        throw new Error('Authentication required');
+                    oauthAuthManager.revokeRole(params.targetEmail, params.role, req.authContext.userInfo.email);
+                    result = { success: true, message: `Role '${params.role}' revoked from ${params.targetEmail}` };
+                    break;
+                case 'admin.getAllUserRoles':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    result = oauthAuthManager.getAllUserRoles();
+                    break;
+                case 'admin.getUserRoles':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    result = {
+                        email: params.email,
+                        roles: oauthAuthManager.getUserRoles(params.email)
+                    };
+                    break;
+                // User limits management methods (require admin)
+                case 'admin.getUserStats':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    result = oauthAuthManager.getUserStats();
+                    break;
+                case 'admin.setUserLimit':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    oauthAuthManager.setUserLimit(params.limit, req.authContext.userInfo.email);
+                    result = { success: true, message: `User limit set to ${params.limit}` };
+                    break;
+                case 'admin.addUserSlots':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    oauthAuthManager.addUserSlots(params.slots, req.authContext.userInfo.email);
+                    result = { success: true, message: `Added ${params.slots} user slots` };
+                    break;
+                case 'admin.getWaitlist':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    result = oauthAuthManager.getWaitlist();
+                    break;
+                case 'admin.removeFromWaitlist':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    const removed = oauthAuthManager.removeFromWaitlist(params.email, req.authContext.userInfo.email);
+                    result = { success: removed, message: removed ? `Removed ${params.email} from waitlist` : `${params.email} not found in waitlist` };
+                    break;
+                // Special access management methods (require admin)
+                case 'admin.grantSpecialAccess':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    oauthAuthManager.grantSpecialAccess(params.email, params.reason, req.authContext.userInfo.email);
+                    result = { success: true, message: `Special access granted to ${params.email}` };
+                    break;
+                case 'admin.promoteFromWaitlist':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    const promoted = oauthAuthManager.promoteFromWaitlist(params.email, req.authContext.userInfo.email);
+                    result = { success: promoted, message: promoted ? `Promoted ${params.email} from waitlist` : `${params.email} not found in waitlist` };
+                    break;
+                case 'admin.revokeSpecialAccess':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    const revoked = oauthAuthManager.revokeSpecialAccess(params.email, req.authContext.userInfo.email);
+                    result = { success: revoked, message: revoked ? `Revoked special access for ${params.email}` : `${params.email} did not have special access` };
+                    break;
+                case 'admin.getSpecialAccessUsers':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    result = oauthAuthManager.getSpecialAccessUsers();
+                    break;
+                case 'admin.bulkGrantSpecialAccess':
+                    if (!oauthAuthManager)
+                        throw new Error('OAuth manager not initialized');
+                    if (!req.authContext || !oauthAuthManager.isAdmin(req.authContext.userInfo.email)) {
+                        throw new Error('Admin role required');
+                    }
+                    result = oauthAuthManager.bulkGrantSpecialAccess(params.emails, params.reason, req.authContext.userInfo.email);
+                    break;
                 case 'executeAIRequest':
-                    result = await handleAIRequest(params, keyManager, aiService);
+                    result = await handleAIRequest(params, keyManager, aiService, config, req.authContext);
                     break;
                 case 'shouldSuggestUpgrade':
                     if (!authManager)
@@ -343,6 +519,10 @@ export function createAIServer(config) {
                 default:
                     // Check if it's a custom function
                     if (functionRegistry.hasFunction(method)) {
+                        // Check authentication requirement for custom functions
+                        if (config.requireAuth && !req.authContext) {
+                            throw new Error('Authentication required for custom functions');
+                        }
                         result = await functionRegistry.executeFunction(method, params, params.aiOptions);
                     }
                     else {
@@ -474,6 +654,11 @@ export async function createAIServerAsync(config) {
             console.log(`   🏢 Allowed orgs: ${config.oauthAuth.allowedOrgs.join(', ')}`);
         }
     }
+    // Add request logging middleware first
+    app.use((req, res, next) => {
+        console.log(`📥 ${req.method} ${req.path} from ${req.headers.origin || 'unknown'}`);
+        next();
+    });
     app.use(helmet());
     app.use(cors({
         origin: config.cors?.origin ?? ['vscode-webview://*', 'http://localhost:*', 'https://localhost:*'],
@@ -490,6 +675,11 @@ export async function createAIServerAsync(config) {
     if (config.oauthAuth && oauthAuthManager) {
         app.post('/auth/oauth', async (req, res) => {
             try {
+                console.log('🔐 OAuth authentication request received');
+                console.log(`   📱 Extension: ${req.body.extensionId}`);
+                console.log(`   🌐 Provider: ${req.body.provider}`);
+                console.log(`   🔑 Token: ${req.body.accessToken?.substring(0, 10)}...`);
+                console.log(`   📟 Device: ${req.body.deviceId}`);
                 const { extensionId, provider, accessToken, deviceId } = req.body;
                 if (!extensionId || !provider || !accessToken || !deviceId) {
                     res.status(400).json({
@@ -499,9 +689,8 @@ export async function createAIServerAsync(config) {
                     return;
                 }
                 // Authenticate with OAuth manager
-                const session = await oauthAuthManager.authenticateWithOAuth(extensionId, provider, accessToken, deviceId);
-                // Generate session token
-                const sessionToken = `oauth_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                const { session, sessionToken } = await oauthAuthManager.authenticateWithOAuth(extensionId, provider, accessToken, deviceId);
+                console.log(`🎫 Created session token: ${sessionToken.substring(0, 16)}...`);
                 res.json({
                     success: true,
                     sessionToken,
@@ -511,6 +700,8 @@ export async function createAIServerAsync(config) {
                 });
             }
             catch (error) {
+                console.error('❌ OAuth authentication failed:', error.message);
+                console.error('   Stack:', error.stack);
                 res.status(401).json({
                     success: false,
                     error: error.message
@@ -651,7 +842,7 @@ export async function createAIServerAsync(config) {
                     result = await keyManager.getUserProviders(params.userId);
                     break;
                 case 'executeAIRequest':
-                    result = await handleAIRequest(params, keyManager, aiService);
+                    result = await handleAIRequest(params, keyManager, aiService, config, req.authContext);
                     break;
                 case 'shouldSuggestUpgrade':
                     if (!authManager)
@@ -673,6 +864,10 @@ export async function createAIServerAsync(config) {
                 default:
                     // Check if it's a custom function
                     if (functionRegistry.hasFunction(method)) {
+                        // Check authentication requirement for custom functions
+                        if (config.requireAuth && !req.authContext) {
+                            throw new Error('Authentication required for custom functions');
+                        }
                         result = await functionRegistry.executeFunction(method, params, params.aiOptions);
                     }
                     else {
@@ -749,8 +944,12 @@ function determineMode(config) {
         return 'byok';
     return 'simple';
 }
-async function handleAIRequest(params, keyManager, aiService) {
+async function handleAIRequest(params, keyManager, aiService, config, authContext) {
     const { userId, content, systemPrompt, promptId, promptContext = {}, metadata = {} } = params;
+    // Check authentication requirement
+    if (config.requireAuth && !authContext) {
+        throw new Error('Authentication required for AI requests');
+    }
     // Debug logging
     console.log('🔍 handleAIRequest Debug:');
     console.log(`   Params keys: ${Object.keys(params).join(', ')}`);
@@ -834,29 +1033,173 @@ async function handleDiscover() {
         return JSON.parse(openrpcContent);
     }
     catch (error) {
-        // Fallback minimal schema if file not found
+        // OpenRPC compliant specification
         return {
             openrpc: '1.2.6',
             info: {
                 title: 'Simple RPC AI Backend',
-                version: '0.1.0',
-                description: 'Platform-agnostic JSON-RPC server for AI integration'
+                version: '1.0.0',
+                description: 'Platform-agnostic JSON-RPC server for AI integration with system prompt protection'
             },
             methods: [
                 {
                     name: 'health',
-                    description: 'Check server health',
-                    params: [],
-                    result: { name: 'healthResult', schema: { type: 'object' } }
+                    description: 'Check server health and availability',
+                    params: {
+                        type: 'object',
+                        properties: {},
+                        additionalProperties: false
+                    },
+                    result: {
+                        name: 'healthResult',
+                        description: 'Server health status',
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                status: { type: 'string' },
+                                timestamp: { type: 'string' }
+                            },
+                            required: ['status', 'timestamp']
+                        }
+                    }
                 },
                 {
                     name: 'executeAIRequest',
                     description: 'Execute AI request with system prompt protection',
-                    params: [
-                        { name: 'content', schema: { type: 'string' }, required: true },
-                        { name: 'systemPrompt', schema: { type: 'string' }, required: true }
-                    ],
-                    result: { name: 'aiResult', schema: { type: 'object' } }
+                    params: {
+                        type: 'object',
+                        properties: {
+                            content: {
+                                type: 'string',
+                                description: 'User content to process'
+                            },
+                            systemPrompt: {
+                                type: 'string',
+                                description: 'System prompt for AI context'
+                            },
+                            promptId: {
+                                type: 'string',
+                                description: 'ID of managed system prompt'
+                            },
+                            userId: {
+                                type: 'string',
+                                description: 'User ID for BYOK mode'
+                            },
+                            metadata: {
+                                type: 'object',
+                                description: 'Additional metadata for the request'
+                            }
+                        },
+                        required: ['content'],
+                        additionalProperties: false
+                    },
+                    result: {
+                        name: 'aiResult',
+                        description: 'AI processing result',
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                success: { type: 'boolean' },
+                                result: { type: 'string' },
+                                metadata: { type: 'object' }
+                            },
+                            required: ['success', 'result']
+                        }
+                    }
+                },
+                {
+                    name: 'initializeSession',
+                    description: 'Initialize device session for progressive authentication',
+                    params: {
+                        type: 'object',
+                        properties: {
+                            deviceId: { type: 'string' },
+                            deviceName: { type: 'string' }
+                        },
+                        required: ['deviceId'],
+                        additionalProperties: false
+                    },
+                    result: {
+                        name: 'sessionResult',
+                        description: 'Session initialization result',
+                        schema: { type: 'object' }
+                    }
+                },
+                {
+                    name: 'getAuthStatus',
+                    description: 'Get current authentication status',
+                    params: {
+                        type: 'object',
+                        properties: {
+                            deviceId: { type: 'string' }
+                        },
+                        required: ['deviceId'],
+                        additionalProperties: false
+                    },
+                    result: {
+                        name: 'authStatusResult',
+                        description: 'Authentication status',
+                        schema: { type: 'object' }
+                    }
+                },
+                {
+                    name: 'storeUserKey',
+                    description: 'Store encrypted API key for user (BYOK)',
+                    params: {
+                        type: 'object',
+                        properties: {
+                            userId: { type: 'string' },
+                            provider: { type: 'string' },
+                            apiKey: { type: 'string' }
+                        },
+                        required: ['userId', 'provider', 'apiKey'],
+                        additionalProperties: false
+                    },
+                    result: {
+                        name: 'storeKeyResult',
+                        description: 'Key storage result',
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                success: { type: 'boolean' }
+                            }
+                        }
+                    }
+                },
+                {
+                    name: 'getUserKey',
+                    description: 'Retrieve user API key',
+                    params: {
+                        type: 'object',
+                        properties: {
+                            userId: { type: 'string' },
+                            provider: { type: 'string' }
+                        },
+                        required: ['userId', 'provider'],
+                        additionalProperties: false
+                    },
+                    result: {
+                        name: 'getUserKeyResult',
+                        description: 'Retrieved API key',
+                        schema: { type: 'object' }
+                    }
+                },
+                {
+                    name: 'shouldSuggestUpgrade',
+                    description: 'Check if auth upgrade should be suggested',
+                    params: {
+                        type: 'object',
+                        properties: {
+                            deviceId: { type: 'string' }
+                        },
+                        required: ['deviceId'],
+                        additionalProperties: false
+                    },
+                    result: {
+                        name: 'suggestUpgradeResult',
+                        description: 'Upgrade suggestion',
+                        schema: { type: 'boolean' }
+                    }
                 }
             ]
         };

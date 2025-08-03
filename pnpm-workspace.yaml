@@ -4,3 +4,5 @@ packages:
   # Example packages
   - "examples/servers"
   - "examples/extensions"
+  # Tools
+  - "tools/*"

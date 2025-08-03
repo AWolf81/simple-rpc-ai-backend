@@ -368,6 +368,34 @@ export class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
   }
 
   /**
+   * Execute a SQL statement (for CREATE, INSERT, UPDATE, DELETE)
+   */
+  async execute(sql: string, params: any[] = []): Promise<{ changes: number; lastInsertRowid: number }> {
+    const stmt = this.db.prepare(sql);
+    const result = stmt.run(...params);
+    return {
+      changes: result.changes,
+      lastInsertRowid: result.lastInsertRowid as number
+    };
+  }
+
+  /**
+   * Get a single row from a SQL query
+   */
+  async get(sql: string, params: any[] = []): Promise<any> {
+    const stmt = this.db.prepare(sql);
+    return stmt.get(...params);
+  }
+
+  /**
+   * Get all rows from a SQL query
+   */
+  async all(sql: string, params: any[] = []): Promise<any[]> {
+    const stmt = this.db.prepare(sql);
+    return stmt.all(...params);
+  }
+
+  /**
    * Close database connection
    */
   async close(): Promise<void> {
