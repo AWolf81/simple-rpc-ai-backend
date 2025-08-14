@@ -58,6 +58,9 @@ coverage/
 *.sqlite
 *.sqlite3
 
+# Docker data
+data
+
 # Temporary files
 tmp/
 temp/

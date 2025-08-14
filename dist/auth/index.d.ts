@@ -11,7 +11,7 @@ export type { User, UserDevice, OAuthData, DatabaseAdapter } from './user-manage
 export type { UserKey, KeyValidationResult, KeyStorageAdapter, AIProviderValidator } from './key-manager.js';
 export type { AuthSession, OAuthProvider, PasskeyCredential, AuthUpgradeOptions } from './auth-manager.js';
 export type { OAuthSession, OAuthConfig } from './oauth-auth-manager.js';
-export { SQLiteAdapter } from '../database/sqlite-adapter.js';
+export { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 export { AIKeyValidator } from '../services/ai-validator.js';
 export type { AIClientOptions, DeviceInfo, AuthUpgradePrompt } from '../client.js';
 //# sourceMappingURL=index.d.ts.map

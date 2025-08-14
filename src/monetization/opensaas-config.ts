@@ -60,6 +60,13 @@ export interface MonetizedAIServerConfig {
     type?: 'sqlite' | 'postgresql' | 'mysql';
     connectionString?: string;
     path?: string;
+    // PostgreSQL specific options
+    host?: string;
+    port?: number;
+    database?: string;
+    user?: string;
+    password?: string;
+    ssl?: boolean;
   };
   serviceProviders?: any; // AI service providers config
   cors?: {

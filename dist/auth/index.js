@@ -10,6 +10,6 @@ export { AuthManager } from './auth-manager.js';
 // OAuth authentication (recommended secure approach)
 export { OAuthAuthManager } from './oauth-auth-manager.js';
 // Database and validation
-export { SQLiteAdapter } from '../database/sqlite-adapter.js';
+export { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 export { AIKeyValidator } from '../services/ai-validator.js';
 //# sourceMappingURL=index.js.map

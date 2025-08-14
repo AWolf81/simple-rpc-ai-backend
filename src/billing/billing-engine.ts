@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { UsageTracker, type UsageEvent } from './usage-tracker.js';
-import { SQLiteAdapter } from '../database/sqlite-adapter.js';
+import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 import winston from 'winston';
 
 export interface BillingEvent {
@@ -44,12 +44,12 @@ export interface SubscriptionInfo {
 }
 
 export class BillingEngine {
-  private db: SQLiteAdapter;
+  private db: PostgreSQLAdapter;
   private usageTracker: UsageTracker;
   private config: BillingConfig;
   private logger: winston.Logger;
 
-  constructor(db: SQLiteAdapter, usageTracker: UsageTracker, config: BillingConfig) {
+  constructor(db: PostgreSQLAdapter, usageTracker: UsageTracker, config: BillingConfig) {
     this.db = db;
     this.usageTracker = usageTracker;
     this.config = config;

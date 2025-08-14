@@ -1,4 +1,4 @@
-import { SQLiteAdapter } from '../database/sqlite-adapter.js';
+import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 import winston from 'winston';
 
 export interface UsageEvent {
@@ -78,11 +78,11 @@ export const PROVIDER_PRICING = {
 } as const;
 
 export class UsageTracker {
-  private db: SQLiteAdapter;
+  private db: PostgreSQLAdapter;
   private logger: winston.Logger;
   private platformFeePercentage: number;
 
-  constructor(db: SQLiteAdapter, platformFeePercentage: number = 0.20) {
+  constructor(db: PostgreSQLAdapter, platformFeePercentage: number = 0.20) {
     this.db = db;
     this.platformFeePercentage = platformFeePercentage;
     

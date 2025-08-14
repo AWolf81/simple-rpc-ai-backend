@@ -43,7 +43,7 @@ export type {
 } from './oauth-auth-manager.js';
 
 // Database and validation
-export { SQLiteAdapter } from '../database/sqlite-adapter.js';
+export { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 export { AIKeyValidator } from '../services/ai-validator.js';
 
 // Client (now in main client.ts)

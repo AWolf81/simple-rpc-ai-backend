@@ -1,14 +1,19 @@
+"use strict";
 /**
  * SQLite Database Adapter for BYOK system
  *
  * Implements the database interfaces for users, devices, and keys
  * Using SQLite for development and testing - can be swapped for PostgreSQL/MySQL in production
  */
-import Database from 'better-sqlite3';
-export class SQLiteAdapter {
-    db;
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SQLiteAdapter = void 0;
+const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
+class SQLiteAdapter {
     constructor(databasePath = ':memory:') {
-        this.db = new Database(databasePath);
+        this.db = new better_sqlite3_1.default(databasePath);
     }
     /**
      * Initialize database schema
@@ -294,35 +299,11 @@ export class SQLiteAdapter {
         };
     }
     /**
-     * Execute a SQL statement (for CREATE, INSERT, UPDATE, DELETE)
-     */
-    async execute(sql, params = []) {
-        const stmt = this.db.prepare(sql);
-        const result = stmt.run(...params);
-        return {
-            changes: result.changes,
-            lastInsertRowid: result.lastInsertRowid
-        };
-    }
-    /**
-     * Get a single row from a SQL query
-     */
-    async get(sql, params = []) {
-        const stmt = this.db.prepare(sql);
-        return stmt.get(...params);
-    }
-    /**
-     * Get all rows from a SQL query
-     */
-    async all(sql, params = []) {
-        const stmt = this.db.prepare(sql);
-        return stmt.all(...params);
-    }
-    /**
      * Close database connection
      */
     async close() {
         this.db.close();
     }
 }
+exports.SQLiteAdapter = SQLiteAdapter;
 //# sourceMappingURL=sqlite-adapter.js.map

@@ -11,7 +11,7 @@
  * - No multi-device sync needed
  */
 
-import { createAIServer } from '../../dist/index.js';
+import { createSimpleAIServer } from '../../dist/server-simple.js';
 
 console.log(`
 🚀 Basic AI Server - Service Provider Keys
@@ -91,18 +91,17 @@ Focus on high-level design improvements.
 };
 
 // Create and start the server with service provider keys
-const server = createAIServer({
-  mode: 'simple', // Service provider keys only
-  systemPrompts: prompts,
+const server = createSimpleAIServer({
   // Simple single provider (uses ANTHROPIC_API_KEY env var)
   serviceProviders: process.env.ANTHROPIC_API_KEY ? {
     anthropic: {
       apiKey: process.env.ANTHROPIC_API_KEY,
       priority: 1
     }
-  } : undefined, // No AI providers if no API key - will show helpful error
-  requirePayment: {
-    enabled: false // Allow free usage for prototyping
+  } : {
+    anthropic: { priority: 1 },
+    openai: { priority: 2 },
+    google: { priority: 3 }
   },
   port: 8000,
   cors: {

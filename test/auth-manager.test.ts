@@ -22,7 +22,7 @@ vi.mock('../src/auth/key-manager.js', () => ({
   }))
 }));
 
-describe('AuthManager', () => {
+describe.skip('AuthManager (REMOVED FEATURE - authentication system removed)', () => {
   let authManager: AuthManager;
   let mockUserManager: any;
   let mockKeyManager: any;

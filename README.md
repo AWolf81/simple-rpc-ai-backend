@@ -12,18 +12,441 @@
 **🔬 Alpha Software** - This package is in active development and not yet published to npm.
 
 - ✅ **Core functionality working** - Basic RPC server, AI integration, authentication
+- ✅ **Enterprise secret management** - Vaultwarden integration with PostgreSQL
 - ✅ **OpenRPC documentation complete** - Full API specification available
 - ✅ **Test coverage >80%** - Comprehensive test suite
 - ⚠️ **API may change** - Breaking changes possible before v1.0
 - 📦 **Not on npm yet** - Install directly from GitHub (see below)
 
 ### **Roadmap to v1.0**
+- [x] PostgreSQL secret management with user isolation
+- [x] Comprehensive audit logging for all secret operations
+- [x] JSON-RPC CRUD operations for API key management
+- [x] Security testing and user isolation validation
+- [x] API token system for external access
+- [x] Comprehensive health monitoring
 - [ ] Performance optimization and load testing
 - [ ] Additional AI provider integrations
 - [ ] Production deployment guides
 - [ ] Security audit and hardening
-- [ ] Comprehensive documentation website
 - [ ] **npm publication**
+
+## 🔐 **Secret Management Options**
+
+This package offers **flexible storage options** for API keys and system configuration:
+
+### 🐘 **PostgreSQL Secret Manager (Recommended)**
+
+**Simple, secure multi-tenant API key storage with PostgreSQL:**
+
+```bash
+# Setup PostgreSQL secret manager
+pnpm run postgres:setup
+
+# Start PostgreSQL service
+pnpm run postgres:start
+
+# Test user isolation security
+pnpm test:postgres
+```
+
+**Benefits:**
+- 🔒 **AES-256-GCM encryption** for all API keys
+- 👥 **True user isolation** - each user has separate database rows
+- 📊 **Comprehensive audit logging** of all secret operations
+- 🚀 **Simple setup** - just PostgreSQL, no complex dependencies
+- 🛡️ **Security-first design** - database-level access controls
+- 🏢 **Corporate-friendly** - works behind firewalls and proxies
+
+> **Why PostgreSQL over Infisical?** We chose PostgreSQL for simplicity and reliability. While Infisical offers enterprise features, our PostgreSQL implementation provides the same security guarantees (encryption, user isolation, audit logging) with a much simpler setup. No Docker orchestration complexity, no external services - just a reliable PostgreSQL database.
+
+### 📁 **File Storage (Simple Development)**
+
+**Simple file-based storage for development and small deployments:**
+
+```javascript
+const server = createAIServer({
+  keyStorage: {
+    type: 'file',
+    path: './data/keys.json',    // Encrypted local storage
+    masterKey: process.env.MASTER_KEY
+  }
+});
+```
+
+**Benefits:**
+- 🚀 **Zero setup** - No external dependencies
+- 🔒 **AES-256-GCM encryption** for local files  
+- 💻 **Perfect for development** and single-user deployments
+- 📦 **Portable** - Easy to backup and restore
+
+### 🔑 **Direct Key Passing (Ultimate Flexibility)**
+
+**Pass API keys directly in requests - ideal for VS Code secure storage integration:**
+
+```javascript
+// Client can pass API key per request
+const result = await client.request('executeAIRequest', {
+  content: code,
+  systemPrompt: 'security_review',
+  apiKey: vsCodeSecretStorage.get('anthropic-key')  // VS Code handles storage
+});
+```
+
+**Benefits:**
+- 🎯 **Zero backend storage** - Client manages keys entirely
+- 🔐 **VS Code secure storage** integration
+- 🏢 **Corporate policy compliance** - Keys never leave user's machine
+- ⚡ **Instant setup** - No key management infrastructure needed
+
+## 🔧 **Storage Configuration Examples**
+
+### Option 1: PostgreSQL Secret Manager (Recommended)
+
+```javascript
+// server.js - Production setup with PostgreSQL
+import { createAIServer } from 'simple-rpc-ai-backend';
+import { PostgreSQLRPCMethods } from 'simple-rpc-ai-backend/auth/PostgreSQLRPCMethods';
+
+const server = createAIServer({
+  secretManager: {
+    type: 'postgresql',
+    host: process.env.SECRET_MANAGER_DB_HOST || 'localhost',
+    port: process.env.SECRET_MANAGER_DB_PORT || 5433,
+    database: process.env.SECRET_MANAGER_DB_NAME || 'secrets',
+    user: process.env.SECRET_MANAGER_DB_USER || 'secret_manager',
+    password: process.env.SECRET_MANAGER_DB_PASS,
+    encryptionKey: process.env.SECRET_MANAGER_ENCRYPTION_KEY
+  },
+  systemPrompts: {
+    security_review: "You are a senior security engineer...",
+    code_quality: "You are a senior architect..."
+  }
+});
+
+server.start();
+```
+
+**Environment setup:**
+```bash
+# .env.postgres
+SECRET_MANAGER_DB_HOST=localhost
+SECRET_MANAGER_DB_PORT=5433
+SECRET_MANAGER_DB_NAME=secrets
+SECRET_MANAGER_DB_USER=secret_manager
+SECRET_MANAGER_DB_PASS=your-secure-password
+SECRET_MANAGER_ENCRYPTION_KEY=your-32-character-key
+```
+
+### Option 2: File Storage (Simple Development)
+
+```javascript
+// server.js - Development/small deployment setup  
+import { createAIServer } from 'simple-rpc-ai-backend';
+
+const server = createAIServer({
+  keyStorage: {
+    type: 'file',
+    path: './secure/keys.encrypted.json',
+    masterKey: process.env.MASTER_KEY || 'dev-key-not-for-production'
+  },
+  prompts: {
+    security_review: "You are a senior security engineer...",
+    code_quality: "You are a senior architect..."
+  }
+});
+
+server.start();
+```
+
+### Option 3: Client-Managed Keys (VS Code Integration)
+
+```javascript
+// server.js - No backend key storage
+import { createAIServer } from 'simple-rpc-ai-backend';
+
+const server = createAIServer({
+  keyStorage: {
+    type: 'client_managed'  // Keys passed in each request
+  },
+  prompts: {
+    security_review: "You are a senior security engineer...",
+    code_quality: "You are a senior architect..."
+  }
+});
+
+// VS Code extension
+import * as vscode from 'vscode';
+import { RPCClient } from 'simple-rpc-ai-backend';
+
+const client = new RPCClient('http://localhost:8000');
+
+async function analyzeCode() {
+  // Get API key from VS Code's secure storage
+  const apiKey = await vscode.workspace.getConfiguration().get('anthropic.apiKey') ||
+                 await context.secrets.get('anthropic-api-key');
+  
+  const result = await client.request('executeAIRequest', {
+    content: editor.document.getText(),
+    systemPrompt: 'security_review',
+    apiKey: apiKey  // Passed directly, never stored on server
+  });
+}
+```
+
+## 📦 **Using in Your Own Package**
+
+### Installation
+
+```bash
+# Install from GitHub (current)
+npm install git+https://github.com/AWolf81/simple-rpc-ai-backend.git
+
+# Or with pnpm (recommended)
+pnpm add git+https://github.com/AWolf81/simple-rpc-ai-backend.git
+```
+
+### Option A: Secure Enterprise Setup with Vaultwarden
+
+**1. Add Vaultwarden infrastructure to your project:**
+
+```bash
+# Copy infrastructure files to your project
+cp node_modules/simple-rpc-ai-backend/docker-compose.vaultwarden.yml ./
+cp node_modules/simple-rpc-ai-backend/.env.vaultwarden.example ./
+cp -r node_modules/simple-rpc-ai-backend/docker ./
+
+# Setup Vaultwarden
+./docker/setup-vaultwarden.sh
+```
+
+**2. Create your secure AI backend server:**
+
+```javascript
+// your-ai-backend/server.js - Secure Server-Side Implementation
+import { createAIServer, SecureVaultManager } from 'simple-rpc-ai-backend';
+
+// Initialize secure vault manager
+const vaultManager = new SecureVaultManager({
+  bitwardenConfig: loadVaultwardenConfig(),
+  databaseMasterKey: process.env.DATABASE_MASTER_KEY, // 64-char hex key
+  userBridge: new UserIdentityBridge()
+});
+
+const server = createAIServer({
+  vaultManager,
+  prompts: {
+    // Your proprietary system prompts (server-side only!)
+    myCustomAnalysis: `
+      You are an expert in my domain-specific requirements.
+      Analyze the code for: [your specific criteria]  
+      Provide recommendations in this format: [your format]
+    `,
+    security_review: `
+      You are a senior security engineer. Review code for vulnerabilities...
+    `
+  },
+  serviceProviders: ['anthropic', 'openai', 'google'],
+  port: 8000
+});
+
+// Register secure RPC methods (automatic onboarding built-in)
+server.addMethod('vaultwarden.storeApiKey', async (params) => {
+  // Auto-onboards user if needed - no explicit onboarding call required
+  return await vaultManager.storeApiKey(
+    params.opensaasJWT, 
+    params.apiKey, 
+    params.provider
+  );
+});
+
+server.addMethod('executeAIRequest', async (params) => {
+  // Auto-onboards user + retrieves keys automatically
+  return await vaultManager.executeAIRequestWithAutoKey(
+    params.opensaasJWT,
+    params.content,
+    params.systemPrompt,
+    params.provider
+  );
+});
+
+server.start();
+```
+
+**3. Ultra-simple client integration:**
+
+```javascript
+// your-vscode-extension/src/extension.js - Zero Crypto Complexity!
+import { RPCClient } from 'simple-rpc-ai-backend';
+
+const client = new RPCClient('http://localhost:8000');
+
+export async function activate(context) {
+  // Get OpenSaaS JWT (from your auth system)
+  const opensaasJWT = await getOpenSaaSJWT();
+  
+  // Store API key once - server auto-onboards user transparently!
+  await client.request('vaultwarden.storeApiKey', {
+    opensaasJWT,
+    apiKey: await getApiKeyFromUser(), 
+    provider: 'anthropic'
+  });
+
+  // Use AI - server handles everything automatically!
+  const result = await client.request('executeAIRequest', {
+    opensaasJWT,
+    content: code,
+    systemPrompt: 'myCustomAnalysis',
+    provider: 'anthropic'  // Server retrieves key + onboards if needed
+  });
+  
+  // That's it! Zero onboarding calls, zero crypto, zero vault management!
+}
+```
+
+### Option B: Simple File Storage
+
+```javascript
+// your-ai-backend/server.js - No external dependencies
+import { createAIServer } from 'simple-rpc-ai-backend';
+
+const server = createAIServer({
+  keyStorage: {
+    type: 'file',
+    path: './secure/api-keys.encrypted.json',
+    masterKey: process.env.MASTER_KEY
+  },
+  prompts: {
+    myAnalysis: "Your domain-specific prompt here..."
+  }
+});
+
+server.start();
+```
+
+### Option C: Client-Managed Keys (Perfect for VS Code)
+
+```javascript
+// your-ai-backend/server.js - Zero key management
+import { createAIServer } from 'simple-rpc-ai-backend';
+
+const server = createAIServer({
+  keyStorage: { type: 'client_managed' },
+  prompts: {
+    myAnalysis: "Your protected system prompt..."
+  }
+});
+
+// your-vscode-extension/src/extension.js  
+import { RPCClient } from 'simple-rpc-ai-backend';
+
+const client = new RPCClient('http://localhost:8000');
+
+async function analyzeWithVSCodeKeys() {
+  // VS Code's secure storage handles API keys
+  const apiKey = await context.secrets.get('anthropic-api-key');
+  
+  const result = await client.request('executeAIRequest', {
+    content: code,
+    systemPrompt: 'myAnalysis',
+    apiKey: apiKey  // Never stored on server
+  });
+}
+```
+
+## 🎯 **Which Storage Option Should You Choose?**
+
+| Scenario | Recommended Option | Why |
+|----------|-------------------|-----|
+| **Enterprise SaaS** | 🐘 PostgreSQL Vault | Multi-user, audit trails, encrypted storage |
+| **Team Development** | 📁 File Storage | Simple setup, encrypted, portable |
+| **VS Code Extensions** | 🔑 Client-Managed | Integrates with VS Code secure storage |
+| **Corporate Deployment** | 🐘 PostgreSQL Vault | Compliance, centralized control |
+| **MVP/Prototype** | 🔑 Client-Managed | Zero infrastructure, instant start |
+| **Open Source Projects** | 📁 File Storage | No external dependencies |
+
+## 🛡️ **Security Comparison: Old vs New Architecture**
+
+### **❌ Old Client-Side Approach (Security Issues)**
+| Component | Master Password | Vault Credentials | API Keys | Attack Surface |
+|-----------|----------------|-------------------|----------|----------------|
+| **VS Code Extension** | ✅ Generated/stored | ✅ Exposed to client | ✅ Encrypt/decrypt | 🚨 **HIGH** - Client crypto |
+| **RPC Server** | ✅ Receives hash | ✅ Knows vault user ID | ❌ Only ciphertext | 🟡 Medium |
+| **Vaultwarden** | ✅ Stores hash | ✅ User account | ✅ Encrypted storage | 🟡 Medium |
+
+**Problems:** Master passwords in untrusted environment, complex client crypto, vault IDs exposed
+
+### **✅ New Server-Side Approach (Secure)**  
+| Component | Master Password | Vault Credentials | API Keys | Attack Surface |
+|-----------|----------------|-------------------|----------|----------------|
+| **VS Code Extension** | ❌ Never sees | ❌ Never sees | ✅ Provides once | 🟢 **LOW** - JWT only |
+| **RPC Server** | ✅ Generates server-side | ✅ Manages internally | ✅ Retrieves/uses | 🟡 Medium - auditable |
+| **Vaultwarden** | ✅ Server account | ✅ Server auth | ✅ Encrypted storage | 🟢 Low |
+
+**Benefits:** Zero client crypto, server-generated passwords, minimal client knowledge
+
+### **🔒 Storage Security Comparison**
+
+| Feature | Old Client-Side | New Server-Side | File Storage | Client-Managed |
+|---------|----------------|----------------|--------------|----------------|
+| **System Prompt Protection** | ✅ | ✅ | ✅ | ✅ |
+| **Master Key Security** | ❌ Client-side | ✅ Server crypto.randomBytes | ✅ AES-256-GCM | ✅ Client handles |
+| **Client Complexity** | 🚨 High crypto | ✅ JWT only | 🟡 Medium | 🟡 Medium |
+| **Audit Trail** | 🟡 Partial | ✅ Complete server logs | ❌ | ❌ |
+| **Multi-user Support** | ✅ Complex | ✅ Simple | ❌ | ✅ Per client |
+| **Corporate Compliance** | 🟡 Client risks | ✅ Server-controlled | 🟡 Basic | ✅ Zero storage |
+| **Attack Surface** | 🚨 High | 🟢 Low | 🟡 Medium | 🟢 Low |
+
+## 🚀 **5-Minute Quick Start**
+
+### Simple Development Setup (No External Dependencies)
+
+```bash
+# 1. Create your project
+mkdir my-ai-backend && cd my-ai-backend
+npm init -y
+
+# 2. Install package
+npm install git+https://github.com/AWolf81/simple-rpc-ai-backend.git
+
+# 3. Create server
+cat > server.js << 'EOF'
+import { createAIServer } from 'simple-rpc-ai-backend';
+
+const server = createAIServer({
+  keyStorage: { type: 'client_managed' },  // No storage needed
+  prompts: {
+    security_review: "You are a senior security engineer. Review code for vulnerabilities."
+  },
+  serviceProviders: ['anthropic', 'openai']
+});
+
+server.start();
+EOF
+
+# 4. Start server
+node server.js
+# 🚀 Server running on http://localhost:8000
+```
+
+### Test with curl (passing API key directly):
+
+```bash
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", 
+    "method": "executeAIRequest", 
+    "params": {
+      "content": "function login(user, pass) { return users[user] === pass; }",
+      "systemPrompt": "security_review",
+      "apiKey": "your-anthropic-key"
+    }, 
+    "id": 1
+  }'
+```
+
+**Your system prompts are protected server-side, but setup takes 2 minutes!**
 
 ## 🎯 **Why This Package Exists**
 
@@ -50,1171 +473,1191 @@ After reading [Kir Shatrov's reverse engineering of Claude Code](https://kirshat
 - 🔴 **Corporate restrictions** - Proxies block AI provider APIs
 - 🔴 **Complex integration** - Each extension reinvents AI communication
 
-### 🛡️ **Our Solution: Server-Side Prompt Protection**
+### 🛡️ **Our Solution: Server-Side Prompt Protection with Flexible Storage**
 
 **This package solves these problems with a simple RPC architecture:**
 
 - ✅ **System Prompt Protection** - Keep sensitive prompts on your secure server (never client-side)
 - ✅ **Business Logic Security** - Your proprietary AI techniques stay hidden
 - ✅ **Corporate Proxy Bypass** - AI requests go through your backend, not blocked
-- ✅ **Zero Extension Setup** - Users don't need API keys or configuration
+- ✅ **Flexible Key Management** - Vaultwarden, file storage, or client-managed keys
+- ✅ **Zero Extension Setup** - Users don't need API keys or configuration (optional)
 - ✅ **Multi-Provider Support** - Switch AI providers without extension updates
 - ✅ **Simple Integration** - Clean JSON-RPC API for VS Code extensions
 
 **Key Security Principle**: If Claude Code's prompts can be reverse engineered, so can yours. The only safe place for valuable system prompts is on servers you control.
 
-## 🏠 **Local Development & Non-Corporate Benefits**
+## 🖥️ **Frontend Development Guide**
 
-**"Why not send requests directly to AI providers?"** - Great question! Even without corporate proxy concerns, this architecture provides significant value:
+### **Complete CRUD API for VaultStorage**
 
-### 🎯 **Core Benefits (Always Available)**
+The RPC API provides comprehensive CRUD operations for API key management. Here's everything you need to build a frontend:
 
-**🔄 Centralized System Prompt Management**
-```javascript
-// ❌ Without RPC: Prompts scattered across extensions
-const prompt1 = "You are a security expert..."; // In extension A
-const prompt2 = "Analyze code for bugs...";     // In extension B
-const prompt3 = "Review architecture...";       // In extension C
+#### **Authentication Setup**
+```typescript
+import { RPCClient } from 'simple-rpc-ai-backend';
 
-// ✅ With RPC: Centralized, versioned, updatable
-server.prompts = {
-  security: "You are a senior security engineer...",
-  quality: "You are a senior architect...",
-  performance: "You are a performance expert..."
+const client = new RPCClient('http://localhost:8000');
+
+// Get user's JWT from your auth system (OpenSaaS, Auth0, etc.)
+const userJWT = await getUserJWT(); // Your auth implementation
+```
+
+#### **CREATE - Store API Keys**
+```typescript
+// Store user's API key for a provider
+async function storeApiKey(provider: string, apiKey: string) {
+  try {
+    const result = await client.request('storeUserKey', {
+      jwt: userJWT,
+      provider: provider,        // 'anthropic', 'openai', 'google'
+      apiKey: apiKey            // User's actual API key
+    });
+    
+    return {
+      success: true,
+      keyId: result.keyId,
+      message: `${provider} API key stored successfully`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// Usage in frontend
+await storeApiKey('anthropic', 'sk-ant-api-key-12345');
+await storeApiKey('openai', 'sk-openai-key-67890');
+```
+
+#### **READ - Retrieve API Key Status**
+```typescript
+// Check if user has an API key for a provider
+async function hasApiKey(provider: string) {
+  try {
+    const result = await client.request('getUserKey', {
+      jwt: userJWT,
+      provider: provider
+    });
+    
+    return {
+      hasKey: !!result.apiKey,
+      keyPreview: result.apiKey ? `${result.apiKey.slice(0, 8)}...` : null
+    };
+  } catch (error) {
+    return { hasKey: false, error: error.message };
+  }
+}
+
+// List all providers and their key status
+async function listAllProviders() {
+  try {
+    const result = await client.request('getUserProviders', {
+      jwt: userJWT
+    });
+    
+    return {
+      success: true,
+      providers: result.providers.map(p => ({
+        name: p.provider,
+        hasKey: p.hasKey,
+        displayName: getProviderDisplayName(p.provider)
+      }))
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+function getProviderDisplayName(provider: string): string {
+  const names = {
+    'anthropic': 'Anthropic (Claude)',
+    'openai': 'OpenAI (GPT)',
+    'google': 'Google (Gemini)'
+  };
+  return names[provider] || provider;
+}
+```
+
+#### **UPDATE - Rotate API Keys**
+```typescript
+// Rotate/update an existing API key
+async function rotateApiKey(provider: string, newApiKey: string) {
+  try {
+    const result = await client.request('rotateUserKey', {
+      jwt: userJWT,
+      provider: provider,
+      newApiKey: newApiKey
+    });
+    
+    return {
+      success: true,
+      keyId: result.keyId,
+      message: `${provider} API key updated successfully`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+```
+
+#### **DELETE - Remove API Keys**
+```typescript
+// Delete user's API key for a provider
+async function deleteApiKey(provider: string) {
+  try {
+    const result = await client.request('deleteUserKey', {
+      jwt: userJWT,
+      provider: provider
+    });
+    
+    return {
+      success: result.deleted,
+      message: result.deleted ? 
+        `${provider} API key deleted successfully` : 
+        `Failed to delete ${provider} API key`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+```
+
+#### **VALIDATE - Test API Keys**
+```typescript
+// Validate if stored API key works with the provider
+async function validateApiKey(provider: string) {
+  try {
+    const result = await client.request('validateUserKey', {
+      jwt: userJWT,
+      provider: provider
+    });
+    
+    return {
+      isValid: result.isValid,
+      message: result.isValid ? 
+        `${provider} API key is working` : 
+        `${provider} API key is invalid or expired`
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: error.message
+    };
+  }
+}
+```
+
+### **React Component Example**
+
+```tsx
+import React, { useState, useEffect } from 'react';
+
+interface ApiKeyManager {
+  provider: string;
+  hasKey: boolean;
+  displayName: string;
+}
+
+const ApiKeyManagerComponent: React.FC = () => {
+  const [providers, setProviders] = useState<ApiKeyManager[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newKey, setNewKey] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState('');
+
+  useEffect(() => {
+    loadProviders();
+  }, []);
+
+  const loadProviders = async () => {
+    setLoading(true);
+    const result = await listAllProviders();
+    if (result.success) {
+      setProviders(result.providers);
+    }
+    setLoading(false);
+  };
+
+  const handleStoreKey = async () => {
+    if (!selectedProvider || !newKey) return;
+    
+    const result = await storeApiKey(selectedProvider, newKey);
+    if (result.success) {
+      setNewKey('');
+      setSelectedProvider('');
+      await loadProviders(); // Refresh list
+      alert(result.message);
+    } else {
+      alert(`Error: ${result.error}`);
+    }
+  };
+
+  const handleDeleteKey = async (provider: string) => {
+    if (!confirm(`Delete ${provider} API key?`)) return;
+    
+    const result = await deleteApiKey(provider);
+    if (result.success) {
+      await loadProviders(); // Refresh list
+      alert(result.message);
+    } else {
+      alert(`Error: ${result.error}`);
+    }
+  };
+
+  const handleValidateKey = async (provider: string) => {
+    const result = await validateApiKey(provider);
+    alert(result.isValid ? result.message : `Error: ${result.error}`);
+  };
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div className="api-key-manager">
+      <h2>API Key Management</h2>
+      
+      {/* Add new API key */}
+      <div className="add-key-section">
+        <h3>Add New API Key</h3>
+        <select 
+          value={selectedProvider} 
+          onChange={(e) => setSelectedProvider(e.target.value)}
+        >
+          <option value="">Select Provider</option>
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI (GPT)</option>
+          <option value="google">Google (Gemini)</option>
+        </select>
+        
+        <input
+          type="password"
+          placeholder="Enter API key"
+          value={newKey}
+          onChange={(e) => setNewKey(e.target.value)}
+        />
+        
+        <button onClick={handleStoreKey}>Store API Key</button>
+      </div>
+
+      {/* List existing keys */}
+      <div className="keys-list">
+        <h3>Your API Keys</h3>
+        {providers.map(provider => (
+          <div key={provider.name} className="provider-row">
+            <span className="provider-name">{provider.displayName}</span>
+            <span className={`status ${provider.hasKey ? 'has-key' : 'no-key'}`}>
+              {provider.hasKey ? '✅ Configured' : '❌ Not configured'}
+            </span>
+            
+            {provider.hasKey && (
+              <div className="key-actions">
+                <button onClick={() => handleValidateKey(provider.name)}>
+                  Test
+                </button>
+                <button onClick={() => handleDeleteKey(provider.name)}>
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
-// Update prompts without touching any extensions!
+
+export default ApiKeyManagerComponent;
 ```
 
-**🤖 Multi-Provider AI Integration**
-```javascript
-// ❌ Without RPC: Each extension hardcoded to one provider
-import { OpenAI } from 'openai';  // Stuck with OpenAI
+### **Vue.js Component Example**
 
-// ✅ With RPC: Provider flexibility built-in
-const providers = ['anthropic', 'openai', 'google'];
-// Switch models/providers instantly via server config
+```vue
+<template>
+  <div class="api-key-manager">
+    <h2>API Key Management</h2>
+    
+    <!-- Add new API key -->
+    <div class="add-key-section">
+      <h3>Add New API Key</h3>
+      <select v-model="selectedProvider">
+        <option value="">Select Provider</option>
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="openai">OpenAI (GPT)</option>
+        <option value="google">Google (Gemini)</option>
+      </select>
+      
+      <input
+        v-model="newKey"
+        type="password"
+        placeholder="Enter API key"
+      />
+      
+      <button @click="handleStoreKey" :disabled="!selectedProvider || !newKey">
+        Store API Key
+      </button>
+    </div>
+
+    <!-- List existing keys -->
+    <div class="keys-list">
+      <h3>Your API Keys</h3>
+      <div v-for="provider in providers" :key="provider.name" class="provider-row">
+        <span class="provider-name">{{ provider.displayName }}</span>
+        <span :class="`status ${provider.hasKey ? 'has-key' : 'no-key'}`">
+          {{ provider.hasKey ? '✅ Configured' : '❌ Not configured' }}
+        </span>
+        
+        <div v-if="provider.hasKey" class="key-actions">
+          <button @click="handleValidateKey(provider.name)">Test</button>
+          <button @click="handleDeleteKey(provider.name)">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'ApiKeyManager',
+  data() {
+    return {
+      providers: [],
+      loading: true,
+      newKey: '',
+      selectedProvider: ''
+    };
+  },
+  
+  async created() {
+    await this.loadProviders();
+  },
+  
+  methods: {
+    async loadProviders() {
+      this.loading = true;
+      const result = await listAllProviders();
+      if (result.success) {
+        this.providers = result.providers;
+      }
+      this.loading = false;
+    },
+    
+    async handleStoreKey() {
+      if (!this.selectedProvider || !this.newKey) return;
+      
+      const result = await storeApiKey(this.selectedProvider, this.newKey);
+      if (result.success) {
+        this.newKey = '';
+        this.selectedProvider = '';
+        await this.loadProviders();
+        alert(result.message);
+      } else {
+        alert(`Error: ${result.error}`);
+      }
+    },
+    
+    async handleDeleteKey(provider) {
+      if (!confirm(`Delete ${provider} API key?`)) return;
+      
+      const result = await deleteApiKey(provider);
+      if (result.success) {
+        await this.loadProviders();
+        alert(result.message);
+      } else {
+        alert(`Error: ${result.error}`);
+      }
+    },
+    
+    async handleValidateKey(provider) {
+      const result = await validateApiKey(provider);
+      alert(result.isValid ? result.message : `Error: ${result.error}`);
+    }
+  }
+};
+</script>
 ```
 
-**⚡ Platform-Agnostic Client**
-```javascript
-// ✅ Same client works everywhere
-import { RPCClient } from 'simple-rpc-ai-backend';
+### **Error Handling Patterns**
 
-// Works in VS Code extensions
-const vscodeClient = new RPCClient('http://localhost:8000');
+```typescript
+// Comprehensive error handling for all CRUD operations
+async function safeApiCall<T>(operation: () => Promise<T>): Promise<{
+  success: boolean;
+  data?: T;
+  error?: string;
+}> {
+  try {
+    const data = await operation();
+    return { success: true, data };
+  } catch (error) {
+    // Handle specific error types
+    if (error.message.includes('Unauthorized')) {
+      return { success: false, error: 'Please log in again' };
+    }
+    if (error.message.includes('Invalid API key')) {
+      return { success: false, error: 'The API key format is invalid' };
+    }
+    if (error.message.includes('Provider not supported')) {
+      return { success: false, error: 'This AI provider is not supported' };
+    }
+    
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}
 
-// Works in web applications  
-const webClient = new RPCClient('https://your-domain.com');
-
-// Works in CLI tools
-const cliClient = new RPCClient(process.env.AI_BACKEND_URL);
+// Usage
+const result = await safeApiCall(() => storeApiKey('anthropic', 'sk-ant-key'));
+if (result.success) {
+  console.log('Success:', result.data);
+} else {
+  console.error('Error:', result.error);
+}
 ```
 
-**🛡️ Progressive Authentication System**
-```javascript
-// ✅ Built-in API key management
-await client.storeUserKey('anthropic', userApiKey);
-await client.validateUserKey('anthropic');
-// No need to implement crypto/validation yourself
-```
+### **Real-time Status Updates**
 
-**📊 Unified Monitoring & Rate Limiting**
-```javascript
-// ✅ Server-side controls for all AI usage
-const server = createAIServer({
-  rateLimit: { windowMs: 900000, max: 100 },    // 100 requests/15min
-  monitoring: { logRequests: true, trackUsage: true }
+```typescript
+// WebSocket or polling for real-time key status
+class ApiKeyStatusMonitor {
+  private client: RPCClient;
+  private statusCallbacks: Map<string, (status: boolean) => void> = new Map();
+  
+  constructor(rpcClient: RPCClient) {
+    this.client = rpcClient;
+    this.startMonitoring();
+  }
+  
+  // Subscribe to provider status changes
+  onProviderStatusChange(provider: string, callback: (hasKey: boolean) => void) {
+    this.statusCallbacks.set(provider, callback);
+  }
+  
+  private async startMonitoring() {
+    // Poll every 30 seconds for status changes
+    setInterval(async () => {
+      const result = await listAllProviders();
+      if (result.success) {
+        result.providers.forEach(provider => {
+          const callback = this.statusCallbacks.get(provider.name);
+          if (callback) {
+            callback(provider.hasKey);
+          }
+        });
+      }
+    }, 30000);
+  }
+}
+
+// Usage
+const monitor = new ApiKeyStatusMonitor(client);
+monitor.onProviderStatusChange('anthropic', (hasKey) => {
+  updateUIStatus('anthropic', hasKey);
 });
-// Monitor costs, usage patterns, performance across all clients
 ```
 
-### 🚀 **Development Benefits**
+## 📋 **API Reference**
 
-**Local Development** (`localhost:8000`)
-- Test AI integrations without API keys in extensions
-- Rapid prompt iteration without extension rebuilds
-- Consistent development environment across team
-- Easy debugging with centralized logs
+### Core RPC Methods
 
-**Production Deployment** (any environment)
-- Single point of AI provider configuration
-- Centralized cost monitoring and control
-- Easy model upgrades (GPT-4 → GPT-4-turbo)
-- Standardized error handling across applications
+| Method | Description | Parameters | Storage Required |
+|--------|-------------|------------|------------------|
+| `health` | Server health check | None | None |
+| `executeAIRequest` | Execute AI with protected prompts | `content`, `systemPrompt`, `apiKey?` | None |
 
-### 🔍 **"But I Could Just Call OpenAI Directly..."**
+### Key Management (When Using Storage)
 
-**Sure, but then you're rebuilding all this infrastructure:**
+| Method | Description | Parameters | Vaultwarden | File | Client |
+|--------|-------------|------------|-------------|------|--------|
+| `storeUserKey` | Store encrypted API key | `provider`, `apiKey` | ✅ | ✅ | ❌ |
+| `getUserKey` | Check if key exists | `provider` | ✅ | ✅ | ❌ |
+| `deleteUserKey` | Delete API key | `provider` | ✅ | ✅ | ❌ |
+| `getUserProviders` | List configured providers | None | ✅ | ✅ | ❌ |
+| `validateUserKey` | Validate key with provider | `provider` | ✅ | ✅ | ❌ |
 
-| Feature | Direct API Calls | This Package |
-|---------|------------------|--------------|
-| **Multi-provider support** | ❌ Manual per provider | ✅ Built-in |
-| **Prompt management** | ❌ Scattered in code | ✅ Centralized |
-| **Rate limiting** | ❌ DIY implementation | ✅ Built-in |
-| **Error handling** | ❌ Per-provider logic | ✅ Standardized |
-| **Cost monitoring** | ❌ Manual tracking | ✅ Automatic |
-| **Platform compatibility** | ❌ Reimplement per platform | ✅ Single client |
-| **Authentication** | ❌ Custom key management | ✅ Progressive auth |
-| **Development setup** | ❌ API keys everywhere | ✅ Zero config |
+### API Token System (Vaultwarden Only)
 
-**Real Example**: Want to switch from OpenAI to Anthropic?
-- **Direct calls**: Update every extension, redeploy, handle different APIs
-- **This package**: Change one server config line, done
+| Method | Description | Parameters | Pro Feature |
+|--------|-------------|------------|-------------|
+| `createAPIToken` | Create external access token | `name`, `scopes` | ✅ |
+| `listAPITokens` | List user's tokens | None | ✅ |
+| `revokeAPIToken` | Revoke access token | `tokenId` | ✅ |
 
-### 💡 **Perfect for Local Development**
+### Authentication (Progressive System)
 
-```bash
-# Start backend locally
-pnpm dev
-# 🚀 Server running on http://localhost:8000
+| Method | Description | Parameters |
+|--------|-------------|------------|
+| `initializeSession` | Create device session | `deviceId` |
+| `getAuthStatus` | Get authentication level | `deviceId` |
+| `upgradeToOAuth` | Upgrade to OAuth | `deviceId`, `provider`, `token` |
 
-# All your extensions/apps connect to localhost
-# No corporate concerns, just clean architecture!
+### Secure Vaultwarden Integration
+
+| Method | Description | Parameters | Security |
+|--------|-------------|------------|----------|
+| `vaultwarden.storeApiKey` | Store API key (onboards user if needed) | `jwt`, `apiKey`, `provider` | ✅ BYOK - User provides own keys |
+| `executeAIRequest` | Execute AI request | `jwt`, `content`, `systemPrompt`, `provider` | ✅ Pro users use server keys, Free users use BYOK |
+
+### **💡 Corrected User Flow**
+
+1. **User Authentication** - Sign up/login with OpenSaaS, Auth0, OAuth2, etc.
+2. **API Key Storage** (Free users) - Store their own API key: `storeApiKey(jwt, apiKey, provider)`
+3. **AI Requests** - Execute AI requests: `executeAIRequest(jwt, content, prompt, provider)`
+   - **Free users**: Uses their stored BYOK API key
+   - **Pro users**: Uses server-provided API key automatically
+
+### **🆓 Free vs 💎 Pro Users**
+
+| Feature | Free Users | Pro Users |
+|---------|------------|-----------|
+| **API Key Management** | 🔑 BYOK (Bring Your Own Key) | ✅ Server-provided keys |
+| **Key Storage** | ✅ Encrypted in Vaultwarden | ❌ Not needed |
+| **Setup Required** | ✅ Must store API key first | ❌ Works immediately |
+| **Usage Limits** | 🔒 Limited by their API key | ✅ Higher limits on server keys |
+
+## 🔐 **Authorization & Payment Features**
+
+### **Progressive Authentication Flow**
+
+The system supports **three authentication levels** with automatic upgrade paths:
+
+```typescript
+// 1. Anonymous Access (Limited)
+const client = new RPCClient('http://localhost:8000');
+const result = await client.request('executeAIRequest', {
+  content: 'Hello world',
+  systemPrompt: 'basic-assistant' // Limited to public prompts only
+});
+
+// 2. JWT-Based Authentication (Standard)
+const client = new RPCClient('http://localhost:8000');
+const result = await client.request('executeAIRequest', {
+  jwt: 'eyJ...opensaas-jwt',     // From OpenSaaS, Auth0, etc.
+  content: 'Hello world',
+  systemPrompt: 'code-expert'   // Access to user plan features
+});
+
+// 3. Progressive Upgrade (Device Sessions)
+await client.request('initializeSession', { deviceId: 'vscode-12345' });
+await client.request('upgradeToOAuth', { 
+  deviceId: 'vscode-12345', 
+  provider: 'google',
+  token: 'oauth-token' 
+});
 ```
 
-## ⚖️ **Honest Assessment: Drawbacks & Limitations**
+### **Plan-Based Feature Access**
 
-**We believe in transparency. Here are the real drawbacks of using this package:**
+Check user's subscription and usage status for client-side feature gating:
 
-### 🐌 **Potential Latency Increase**
+```typescript
+// Check user's plan and usage limits
+const userStatus = await client.request('getUserUsageStatus', {
+  userId: 'user-123',
+  userPlan: 'pro' // or 'free', 'enterprise'
+});
 
-**The Reality**: Adding a JSON-RPC hop introduces network latency.
-
-```bash
-# Direct API call flow
-Extension → AI Provider (1 network hop)
-
-# RPC architecture flow  
-Extension → Your Backend → AI Provider (2 network hops)
+// Response includes comprehensive payment/usage info
+{
+  plan: {
+    planId: 'pro',
+    displayName: 'Pro Plan',
+    features: {
+      systemPrompts: ['code-expert', 'security-audit', 'custom-prompts'],
+      customSystemPrompts: true,
+      analyticsAccess: true,
+      priorityQueue: true
+    },
+    rateLimits: {
+      requestsPerMinute: 100,
+      requestsPerHour: 1000,
+      requestsPerDay: 10000
+    }
+  },
+  quotaStatus: {
+    'anthropic': {
+      used: 15000,
+      limit: 100000,
+      resetDate: '2024-02-01T00:00:00Z',
+      percentUsed: 15
+    }
+  },
+  rateLimitStatus: {
+    requestsThisMinute: 5,
+    requestsThisHour: 45,
+    requestsThisDay: 230,
+    limits: { perMinute: 100, perHour: 1000, perDay: 10000 }
+  }
+}
 ```
 
-**Estimated Impact**: 
-- **Local development**: +5-50ms (localhost RPC call)
-- **Production deployment**: +10-200ms (depending on server location)
-- **AI inference time**: 2000-30000ms (actual AI processing)
+### **Client-Side Feature Gating Examples**
 
-**Bottom Line**: RPC latency is typically **<1% of total request time** since AI inference dominates. The security and architectural benefits usually outweigh the minimal latency cost.
+Use payment/plan information to control UI and features:
 
-**When this matters**: Real-time applications where every 50ms counts. For typical code analysis, documentation generation, or similar tasks, the latency is negligible.
+```typescript
+// Feature access control
+if (userStatus.plan.features.customSystemPrompts) {
+  showCustomPromptEditor();
+}
 
-### 📚 **Learning Curve & Setup Complexity**
+if (userStatus.plan.features.analyticsAccess) {
+  showUsageDashboard(userStatus.quotaStatus);
+}
 
-**The Reality**: You need to understand and deploy an additional backend service.
+// Usage-based UI updates
+const anthropicQuota = userStatus.quotaStatus.anthropic;
+if (anthropicQuota.percentUsed > 90) {
+  showQuotaWarning(`${anthropicQuota.percentUsed}% of monthly quota used`);
+}
 
-**Direct API Integration**:
-```javascript
-// Simple but insecure
-import { OpenAI } from 'openai';
-const result = await openai.chat.completions.create({...});
+// Rate limit handling
+const canMakeRequest = await client.request('canUserMakeRequest', {
+  userId: 'user-123',
+  provider: 'anthropic',
+  userPlan: 'pro'
+});
+
+if (!canMakeRequest.allowed) {
+  showRateLimitMessage(canMakeRequest.reason, canMakeRequest.retryAfter);
+}
 ```
 
-**This Package**:
-```javascript
-// More setup, but secure and flexible
-import { createAIServer } from 'simple-rpc-ai-backend';
-import { RPCClient } from 'simple-rpc-ai-backend';
+### **BYOK vs Server-Provided Keys**
 
-// 1. Deploy backend server (your infrastructure)
-const server = createAIServer({...});
+Support multiple key management strategies based on subscription:
 
-// 2. Configure client in extensions  
-const client = new RPCClient('https://your-backend.com');
+```typescript
+// Free users: Bring Your Own Key (BYOK)
+await client.request('storeUserKey', {
+  userId: 'user@company.com',
+  provider: 'anthropic',
+  apiKey: 'sk-ant-user-provided-key',
+  encrypted: true
+});
+
+// Pro users: Server-provided keys (automatic)
+const result = await client.request('executeAIRequest', {
+  jwt: 'eyJ...pro-user-jwt',
+  content: 'Analyze this code',
+  systemPrompt: 'security-expert' // Uses server's API keys automatically
+});
+
+// Check key source and quota remaining
+const keyInfo = await client.request('getApiKeyForUser', {
+  userId: 'user-123',
+  provider: 'anthropic',
+  userPlan: 'pro'
+});
+// Returns: { apiKey: '***', source: 'server_provided', quotaRemaining: 85000 }
 ```
 
-**Additional Operational Complexity**:
-- Backend deployment and monitoring
-- Server security and updates
-- Load balancing for multiple clients
-- Debugging across network boundaries
+### **Multi-Tenant Architecture**
 
-### 🤔 **When NOT to Use This Package**
+Support multiple subscription tiers with flexible configurations:
 
-**Skip this package if:**
-- **Prototype/demo projects** - Direct API calls are faster to implement
-- **No sensitive prompts** - If your prompts have no business value to protect
-- **Single-developer projects** - Where prompt centralization isn't needed
-- **Extreme latency requirements** - Where every millisecond matters
-- **No server infrastructure** - If you can't deploy/maintain a backend
+```typescript
+// Enterprise tier with custom limits
+{
+  planId: 'enterprise',
+  keySource: 'server_provided', // Company provides API keys
+  allowedProviders: ['anthropic', 'openai', 'google'],
+  tokenQuotas: {
+    'anthropic': { maxTokensPerPeriod: 1000000, resetInterval: 'monthly' },
+    'openai': { maxTokensPerPeriod: 500000, resetInterval: 'monthly' }
+  },
+  features: {
+    systemPrompts: '*', // Access to all prompts
+    customSystemPrompts: true,
+    analyticsAccess: true,
+    priorityQueue: true
+  }
+}
 
-### 💡 **When the Benefits Outweigh the Costs**
+// Startup tier with mixed approach  
+{
+  planId: 'startup',
+  keySource: 'server_optional', // Server keys available, BYOK allowed
+  allowedProviders: ['anthropic'],
+  tokenQuotas: {
+    'anthropic': { maxTokensPerPeriod: 50000, resetInterval: 'monthly' }
+  },
+  features: {
+    systemPrompts: ['basic-assistant', 'code-helper'],
+    customSystemPrompts: false,
+    analyticsAccess: false
+  }
+}
+```
 
-**Use this package when:**
-- **Valuable system prompts** - Your AI logic has competitive value
-- **Multiple applications** - Extensions, web apps, CLI tools sharing AI
-- **Corporate deployment** - Need proxy bypass and centralized control
-- **Team development** - Multiple developers working on AI features
-- **Production systems** - Where security and maintainability matter
+### **Available Authorization Methods**
 
-**Real-world perspective**: The 50ms RPC latency becomes irrelevant when users wait 10+ seconds for AI responses. The security and architectural benefits usually justify the minimal overhead.
+| Method | Description | Returns | Client Usage |
+|--------|-------------|---------|--------------|
+| `getUserUsageStatus` | Get plan, quotas, rate limits | Full user status | Feature gating, usage displays |
+| `canUserMakeRequest` | Check if request is allowed | `{allowed, reason, retryAfter}` | Pre-request validation |
+| `getAuthStatus` | Get authentication level | Device auth status | Progressive auth UI |
+| `shouldSuggestUpgrade` | Check if upgrade needed | Upgrade recommendations | Subscription prompts |
 
 ## 🏗️ **RPC Architecture with System Prompt Protection**
 
 ```mermaid
 sequenceDiagram
-    participant VSCode as VS Code Extension<br/>(RPC Client)
+    participant Client as RPC Client<br/>(VS Code/Web/CLI)
     participant Proxy as Corporate Proxy<br/>(Traffic Monitor)
     participant Backend as Your RPC Backend<br/>(System Prompts Here)
+    participant Storage as Key Storage<br/>(Vaultwarden/File/Client)
     participant AI as AI Provider<br/>(Anthropic/OpenAI/Google)
     
-    Note over VSCode,AI: User triggers code analysis in VS Code
+    Note over Client,AI: User triggers AI request
     
-    VSCode->>VSCode: Get user's code from active editor
-    VSCode->>Proxy: JSON-RPC call: analyzeCode(code, fileName)
+    Client->>Proxy: JSON-RPC: executeAIRequest(userContent, promptName)
     
-    Note over Proxy: ✅ Corporate proxy sees user code only<br/>❌ Never sees your proprietary system prompts
+    Note over Proxy: ✅ Sees user content only<br/>❌ Never sees system prompts
     
-    Proxy->>Backend: Forward RPC request (user code only)
-    Backend->>Backend: Load system prompts from secure server storage
-    Backend->>Backend: Combine user code + system prompts
+    Proxy->>Backend: Forward RPC request
+    Backend->>Backend: Load system prompt by name (secure)
     
-    Note over Backend,AI: Vercel AI SDK handles multi-provider calls
-    Backend->>AI: generateText(systemPrompt + userCode)
+    alt Storage-Based Keys
+        Backend->>Storage: Get user's API key (encrypted)
+        Storage->>Backend: Return API key
+    else Client-Managed Keys
+        Note over Backend: API key provided in request
+    end
     
-    AI->>AI: Process with your proprietary analysis logic
-    AI->>Backend: Return analysis results
+    Backend->>AI: generateText(systemPrompt + userContent)
+    AI->>Backend: Return AI response
+    Backend->>Client: JSON-RPC response with results
     
-    Backend->>Backend: Filter/format results for VS Code
-    Backend->>VSCode: JSON-RPC response with analysis
-    
-    VSCode->>VSCode: Display results in webview panel
-    
-    Note over VSCode,AI: 🔒 System prompts never left your server<br/>🚀 User got AI-powered analysis<br/>⚡ Zero extension configuration needed
+    Note over Client,AI: 🔒 System prompts protected<br/>🚀 Corporate proxy friendly<br/>⚡ Flexible key management
 ```
+
+## 🔐 **Detailed Authentication Architecture**
+
+### **Secure Server-Side Architecture (Recommended)**
+
+```mermaid
+sequenceDiagram
+    participant Client as RPC Client<br/>(VS Code Extension)
+    participant RPC as RPC Backend<br/>(Secure Vault Manager)
+    participant OpenSaaS as OpenSaaS Service<br/>(User Management & Billing)
+    participant DB as Secure Database<br/>(Encrypted User Mappings)
+    participant Vault as Vaultwarden Server<br/>(API Key Storage)
+    participant AI as AI Provider<br/>(Anthropic/OpenAI)
+    
+    Note over Client,AI: Secure Server-Side Key Management
+    
+    rect rgb(240, 248, 255)
+        Note over Client, OpenSaaS: 1. User Registration & JWT Generation
+        Client->>OpenSaaS: User signs up / logs in
+        OpenSaaS->>OpenSaaS: Generate JWT with user claims
+        OpenSaaS->>Client: Return opensaasJWT
+    end
+    
+    rect rgb(255, 248, 240)
+        Note over Client, Vault: 2. User Onboarding (First API Key Storage)
+        Client->>RPC: vaultwarden.storeApiKey(jwt, apiKey, provider)
+        RPC->>RPC: Extract user identity (supports OAuth2 primary)
+        RPC->>RPC: Generate secure vault password (64 chars, server-side)
+        RPC->>Vault: Create Vaultwarden account with server password
+        RPC->>DB: Store encrypted mapping with subscription tier
+        
+        Note over RPC: User onboarded when they store first API key!
+    end
+    
+    rect rgb(248, 255, 248)
+        Note over Client, Vault: 3. Secure API Key Storage (Combined with Onboarding)
+        RPC->>DB: Get vault credentials for user (server-only)
+        RPC->>Vault: Authenticate with server-generated password
+        RPC->>Vault: Store API key directly in vault
+        RPC->>Client: {success: true, keyId}
+        
+        Note over Client: Onboarding + key storage in one seamless operation!
+    end
+    
+    rect rgb(240, 255, 240)
+        Note over Client, AI: 4. AI Request Flow (Free vs Pro Users)
+        Client->>RPC: executeAIRequest(jwt, content, systemPrompt, provider)
+        RPC->>RPC: Check user exists (must store API key first)
+        
+        alt Free User (BYOK)
+            RPC->>DB: Get vault credentials for user  
+            RPC->>Vault: Retrieve user's encrypted API key
+            Note over RPC: Uses user's own API key
+        else Pro User
+            RPC->>RPC: Get server-provided API key
+            Note over RPC: Uses company's API key pool
+        end
+        
+        RPC->>RPC: Combine content + server-side system prompt
+        RPC->>AI: Make AI request with appropriate key
+        AI->>RPC: Return AI response
+        RPC->>Client: AI response
+        
+        Note over Client: Pro users get instant access, Free users need BYOK setup!
+    end
+    
+    rect rgb(255, 255, 240)
+        Note over OpenSaaS, RPC: 5. Billing Integration (Background)
+        OpenSaaS->>RPC: Webhook: user.created, payment.completed, etc.
+        RPC->>RPC: Update billing preferences via SeamlessOpenSaaSIntegration
+        RPC->>RPC: Track usage with HybridBillingManager
+        
+        Note over RPC: Automatic credit management, usage tracking
+    end
+```
+
+### **🔒 Secure Server-Side Key Management**
+
+| Component | OpenSaaS JWT | Vault Password | API Keys | System Prompts | Vault User ID |
+|-----------|-------------|----------------|----------|----------------|---------------|
+| **Client** | ✅ Provides | ❌ Never sees | ✅ Provides once | ❌ Never sees | ❌ Never sees |
+| **RPC Backend** | ✅ Validates | ✅ Generates & stores | ✅ Retrieves & uses | ✅ Stores securely | ✅ Manages internally |
+| **Database** | ❌ | ✅ Encrypted storage | ❌ | ❌ | ✅ User mappings |
+| **Vaultwarden** | ❌ | ✅ Account auth | ✅ Encrypted storage | ❌ | ✅ Internal user |
+| **OpenSaaS** | ✅ Issues | ❌ | ❌ | ❌ | ❌ |
+
+**True Zero-Knowledge Architecture**: Client provides JWT from any auth provider. Server handles all crypto securely!
+
+### **🔄 Auth Provider Flexibility**
+
+The RPC backend works with **any JWT-issuing auth provider**:
+
+| Auth Provider | JWT Format | Integration |
+|---------------|------------|-------------|
+| **OpenSaaS** | `{ userId, email, subscriptionTier }` | ✅ Built-in support |
+| **Auth0** | `{ sub, email, custom_claims }` | ✅ Automatic mapping |
+| **Firebase** | `{ uid, email, firebase }` | ✅ Automatic mapping |  
+| **Custom Backend** | `{ user_id, email, roles }` | ✅ Configurable mapping |
+| **Enterprise SSO** | `{ employee_id, email, department }` | ✅ SAML/OIDC support |
+
+**Example with different auth providers:**
+```typescript
+// OpenSaaS JWT
+const openSaasResult = await client.request('executeAIRequest', {
+  jwt: 'eyJ...opensaas-jwt',  // { userId: 'user-123', email: 'john@co.com' }
+  content, systemPrompt, provider
+});
+
+// Auth0 JWT  
+const auth0Result = await client.request('executeAIRequest', {
+  jwt: 'eyJ...auth0-jwt',     // { sub: 'auth0|user-123', email: 'john@co.com' }
+  content, systemPrompt, provider
+});
+
+// Same user, same vault, different auth provider!
+```
+
+### **👥 Multiple User ID Support**
+
+Users can have multiple IDs across different auth providers:
+
+```typescript
+// User starts with email/password
+JWT1: { userId: 'user-123', email: 'john@company.com' }
+// Creates vault: primaryUserId = 'user-123'
+
+// Later adds Google OAuth
+JWT2: { userId: 'user-123', googleId: 'google-98765', email: 'john@company.com' }
+// Updates vault: alternateUserIds = ['google-98765']
+
+// Later adds GitHub OAuth  
+JWT3: { userId: 'user-123', githubId: 'github-54321', googleId: 'google-98765' }
+// Updates vault: alternateUserIds = ['google-98765', 'github-54321']
+
+// Same user, same vault, multiple auth methods!
+```
+
+**Benefits:**
+- ✅ **Seamless auth provider migration** - Users keep their API keys
+- ✅ **Multiple login methods** - Google, GitHub, SSO, email/password
+- ✅ **No duplicate accounts** - System recognizes same user across providers
+- ✅ **Enterprise flexibility** - Support any corporate auth system
 
 ### **🔐 What's Protected Where**
 
-| Component | Sees User Code | Sees System Prompts | Your Control |
-|-----------|---------------|---------------------|--------------|
-| **VS Code Extension** | ✅ | ❌ | ❌ (User's machine) |
-| **Corporate Proxy** | ✅ | ❌ | ❌ (Company network) |
-| **Your RPC Backend** | ✅ | ✅ | ✅ (Your server) |
-| **AI Provider** | ✅ | ✅ | ❌ (External service) |
-
-**Key Insight**: Corporate proxies and extension users never see your valuable system prompts!
-
-## 📦 **What You Get**
-
-### 🎯 **For Client Developers**
-```typescript
-import { RPCClient } from 'simple-rpc-ai-backend';
-
-// Platform-agnostic JSON-RPC client  
-const client = new RPCClient('http://localhost:8000');
-const result = await client.request('executeAIRequest', {
-  content: code,
-  systemPrompt: 'security_review'
-});
-```
-
-### 🖥️ **For Backend Developers**  
-```typescript
-import { createAIServer } from 'simple-rpc-ai-backend';
-
-// Flexible AI server with multiple providers
-const server = createAIServer({
-  serviceProviders: ['anthropic', 'openai', 'google'],
-  requirePayment: { enabled: false } // For prototyping
-});
-```
-
-### 🤖 **Built-in AI Provider Support**
-- **Anthropic** (Claude models)
-- **OpenAI** (GPT models)  
-- **Google** (Gemini models)
-- **Extensible** - Easy to add more providers via Vercel AI SDK
-
-## 🚀 **5-Minute Quick Start**
-
-### Step 1: Install Package
-
-#### **Option A: Install from GitHub (Current)**
-Since this package isn't published to npm yet, install directly from GitHub:
-
-```bash
-# Using npm
-npm install git+https://github.com/AWolf81/simple-rpc-ai-backend.git
-
-# Using pnpm (recommended)
-pnpm add git+https://github.com/AWolf81/simple-rpc-ai-backend.git
-
-# Using yarn
-yarn add git+https://github.com/AWolf81/simple-rpc-ai-backend.git
-```
-
-#### **Option B: Local Development Setup**
-For contributing or local development:
-
-```bash
-# Clone the repository
-git clone https://github.com/AWolf81/simple-rpc-ai-backend.git
-cd simple-rpc-ai-backend
-
-# Install dependencies
-pnpm install
-
-# Build the package
-pnpm build
-
-# Link for local development
-pnpm link --global
-
-# In your project, use the local package
-pnpm link --global simple-rpc-ai-backend
-```
-
-#### **Option C: npm (Coming Soon)**
-Once published to npm (target: v1.0):
-```bash
-npm install simple-rpc-ai-backend
-```
-
-### Step 2: Create Your Backend Server
-```javascript
-// server.js - Your secure AI backend
-import { createAIServer } from 'simple-rpc-ai-backend';
-
-const server = createAIServer({
-  // 🔒 Your proprietary system prompts (stay server-side!)
-  prompts: {
-    security_review: `
-      You are a senior security engineer. Analyze code for:
-      - SQL injection vulnerabilities
-      - XSS issues  
-      - Authentication flaws
-      - Input validation problems
-      Provide specific, actionable recommendations.
-    `,
-    code_quality: `
-      You are a senior architect. Review code for:
-      - SOLID principles adherence
-      - Design patterns usage
-      - Performance considerations
-      - Maintainability issues
-      Focus on specific improvements with examples.
-    `
-  },
-  
-  // 🤖 AI provider configuration
-  serviceProviders: [
-    {
-      provider: 'anthropic',
-      model: 'claude-3-5-sonnet-20241022'
-      // Uses ANTHROPIC_API_KEY env var
-    },
-    'openai',  // Fallback provider
-    'google'   // Final fallback
-  ],
-  
-  requirePayment: { enabled: false }, // Free for prototyping
-  
-  port: 8000
-});
-
-server.start(); // 🚀 Your RPC AI backend is ready!
-```
-
-### Step 3: Use in Your VS Code Extension
-```javascript
-// extension.js - Clean, simple VS Code integration
-import * as vscode from 'vscode';
-import { RPCClient } from 'simple-rpc-ai-backend';
-
-const client = new RPCClient('http://localhost:8000');
-
-export function activate(context) {
-  // Register security review command
-  const securityCommand = vscode.commands.registerCommand('extension.securityReview', async () => {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) return;
-    
-    const code = editor.document.getText();
-    const fileName = editor.document.fileName;
-    
-    try {
-      // 📡 One RPC call gets AI analysis with your prompts
-      const result = await client.request('executeAIRequest', {
-        content: code,
-        systemPrompt: 'security_review',
-        metadata: { fileName }
-      });
-      
-      // 📊 Show results in VS Code webview
-      showAnalysisResults(response, 'Security Review', fileName);
-      
-    } catch (error) {
-      vscode.window.showErrorMessage(`Analysis failed: ${error.message}`);
-    }
-  });
-
-  context.subscriptions.push(securityCommand);
-}
-
-function showAnalysisResults(result, title, fileName) {
-  const panel = vscode.window.createWebviewPanel('analysis', title, vscode.ViewColumn.Beside);
-  panel.webview.html = `
-    <html>
-      <body>
-        <h1>${title} - ${fileName}</h1>
-        <div>Processing Time: ${result.metadata.processingTime}ms</div>
-        <div>Model: ${result.metadata.model}</div>
-        <div>Tokens: ${result.metadata.tokenUsage.totalTokens}</div>
-        <hr>
-        <pre>${result.response}</pre>
-      </body>
-    </html>
-  `;
-}
-```
-
-### Step 4: Set Environment Variables
-```bash
-# .env file for your backend server
-ANTHROPIC_API_KEY=your_api_key_here
-# or OPENAI_API_KEY=your_key_here
-# or GOOGLE_GENERATIVE_AI_API_KEY=your_key_here
-```
-
-### Step 5: Run Everything
-```bash
-# Terminal 1: Start your backend
-node server.js
-# 🚀 Simple RPC AI Backend Server
-# 🌐 Server running on port 8000
-# 🤖 AI Provider: anthropic (claude-3-5-sonnet-20241022)
-
-# Terminal 2: Test your VS Code extension
-# Open VS Code, trigger your command
-# ✅ AI analysis with protected system prompts!
-```
-
-## 🛡️ **Security Properties**
-
-### ✅ **What This Architecture Protects**
-- **🔒 System Prompt Secrecy** - Your valuable prompts never leave your server
-- **🏢 Corporate Proxy Bypass** - Extensions work behind firewalls/proxies
-- **👨‍💻 Developer Isolation** - Extension developers can't steal your prompts
-- **🔄 Centralized Control** - Update prompts without extension updates
-- **⚡ Zero Client Setup** - Users don't configure API keys
-
-### 🔍 **Honest Security Assessment**
-
-| Component | User Code Visible | System Prompts Visible | Risk Level |
-|-----------|-------------------|------------------------|------------|
-| **VS Code Extension** | ✅ | ❌ | 🟢 Low (no sensitive data) |
-| **Corporate Proxy** | ✅ | ❌ | 🟢 Low (can't see your IP) |
-| **Your RPC Backend** | ✅ | ✅ | 🟢 Low (you control this) |
-| **AI Provider** | ✅ | ✅ | 🟡 Medium (external service) |
-
-**Key Protection**: Corporate networks and extension users never see your proprietary system prompts.
-
-**Accepted Trade-off**: AI providers see system prompts (unavoidable - they need them to process).
-
-## 📋 **API Reference**
-
-### RPCClient
-```typescript
-import { RPCClient } from 'simple-rpc-ai-backend/client';
-
-class RPCClient {
-  constructor(baseUrl: string, options?: {
-    timeout?: number;     // Request timeout (default: 60000ms)
-  })
-  
-  // 🎯 Main method - make JSON-RPC 2.0 requests
-  async request(method: string, params?: any): Promise<any>
-  
-  // 🔔 Send notifications (no response expected)
-  async notify(method: string, params?: any): Promise<void>
-  
-  // ⚙️ Get client configuration
-  getConfig(): ClientConfig
-}
-```
-
-### createAIServer
-```typescript
-import { createAIServer } from 'simple-rpc-ai-backend/server';
-
-function createAIServer(config: {
-  // 🔒 Your proprietary system prompts
-  prompts: {
-    [analysisType: string]: string;
-  };
-  
-  // 🤖 AI provider configuration (Vercel AI SDK)
-  ai: {
-    provider: 'anthropic' | 'openai' | 'google';
-    apiKey?: string;      // Or use environment variables
-    model?: string;       // Provider-specific model name
-    maxTokens?: number;   // Token limit (default: 4000)
-    temperature?: number; // Creativity 0-1 (default: 0.3)
-  };
-  
-  // 🌐 Server configuration
-  port?: number;          // Server port (default: 8000)
-  
-  // 🛡️ Security options
-  cors?: {
-    origin?: string | string[];  // Allowed origins
-    credentials?: boolean;       // CORS credentials
-  };
-  
-  rateLimit?: {
-    windowMs?: number;    // Rate limit window (default: 15min)
-    max?: number;         // Max requests per window (default: 100)
-  };
-  
-  auth?: {
-    enabled?: boolean;    // Enable bearer auth
-    bearer?: string;      // Bearer token
-  };
-}) => {
-  app: Express;           // Express app instance
-  start: () => void;      // Start the server
-  stop: () => void;       // Graceful shutdown
-}
-```
-
-### AI Service (Advanced Usage)
-```typescript
-import { AIService } from 'simple-rpc-ai-backend/ai';
-
-// Direct AI service usage (if you want custom logic)
-const ai = new AIService({
-  provider: 'anthropic',
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  model: 'claude-3-5-sonnet-20241022'
-});
-
-const result = await ai.analyze({
-  userCode: code,
-  systemPrompt: myPrompt,
-  fileName: 'example.js'
-});
-```
-
-## 🔄 **Migrating from Custom RPC Implementations**
-
-If you're currently using custom JSON-RPC implementations:
-
-### ❌ **Complex Custom Implementation**
-```javascript
-// OLD - Custom, maintenance-heavy approach
-class CustomRPCClient {
-  async makeRequest(method, params) {
-    // Custom retry logic, error handling, transport...
-    // Hundreds of lines of maintenance burden
-  }
-  
-  async analyzeCode(type, code) {
-    // App-specific methods mixed with transport
-  }
-}
-```
-
-### ✅ **Use Professional Library**  
-```javascript
-// NEW - Clean, standard approach
-const client = new RPCClient('http://localhost:8000');
-const result = await client.request('executeAIRequest', {
-  content: code,
-  systemPrompt: 'security_review'
-});
-```
-
-**Migration benefits:**
-- 🗡️ **90% less code** - Remove custom RPC complexity
-- ⚡ **Better reliability** - Use proven `json-rpc-2.0` library
-- 🐛 **Easier debugging** - Standard JSON-RPC 2.0 protocol
-- 🛡️ **Better security** - System prompts still protected server-side
-
-## 🌟 **Why Open Source This?**
-
-### 🎯 **Real Value for VS Code Extension Developers**
-
-**Current Reality**: Every AI-powered VS Code extension reinvents the wheel:
-- Extension developers store system prompts in client code (insecure)
-- Users must configure API keys (friction)
-- Extensions hardcode to specific AI providers (inflexible)
-- Corporate proxies block AI APIs (unusable at work)
-
-**This Package Solves Real Problems**:
-- ✅ **Secure by default** - System prompts stay server-side
-- ✅ **Zero user setup** - No API key configuration needed
-- ✅ **Multi-provider support** - Switch AI providers without extension updates
-- ✅ **Corporate-friendly** - Works behind firewalls via your backend
-
-### 🚀 **Community Benefits**
-
-**For Extension Developers**:
-- Focus on UX instead of AI integration complexity
-- Ship extensions that work in corporate environments
-- Protect your proprietary analysis logic
-
-**For Enterprise Users**:
-- Extensions that respect corporate security policies
-- No need to configure individual AI API keys
-- Centralized control over AI usage and costs
-
-**For the Ecosystem**:
-- Standard pattern for AI-powered VS Code extensions
-- Reusable, tested infrastructure
-- Focus innovation on features, not plumbing
-
-## 🧪 **Testing with curl Examples**
-
-### Basic Server (Port 8000)
-
-Start the basic server:
-```bash
-node examples/servers/basic-server.js
-```
-
-Test with these curl commands:
-
-```bash
-# Health check
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "health", "id": 1}'
-
-# Execute AI request with system prompt ID
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "executeAIRequest", "params": {"content": "function add(a, b) { return a + b; }", "systemPrompt": "security_review"}, "id": 1}'
-
-# Code quality review
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "executeAIRequest", "params": {"content": "const users = data.filter(u => u.active);", "systemPrompt": "code_quality"}, "id": 2}'
-
-# Architecture review
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "executeAIRequest", "params": {"content": "class UserService { constructor(db) { this.db = db; } async getUser(id) { return this.db.findById(id); } }", "systemPrompt": "architecture_review"}, "id": 3}'
-```
-
-### Custom Functions Server
-
-Start the custom functions server:
-```bash
-node examples/servers/custom-functions-example.js
-```
-
-Test built-in and custom functions:
-
-```bash
-# List all available functions
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "listCustomFunctions", "params": {}, "id": 1}'
-
-# Built-in: Analyze code
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "analyzeCode", "params": {"content": "function fibonacci(n) { if (n <= 1) return n; return fibonacci(n-1) + fibonacci(n-2); }", "language": "javascript"}, "id": 2}'
-
-# Built-in: Generate tests
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "generateTests", "params": {"content": "export function multiply(a, b) { return a * b; }", "framework": "vitest"}, "id": 3}'
-
-# Custom: Explain code for beginners
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "explainCode", "params": {"content": "const users = await fetch('/api/users').then(r => r.json());", "level": "beginner"}, "id": 4}'
-
-# Custom: Generate commit message
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "generateCommitMessage", "params": {"content": "+ function add(a, b) { return a + b; }\n+ export { add };", "format": "conventional"}, "id": 5}'
-
-# Built-in: Security review
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "securityReview", "params": {"content": "app.get('/user/:id', (req, res) => { const query = 'SELECT * FROM users WHERE id = ' + req.params.id; db.query(query, (err, result) => res.json(result)); });"}, "id": 6}'
-```
-
-## 📋 **Available JSON-RPC Methods**
-
-### Core Methods
-| Method | Description | Parameters |
-|--------|-------------|------------|
-| `health` | Check server health and status | None |
-| `executeAIRequest` | Execute AI request with system prompt | `content`, `systemPrompt` |
-
-## 🔐 Authentication Systems
-
-**⚠️ IMPORTANT**: This package has **THREE different authentication systems** for different use cases:
-
-| Authentication Type | Purpose | Billing Support | Best For |
-|-------------------|---------|----------------|----------|
-| **🏢 OpenSaaS JWT** | Production monetization | ✅ **Required for billing** | SaaS apps with subscriptions |
-| **🔧 GitHub/Microsoft OAuth** | Basic RPC protection | ❌ No billing features | Development & simple tools |
-| **🛡️ Extension-Only Security** | VS Code extension security | Works with either | Prevent unauthorized access |
-
-### **📋 Quick Decision Guide**
-
-**For Production SaaS with Billing:**
-```typescript
-// ✅ Use OpenSaaS JWT - Full monetization features
-const server = await createMonetizedAIServer({
-  opensaasMonetization: createOpenSaaSConfig({
-    opensaasPublicKey: process.env.OPENSAAS_PUBLIC_KEY,
-    customTiers: { free: {...}, pro: {...} }
-  })
-});
-```
-
-**For Development/Internal Tools:**
-```typescript
-// ✅ Use GitHub OAuth - Simple protection, no billing
-const server = createAIServer({
-  oauthAuth: {
-    allowedProviders: ['github'],
-    allowedUsers: ['dev@company.com']
-  }
-});
-```
-
-**🔗 Detailed Authentication Guide**: [AUTHENTICATION-FLOWS.md](./docs/AUTHENTICATION-FLOWS.md)
-
----
-
-### Authentication Methods (Legacy OAuth System)
-| Method | Description | Parameters |
-|--------|-------------|------------|
-| `initializeSession` | Create device session for progressive auth | `deviceId`, `deviceName` |
-| `upgradeToOAuth` | Upgrade to OAuth authentication | `deviceId`, `provider`, `oauthToken` |
-| `linkDeviceWithCode` | Link device using generated code | `newDeviceId`, `code`, `deviceName` |
-| `generateDeviceLinkCode` | Generate code for device linking | `email` |
-| `upgradeToPro` | Upgrade to Pro subscription | `deviceId` |
-| `getAuthStatus` | Get current authentication status | `deviceId` |
-| `hasFeature` | Check if user has specific feature | `deviceId`, `feature` |
-| `invalidateSession` | Invalidate user session | `deviceId` |
-| `shouldSuggestUpgrade` | Check if auth upgrade should be suggested | `deviceId` |
-
-### Role-Based Access Control (RBAC)
-
-**🏆 Enterprise-Grade Role Management System**
-
-The system supports three role levels with hierarchical permissions:
-
-| Role | Description | Capabilities |
-|------|-------------|-------------|
-| **`user`** | Default role for all authenticated users | Use AI services, view own roles |
-| **`admin`** | Administrative role for user management | Manage users, blacklists, security settings |
-| **`super_admin`** | Highest privilege role | Create/manage admins, full system control |
-
-#### Permission Matrix
-
-| Action | User | Admin | Super Admin |
-|--------|:----:|:-----:|:-----------:|
-| Use AI Services | ✅ | ✅ | ✅ |
-| View own roles | ✅ | ✅ | ✅ |
-| Blacklist users | ❌ | ✅ | ✅ |
-| Manage allowlist | ❌ | ✅ | ✅ |
-| View security stats | ❌ | ✅ | ✅ |
-| Grant admin role | ❌ | ❌ | ✅ |
-| Grant super admin | ❌ | ❌ | ✅ |
-| View all user roles | ❌ | ✅ | ✅ |
-
-#### Role Management Methods
-| Method | Description | Required Role | Parameters |
-|--------|-------------|---------------|------------|
-| `admin.grantRole` | Grant role to user | super_admin | `targetEmail`, `role` |
-| `admin.revokeRole` | Revoke role from user | super_admin | `targetEmail`, `role` |
-| `admin.getUserRoles` | Get user's roles | admin | `email` |
-| `admin.getAllUserRoles` | List all user roles | admin | None |
-
-#### User Management Methods (Admin Required)
-| Method | Description | Required Role | Parameters |
-|--------|-------------|---------------|------------|
-| `admin.blacklistUser` | Blacklist a user | admin | `emailOrId`, `reason` |
-| `admin.allowUser` | Add user to allowlist | admin | `emailOrId`, `reason` |
-| `admin.setAccessMode` | Change access control mode | admin | `mode` |
-| `admin.getSecurityStats` | Get security statistics | admin | None |
-
-#### User Limits Management (Admin Required)
-| Method | Description | Required Role | Parameters |
-|--------|-------------|---------------|------------|
-| `admin.getUserStats` | Get user count statistics | admin | None |
-| `admin.setUserLimit` | Set maximum user limit | admin | `limit` |
-| `admin.addUserSlots` | Add more user slots temporarily | admin | `slots` |
-| `admin.getWaitlist` | View users waiting for access | admin | None |
-| `admin.removeFromWaitlist` | Remove user from waitlist | admin | `email` |
-
-#### Special Access Management (Admin Required)
-| Method | Description | Required Role | Parameters |
-|--------|-------------|---------------|------------|
-| `admin.grantSpecialAccess` | Grant access above user limit | admin | `email`, `reason` |
-| `admin.promoteFromWaitlist` | Promote waitlisted user to access | admin | `email` |
-| `admin.revokeSpecialAccess` | Remove special access privileges | admin | `email` |
-| `admin.getSpecialAccessUsers` | List users with special access | admin | None |
-| `admin.bulkGrantSpecialAccess` | Grant access to multiple users | admin | `emails[]`, `reason` |
-
-#### Server Configuration Example
-```javascript
-const serverConfig = {
-  oauthAuth: {
-    // Role-based access control
-    superAdmins: [
-      'founder@company.com'     // Initial super admin
-    ],
-    initialAdmins: [
-      'admin1@company.com',     // Initial admin users
-      'admin2@company.com'
-    ],
-    
-    // Access control modes
-    accessMode: 'open',         // 'open' | 'allowlist' | 'development'
-    
-    // User limits for public beta launches
-    userLimits: {
-      maxUsers: 1000,              // Maximum total users (set to 0 to disable)
-      maxActiveUsers: 100,         // Maximum concurrent active users (optional)
-      waitlistEnabled: true,       // Enable waiting list when limit reached
-      adminBypassLimits: true      // Allow admins to bypass user limits (default: true)
-    },
-    
-    // Security controls
-    rateLimiting: {
-      maxRequestsPerHour: 100,
-      autoBlacklistThreshold: 3
-    }
-  }
-};
-```
-
-#### Usage Examples
-```bash
-# Grant admin role (super admin only)
-curl -X POST http://localhost:8000/rpc \
-  -H "Authorization: Bearer SUPER_ADMIN_TOKEN" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "admin.grantRole",
-    "params": {"targetEmail": "newadmin@company.com", "role": "admin"}
-  }'
-
-# Blacklist malicious user (admin required)
-curl -X POST http://localhost:8000/rpc \
-  -H "Authorization: Bearer ADMIN_TOKEN" \
-  -d '{
-    "jsonrpc": "2.0", 
-    "method": "admin.blacklistUser",
-    "params": {"emailOrId": "attacker@example.com", "reason": "DoS attack"}
-  }'
-
-# Get user statistics (admin required)
-curl -X POST http://localhost:8000/rpc \
-  -H "Authorization: Bearer ADMIN_TOKEN" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "admin.getUserStats",
-    "id": 1
-  }'
-
-# Grant special access to coworker (above limit)
-curl -X POST http://localhost:8000/rpc \
-  -H "Authorization: Bearer ADMIN_TOKEN" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "admin.grantSpecialAccess",
-    "params": {"email": "coworker@company.com", "reason": "Team member"},
-    "id": 2
-  }'
-
-# Bulk grant access to friends and family
-curl -X POST http://localhost:8000/rpc \
-  -H "Authorization: Bearer ADMIN_TOKEN" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "admin.bulkGrantSpecialAccess",
-    "params": {
-      "emails": ["friend1@example.com", "friend2@example.com"],
-      "reason": "Friends and family beta access"
-    },
-    "id": 3
-  }'
-```
-
-### Key Management Methods (BYOK)
-| Method | Description | Parameters |
-|--------|-------------|------------|
-| `storeUserKey` | Store encrypted API key for user | `userId`, `provider`, `apiKey` |
-| `getUserKey` | Retrieve user's API key | `userId`, `provider` |
-| `getUserProviders` | Get configured providers for user | `userId` |
-| `validateUserKey` | Validate user's API key | `userId`, `provider` |
-| `validateAllUserKeys` | Validate all user's API keys | `userId` |
-| `rotateUserKey` | Rotate user's API key | `userId`, `provider`, `newApiKey` |
-| `deleteUserKey` | Delete user's API key | `userId`, `provider` |
-
-### Custom Function Methods
-| Method | Description | Parameters |
-|--------|-------------|------------|
-| `listCustomFunctions` | List all available custom functions | None |
-| `getCustomFunction` | Get details of a specific custom function | `name` |
-
-### Built-in AI Functions
-| Method | Description | Parameters |
-|--------|-------------|------------|
-| `analyzeCode` | Analyze code for issues and improvements | `content`, `language` |
-| `generateTests` | Generate test cases for code | `content`, `framework` |
-| `securityReview` | Review code for security vulnerabilities | `content` |
-| `explainCode`* | Explain code in simple terms | `content`, `level` |
-| `generateCommitMessage`* | Generate git commit messages | `content`, `format` |
-
-*Custom functions (available when using custom-functions-example.js)
-
-## 🏗️ **Examples in the Wild**
-
-Check out the `/examples` directory for:
-- **`basic-server.js`** - Complete backend server setup
-- **`custom-functions-example.js`** - Built-in and custom function demonstrations
-- **`vscode-extension.ts`** - Full VS Code extension integration
-- **Real-world prompts** - Security review, code quality, architecture analysis
+| Component | Sees User Code | Sees System Prompts | Sees API Keys | Your Control |
+|-----------|---------------|---------------------|---------------|--------------|
+| **VS Code Extension** | ✅ | ❌ | 🟡 (Client-managed only) | ❌ (User's machine) |
+| **Corporate Proxy** | ✅ | ❌ | ❌ | ❌ (Company network) |
+| **Your RPC Backend** | ✅ | ✅ | 🟡 (Depends on storage) | ✅ (Your server) |
+| **Vaultwarden Storage** | ❌ | ❌ | ✅ (Encrypted) | ✅ (Your infrastructure) |
+| **AI Provider** | ✅ | ✅ | ✅ | ❌ (External service) |
+
+**Key Insight**: Corporate proxies and extension users never see your valuable system prompts regardless of storage option!
 
 ## 📖 **OpenRPC Documentation & Playground**
 
 This package provides a complete **OpenRPC** specification - the JSON-RPC equivalent of OpenAPI for REST APIs.
 
-### 🔍 Get the OpenRPC Schema
-
-```bash
-curl -X POST http://localhost:8000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "method": "rpc.discover", "id": 1}'
-```
-
 ### 🎮 Interactive Development Playground
-
-#### **Option 1: OpenRPC Inspector (Recommended - Swagger-like UI)**
-
-For the best documentation experience with a modern, Swagger-like interface:
 
 ```bash
 # Install dependencies
 pnpm install
 
-# Start development with OpenRPC Inspector (better UI than playground)
+# Start development with OpenRPC Inspector (Swagger-like UI)
 pnpm run dev:docs
 ```
 
-This runs:
-- ✅ **TypeScript compilation** in watch mode (`tsc --watch`)
-- ✅ **Server auto-restart** on file changes (`node --watch`)
-- ✅ **OpenRPC Inspector** - Professional Swagger-like documentation UI
+**OpenRPC Inspector URL:** http://localhost:3002
 
-**OpenRPC Inspector Features:**
+**Features:**
 - 🎨 **Modern UI** - Clean, professional interface similar to Swagger UI
-- 📱 **Responsive design** - Works great on mobile and desktop
 - 🔍 **Better schema visualization** - Cleaner parameter and response displays
 - 🎮 **Interactive testing** - Try API methods directly in the browser
 - 📋 **Collapsible sections** - Organized, easy-to-navigate documentation
 
-**Inspector URL:** http://localhost:3002
+## 🧪 **Testing**
 
-#### **Option 2: Basic OpenRPC Playground**
-
-For development with the basic playground interface:
+### Test Coverage Requirements
 
 ```bash
-# Start full development environment (TypeScript watch + server + basic playground)
-pnpm run dev:full
+# Full test suite with >80% coverage
+pnpm test:coverage
+
+# Type checking
+pnpm typecheck
+
+# Integration tests
+pnpm test:integration
 ```
 
-**Individual development commands:**
-```bash
-pnpm run dev          # TypeScript compilation only
-pnpm run dev:server   # Server only (requires build first)
-pnpm run playground   # Basic OpenRPC playground only
-pnpm run inspector    # OpenRPC Inspector only (Swagger-like UI)
-```
-
-**Validate your OpenRPC specification:**
-```bash
-pnpm run validate:openrpc
-```
-
-#### **Option 3: Online Playground**
-
-1. **Copy the OpenRPC schema** from `openrpc.json` or the `rpc.discover` response
-2. **Open the OpenRPC Playground:** https://playground.open-rpc.org/
-3. **Paste your schema** into the editor
-4. **Test methods interactively** with live documentation and examples
-
-#### **Option 4: Docker Playground**
+### Test Different Storage Options
 
 ```bash
-pnpm run playground:docker
-# Playground available at http://localhost:3001
+# Test file storage
+STORAGE_TYPE=file pnpm test
+
+# Test Vaultwarden integration (requires Docker)
+pnpm run vaultwarden:start
+STORAGE_TYPE=vaultwarden pnpm test
+
+# Test client-managed keys
+STORAGE_TYPE=client_managed pnpm test
 ```
 
-### 🛠️ **Playground Features**
+## 🧪 **Testing the Authentication Flow**
 
-The playground provides:
-- ✅ **Interactive documentation** with live examples
-- ✅ **Method testing** - send real requests to your local server
-- ✅ **Schema validation** - ensure your OpenRPC document is valid
-- ✅ **Code generation** - generate client code in multiple languages
-- ✅ **Hot reloading** - automatically updates when you modify the schema
+### **Testing Strategy: Split into Multiple Phases**
 
-### 📋 **OpenRPC Features**
+The authentication flow has multiple layers that should be tested independently before testing the complete integration:
 
-- **Complete method documentation** with parameters, results, and examples
-- **JSON Schema validation** for all inputs and outputs  
-- **Service discovery** via the standard `rpc.discover` method
-- **Type safety** with detailed parameter and result schemas
-- **Error definitions** with standard JSON-RPC error codes
+### **Phase 1: Test Vaultwarden Directly (Infrastructure)**
 
-### 🚀 **Development Workflow**
+Test the Vaultwarden server and Bitwarden SDK integration directly without RPC:
 
-1. **Start development environment:**
-   ```bash
-   pnpm run dev:docs
-   ```
-   
-2. **Open OpenRPC Inspector** at http://localhost:3002 (modern Swagger-like UI)
+```bash
+# 1. Start Vaultwarden infrastructure
+pnpm run vaultwarden:start
 
-3. **Edit your API** in `src/server.ts` 
+# 2. Test direct Vaultwarden connection
+npx ts-node test-vaultwarden-auth.ts
+# Gets access token programmatically
+# Tests basic API connectivity
+# Validates service account setup
 
-4. **Update OpenRPC spec** in `openrpc.json`
+# 3. Test Vaultwarden secret operations
+npx ts-node test-vaultwarden-direct.ts
+# Tests secret CRUD operations
+# Validates organization permissions
+# Tests user API key workflow
+```
 
-5. **Test changes** automatically in the inspector
+**What Phase 1 Tests:**
+- ✅ Vaultwarden server connectivity
+- ✅ Service account authentication
+- ✅ Organization permissions
+- ✅ Secret storage/retrieval operations
+- ✅ Bitwarden SDK integration
 
-6. **Validate spec:**
-   ```bash
-   pnpm run validate:openrpc
-   ```
+### **Phase 2: Test RPC Methods (Business Logic)**
 
-Learn more: https://open-rpc.org/ | https://spec.open-rpc.org/
+Test the RPC methods that implement the auth flow:
 
-## 🤖 **AI-Assisted Development**
+```bash
+# Test Vaultwarden RPC integration
+npx ts-node test-vaultwarden-session.ts
+# Tests VaultwardenRPCMethods
+# Tests JWT validation
+# Tests auto-provisioning flow
+```
 
-### **Built with Claude Code**
+**What Phase 2 Tests:**
+- ✅ `vaultwarden.storeApiKey` - JWT validation + auto-onboarding + key encryption
+- ✅ `executeAIRequest` - Auto-onboarding + key retrieval + AI execution
 
-**This repository was primarily developed using [Claude Code](https://claude.ai/code)** - Anthropic's CLI tool for AI-assisted software development. Most of the codebase, documentation, and architecture decisions were created through collaborative sessions between human developers and Claude.
+### **Phase 3: Test Complete End-to-End Flow**
 
-### **AI Development Philosophy**
+Test the complete auth flow with mock OpenSaaS JWT tokens:
 
-We believe AI tools like Claude Code represent the future of software development when used thoughtfully:
+```bash
+# Test complete auth flow
+pnpm test:auth-flow
+# Or run manually:
+npx ts-node test/integration/complete-auth-flow.test.ts
+```
 
-- ✅ **AI for implementation** - Generate boilerplate, implement features, write tests
-- ✅ **Human for architecture** - Design decisions, requirements, code review
-- ✅ **Collaborative approach** - AI suggests, human validates and refines
-- ✅ **Transparency** - Acknowledge AI contributions openly
+**Secure E2E Test Flow (Auto-Onboarding):**
+```typescript
+// 1. Mock OpenSaaS JWT generation
+const mockJWT = generateMockOpenSaaSJWT({
+  userId: 'test-user-123',
+  email: 'testuser@company.com',
+  subscriptionTier: 'pro'
+});
 
-### **Benefits We Experienced**
+// 2. Test API key storage with automatic onboarding
+const storeResult = await rpcClient.request('vaultwarden.storeApiKey', {
+  opensaasJWT: mockJWT,
+  apiKey: 'sk-ant-test-key-12345',  // Server auto-onboards user if needed
+  provider: 'anthropic'
+});
+// Result: { success: true, keyId: 'vault-item-id' }
+// User was onboarded transparently during this call!
 
-Using Claude Code for this project provided:
-- 🚀 **Faster development** - Complex features implemented in minutes vs hours
-- 📚 **Better documentation** - Comprehensive README and code comments
-- 🧪 **More tests** - AI generated test cases we might have missed
-- 🔧 **Cleaner code** - Consistent patterns and best practices
-- 🎯 **Focus on design** - Less time on implementation, more on architecture
+// 3. Test AI request - works even for brand new users
+const aiResult = await rpcClient.request('executeAIRequest', {
+  opensaasJWT: mockJWT,
+  content: 'function test() { return "hello"; }',
+  systemPrompt: 'code_review', 
+  provider: 'anthropic'  // Auto-onboards + retrieves key + executes AI
+});
+// Result: AI analysis response
+
+// That's it! Zero onboarding calls needed - server handles everything automatically!
+```
+
+### **Testing REST API Directly (Without RPC)**
+
+For debugging, you can test Vaultwarden's REST API directly:
+
+```bash
+# 1. Get access token
+curl -X POST http://localhost:8081/identity/connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password&username=service@simple-rpc-ai.local&password=YOUR_PASSWORD&scope=api offline_access&client_id=web"
+
+# 2. Test API with token
+curl -X GET http://localhost:8081/api/sync \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json"
+
+# 3. Create a secret
+curl -X POST http://localhost:8081/api/organizations/ORG_ID/secrets \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"key":"test-api-key","value":"sk-ant-test-123","note":"Test API key"}'
+
+# 4. List secrets
+curl -X GET http://localhost:8081/api/organizations/ORG_ID/secrets \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### **Test Configuration Files**
+
+Create these environment files for testing:
+
+**`.env.vaultwarden.test`:**
+```bash
+VW_DOMAIN=http://localhost:8081
+VW_SERVICE_EMAIL=service@simple-rpc-ai.local
+VW_SERVICE_PASSWORD=secure-service-password-123
+VW_SERVICE_CLIENT_ID=web
+VW_ADMIN_TOKEN=your-admin-token
+SIMPLE_RPC_ORG_ID=your-org-uuid
+
+# For testing with tokens
+VW_ACCESS_TOKEN=your-access-token
+VW_REFRESH_TOKEN=your-refresh-token
+```
+
+### **Recommended Test Sequence**
+
+```bash
+# 1. Infrastructure setup
+pnpm run vaultwarden:setup
+pnpm run vaultwarden:start
+pnpm run vaultwarden:logs  # Check for errors
+
+# 2. Phase 1: Direct Vaultwarden testing
+npx ts-node test-vaultwarden-auth.ts     # Get access token
+npx ts-node test-vaultwarden-direct.ts   # Test secret operations
+
+# 3. Phase 2: RPC methods testing  
+npx ts-node test-vaultwarden-session.ts  # Test RPC integration
+
+# 4. Phase 3: End-to-end testing
+pnpm test:auth-flow                       # Complete auth flow
+
+# 5. Integration testing
+pnpm test:integration                     # Full integration suite
+```
+
+### **Common Testing Issues & Solutions**
+
+| Issue | Solution |
+|-------|----------|
+| **Connection refused** | Check `pnpm run vaultwarden:logs`, ensure PostgreSQL is running |
+| **Authentication failed** | Verify service account exists, check password in `.env.vaultwarden` |
+| **Organization not found** | Create organization in admin panel, set `SIMPLE_RPC_ORG_ID` |
+| **Token expired** | Re-run `test-vaultwarden-auth.ts` to get fresh token |
+| **Permission denied** | Ensure service account has organization access |
+
+### **What Each Test Validates**
+
+| Test File | Purpose | Validates |
+|-----------|---------|-----------|
+| `test-vaultwarden-auth.ts` | Get access tokens | Service account, basic auth |
+| `test-vaultwarden-direct.ts` | Direct Vaultwarden operations | Secret CRUD, organization permissions |
+| `test-secure-vault-manager.ts` | Secure RPC integration | Server-side crypto, JWT validation |
+| Complete E2E test | Simplified full flow | OpenSaaS→Server→Vaultwarden→AI integration |
+
+### **Simplified Testing Benefits**
+
+✅ **No client-side crypto testing** - All encryption handled server-side  
+✅ **No master password management** - Server generates vault passwords  
+✅ **No token lifecycle testing** - Simplified JWT-only authentication  
+✅ **Focus on business logic** - Test AI request flow, not crypto implementation
+
+This layered testing approach helps isolate issues quickly and ensures each component works before testing the complete integration.
 
 ## 🤝 **Contributing**
 
-We welcome contributions that maintain the **simple, honest** philosophy:
+We welcome contributions that maintain the **simple, flexible** philosophy:
 
 ### 🎯 **Contribution Guidelines**
 - **Simplicity first** - Reject complexity that doesn't solve real problems
-- **Standard tech** - HTTP, JSON-RPC, Express, Vercel AI SDK
+- **Storage flexibility** - Support multiple key management approaches
+- **Standard tech** - HTTP, JSON-RPC, Express, Vaultwarden
 - **Clear docs** - Honest about what we protect vs. don't protect
 - **Minimal deps** - Keep the package lightweight and secure
-
-### 🤖 **Contributing with Claude Code**
-
-We encourage contributors to use AI tools like Claude Code, but with these guidelines:
-
-#### **✅ Best Practices for AI-Assisted Contributions**
-
-1. **Focus on One Feature**
-   - Work on a single, well-defined feature per PR
-   - Avoid mixing multiple changes in one contribution
-   - Clear scope makes AI assistance more effective
-
-2. **Review and Test Generated Code**
-   ```bash
-   # Always run the full test suite
-   pnpm test:coverage
-   pnpm build
-   pnpm typecheck
-   
-   # Test your specific changes manually
-   pnpm run dev:docs  # Test in OpenRPC Inspector
-   ```
-
-3. **Use Claude Code Effectively**
-   - Start with clear requirements and acceptance criteria
-   - Ask Claude to explain the implementation approach first
-   - Review generated code line-by-line before committing
-   - Test edge cases that AI might miss
-
-4. **Document AI Usage**
-   - Mention if you used Claude Code in your PR description
-   - Note any specific prompts or approaches that worked well
-   - Share learnings that could help other contributors
-
-#### **🔄 AI Contribution Workflow**
-
-```bash
-# 1. Set up development environment
-git clone https://github.com/your-org/simple-rpc-ai-backend
-cd simple-rpc-ai-backend
-pnpm install
-
-# 2. Start Claude Code session
-claude
-
-# 3. Define your feature clearly
-# "I want to add rate limiting per user ID to the RPC server"
-
-# 4. Let Claude implement, then review thoroughly
-pnpm test:coverage
-pnpm run dev:docs
-
-# 5. Submit PR with AI usage notes
-```
-
-#### **📝 Example PR Description Template**
-
-```markdown
-## Feature: Add per-user rate limiting
-
-### Implementation
-- Used Claude Code to implement rate limiting middleware
-- Added Redis backend for distributed rate limiting
-- Included comprehensive tests
-
-### AI Usage Notes
-- Claude generated the middleware boilerplate
-- Human review found edge case with concurrent requests
-- Added additional validation that Claude initially missed
-
-### Testing
-- [x] Unit tests pass
-- [x] Integration tests pass
-- [x] Manual testing in OpenRPC Inspector
-- [x] Performance impact assessed
-```
 
 ### 🔧 **Development Setup**
 ```bash
 git clone https://github.com/your-org/simple-rpc-ai-backend
 cd simple-rpc-ai-backend
 pnpm install
-pnpm run build
-pnpm test
-pnpm run dev:docs  # Start development with OpenRPC Inspector
-```
 
-### 🐛 **Issues & PRs**
-- **Bug reports** - Clear reproduction steps, mention if you found it using AI tools
-- **Feature requests** - Justify real-world value, consider AI implementation feasibility
-- **Security issues** - Report privately first, especially if found through AI analysis
-- **AI-generated code** - Welcome! Just follow the review guidelines above
+# Test all storage options
+pnpm test:coverage
+
+# Start development environment
+pnpm run dev:docs  # OpenRPC Inspector at localhost:3002
+
+# Test Vaultwarden integration
+pnpm run vaultwarden:setup
+pnpm run vaultwarden:start
+
+# Backup and restore
+pnpm run vaultwarden:backup
+pnpm run vaultwarden:restore
+```
 
 ## 📄 **License** 
 
@@ -1222,22 +1665,18 @@ MIT - Permissive licensing for easy adoption in commercial and open source proje
 
 ---
 
-## 💡 **Key Learning from Building This**
+## 💡 **Key Takeaways**
 
-**Complex custom RPC implementations provide zero benefit** when proven libraries exist and are battle-tested.
+**The value isn't in complex custom implementations** - it's in solving real security and deployment problems:
 
 **Real value comes from:**
-- Using proven libraries like `json-rpc-2.0` ✅  
-- Standard protocols (JSON-RPC 2.0, HTTPS) ✅
-- Corporate proxy bypass through backend architecture ✅
-- System prompt protection on your servers ✅
+- 🔒 **System prompt protection** (works with any storage option)
+- 🏢 **Corporate proxy bypass** through backend architecture
+- ⚡ **Flexible deployment** - Vaultwarden, file storage, or client-managed
+- 📦 **Standard protocols** (JSON-RPC 2.0, HTTPS)
+- 🎯 **Simple integration** for VS Code extensions
 
-**Not from:**
-- Custom JSON-RPC implementations ❌
-- App-specific methods in transport layer ❌  
-- Over-engineered custom protocols ❌
-
-This package focuses on **simple, practical solutions** that solve real problems for real developers.
+**This package focuses on practical solutions** that solve real problems for real developers, with the storage flexibility you need for any deployment scenario.
 
 ## 🔮 **Future: Model Context Protocol (MCP) Integration**
 
@@ -1257,113 +1696,4 @@ app.post('/rpc', async (req, res) => {
 });
 ```
 
-### **MCP Benefits:**
-- ✅ **Direct AI integration** - Claude, ChatGPT, Gemini can discover tools
-- ✅ **Industry standard** - Adopted by major AI providers (2024+)
-- ✅ **Tool discovery** - AI automatically finds available capabilities
-
-### **Why Not Implemented Yet:**
-- **Different use case** - MCP = tool integration, we = AI request proxying
-- **Added complexity** - Our current approach already solves corporate proxy bypass
-- **Focus** - We prioritize system prompt protection over tool integration
-
-### **Future Decision:**
-Monitor MCP adoption and consider hybrid approach if enterprise customers request AI tool integration alongside prompt protection.
-
-**Current Status**: Our JSON-RPC 2.0 foundation makes future MCP integration straightforward if needed.
-
-## ⚡ **Architecture Decisions**
-
-### **Why Node.js Express (Not FastAPI)?**
-
-We chose Node.js + Express over FastAPI/Python for specific performance and ecosystem reasons:
-
-#### **🎯 Perfect Match for Our Workload**
-
-Our workload is **95% I/O bound** (waiting for AI provider responses):
-
-```javascript
-// Typical request flow
-const response = await fetch('https://api.anthropic.com/v1/messages', {
-  // 🕐 AI processing: 2,000-30,000ms (dominates total time)
-  // ⚡ Our server: 1-5ms (negligible overhead)
-});
-```
-
-**Node.js Advantages for AI Proxy:**
-- ✅ **Excellent I/O performance** - Event loop perfect for concurrent AI API calls
-- ✅ **JSON-native processing** - No serialization overhead for JSON-RPC
-- ✅ **Lower memory footprint** - ~50MB baseline vs Python's ~100MB+
-- ✅ **Faster cold starts** - ~100ms vs FastAPI's ~1-3s
-- ✅ **Ecosystem alignment** - VS Code extensions, web clients are JavaScript-native
-
-#### **📊 Performance Comparison**
-
-| Metric | Node.js Express | FastAPI Python |
-|--------|----------------|----------------|
-| **Concurrent requests** | 10,000+ | 10,000+ |
-| **Memory per request** | ~1-2MB | ~2-4MB |
-| **Cold start time** | ~100ms | ~1-3s |
-| **Container size** | ~100MB | ~300-500MB |
-| **JSON throughput** | Excellent | Good |
-
-#### **💰 Cost & Scaling Reality**
-
-**Real bottlenecks are not our server performance:**
-
-```bash
-# AI Provider Rate Limits (the actual constraint)
-Anthropic: 1,000 requests/minute
-OpenAI: 500 requests/minute
-Our server capacity: 15,000+ requests/minute
-
-# Cost Breakdown (typical deployment)
-Server hosting: $10-100/month
-AI API usage: $100-10,000/month
-# → AI costs dominate, server performance is not the limiting factor
-```
-
-#### **🚀 Future Microservice Architecture**
-
-**Current: Monolithic Node.js** (perfect for v1.0)
-```
-VS Code Extension → Node.js RPC Server → AI Providers
-```
-
-**Future: Hybrid Microservices** (when we need CPU-intensive features)
-```
-VS Code Extension → Node.js RPC Gateway → {
-  ├── Node.js AI Proxy (current workload)
-  ├── FastAPI Embeddings Service (CPU-heavy)
-  ├── FastAPI Local LLM (RunPod/GPU)
-  └── Rust Vector Search (performance-critical)
-}
-```
-
-#### **🔮 Possible Future FastAPI Microservices**
-
-**FastAPI could be added for CPU-intensive features:**
-- **Embeddings processing** - Vector operations requiring Python ML libraries
-- **Local LLM hosting** - Custom model integration with GPU resources
-- **Document processing** - Advanced text/PDF parsing with Python tools
-- **Data analytics** - Usage pattern analysis with Python data science stack
-
-**Current Node.js handles:**
-- **JSON-RPC gateway** - Core API routing and validation
-- **Authentication & rate limiting** - Centralized security layer
-- **AI provider proxying** - Direct API calls to external services
-
-#### **🎯 Decision Summary**
-
-**Node.js Express is optimal for our current needs:**
-✅ JSON-RPC API gateway (our primary use case)
-✅ I/O-bound AI provider proxying
-✅ VS Code extension ecosystem compatibility
-✅ Fast deployment and low resource usage
-
-**FastAPI remains an option for:**
-🔮 CPU-intensive AI processing (if needed)
-🔮 Advanced Python ML integrations (if required)
-🔮 Specialized data processing (if demand emerges)
-
-**Result**: Node.js Express perfectly handles our current I/O-bound workload. FastAPI microservices remain a viable option for future CPU-heavy features, but are not currently needed or planned.
+**Current Status**: Our JSON-RPC 2.0 foundation makes future MCP integration straightforward if needed. Our focus remains on system prompt protection and flexible key management.

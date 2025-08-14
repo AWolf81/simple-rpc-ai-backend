@@ -9,11 +9,13 @@ export { RPCClient } from './client.js'; // Basic JSON-RPC client (platform-agno
 export { AIClient } from './client.js'; // Enhanced client with BYOK
 export { AIService } from './services/ai-service.js'; // Direct AI service usage
 export { createAIServer, createAIServerAsync } from './server.js'; // Server factories
+export { createSimpleAIServer } from './server-simple.js'; // Simplified server
+export { createTRPCServer } from './server-trpc.js'; // tRPC server with type safety
 // Custom function system
 export { FunctionRegistry } from './services/function-registry.js';
 export { PromptManager, promptManager } from './services/prompt-manager.js';
 // Authentication system exports
-export { UserManager, SimpleKeyManager, AuthManager, SQLiteAdapter, AIKeyValidator } from './auth/index.js';
+export { UserManager, SimpleKeyManager, AuthManager, PostgreSQLAdapter, AIKeyValidator } from './auth/index.js';
 // OpenSaaS Monetization exports
 export { createMonetizedAIServer } from './monetization/opensaas-server.js';
 export { createOpenSaaSConfig, mergeOpenSaaSConfig, validateOpenSaaSConfig, EXAMPLE_CUSTOM_TIERS, DEFAULT_OPENSAAS_CONFIG } from './monetization/opensaas-config.js';

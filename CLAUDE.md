@@ -26,6 +26,16 @@ node examples/servers/basic-server.js    # Basic server example
 node examples/servers/ai-server-example.js  # Full AI server example
 ```
 
+### Vaultwarden Management
+```bash
+pnpm run vaultwarden:setup    # Setup Vaultwarden infrastructure
+pnpm run vaultwarden:start    # Start Vaultwarden services
+pnpm run vaultwarden:stop     # Stop Vaultwarden services
+pnpm run vaultwarden:logs     # View service logs
+pnpm run vaultwarden:backup   # Create encrypted backup
+pnpm run vaultwarden:restore  # Restore from backup
+```
+
 ## Architecture Overview
 
 ### Core Components
@@ -113,6 +123,8 @@ The package provides these JSON-RPC methods:
 6. **`shouldSuggestUpgrade`** - Check if auth upgrade should be suggested
 
 ### Key Management Methods (BYOK)
+**User Identification**: All key management methods use email addresses as user identifiers. Any valid email format works: `user@gmail.com`, `admin@company.com`, `developer@startup.io`, etc.
+
 7. **`storeUserKey`** - Store encrypted API key for user
 8. **`getUserKey`** - Retrieve user's API key
 9. **`getUserProviders`** - Get configured providers for user
@@ -310,16 +322,20 @@ When generating specs, always ask:
 ```
 project/
 ├── src/                   # Main source code
+├── docker/                # Docker infrastructure and scripts
+│   ├── setup-vaultwarden.sh     # Vaultwarden setup script
+│   ├── backup-vaultwarden.sh    # Backup script
+│   ├── restore-vaultwarden.sh   # Restore script
+│   ├── wait-for-postgres.sh     # PostgreSQL wait script
+│   ├── pg-healthcheck.sh        # PostgreSQL health check
+│   └── init-db.sql              # Database initialization
 ├── examples/
 │   ├── servers/           # Server implementation examples
 │   ├── extensions/        # VS Code extension examples
 │   └── web-ui/           # Web application examples
-├── specs/
-│   ├── architecture.md    # System architecture documentation
-│   ├── coding-standards.md # Development standards
-│   ├── tech-debt.md      # Technical debt tracking
-│   └── features/         # Individual feature specifications
 ├── test/                 # Test suites
+├── docker-compose.vaultwarden.yml  # Vaultwarden infrastructure
+├── .env.vaultwarden.example        # Environment template
 ├── CLAUDE.md             # This file
 └── README.md             # User-facing documentation
 ```
@@ -337,13 +353,14 @@ project/
 - **❄️ On Hold**: Temporarily paused
 - **🗑️ Cancelled**: No longer needed
 
-### Current Package Status: **✅ Core Complete**
-- JSON-RPC client and server: ✅ Complete
-- Authentication system: ✅ Complete
-- AI service integration: ✅ Complete
-- VS Code examples: ✅ Complete
-- Documentation: ✅ Complete
-- Known issues: 🚫 Billing module incomplete (6 TypeScript errors)
+### Current Package Status: **✅ Core Complete - Simplified Architecture**
+- **Simple JSON-RPC server**: ✅ Complete (`createSimpleAIServer`)
+- **PostgreSQL billing integration**: ✅ Complete (token tracking for OpenSaaS)
+- **AI service integration**: ✅ Complete (Anthropic, OpenAI, Google)
+- **Platform-agnostic client**: ✅ Complete
+- **TypeScript compilation**: ✅ Complete (0 errors)
+- **Core tests**: ✅ Complete (simple server tested)
+- **Complex server**: 🗑️ Deprecated (use simple server instead)
 
 ## Communication Guidelines
 - Be proactive about detecting JSON-RPC and AI integration planning

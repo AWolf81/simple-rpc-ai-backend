@@ -10,6 +10,8 @@ export { RPCClient } from './client.js';          // Basic JSON-RPC client (plat
 export { AIClient } from './client.js';           // Enhanced client with BYOK
 export { AIService } from './services/ai-service.js';      // Direct AI service usage
 export { createAIServer, createAIServerAsync } from './server.js';     // Server factories
+export { createSimpleAIServer } from './server-simple.js';     // Simplified server
+export { createTRPCServer } from './server-trpc.js';      // tRPC server with type safety
 
 // Custom function system
 export { FunctionRegistry } from './services/function-registry.js';
@@ -20,7 +22,7 @@ export {
   UserManager,
   SimpleKeyManager,
   AuthManager,
-  SQLiteAdapter,
+  PostgreSQLAdapter,
   AIKeyValidator
 } from './auth/index.js';
 
@@ -48,6 +50,11 @@ export type {
   AIServerConfig,
   AIServerAsyncConfig
 } from './server.js';
+
+export type {
+  TRPCServerConfig,
+  AppRouter
+} from './server-trpc.js';
 
 // Custom function types
 export type {

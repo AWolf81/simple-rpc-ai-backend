@@ -42,6 +42,12 @@ export interface MonetizedAIServerConfig {
         type?: 'sqlite' | 'postgresql' | 'mysql';
         connectionString?: string;
         path?: string;
+        host?: string;
+        port?: number;
+        database?: string;
+        user?: string;
+        password?: string;
+        ssl?: boolean;
     };
     serviceProviders?: any;
     cors?: {

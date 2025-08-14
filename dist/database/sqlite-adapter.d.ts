@@ -1,51 +1,138 @@
-/**
- * SQLite Database Adapter for BYOK system
- *
- * Implements the database interfaces for users, devices, and keys
- * Using SQLite for development and testing - can be swapped for PostgreSQL/MySQL in production
- */
-import { DatabaseAdapter, User, UserDevice } from '../auth/user-manager.js';
-import { KeyStorageAdapter, UserKey } from '../auth/key-manager.js';
-export declare class SQLiteAdapter implements DatabaseAdapter, KeyStorageAdapter {
-    private db;
+export const __esModule: boolean;
+export class SQLiteAdapter {
     constructor(databasePath?: string);
+    db: any;
     /**
      * Initialize database schema
      */
     initialize(): Promise<void>;
-    private createTables;
-    private createIndexes;
-    createUser(userData: Partial<User>): Promise<User>;
-    findUserById(userId: string): Promise<User | null>;
-    findUserByOAuth(provider: string, oauthId: string): Promise<User | null>;
-    updateUser(userId: string, updates: Partial<User>): Promise<User>;
-    createDevice(deviceData: Partial<UserDevice>): Promise<UserDevice>;
-    findDeviceById(deviceId: string): Promise<UserDevice | null>;
-    findUserDevices(userId: string): Promise<UserDevice[]>;
-    updateDevice(deviceId: string, updates: Partial<UserDevice>): Promise<UserDevice>;
-    storeKey(keyData: UserKey): Promise<void>;
-    getKey(userId: string, provider: string): Promise<UserKey | null>;
-    getUserKeys(userId: string): Promise<UserKey[]>;
-    updateKey(userId: string, provider: string, updates: Partial<UserKey>): Promise<UserKey>;
-    deleteKey(userId: string, provider: string): Promise<void>;
-    private mapRowToUser;
-    private mapRowToDevice;
-    private mapRowToKey;
-    /**
-     * Execute a SQL statement (for CREATE, INSERT, UPDATE, DELETE)
-     */
-    execute(sql: string, params?: any[]): Promise<{
-        changes: number;
-        lastInsertRowid: number;
+    createTables(): void;
+    createIndexes(): void;
+    createUser(userData: any): Promise<{
+        userId: any;
+        isAnonymous: any;
+        oauthProvider: any;
+        oauthId: any;
+        email: any;
+        plan: any;
+        features: any;
+        createdAt: any;
+        updatedAt: any;
     }>;
-    /**
-     * Get a single row from a SQL query
-     */
-    get(sql: string, params?: any[]): Promise<any>;
-    /**
-     * Get all rows from a SQL query
-     */
-    all(sql: string, params?: any[]): Promise<any[]>;
+    findUserById(userId: any): Promise<{
+        userId: any;
+        isAnonymous: boolean;
+        oauthProvider: any;
+        oauthId: any;
+        email: any;
+        plan: any;
+        features: any;
+        createdAt: Date;
+        updatedAt: Date;
+    } | null>;
+    findUserByOAuth(provider: any, oauthId: any): Promise<{
+        userId: any;
+        isAnonymous: boolean;
+        oauthProvider: any;
+        oauthId: any;
+        email: any;
+        plan: any;
+        features: any;
+        createdAt: Date;
+        updatedAt: Date;
+    } | null>;
+    updateUser(userId: any, updates: any): Promise<{
+        userId: any;
+        isAnonymous: boolean;
+        oauthProvider: any;
+        oauthId: any;
+        email: any;
+        plan: any;
+        features: any;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    createDevice(deviceData: any): Promise<{
+        deviceId: any;
+        userId: any;
+        deviceName: any;
+        deviceFingerprint: any;
+        isActive: any;
+        lastSeen: any;
+        createdAt: any;
+    }>;
+    findDeviceById(deviceId: any): Promise<{
+        deviceId: any;
+        userId: any;
+        deviceName: any;
+        deviceFingerprint: any;
+        isActive: boolean;
+        lastSeen: Date;
+        createdAt: Date;
+    } | null>;
+    findUserDevices(userId: any): Promise<any>;
+    updateDevice(deviceId: any, updates: any): Promise<{
+        deviceId: any;
+        userId: any;
+        deviceName: any;
+        deviceFingerprint: any;
+        isActive: boolean;
+        lastSeen: Date;
+        createdAt: Date;
+    }>;
+    storeKey(keyData: any): Promise<void>;
+    getKey(userId: any, provider: any): Promise<{
+        userId: any;
+        provider: any;
+        encryptedApiKey: any;
+        nonce: any;
+        isValid: boolean;
+        lastValidated: Date | undefined;
+        createdAt: Date;
+        updatedAt: Date;
+    } | null>;
+    getUserKeys(userId: any): Promise<any>;
+    updateKey(userId: any, provider: any, updates: any): Promise<{
+        userId: any;
+        provider: any;
+        encryptedApiKey: any;
+        nonce: any;
+        isValid: boolean;
+        lastValidated: Date | undefined;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    deleteKey(userId: any, provider: any): Promise<void>;
+    mapRowToUser(row: any): {
+        userId: any;
+        isAnonymous: boolean;
+        oauthProvider: any;
+        oauthId: any;
+        email: any;
+        plan: any;
+        features: any;
+        createdAt: Date;
+        updatedAt: Date;
+    };
+    mapRowToDevice(row: any): {
+        deviceId: any;
+        userId: any;
+        deviceName: any;
+        deviceFingerprint: any;
+        isActive: boolean;
+        lastSeen: Date;
+        createdAt: Date;
+    };
+    mapRowToKey(row: any): {
+        userId: any;
+        provider: any;
+        encryptedApiKey: any;
+        nonce: any;
+        isValid: boolean;
+        lastValidated: Date | undefined;
+        createdAt: Date;
+        updatedAt: Date;
+    };
     /**
      * Close database connection
      */

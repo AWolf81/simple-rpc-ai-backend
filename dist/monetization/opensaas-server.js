@@ -6,7 +6,7 @@ import { JWTMiddleware, mergeWithDefaultTiers } from '../auth/jwt-middleware.js'
 import { RateLimiter } from '../middleware/rate-limiter.js';
 import { UsageTracker } from '../billing/usage-tracker.js';
 import { BillingEngine } from '../billing/billing-engine.js';
-import { SQLiteAdapter } from '../database/sqlite-adapter.js';
+import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 // Import existing server components
 import { AIService } from '../services/ai-service.js';
 import { FunctionRegistry } from '../services/function-registry.js';
@@ -24,8 +24,21 @@ export async function createMonetizedAIServer(config) {
     }
     const opensaasConfig = mergeOpenSaaSConfig(config.opensaasMonetization);
     validateOpenSaaSConfig(opensaasConfig);
-    // Initialize database
-    const db = new SQLiteAdapter(config.database?.path ?? ':memory:');
+    // Initialize database - convert config format to PostgreSQL format
+    const dbConfig = config.database ? {
+        host: config.database.host || 'localhost',
+        port: config.database.port || 5432,
+        database: config.database.database || 'ai_backend',
+        user: config.database.user || 'postgres',
+        password: config.database.password || 'password'
+    } : {
+        host: 'localhost',
+        port: 5432,
+        database: 'ai_backend',
+        user: 'postgres',
+        password: 'password'
+    };
+    const db = new PostgreSQLAdapter(dbConfig);
     await db.initialize();
     // Initialize AI service
     let aiService;

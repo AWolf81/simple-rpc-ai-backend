@@ -10,7 +10,7 @@ vi.mock('../src/services/ai-service.js', () => ({
   }))
 }));
 
-describe('Custom Functions System', () => {
+describe.skip('Custom Functions System (REMOVED FEATURE - FunctionRegistry and PromptManager removed)', () => {
   let functionRegistry: FunctionRegistry;
   let promptManager: PromptManager;
   let mockAIService: any;

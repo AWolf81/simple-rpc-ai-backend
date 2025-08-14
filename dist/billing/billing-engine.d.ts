@@ -1,5 +1,5 @@
 import { UsageTracker, type UsageEvent } from './usage-tracker.js';
-import { SQLiteAdapter } from '../database/sqlite-adapter.js';
+import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 export interface BillingEvent {
     type: 'usage' | 'quota_exceeded' | 'tier_upgrade' | 'payment_failed' | 'subscription_cancelled';
     userId: string;
@@ -41,7 +41,7 @@ export declare class BillingEngine {
     private usageTracker;
     private config;
     private logger;
-    constructor(db: SQLiteAdapter, usageTracker: UsageTracker, config: BillingConfig);
+    constructor(db: PostgreSQLAdapter, usageTracker: UsageTracker, config: BillingConfig);
     /**
      * Initialize billing database tables
      */

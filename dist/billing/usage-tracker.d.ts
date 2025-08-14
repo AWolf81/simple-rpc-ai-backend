@@ -1,4 +1,4 @@
-import { SQLiteAdapter } from '../database/sqlite-adapter.js';
+import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 export interface UsageEvent {
     userId: string;
     organizationId?: string;
@@ -105,7 +105,7 @@ export declare class UsageTracker {
     private db;
     private logger;
     private platformFeePercentage;
-    constructor(db: SQLiteAdapter, platformFeePercentage?: number);
+    constructor(db: PostgreSQLAdapter, platformFeePercentage?: number);
     /**
      * Initialize database tables for usage tracking
      */

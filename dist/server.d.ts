@@ -1,8 +1,5 @@
 import type { Express } from 'express';
 import type { Server } from 'http';
-import type { ServiceProvidersConfig } from './services/ai-service.js';
-import { FunctionRegistry } from './services/function-registry.js';
-import { PromptManager } from './services/prompt-manager.js';
 export interface AIServerConfig {
     port?: number;
     database?: {
@@ -11,6 +8,14 @@ export interface AIServerConfig {
         path?: string;
     };
     masterEncryptionKey?: string;
+    vaultwarden?: {
+        enabled?: boolean;
+        serverUrl: string;
+        serviceEmail: string;
+        servicePassword: string;
+        clientId?: string;
+        clientSecret?: string;
+    };
     oauth?: {
         github?: {
             clientId: string;
@@ -26,7 +31,7 @@ export interface AIServerConfig {
         };
     };
     mode?: 'simple' | 'byok' | 'hybrid';
-    serviceProviders?: ServiceProvidersConfig;
+    serviceProviders?: any;
     fallbackStrategy?: 'priority' | 'round_robin' | 'fastest_first';
     requirePayment?: {
         enabled?: boolean;
@@ -67,29 +72,6 @@ export interface AIServerConfig {
         };
     };
 }
-export interface RPCRequest {
-    jsonrpc: '2.0';
-    id: number;
-    method: string;
-    params?: any;
-}
-export interface RPCResponse {
-    jsonrpc?: '2.0';
-    id: number;
-    result?: any;
-    error?: {
-        code: number;
-        message: string;
-        data?: any;
-    };
-}
-export declare function createAIServer(config: AIServerConfig): {
-    app: Express;
-    functionRegistry: FunctionRegistry;
-    promptManager: PromptManager;
-    start: (port?: number) => Server;
-    stop: () => void;
-};
 export interface AIServerAsyncConfig extends Omit<AIServerConfig, 'systemPrompts'> {
     systemPrompts?: {
         [promptId: string]: string | {
@@ -108,10 +90,17 @@ export interface AIServerAsyncConfig extends Omit<AIServerConfig, 'systemPrompts
         };
     };
 }
+export declare function createAIServer(config: AIServerConfig): {
+    app: Express;
+    functionRegistry: any;
+    promptManager: any;
+    start: (port?: number) => Server;
+    stop: () => void;
+};
 export declare function createAIServerAsync(config: AIServerAsyncConfig): Promise<{
     app: Express;
-    functionRegistry: FunctionRegistry;
-    promptManager: PromptManager;
+    functionRegistry: any;
+    promptManager: any;
     start: (port?: number) => Server;
     stop: () => void;
 }>;
