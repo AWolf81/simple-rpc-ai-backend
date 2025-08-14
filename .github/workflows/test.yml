@@ -11,7 +11,7 @@ on:
 
 jobs:
   test:
-    name: Test on Node.js ${{ matrix.node-version }} (${{ matrix.os }})
+    name: Unit Tests on Node.js ${{ matrix.node-version }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     environment: test
 
@@ -22,106 +22,102 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 10.6.1
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.1
 
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
 
-    - name: Install dependencies
-      run: pnpm install
+      - name: Install dependencies
+        run: pnpm install
 
-    - name: Run tests with coverage and JUnit report
-      run: |
-        pnpm test:coverage -- --run
-        pnpm vitest --reporter=junit --outputFile=test-report.junit.xml
-      env:
-        CI: true
+      - name: Run tests with coverage
+        run: pnpm test:coverage -- --run
+        env:
+          CI: true
 
-    - name: Upload coverage artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage
-        path: coverage/
+      - name: Upload unit test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit-${{ matrix.node-version }}-${{ matrix.os }}
+          path: coverage/
+          if-no-files-found: warn
+          compression-level: 6
 
-    - name: Upload JUnit test report
-      uses: actions/upload-artifact@v4
-      with:
-        name: junit-report
-        path: test-report.junit.xml
+      - name: Upload unit test coverage to Codecov
+        if: matrix.node-version == 20 && matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: AWolf81/simple-rpc-ai-backend
+          directory: coverage/
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: simple-rpc-ai-backend
+          fail_ci_if_error: false
+          verbose: true
 
-    - name: Run type checking
-      run: pnpm typecheck
-      continue-on-error: true
-
-    - name: Run linting
-      run: pnpm lint --max-warnings 0 || true
-      continue-on-error: true
-
-    - name: Upload coverage to Codecov
-      if: matrix.node-version == 20 && matrix.os == 'ubuntu-latest'
-      uses: codecov/codecov-action@v5
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        slug: AWolf81/simple-rpc-ai-backend
-        directory: coverage/
-        files: ./coverage/lcov.info
-        flags: unittests
-        name: simple-rpc-ai-backend
-        fail_ci_if_error: false
-        verbose: true
-
-    - name: Upload test results to Codecov
-      if: ${{ !cancelled() }}
-      uses: codecov/test-results-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload Vitest test results to Codecov
+        if: matrix.node-version == 20 && matrix.os == 'ubuntu-latest'
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          path: test-report.junit.xml
 
   integration-tests:
-    name: Integration Tests (VS Code Focus)
+    name: Integration Tests
     runs-on: ubuntu-latest
     environment: test
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 10.6.1
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.1
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: 'pnpm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
 
-    - name: Install dependencies
-      run: pnpm install
+      - name: Install dependencies
+        run: pnpm install
 
-    - name: Run integration tests with coverage
-      run: pnpm test -- --run --coverage
-      env:
-        CI: true
+      - name: Run integration tests
+        run: pnpm test -- --run --coverage
+        env:
+          CI: true
 
-    - name: Upload integration test coverage to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        slug: AWolf81/simple-rpc-ai-backend
-        directory: coverage/
-        flags: integration
-        name: integration-tests
-        fail_ci_if_error: false
+      - name: Upload integration test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: coverage/
+          if-no-files-found: warn
+          compression-level: 6
+
+      - name: Upload integration test coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: AWolf81/simple-rpc-ai-backend
+          directory: coverage/
+          flags: integration
+          name: integration-tests
+          fail_ci_if_error: false
+          verbose: true
 
   security-audit:
     name: Security Audit
