@@ -54,7 +54,7 @@ jobs:
 
     - name: Upload coverage to Codecov
       if: matrix.node-version == 20 && matrix.os == 'ubuntu-latest'
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         slug: AWolf81/simple-rpc-ai-backend
@@ -159,7 +159,7 @@ jobs:
         CI: true
 
     - name: Upload integration test coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         slug: AWolf81/simple-rpc-ai-backend
