@@ -14,13 +14,12 @@ jobs:
     name: Test on Node.js ${{ matrix.node-version }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     environment: test
-    
+
     strategy:
       fail-fast: false
       matrix:
         node-version: [18, 20, 22]
         os: [ubuntu-latest, windows-latest, macos-latest]
-
 
     steps:
     - name: Checkout repository
@@ -40,16 +39,30 @@ jobs:
     - name: Install dependencies
       run: pnpm install
 
-    - name: Run tests with coverage
-      run: pnpm test:coverage -- --run
+    - name: Run tests with coverage and JUnit report
+      run: |
+        pnpm test:coverage -- --run
+        pnpm vitest --reporter=junit --outputFile=test-report.junit.xml
       env:
         CI: true
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage
+        path: coverage/
+
+    - name: Upload JUnit test report
+      uses: actions/upload-artifact@v3
+      with:
+        name: junit-report
+        path: test-report.junit.xml
 
     - name: Run type checking
       run: pnpm typecheck
       continue-on-error: true
 
-    - name: Run linting  
+    - name: Run linting
       run: pnpm lint --max-warnings 0 || true
       continue-on-error: true
 
@@ -66,70 +79,11 @@ jobs:
         fail_ci_if_error: false
         verbose: true
 
-  security-audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+    - name: Upload test results to Codecov
+      if: ${{ !cancelled() }}
+      uses: codecov/test-results-action@v1
       with:
-        version: 10.6.1
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: pnpm install
-
-    - name: Run security audit
-      run: pnpm audit --audit-level=moderate
-
-    - name: Check for vulnerabilities
-      run: pnpm audit --audit-level=high --prod
-
-  build:
-    name: Build Package
-    runs-on: ubuntu-latest
-    
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 10.6.1
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: pnpm install
-
-    - name: Build package
-      run: pnpm run build
-
-    - name: Check package can be packed
-      run: pnpm pack
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-output
-        path: dist/
-        retention-days: 7
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   integration-tests:
     name: Integration Tests (VS Code Focus)
@@ -154,7 +108,7 @@ jobs:
     - name: Install dependencies
       run: pnpm install
 
-    - name: Run integration tests
+    - name: Run integration tests with coverage
       run: pnpm test -- --run --coverage
       env:
         CI: true
@@ -169,70 +123,103 @@ jobs:
         name: integration-tests
         fail_ci_if_error: false
 
-
-  examples-test:
-    name: Test Examples
+  security-audit:
+    name: Security Audit
     runs-on: ubuntu-latest
-    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
       with:
         version: 10.6.1
-
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: 20
         cache: 'pnpm'
-
     - name: Install dependencies
       run: pnpm install
+    - name: Run security audit
+      run: pnpm audit --audit-level=moderate
+    - name: Check for vulnerabilities
+      run: pnpm audit --audit-level=high --prod
 
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.6.1
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+    - name: Install dependencies
+      run: pnpm install
+    - name: Build package
+      run: pnpm run build
+    - name: Check package can be packed
+      run: pnpm pack
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-output
+        path: dist/
+        retention-days: 7
+
+  examples-test:
+    name: Test Examples
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.6.1
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+    - name: Install dependencies
+      run: pnpm install
     - name: Test basic server example
       run: |
-        echo "Testing basic server example..."
         node examples/servers/basic-server.js &
         SERVER_PID=$!
         sleep 2
         kill $SERVER_PID || echo "Server already stopped"
-
     - name: Test AI server example
       run: |
-        echo "Testing AI server example..."
-        # Just validate the file syntax
         node -c examples/servers/ai-server-example.js
 
   release-check:
     name: Release Readiness Check
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
       with:
         version: 10.6.1
-
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: 20
         cache: 'pnpm'
-
     - name: Install dependencies
       run: pnpm install
-
     - name: Check package.json validity
       run: pnpm run lint:package || echo "Package.json validation not available"
-
     - name: Verify README exists and is valid
       run: |
         if [ ! -f "README.md" ]; then
@@ -240,7 +227,6 @@ jobs:
           exit 1
         fi
         echo "✅ README.md found"
-
     - name: Check for required files
       run: |
         required_files=("package.json" "tsconfig.json" "src/index.ts" "CONTRIBUTING.md")
@@ -251,26 +237,20 @@ jobs:
           fi
           echo "✅ Found: $file"
         done
-
     - name: Test package installation
       run: |
         pnpm pack
         PACKAGE_FILE=$(ls *.tgz)
-        echo "✅ Package created: $PACKAGE_FILE"
-        
-        # Test installation in a temp directory
         mkdir -p /tmp/test-install
         cd /tmp/test-install
         echo '{"name":"test-install","version":"1.0.0"}' > package.json
         pnpm install $GITHUB_WORKSPACE/$PACKAGE_FILE
-        echo "✅ Package installation test passed"
 
   notify-results:
     name: Notify Test Results
     runs-on: ubuntu-latest
     needs: [test, security-audit, build, integration-tests, examples-test]
     if: always()
-    
     steps:
     - name: Check test results
       run: |
@@ -280,10 +260,8 @@ jobs:
         echo "- Build: ${{ needs.build.result }}"
         echo "- Integration Tests: ${{ needs.integration-tests.result }}"
         echo "- Examples Test: ${{ needs.examples-test.result }}"
-        
         if [[ "${{ needs.test.result }}" == "failure" || "${{ needs.security-audit.result }}" == "failure" || "${{ needs.build.result }}" == "failure" ]]; then
           echo "❌ Critical tests failed"
           exit 1
         else
           echo "✅ All critical tests passed"
-        fi
