@@ -47,13 +47,13 @@ jobs:
         CI: true
 
     - name: Upload coverage artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage
         path: coverage/
 
     - name: Upload JUnit test report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: junit-report
         path: test-report.junit.xml
