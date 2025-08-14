@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
 
 # Build outputs
 # re-add dist back later - for now we're pushing it for easier usage
