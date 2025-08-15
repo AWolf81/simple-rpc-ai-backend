@@ -1,68 +1,38 @@
 /**
- * Type-safe RPC Router inspired by tRPC patterns
+ * Simplified RPC Router using tRPC
  *
- * Provides createRPCRouter for building type-safe JSON-RPC endpoints
- * with automatic OpenRPC schema generation.
+ * This file now exports tRPC components directly, simplifying the codebase
+ * by using the battle-tested tRPC library instead of custom implementations.
  */
-import type { Request, Response } from 'express';
-export interface RPCContext {
-    req: Request;
-    res: Response;
-}
-export interface RPCMeta {
-    description?: string;
-    examples?: Array<{
-        name: string;
-        params?: any;
-        result?: any;
-    }>;
-}
-export interface RPCProcedure<TInput = any, TOutput = any> {
-    _def: {
-        input?: (input: unknown) => TInput;
-        output?: (output: TOutput) => TOutput;
-        meta?: RPCMeta;
-        resolver: (input: TInput, ctx: RPCContext) => Promise<TOutput> | TOutput;
-    };
-}
-export interface RPCProcedureBuilder {
-    input<T>(validator: (input: unknown) => T): RPCProcedureWithInput<T>;
-    meta(meta: RPCMeta): this;
-    mutation<TOutput>(resolver: (input: unknown, ctx: RPCContext) => Promise<TOutput> | TOutput): RPCProcedure<unknown, TOutput>;
-    query<TOutput>(resolver: (input: unknown, ctx: RPCContext) => Promise<TOutput> | TOutput): RPCProcedure<unknown, TOutput>;
-}
-export interface RPCProcedureWithInput<TInput> {
-    meta(meta: RPCMeta): this;
-    mutation<TOutput>(resolver: (input: TInput, ctx: RPCContext) => Promise<TOutput> | TOutput): RPCProcedure<TInput, TOutput>;
-    query<TOutput>(resolver: (input: TInput, ctx: RPCContext) => Promise<TOutput> | TOutput): RPCProcedure<TInput, TOutput>;
-}
-export interface RPCRouter {
-    _def: {
-        procedures: Record<string, RPCProcedure>;
-    };
-}
-export type InputValidator<T> = (input: unknown) => T;
+import { z } from 'zod';
+import { createTRPCRouter, publicProcedure } from '../trpc/index.js';
+import { appRouter } from '../trpc/root.js';
+import type { AppRouter } from '../trpc/root.js';
+export { createTRPCRouter, publicProcedure };
+export { appRouter as mainRouter };
+export type { AppRouter };
 export declare const v: {
-    object: <T extends Record<string, any>>(schema: { [K in keyof T]: InputValidator<T[K]>; }) => InputValidator<T>;
-    string: () => InputValidator<string>;
-    number: () => InputValidator<number>;
-    optional: <T>(validator: InputValidator<T>) => InputValidator<T | undefined>;
+    object: <Shape extends z.ZodRawShape>(shape: Shape, params?: z.RawCreateParams) => z.ZodObject<Shape, "strip", z.ZodTypeAny, z.objectOutputType<Shape, z.ZodTypeAny, "strip">, z.objectInputType<Shape, z.ZodTypeAny, "strip">>;
+    string: (params?: z.RawCreateParams & {
+        coerce?: true;
+    }) => z.ZodString;
+    number: (params?: z.RawCreateParams & {
+        coerce?: boolean;
+    }) => z.ZodNumber;
+    optional: <Inner extends z.ZodTypeAny>(type: Inner, params?: z.RawCreateParams) => z.ZodOptional<Inner>;
+    array: <El extends z.ZodTypeAny>(schema: El, params?: z.RawCreateParams) => z.ZodArray<El>;
+    boolean: (params?: z.RawCreateParams & {
+        coerce?: boolean;
+    }) => z.ZodBoolean;
+    enum: {
+        <U extends string, T extends Readonly<[U, ...U[]]>>(values: T, params?: z.RawCreateParams): z.ZodEnum<z.Writeable<T>>;
+        <U extends string, T extends [U, ...U[]]>(values: T, params?: z.RawCreateParams): z.ZodEnum<T>;
+    };
 };
-declare class RPCProcedureBuilderImpl implements RPCProcedureBuilder, RPCProcedureWithInput<any> {
-    private _input?;
-    private _meta?;
-    input<T>(validator: (input: unknown) => T): RPCProcedureWithInput<T>;
-    meta(meta: RPCMeta): this;
-    mutation<TOutput>(resolver: (input: any, ctx: RPCContext) => Promise<TOutput> | TOutput): RPCProcedure<any, TOutput>;
-    query<TOutput>(resolver: (input: any, ctx: RPCContext) => Promise<TOutput> | TOutput): RPCProcedure<any, TOutput>;
-}
-export declare const publicProcedure: RPCProcedureBuilderImpl;
-export declare function createRPCRouter(procedures: Record<string, RPCProcedure>): RPCRouter;
-export declare function executeProcedure(procedure: RPCProcedure, input: unknown, ctx: RPCContext): Promise<any>;
-export declare function generateOpenRPCSchema(router: RPCRouter, info: {
+export declare const createRPCRouter: typeof createTRPCRouter;
+export declare function generateOpenRPCSchema(info: {
     title: string;
     description?: string;
     version: string;
 }): any;
-export {};
 //# sourceMappingURL=router.d.ts.map

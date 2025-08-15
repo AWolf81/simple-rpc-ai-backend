@@ -1,0 +1,481 @@
+/**
+ * RPC AI Server
+ * 
+ * One server that supports both JSON-RPC and tRPC endpoints for AI applications.
+ * Provides simple configuration for basic use cases and advanced options for complex scenarios.
+ */
+
+import express from 'express';
+import type { Express, Request, Response } from 'express';
+import type { Server } from 'http';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import * as trpcExpress from '@trpc/server/adapters/express';
+
+import { createAppRouter } from './trpc/root.js';
+import { createTRPCContext } from './trpc/index.js';
+import type { AppRouter } from './trpc/root.js';
+import type { AIRouterConfig } from './trpc/routers/ai.js';
+import { AIService } from './services/ai-service.js';
+
+export interface RpcAiServerConfig {
+  // Basic settings
+  port?: number;
+  
+  // AI Configuration
+  aiLimits?: AIRouterConfig;
+  
+  // Protocol support
+  protocols?: {
+    jsonRpc?: boolean;    // Enable JSON-RPC endpoint (default: true)
+    tRpc?: boolean;       // Enable tRPC endpoint (default: true)
+  };
+  
+  // Network settings
+  cors?: {
+    origin?: string | string[];
+    credentials?: boolean;
+  };
+  
+  // Security & rate limiting
+  rateLimit?: {
+    windowMs?: number;
+    max?: number;
+  };
+  
+  // Custom paths
+  paths?: {
+    jsonRpc?: string;     // Default: '/rpc'
+    tRpc?: string;        // Default: '/trpc'
+    health?: string;      // Default: '/health'
+  };
+}
+
+export class RpcAiServer {
+  private app: Express;
+  private server?: Server;
+  private config: Required<RpcAiServerConfig>;
+  private router: AppRouter;
+  private aiService: AIService;
+
+  /**
+   * Opinionated protocol configuration:
+   * - Default: JSON-RPC only (simpler, universal)
+   * - If only one protocol specified as true, disable the other
+   * - If both explicitly specified, use provided values
+   */
+  private getOpinionatedProtocols(protocols?: { jsonRpc?: boolean; tRpc?: boolean }) {
+    // No protocols specified - default to JSON-RPC only (simpler)
+    if (!protocols) {
+      return { jsonRpc: true, tRpc: false };
+    }
+
+    const { jsonRpc, tRpc } = protocols;
+
+    // Both explicitly specified - respect user choice
+    if (jsonRpc !== undefined && tRpc !== undefined) {
+      return { jsonRpc, tRpc };
+    }
+
+    // Only one specified - be opinionated about the other
+    if (jsonRpc === true && tRpc === undefined) {
+      return { jsonRpc: true, tRpc: false };
+    }
+    if (tRpc === true && jsonRpc === undefined) {
+      return { jsonRpc: false, tRpc: true };
+    }
+    if (jsonRpc === false && tRpc === undefined) {
+      return { jsonRpc: false, tRpc: true };
+    }
+    if (tRpc === false && jsonRpc === undefined) {
+      return { jsonRpc: true, tRpc: false };
+    }
+
+    // Fallback to default
+    return { jsonRpc: true, tRpc: false };
+  }
+
+  constructor(config: RpcAiServerConfig = {}) {
+    // Opinionated protocol defaults
+    const protocols = this.getOpinionatedProtocols(config.protocols);
+    
+    // Set smart defaults
+    this.config = {
+      port: 8000,
+      aiLimits: {},
+      protocols,
+      cors: {
+        origin: '*',
+        credentials: false,
+        ...config.cors
+      },
+      rateLimit: {
+        windowMs: 15 * 60 * 1000, // 15 minutes
+        max: 1000, // Conservative but reasonable
+        ...config.rateLimit
+      },
+      paths: {
+        jsonRpc: '/rpc',
+        tRpc: '/trpc',
+        health: '/health',
+        ...config.paths
+      },
+      ...config
+    };
+
+    // Create router with AI configuration
+    this.router = createAppRouter(this.config.aiLimits);
+    
+    // Initialize AI service for JSON-RPC endpoint
+    this.aiService = new AIService({
+      serviceProviders: {
+        anthropic: { priority: 1 },
+        openai: { priority: 2 },
+        google: { priority: 3 }
+      }
+    });
+
+    this.app = express();
+    this.setupMiddleware();
+    this.setupRoutes();
+  }
+
+  private setupMiddleware() {
+    // Security
+    this.app.use(helmet());
+    
+    // CORS
+    this.app.use(cors({
+      origin: this.config.cors.origin,
+      credentials: this.config.cors.credentials,
+      methods: ['GET', 'POST', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    }));
+
+    // Body parsing
+    this.app.use(express.json({ limit: '50mb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+    // Rate limiting
+    if (this.config.rateLimit.max! > 0) {
+      this.app.use(rateLimit({
+        windowMs: this.config.rateLimit.windowMs!,
+        max: this.config.rateLimit.max!,
+        message: {
+          error: 'Too many requests',
+          retryAfter: Math.ceil(this.config.rateLimit.windowMs! / 1000)
+        },
+        standardHeaders: true,
+        legacyHeaders: false,
+      }));
+    }
+  }
+
+  private setupRoutes() {
+    // Health endpoint
+    this.app.get(this.config.paths.health!, (req: Request, res: Response) => {
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        version: '0.1.0',
+        protocols: {
+          jsonRpc: this.config.protocols.jsonRpc ? this.config.paths.jsonRpc : null,
+          tRpc: this.config.protocols.tRpc ? this.config.paths.tRpc : null,
+        }
+      });
+    });
+
+    // tRPC endpoint (if enabled)
+    if (this.config.protocols.tRpc) {
+      this.app.use(
+        this.config.paths.tRpc!,
+        trpcExpress.createExpressMiddleware({
+          router: this.router,
+          createContext: createTRPCContext,
+          onError: ({ path, error }) => {
+            console.error(`❌ tRPC failed on ${path ?? "<no-path>"}:`, error);
+          },
+        })
+      );
+    }
+
+    // JSON-RPC endpoint (if enabled)
+    if (this.config.protocols.jsonRpc) {
+      this.app.post(this.config.paths.jsonRpc!, async (req: Request, res: Response) => {
+        try {
+          const { method, params, id } = req.body;
+
+          // Handle JSON-RPC methods compatible with tRPC
+          switch (method) {
+            case 'health':
+            case 'ai.health':
+              return res.json({
+                jsonrpc: '2.0',
+                id,
+                result: { 
+                  status: 'healthy', 
+                  timestamp: new Date().toISOString(),
+                  uptime: process.uptime()
+                }
+              });
+
+            case 'executeAIRequest':
+            case 'ai.executeAIRequest': {
+              const { content, systemPrompt, options } = params;
+              
+              if (!content || !systemPrompt) {
+                return res.json({
+                  jsonrpc: '2.0',
+                  id,
+                  error: {
+                    code: -32602,
+                    message: 'Invalid params: content and systemPrompt are required'
+                  }
+                });
+              }
+
+              const result = await this.aiService.execute({
+                content,
+                systemPrompt,
+                options
+              });
+
+              return res.json({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  success: true,
+                  data: result
+                }
+              });
+            }
+
+            case 'listProviders':
+            case 'ai.listProviders':
+              return res.json({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  providers: [
+                    {
+                      name: 'anthropic',
+                      models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'],
+                      priority: 1,
+                    },
+                    {
+                      name: 'openai', 
+                      models: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
+                      priority: 2,
+                    },
+                    {
+                      name: 'google',
+                      models: ['gemini-1.5-pro', 'gemini-1.5-flash'],
+                      priority: 3,
+                    },
+                  ],
+                }
+              });
+
+            default:
+              return res.json({
+                jsonrpc: '2.0',
+                id,
+                error: {
+                  code: -32601,
+                  message: `Method not found: ${method}`
+                }
+              });
+          }
+        } catch (error) {
+          return res.status(500).json({
+            jsonrpc: '2.0',
+            id: req.body?.id || null,
+            error: {
+              code: -32603,
+              message: `Internal error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          });
+        }
+      });
+    }
+
+    // OpenRPC schema endpoint (for JSON-RPC discovery)
+    if (this.config.protocols.jsonRpc) {
+      this.app.get('/openrpc.json', (req: Request, res: Response) => {
+        res.json(this.getOpenRPCSchema());
+      });
+    }
+
+    // Root endpoint - helpful information
+    this.app.get('/', (req: Request, res: Response) => {
+      res.json({
+        name: 'Simple RPC AI Backend',
+        version: '0.1.0',
+        description: 'Unified server supporting both JSON-RPC and tRPC protocols',
+        endpoints: {
+          health: this.config.paths.health,
+          ...(this.config.protocols.jsonRpc && {
+            jsonRpc: this.config.paths.jsonRpc,
+            openRpcSchema: '/openrpc.json'
+          }),
+          ...(this.config.protocols.tRpc && {
+            tRpc: this.config.paths.tRpc + '/*'
+          })
+        },
+        configuration: {
+          protocols: this.config.protocols,
+          aiLimits: this.config.aiLimits,
+        }
+      });
+    });
+
+    // Catch all
+    this.app.use('*', (req: Request, res: Response) => {
+      res.status(404).json({
+        error: 'Not found',
+        message: 'This endpoint does not exist.',
+        availableEndpoints: {
+          health: this.config.paths.health,
+          ...(this.config.protocols.jsonRpc && { jsonRpc: this.config.paths.jsonRpc }),
+          ...(this.config.protocols.tRpc && { tRpc: this.config.paths.tRpc })
+        }
+      });
+    });
+  }
+
+  private getOpenRPCSchema() {
+    return {
+      openrpc: "1.2.6",
+      info: {
+        title: "Simple RPC AI Backend",
+        description: "Unified AI server with system prompt protection",
+        version: "0.1.0"
+      },
+      servers: [{
+        name: "Unified AI Server",
+        url: `http://localhost:${this.config.port}${this.config.paths.jsonRpc}`,
+        description: "JSON-RPC endpoint"
+      }],
+      methods: [
+        {
+          name: "health",
+          description: "Check server health",
+          params: [],
+          result: {
+            name: "healthResult",
+            schema: {
+              type: "object",
+              properties: {
+                status: { type: "string" },
+                timestamp: { type: "string" },
+                uptime: { type: "number" }
+              }
+            }
+          }
+        },
+        {
+          name: "executeAIRequest",
+          description: "Execute AI request with system prompt protection",
+          params: [
+            {
+              name: "content",
+              required: true,
+              schema: { type: "string" }
+            },
+            {
+              name: "systemPrompt", 
+              required: true,
+              schema: { type: "string" }
+            },
+            {
+              name: "options",
+              required: false,
+              schema: {
+                type: "object",
+                properties: {
+                  model: { type: "string" },
+                  maxTokens: { type: "number" },
+                  temperature: { type: "number" }
+                }
+              }
+            }
+          ],
+          result: {
+            name: "aiResult",
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                data: { type: "object" }
+              }
+            }
+          }
+        }
+      ]
+    };
+  }
+
+  public async start(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.server = this.app.listen(this.config.port, () => {
+        console.log(`🚀 RPC AI Server running on port ${this.config.port}`);
+        console.log(`📍 Endpoints:`);
+        console.log(`   • Health: GET http://localhost:${this.config.port}${this.config.paths.health}`);
+        if (this.config.protocols.jsonRpc) {
+          console.log(`   • JSON-RPC: POST http://localhost:${this.config.port}${this.config.paths.jsonRpc}`);
+          console.log(`   • OpenRPC Schema: GET http://localhost:${this.config.port}/openrpc.json`);
+        }
+        if (this.config.protocols.tRpc) {
+          console.log(`   • tRPC: POST http://localhost:${this.config.port}${this.config.paths.tRpc}/*`);
+        }
+        console.log(`📋 Configuration:`);
+        console.log(`   • Protocols: ${Object.entries(this.config.protocols).filter(([,enabled]) => enabled).map(([name]) => name).join(', ')}`);
+        console.log(`   • Rate limit: ${this.config.rateLimit.max} req/${this.config.rateLimit.windowMs!/1000}s`);
+        if (this.config.aiLimits.content?.maxLength) {
+          console.log(`   • Content limit: ${this.config.aiLimits.content.maxLength.toLocaleString()} chars`);
+        }
+        if (this.config.aiLimits.tokens?.maxTokenLimit) {
+          console.log(`   • Token limit: ${this.config.aiLimits.tokens.maxTokenLimit.toLocaleString()}`);
+        }
+        resolve();
+      });
+
+      this.server.on('error', reject);
+    });
+  }
+
+  public async stop(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.server) {
+        this.server.close(() => {
+          console.log('✅ Server stopped');
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  public getApp(): Express {
+    return this.app;
+  }
+
+  public getRouter(): AppRouter {
+    return this.router;
+  }
+
+  public getConfig(): Required<RpcAiServerConfig> {
+    return this.config;
+  }
+}
+
+// Factory function for easy usage
+export function createRpcAiServer(config: RpcAiServerConfig = {}): RpcAiServer {
+  return new RpcAiServer(config);
+}
+
+// Export types
+export type { AppRouter };

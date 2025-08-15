@@ -1,18 +1,594 @@
 # Simple RPC AI Backend
 
-> **🚀 Platform-agnostic RPC server for AI integration in VS Code extensions, web apps, and CLI tools.**
+> **🚀 One server for all your AI needs - supports both JSON-RPC and tRPC with configurable limits.**
 
+[![codecov](https://codecov.io/gh/AWolf81/simple-rpc-ai-backend/branch/master/graph/badge.svg?token=LB25iUAO1h)](https://codecov.io/gh/AWolf81/simple-rpc-ai-backend)
+[![Test Simple RPC AI Backend](https://github.com/AWolf81/simple-rpc-ai-backend/actions/workflows/test.yml/badge.svg)](https://github.com/AWolf81/simple-rpc-ai-backend/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![Status](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/AWolf81/simple-rpc-ai-backend)
 [![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-blueviolet.svg)](https://claude.ai/code)
 
+## 🚀 **Quick Start**
+
+```typescript
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
+
+// Basic setup - uses smart defaults
+const server = createRpcAiServer();  // See default configuration below
+await server.start();
+
+// Production setup with predefined limits
+import { AI_LIMIT_PRESETS } from 'simple-rpc-ai-backend';
+
+const server = createRpcAiServer({
+  port: 8080,
+  aiLimits: AI_LIMIT_PRESETS.standard    // Balanced limits for most apps
+});
+await server.start();
+```
+
+**Smart protocol defaults:**
+- 📡 **JSON-RPC by default** - Simple, universal, works everywhere
+- ⚡ **tRPC available** - Enable for TypeScript projects with better DX
+
+## ⚙️ **Default Configuration (Zero Config)**
+
+When you call `createRpcAiServer()` with no parameters, you get these sensible defaults:
+
+```typescript
+// This is what you get by default:
+createRpcAiServer({
+  port: 8000,
+  
+  // Protocols: JSON-RPC only (simple, universal)
+  protocols: {
+    jsonRpc: true,   // ✅ Enabled - works with any language
+    tRpc: false      // ❌ Disabled - enable for TypeScript projects
+  },
+  
+  // AI Limits: Standard preset (balanced for most use cases)
+  aiLimits: {
+    content: {
+      maxLength: 500_000,    // 500KB (~100k words) - handles large files
+      minLength: 1
+    },
+    tokens: {
+      defaultMaxTokens: 4096,    // Good default for most AI models
+      maxTokenLimit: 32_000,     // Supports long context models
+      minTokens: 1
+    },
+    systemPrompt: {
+      maxLength: 25_000,     // 25KB - supports complex prompts
+      minLength: 1
+    }
+  },
+  
+  // Security: Permissive for development, lock down for production
+  cors: {
+    origin: '*',           // Allow all origins - ⚠️ change for production
+    credentials: false
+  },
+  
+  // Rate Limiting: Conservative but reasonable
+  rateLimit: {
+    windowMs: 15 * 60 * 1000,  // 15 minutes
+    max: 1000                  // 1000 requests per 15 min per IP
+  },
+  
+  // Endpoints: Standard paths
+  paths: {
+    jsonRpc: '/rpc',       // POST requests for JSON-RPC
+    tRpc: '/trpc',         // tRPC endpoint (if enabled)
+    health: '/health'      // GET for health checks
+  }
+});
+```
+
+**Why These Defaults?**
+
+| Setting | Value | Reasoning |
+|---------|-------|-----------|
+| **JSON-RPC only** | `jsonRpc: true, tRpc: false` | Universal compatibility, simpler to use |
+| **Standard AI limits** | 500KB content, 4096 tokens | Handles most use cases without being excessive |
+| **Permissive CORS** | `origin: '*'` | Easy development - ⚠️ **change for production** |
+| **Generous rate limits** | 1000/15min | Prevents abuse while allowing normal usage |
+| **Port 8000** | Standard port | Avoids conflicts with common services |
+
+> ⚠️ **Review Before Production:** These defaults prioritize ease of development. For production deployments:
+> - **AI Limits:** Validate token limits against your AI provider's models and your budget
+> - **CORS:** Always restrict to your specific domains (`origin: 'https://yourapp.com'`)
+> - **Rate Limits:** Adjust based on expected user load and abuse prevention needs
+> - **Security:** Consider authentication, API keys, and access controls
+
+**⚡ Quick Customization:**
+
+```typescript
+// Enable tRPC for TypeScript projects
+const server = createRpcAiServer({
+  protocols: { tRpc: true }  // Auto-disables JSON-RPC
+});
+
+// Use conservative limits for production
+const server = createRpcAiServer({
+  aiLimits: AI_LIMIT_PRESETS.conservative,
+  cors: { origin: 'https://yourapp.com' }  // Lock down CORS
+});
+
+// Development with generous limits
+const server = createRpcAiServer({
+  aiLimits: AI_LIMIT_PRESETS.generous,
+  rateLimit: { max: 10000 }  // Higher rate limits for dev
+});
+```
+
+## 🔀 **tRPC vs JSON-RPC: When to Use Which?**
+
+### **📊 Quick Comparison**
+
+| Feature | JSON-RPC 2.0 | tRPC |
+|---------|-------------|------|
+| **Type Safety** | ❌ Manual types | ✅ End-to-end TypeScript |
+| **Client Generation** | ❌ Manual client code | ✅ Auto-generated client |
+| **Protocol Standard** | ✅ Universal standard | 🟡 TypeScript ecosystem |
+| **VS Code Extensions** | ✅ Simple setup | ✅ Better DX |
+| **Web Applications** | 🟡 More work | ✅ Excellent DX |
+| **Non-TypeScript Clients** | ✅ Any language | ❌ TypeScript only |
+| **Bundle Size** | 🟢 Minimal | 🟡 Larger |
+| **Learning Curve** | 🟢 Simple | 🟡 Moderate |
+
+### **🎯 When to Use JSON-RPC**
+
+**Perfect for:**
+- ✅ **Standalone VS Code Extensions** - When extension is independent from backend
+- ✅ **Cross-language clients** - Python, Go, Rust, Java can all consume JSON-RPC
+- ✅ **CLI tools** - Minimal dependencies, easy to implement
+- ✅ **Mobile apps** - React Native, Flutter, native iOS/Android
+- ✅ **Legacy systems** - Integrates with existing JSON-RPC infrastructure
+- ✅ **Simple automation** - Scripts, webhooks, serverless functions
+- ✅ **Third-party integrations** - When consumers don't use TypeScript
+
+**Example - VS Code Extension:**
+```typescript
+import { RPCClient } from 'simple-rpc-ai-backend';
+
+const client = new RPCClient('http://localhost:8000');
+
+// Simple and direct
+const result = await client.request('executeAIRequest', {
+  content: editor.document.getText(),
+  systemPrompt: 'security_review',
+  apiKey: await context.secrets.get('anthropic-key')
+});
+```
+
+### **⚡ When to Use tRPC**
+
+**Perfect for:**
+- ✅ **Modern web applications** - React, Vue, Svelte with TypeScript
+- ✅ **Full-stack TypeScript** - Shared types between frontend and backend
+- ✅ **Monorepo VS Code Extensions** - When extension and backend share types
+- ✅ **Rapid development** - Auto-completion, refactoring, error detection
+- ✅ **Complex data flows** - Nested objects, unions, detailed validation
+- ✅ **Team development** - Type safety prevents integration bugs
+
+**Example - React Web App:**
+```typescript
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import type { AppRouter } from 'simple-rpc-ai-backend';
+
+const client = createTRPCProxyClient<AppRouter>({
+  links: [httpBatchLink({ url: 'http://localhost:8000/trpc' })],
+});
+
+// Full type safety and auto-completion
+const result = await client.ai.executeAIRequest.mutate({
+  content: code,              // TypeScript knows this is required
+  systemPrompt: 'code_review', // Auto-complete available prompts
+  options: {
+    maxTokens: 4096,          // Type-checked at compile time
+    temperature: 0.1
+  }
+});
+
+// result is fully typed - no manual type assertions needed!
+console.log(result.success); // TypeScript knows this exists
+```
+
+### **🎯 Recommendation: Choose One Protocol**
+
+While our unified server supports both protocols simultaneously, **choose one** based on your tech stack:
+
+```typescript
+// Default: JSON-RPC only (simple, universal)
+const server = createRpcAiServer();  // { jsonRpc: true, tRpc: false }
+
+// TypeScript project: tRPC only (better DX)
+const server = createRpcAiServer({
+  protocols: { tRpc: true }          // Auto-sets { jsonRpc: false, tRpc: true }
+});
+
+// Explicit control: enable both (if needed)
+const server = createRpcAiServer({
+  protocols: { 
+    jsonRpc: true, 
+    tRpc: true 
+  }
+});
+```
+
+**Decision Tree:**
+
+```
+Is your entire stack TypeScript?
+├── YES → Use tRPC (better DX, type safety, auto-completion)
+│   ├── VS Code extension + TS backend → tRPC
+│   ├── React/Vue + Node.js → tRPC  
+│   └── Monorepo setup → tRPC
+│
+└── NO → Use JSON-RPC (universal compatibility)
+    ├── Python/Go/PHP backend → JSON-RPC
+    ├── Multiple client languages → JSON-RPC
+    ├── Third-party consumers → JSON-RPC
+    └── Legacy system integration → JSON-RPC
+```
+
+### **🏗️ Monorepo VS Code Extension with Shared Types**
+
+**If your VS Code extension and backend are in the same repository**, tRPC is actually the better choice:
+
+```typescript
+// packages/backend/src/server.ts
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
+
+const server = createRpcAiServer({
+  protocols: { tRpc: true },  // Enable tRPC for shared types
+  aiLimits: {
+    content: { maxLength: 1_000_000 },
+    tokens: { defaultMaxTokens: 8192 }
+  }
+});
+
+export type AppRouter = typeof server.getRouter;
+```
+
+```typescript
+// packages/vscode-extension/src/extension.ts
+import * as vscode from 'vscode';
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import type { AppRouter } from '../../backend/src/server'; // Shared types!
+
+export function activate(context: vscode.ExtensionContext) {
+  // Type-safe client with zero manual type definitions
+  const client = createTRPCProxyClient<AppRouter>({
+    links: [
+      httpBatchLink({
+        url: 'http://localhost:8000/trpc',
+      }),
+    ],
+  });
+
+  const disposable = vscode.commands.registerCommand('extension.analyzeCode', async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+
+    try {
+      // Full type safety - VS Code will auto-complete everything!
+      const result = await client.ai.executeAIRequest.mutate({
+        content: editor.document.getText(),     // TypeScript knows this is required
+        systemPrompt: 'security_review',       // Auto-complete shows available prompts
+        options: {
+          maxTokens: 4096,                     // Type-checked at compile time
+          temperature: 0.1                     // VS Code shows valid range
+        }
+      });
+
+      // result is fully typed - no casting needed!
+      if (result.success) {
+        vscode.window.showInformationMessage(result.data.content);
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Analysis failed: ${error.message}`);
+    }
+  });
+
+  context.subscriptions.push(disposable);
+}
+```
+
+**Benefits of tRPC in Monorepo VS Code Extensions:**
+- ✅ **Zero type maintenance** - Types are automatically shared
+- ✅ **Refactoring safety** - Rename a field, get compile errors everywhere it's used
+- ✅ **Auto-completion** - VS Code shows all available methods and parameters
+- ✅ **Runtime validation** - Input validation with Zod schemas
+- ✅ **Better debugging** - TypeScript stack traces with real method names
+
+### **📋 Complete Monorepo Setup Guide**
+
+**Step 1: Project Structure**
+```
+your-ai-extension-project/
+├── packages/
+│   ├── backend/                 # AI server package
+│   │   ├── src/
+│   │   │   ├── server.ts       # Main server file
+│   │   │   └── types.ts        # Shared types export
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── extension/              # VS Code extension package
+│       ├── src/
+│       │   ├── extension.ts    # Main extension file
+│       │   └── ai-client.ts    # tRPC client
+│       ├── package.json
+│       └── tsconfig.json
+├── package.json                # Root package.json with workspaces
+└── tsconfig.json              # Root TypeScript config
+```
+
+**Step 2: Root Package Configuration**
+```json
+// package.json (root)
+{
+  "name": "ai-extension-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "concurrently": "^8.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:extension\"",
+    "dev:backend": "npm run dev --workspace=packages/backend",
+    "dev:extension": "npm run compile --workspace=packages/extension",
+    "build": "npm run build --workspace=packages/backend && npm run compile --workspace=packages/extension"
+  }
+}
+```
+
+**Step 3: Backend Package Setup**
+```json
+// packages/backend/package.json
+{
+  "name": "@your-project/backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "simple-rpc-ai-backend": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+```
+
+```typescript
+// packages/backend/src/server.ts
+import { createRpcAiServer, AI_LIMIT_PRESETS } from 'simple-rpc-ai-backend';
+
+const server = createRpcAiServer({
+  protocols: { tRpc: true },  // tRPC only for TypeScript monorepo
+  port: 3000,
+  aiLimits: AI_LIMIT_PRESETS.standard,
+  cors: {
+    origin: ['vscode-webview://*'],  // Allow VS Code webviews
+    credentials: true
+  }
+});
+
+// Export the router type for the extension
+export type AppRouter = typeof server.getRouter;
+
+// Start server
+server.start().then(() => {
+  console.log('🚀 AI Backend server running on port 3000');
+  console.log('📍 tRPC endpoint: http://localhost:3000/trpc');
+}).catch(console.error);
+```
+
+```typescript
+// packages/backend/src/types.ts
+export type { AppRouter } from './server.js';
+```
+
+**Step 4: Extension Package Setup**
+```json
+// packages/extension/package.json
+{
+  "name": "your-ai-extension",
+  "version": "1.0.0",
+  "main": "./dist/extension.js",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "activationEvents": [
+    "onCommand:extension.analyzeCode"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.analyzeCode",
+        "title": "Analyze Code with AI"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "@trpc/client": "^10.45.0",
+    "@your-project/backend": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0"
+  }
+}
+```
+
+```typescript
+// packages/extension/src/ai-client.ts
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import type { AppRouter } from '@your-project/backend/src/types';
+
+export const aiClient = createTRPCProxyClient<AppRouter>({
+  links: [
+    httpBatchLink({
+      url: 'http://localhost:3000/trpc',
+    }),
+  ],
+});
+```
+
+```typescript
+// packages/extension/src/extension.ts
+import * as vscode from 'vscode';
+import { aiClient } from './ai-client';
+
+export function activate(context: vscode.ExtensionContext) {
+  const disposable = vscode.commands.registerCommand('extension.analyzeCode', async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      vscode.window.showErrorMessage('No active editor');
+      return;
+    }
+
+    const document = editor.document;
+    const code = document.getText();
+
+    try {
+      // Type-safe AI request with full auto-completion
+      const result = await aiClient.ai.executeAIRequest.mutate({
+        content: code,
+        systemPrompt: 'security_review',
+        options: {
+          maxTokens: 4096,
+          temperature: 0.1
+        }
+      });
+
+      // Show results in VS Code
+      if (result.success) {
+        const panel = vscode.window.createWebviewPanel(
+          'aiAnalysis',
+          'AI Analysis Results',
+          vscode.ViewColumn.Two,
+          {}
+        );
+        
+        panel.webview.html = `
+          <html>
+            <body>
+              <h1>AI Analysis Results</h1>
+              <pre>${result.data.content}</pre>
+            </body>
+          </html>
+        `;
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`AI analysis failed: ${error.message}`);
+    }
+  });
+
+  context.subscriptions.push(disposable);
+}
+
+export function deactivate() {}
+```
+
+**Step 5: TypeScript Configuration**
+```json
+// tsconfig.json (root)
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "references": [
+    { "path": "./packages/backend" },
+    { "path": "./packages/extension" }
+  ]
+}
+```
+
+```json
+// packages/backend/tsconfig.json
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true
+  },
+  "include": ["src/**/*"]
+}
+```
+
+```json
+// packages/extension/tsconfig.json
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "module": "CommonJS",
+    "target": "ES2020"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../backend" }
+  ]
+}
+```
+
+**Step 6: Development Workflow**
+```bash
+# Install dependencies
+npm install
+
+# Start development (both backend and extension compilation)
+npm run dev
+
+# In VS Code, press F5 to launch Extension Development Host
+# Your extension will have full type safety with the running backend
+```
+
+**Key Benefits of This Setup:**
+- ✅ **Shared types** - Extension gets full TypeScript intellisense for AI methods
+- ✅ **Hot reload** - Backend changes automatically update extension types
+- ✅ **Type safety** - Compile-time errors if backend API changes
+- ✅ **Auto-completion** - VS Code shows all available AI methods and parameters
+- ✅ **Single repository** - Easy to manage and deploy together
+
+### **💡 Why We Built Both**
+
+**JSON-RPC** is the universal language of RPC - every programming language can speak it. It's perfect for VS Code extensions where simplicity and small bundle size matter.
+
+**tRPC** provides an incredible developer experience for TypeScript applications. The type safety and auto-completion significantly reduce bugs and development time.
+
+**Our approach**: Start with JSON-RPC for simplicity, add tRPC when you need the enhanced DX for web applications.
+
 ## ⚠️ **Development Status**
 
 **🔬 Alpha Software** - This package is in active development and not yet published to npm.
 
-- ✅ **Core functionality working** - Basic RPC server, AI integration, authentication
-- ✅ **Enterprise secret management** - Vaultwarden integration with PostgreSQL
+- ✅ **Core functionality working** - Unified RPC server, AI integration, configurable limits
+- ✅ **PostgreSQL key management** - Secure multi-tenant API key storage  
 - ✅ **OpenRPC documentation complete** - Full API specification available
 - ✅ **Test coverage >80%** - Comprehensive test suite
 - ⚠️ **API may change** - Breaking changes possible before v1.0
@@ -31,7 +607,135 @@
 - [ ] Security audit and hardening
 - [ ] **npm publication**
 
-## 🔐 **Secret Management Options**
+## ⚙️ **Configuration**
+
+The new unified server supports extensive configuration for all use cases:
+
+### **Basic Configuration**
+
+```typescript
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
+
+const server = createRpcAiServer({
+  // Basic settings
+  port: 8000,
+  
+  // Protocol support (JSON-RPC by default, tRPC available)
+  protocols: {
+    tRpc: true        // Enable tRPC for TypeScript projects (auto-disables JSON-RPC)
+    // Default: { jsonRpc: true, tRpc: false }
+  },
+  
+  // AI limits (configurable for your use case)
+  aiLimits: {
+    content: {
+      maxLength: 1_000_000,  // 1MB content limit
+      minLength: 1
+    },
+    tokens: {
+      defaultMaxTokens: 4096,    // Good default for most use cases
+      maxTokenLimit: 200_000,    // Support for long context models
+      minTokens: 1
+    },
+    systemPrompt: {
+      maxLength: 50_000,   // Support for complex prompts
+      minLength: 1
+    }
+  },
+  
+  // Security & rate limiting
+  rateLimit: {
+    windowMs: 15 * 60 * 1000,  // 15 minutes
+    max: 1000                  // requests per window per IP
+  },
+  
+  // CORS configuration
+  cors: {
+    origin: '*',        // or ['https://yourapp.com']
+    credentials: false
+  }
+});
+```
+
+### **AI Limit Presets for Common Use Cases**
+
+Choose the right preset for your needs:
+
+```typescript
+import { createRpcAiServer, AI_LIMIT_PRESETS } from 'simple-rpc-ai-backend';
+
+// 🏭 Production (conservative limits)
+const prodServer = createRpcAiServer({
+  aiLimits: AI_LIMIT_PRESETS.conservative,
+  rateLimit: { max: 100 }
+});
+
+// 📊 Most applications (balanced limits)  
+const appServer = createRpcAiServer({
+  aiLimits: AI_LIMIT_PRESETS.standard      // Default choice
+});
+
+// 🚀 Development (generous limits)
+const devServer = createRpcAiServer({
+  aiLimits: AI_LIMIT_PRESETS.generous
+});
+
+// 🔥 Specialized use cases (maximum limits)
+const maxServer = createRpcAiServer({
+  aiLimits: AI_LIMIT_PRESETS.maximum
+});
+```
+
+**Preset Details:**
+
+| Preset | Content Limit | Default Tokens | Max Tokens | System Prompt | Use Case |
+|--------|---------------|----------------|------------|---------------|----------|
+| **conservative** | 100KB (~20k words) | 2,048 | 8,192 | 10KB | 🏭 Production, cost control |
+| **standard** | 500KB (~100k words) | 4,096 | 32,000 | 25KB | 📊 Most applications |
+| **generous** | 2MB (~400k words) | 8,192 | 100,000 | 50KB | 🚀 Development, large docs |
+| **maximum** | 10MB (~2M words) | 16,384 | 1,000,000 | 100KB | 🔥 Specialized, research |
+
+> ⚠️ **Important Disclaimers:**
+> 
+> **Validate Against Your Needs:** These are suggested defaults based on common use cases. Always review and adjust limits based on:
+> - Your specific application requirements
+> - AI provider token limits (Claude: 200k, GPT-4: 128k, etc.)
+> - Cost considerations and budget constraints
+> - Expected user behavior and content size
+> 
+> **Check AI Provider Limits:** Each AI provider has different context windows and token limits:
+> - **Anthropic Claude:** 200k tokens max context
+> - **OpenAI GPT-4:** 8k-128k tokens depending on model
+> - **Google Gemini:** 1M tokens for Pro models
+> 
+> **Monitor Usage & Costs:** Higher limits = higher potential costs. Start conservative and increase based on actual usage patterns.
+
+**Custom Configuration:**
+
+```typescript
+// Mix presets with custom overrides
+const customServer = createRpcAiServer({
+  aiLimits: {
+    ...AI_LIMIT_PRESETS.standard,
+    tokens: { 
+      ...AI_LIMIT_PRESETS.standard.tokens,
+      defaultMaxTokens: 8192        // Higher default for your use case
+    }
+  }
+});
+
+// Protocol selection examples
+const jsonRpcServer = createRpcAiServer({
+  aiLimits: AI_LIMIT_PRESETS.conservative    // JSON-RPC by default
+});
+
+const tRpcServer = createRpcAiServer({
+  protocols: { tRpc: true },                  // tRPC only
+  aiLimits: AI_LIMIT_PRESETS.generous
+});
+```
+
+## 🔐 **API Key Management Options**
 
 This package offers **flexible storage options** for API keys and system configuration:
 
@@ -65,11 +769,11 @@ pnpm test:postgres
 **Simple file-based storage for development and small deployments:**
 
 ```javascript
-const server = createAIServer({
-  keyStorage: {
-    type: 'file',
-    path: './data/keys.json',    // Encrypted local storage
-    masterKey: process.env.MASTER_KEY
+const server = createRpcAiServer({
+  // File storage is built-in, just specify limits
+  aiLimits: {
+    content: { maxLength: 1_000_000 },  // 1MB max
+    tokens: { defaultMaxTokens: 4096 }  // Good default
   }
 });
 ```
@@ -99,16 +803,232 @@ const result = await client.request('executeAIRequest', {
 - 🏢 **Corporate policy compliance** - Keys never leave user's machine
 - ⚡ **Instant setup** - No key management infrastructure needed
 
+## 📚 **Usage Examples**
+
+### **JSON-RPC Client Examples**
+
+**Basic usage (platform-agnostic):**
+```typescript
+import { RPCClient } from 'simple-rpc-ai-backend';
+
+const client = new RPCClient('http://localhost:8000');
+
+// Execute AI request with client-managed API key
+const result = await client.request('executeAIRequest', {
+  content: 'function login(user, pass) { return user === "admin" && pass === "123"; }',
+  systemPrompt: 'security_review',
+  apiKey: 'your-anthropic-key'  // Optional - only if using client-managed keys
+});
+
+console.log(result.success, result.data);
+```
+
+**VS Code Extension integration:**
+```typescript
+import * as vscode from 'vscode';
+import { RPCClient } from 'simple-rpc-ai-backend';
+
+export function activate(context: vscode.ExtensionContext) {
+  const client = new RPCClient('http://localhost:8000');
+  
+  const disposable = vscode.commands.registerCommand('extension.analyzeCode', async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+    
+    // Get API key from VS Code's secure storage
+    const apiKey = await context.secrets.get('anthropic-api-key');
+    
+    try {
+      const result = await client.request('executeAIRequest', {
+        content: editor.document.getText(),
+        systemPrompt: 'security_review',
+        apiKey: apiKey
+      });
+      
+      // Show results in VS Code
+      vscode.window.showInformationMessage(`Analysis: ${result.data.content}`);
+    } catch (error) {
+      vscode.window.showErrorMessage(`Error: ${error.message}`);
+    }
+  });
+  
+  context.subscriptions.push(disposable);
+}
+```
+
+### **tRPC Client Examples**
+
+**React web application:**
+```typescript
+import React, { useState } from 'react';
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import type { AppRouter } from 'simple-rpc-ai-backend';
+
+const client = createTRPCProxyClient<AppRouter>({
+  links: [
+    httpBatchLink({
+      url: 'http://localhost:8000/trpc',
+    }),
+  ],
+});
+
+function CodeAnalyzer() {
+  const [code, setCode] = useState('');
+  const [result, setResult] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  const analyzeCode = async () => {
+    setLoading(true);
+    try {
+      // Full type safety - TypeScript knows all parameter types
+      const response = await client.ai.executeAIRequest.mutate({
+        content: code,
+        systemPrompt: 'security_review',
+        options: {
+          maxTokens: 4096,
+          temperature: 0.1
+        }
+      });
+      
+      // Response is fully typed
+      setResult(response.content);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <div>
+      <textarea 
+        value={code} 
+        onChange={(e) => setCode(e.target.value)}
+        placeholder="Paste your code here..."
+      />
+      <button onClick={analyzeCode} disabled={loading}>
+        {loading ? 'Analyzing...' : 'Analyze Code'}
+      </button>
+      {result && (
+        <div className="result">
+          <h3>Analysis Result:</h3>
+          <pre>{result}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default CodeAnalyzer;
+```
+
+**Next.js API integration:**
+```typescript
+// pages/api/ai-proxy.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import type { AppRouter } from 'simple-rpc-ai-backend';
+
+const client = createTRPCProxyClient<AppRouter>({
+  links: [
+    httpBatchLink({
+      url: process.env.AI_BACKEND_URL || 'http://localhost:8000/trpc',
+    }),
+  ],
+});
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  try {
+    const { content, systemPrompt } = req.body;
+    
+    // Type-safe proxy to AI backend
+    const result = await client.ai.executeAIRequest.mutate({
+      content,
+      systemPrompt,
+      options: {
+        maxTokens: 2048
+      }
+    });
+    
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'AI request failed' });
+  }
+}
+```
+
+### **CLI Tool Example**
+
+```typescript
+#!/usr/bin/env node
+import { RPCClient } from 'simple-rpc-ai-backend';
+import { readFileSync } from 'fs';
+import { program } from 'commander';
+
+program
+  .name('ai-code-review')
+  .description('AI-powered code review tool')
+  .argument('<file>', 'file to analyze')
+  .option('-p, --prompt <prompt>', 'system prompt to use', 'security_review')
+  .option('-k, --api-key <key>', 'API key (or set AI_API_KEY env var)')
+  .action(async (file, options) => {
+    const client = new RPCClient(process.env.AI_BACKEND_URL || 'http://localhost:8000');
+    const apiKey = options.apiKey || process.env.AI_API_KEY;
+    
+    if (!apiKey) {
+      console.error('Error: API key required. Use --api-key or set AI_API_KEY environment variable.');
+      process.exit(1);
+    }
+    
+    try {
+      const content = readFileSync(file, 'utf-8');
+      
+      console.log(`Analyzing ${file} with ${options.prompt} prompt...`);
+      
+      const result = await client.request('executeAIRequest', {
+        content,
+        systemPrompt: options.prompt,
+        apiKey
+      });
+      
+      console.log('\n--- Analysis Result ---');
+      console.log(result.data.content);
+    } catch (error) {
+      console.error('Error:', error.message);
+      process.exit(1);
+    }
+  });
+
+program.parse();
+```
+
+**Usage:**
+```bash
+# Install globally
+npm install -g ai-code-review
+
+# Analyze a file
+ai-code-review src/auth.js --prompt security_review --api-key sk-ant-...
+
+# Or with environment variable
+export AI_API_KEY=sk-ant-...
+ai-code-review src/auth.js
+```
+
 ## 🔧 **Storage Configuration Examples**
 
 ### Option 1: PostgreSQL Secret Manager (Recommended)
 
 ```javascript
 // server.js - Production setup with PostgreSQL
-import { createAIServer } from 'simple-rpc-ai-backend';
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
 import { PostgreSQLRPCMethods } from 'simple-rpc-ai-backend/auth/PostgreSQLRPCMethods';
 
-const server = createAIServer({
+const server = createRpcAiServer({
   secretManager: {
     type: 'postgresql',
     host: process.env.SECRET_MANAGER_DB_HOST || 'localhost',
@@ -142,9 +1062,9 @@ SECRET_MANAGER_ENCRYPTION_KEY=your-32-character-key
 
 ```javascript
 // server.js - Development/small deployment setup  
-import { createAIServer } from 'simple-rpc-ai-backend';
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
 
-const server = createAIServer({
+const server = createRpcAiServer({
   keyStorage: {
     type: 'file',
     path: './secure/keys.encrypted.json',
@@ -163,9 +1083,9 @@ server.start();
 
 ```javascript
 // server.js - No backend key storage
-import { createAIServer } from 'simple-rpc-ai-backend';
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
 
-const server = createAIServer({
+const server = createRpcAiServer({
   keyStorage: {
     type: 'client_managed'  // Keys passed in each request
   },
@@ -206,34 +1126,34 @@ npm install git+https://github.com/AWolf81/simple-rpc-ai-backend.git
 pnpm add git+https://github.com/AWolf81/simple-rpc-ai-backend.git
 ```
 
-### Option A: Secure Enterprise Setup with Vaultwarden
+### Option A: Secure Enterprise Setup with PostgreSQL
 
-**1. Add Vaultwarden infrastructure to your project:**
+**1. Add PostgreSQL infrastructure to your project:**
 
 ```bash
 # Copy infrastructure files to your project
-cp node_modules/simple-rpc-ai-backend/docker-compose.vaultwarden.yml ./
-cp node_modules/simple-rpc-ai-backend/.env.vaultwarden.example ./
+cp node_modules/simple-rpc-ai-backend/docker-compose.postgres.yml ./
+cp node_modules/simple-rpc-ai-backend/.env.postgres.example ./
 cp -r node_modules/simple-rpc-ai-backend/docker ./
 
-# Setup Vaultwarden
-./docker/setup-vaultwarden.sh
+# Setup PostgreSQL
+./docker/setup-postgres.sh
 ```
 
 **2. Create your secure AI backend server:**
 
 ```javascript
 // your-ai-backend/server.js - Secure Server-Side Implementation
-import { createAIServer, SecureVaultManager } from 'simple-rpc-ai-backend';
+import { createRpcAiServer, SecureVaultManager } from 'simple-rpc-ai-backend';
 
 // Initialize secure vault manager
 const vaultManager = new SecureVaultManager({
-  bitwardenConfig: loadVaultwardenConfig(),
+  bitwardenConfig: loadPostgreSQLConfig(),
   databaseMasterKey: process.env.DATABASE_MASTER_KEY, // 64-char hex key
   userBridge: new UserIdentityBridge()
 });
 
-const server = createAIServer({
+const server = createRpcAiServer({
   vaultManager,
   prompts: {
     // Your proprietary system prompts (server-side only!)
@@ -308,9 +1228,9 @@ export async function activate(context) {
 
 ```javascript
 // your-ai-backend/server.js - No external dependencies
-import { createAIServer } from 'simple-rpc-ai-backend';
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
 
-const server = createAIServer({
+const server = createRpcAiServer({
   keyStorage: {
     type: 'file',
     path: './secure/api-keys.encrypted.json',
@@ -328,9 +1248,9 @@ server.start();
 
 ```javascript
 // your-ai-backend/server.js - Zero key management
-import { createAIServer } from 'simple-rpc-ai-backend';
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
 
-const server = createAIServer({
+const server = createRpcAiServer({
   keyStorage: { type: 'client_managed' },
   prompts: {
     myAnalysis: "Your protected system prompt..."
@@ -365,37 +1285,19 @@ async function analyzeWithVSCodeKeys() {
 | **MVP/Prototype** | 🔑 Client-Managed | Zero infrastructure, instant start |
 | **Open Source Projects** | 📁 File Storage | No external dependencies |
 
-## 🛡️ **Security Comparison: Old vs New Architecture**
+## 🔒 **Storage Security Comparison**
 
-### **❌ Old Client-Side Approach (Security Issues)**
-| Component | Master Password | Vault Credentials | API Keys | Attack Surface |
-|-----------|----------------|-------------------|----------|----------------|
-| **VS Code Extension** | ✅ Generated/stored | ✅ Exposed to client | ✅ Encrypt/decrypt | 🚨 **HIGH** - Client crypto |
-| **RPC Server** | ✅ Receives hash | ✅ Knows vault user ID | ❌ Only ciphertext | 🟡 Medium |
-| **Vaultwarden** | ✅ Stores hash | ✅ User account | ✅ Encrypted storage | 🟡 Medium |
-
-**Problems:** Master passwords in untrusted environment, complex client crypto, vault IDs exposed
-
-### **✅ New Server-Side Approach (Secure)**  
-| Component | Master Password | Vault Credentials | API Keys | Attack Surface |
-|-----------|----------------|-------------------|----------|----------------|
-| **VS Code Extension** | ❌ Never sees | ❌ Never sees | ✅ Provides once | 🟢 **LOW** - JWT only |
-| **RPC Server** | ✅ Generates server-side | ✅ Manages internally | ✅ Retrieves/uses | 🟡 Medium - auditable |
-| **Vaultwarden** | ✅ Server account | ✅ Server auth | ✅ Encrypted storage | 🟢 Low |
-
-**Benefits:** Zero client crypto, server-generated passwords, minimal client knowledge
-
-### **🔒 Storage Security Comparison**
-
-| Feature | Old Client-Side | New Server-Side | File Storage | Client-Managed |
-|---------|----------------|----------------|--------------|----------------|
-| **System Prompt Protection** | ✅ | ✅ | ✅ | ✅ |
-| **Master Key Security** | ❌ Client-side | ✅ Server crypto.randomBytes | ✅ AES-256-GCM | ✅ Client handles |
-| **Client Complexity** | 🚨 High crypto | ✅ JWT only | 🟡 Medium | 🟡 Medium |
-| **Audit Trail** | 🟡 Partial | ✅ Complete server logs | ❌ | ❌ |
-| **Multi-user Support** | ✅ Complex | ✅ Simple | ❌ | ✅ Per client |
-| **Corporate Compliance** | 🟡 Client risks | ✅ Server-controlled | 🟡 Basic | ✅ Zero storage |
-| **Attack Surface** | 🚨 High | 🟢 Low | 🟡 Medium | 🟢 Low |
+| Feature | PostgreSQL | File Storage | Client-Managed |
+|---------|-----------|--------------|----------------|
+| **System Prompt Protection** | ✅ Server-side only | ✅ Server-side only | ✅ Server-side only |
+| **API Key Security** | 🔒 AES-256-GCM encrypted | 🔒 AES-256-GCM encrypted | ✅ Client handles |
+| **Multi-user Support** | ✅ True user isolation | ❌ Single instance | ✅ Per client instance |
+| **Audit Trail** | ✅ Complete server logs | 🟡 Basic file logs | ❌ No audit trail |
+| **Setup Complexity** | 🟡 PostgreSQL required | ✅ Zero setup | ✅ Zero server setup |
+| **Corporate Compliance** | ✅ Enterprise ready | 🟡 Basic compliance | ✅ Zero storage risk |
+| **Backup & Recovery** | ✅ Database backups | 🟡 File-based | ✅ Client responsibility |
+| **Attack Surface** | 🟡 Database + server | 🟡 File system + server | 🟢 Minimal server |
+| **Recommended For** | 🏢 Production/Enterprise | 💻 Development/Small teams | 🔌 VS Code extensions |
 
 ## 🚀 **5-Minute Quick Start**
 
@@ -411,9 +1313,9 @@ npm install git+https://github.com/AWolf81/simple-rpc-ai-backend.git
 
 # 3. Create server
 cat > server.js << 'EOF'
-import { createAIServer } from 'simple-rpc-ai-backend';
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
 
-const server = createAIServer({
+const server = createRpcAiServer({
   keyStorage: { type: 'client_managed' },  // No storage needed
   prompts: {
     security_review: "You are a senior security engineer. Review code for vulnerabilities."
@@ -480,7 +1382,7 @@ After reading [Kir Shatrov's reverse engineering of Claude Code](https://kirshat
 - ✅ **System Prompt Protection** - Keep sensitive prompts on your secure server (never client-side)
 - ✅ **Business Logic Security** - Your proprietary AI techniques stay hidden
 - ✅ **Corporate Proxy Bypass** - AI requests go through your backend, not blocked
-- ✅ **Flexible Key Management** - Vaultwarden, file storage, or client-managed keys
+- ✅ **Flexible Key Management** - PostgreSQL, file storage, or client-managed keys
 - ✅ **Zero Extension Setup** - Users don't need API keys or configuration (optional)
 - ✅ **Multi-Provider Support** - Switch AI providers without extension updates
 - ✅ **Simple Integration** - Clean JSON-RPC API for VS Code extensions
@@ -972,7 +1874,7 @@ monitor.onProviderStatusChange('anthropic', (hasKey) => {
 
 ### Key Management (When Using Storage)
 
-| Method | Description | Parameters | Vaultwarden | File | Client |
+| Method | Description | Parameters | PostgreSQL | File | Client |
 |--------|-------------|------------|-------------|------|--------|
 | `storeUserKey` | Store encrypted API key | `provider`, `apiKey` | ✅ | ✅ | ❌ |
 | `getUserKey` | Check if key exists | `provider` | ✅ | ✅ | ❌ |
@@ -980,7 +1882,7 @@ monitor.onProviderStatusChange('anthropic', (hasKey) => {
 | `getUserProviders` | List configured providers | None | ✅ | ✅ | ❌ |
 | `validateUserKey` | Validate key with provider | `provider` | ✅ | ✅ | ❌ |
 
-### API Token System (Vaultwarden Only)
+### API Token System (PostgreSQL Only)
 
 | Method | Description | Parameters | Pro Feature |
 |--------|-------------|------------|-------------|
@@ -996,7 +1898,7 @@ monitor.onProviderStatusChange('anthropic', (hasKey) => {
 | `getAuthStatus` | Get authentication level | `deviceId` |
 | `upgradeToOAuth` | Upgrade to OAuth | `deviceId`, `provider`, `token` |
 
-### Secure Vaultwarden Integration
+### Secure PostgreSQL Integration
 
 | Method | Description | Parameters | Security |
 |--------|-------------|------------|----------|
@@ -1016,7 +1918,7 @@ monitor.onProviderStatusChange('anthropic', (hasKey) => {
 | Feature | Free Users | Pro Users |
 |---------|------------|-----------|
 | **API Key Management** | 🔑 BYOK (Bring Your Own Key) | ✅ Server-provided keys |
-| **Key Storage** | ✅ Encrypted in Vaultwarden | ❌ Not needed |
+| **Key Storage** | ✅ Encrypted in PostgreSQL | ❌ Not needed |
 | **Setup Required** | ✅ Must store API key first | ❌ Works immediately |
 | **Usage Limits** | 🔒 Limited by their API key | ✅ Higher limits on server keys |
 
@@ -1211,7 +2113,7 @@ sequenceDiagram
     participant Client as RPC Client<br/>(VS Code/Web/CLI)
     participant Proxy as Corporate Proxy<br/>(Traffic Monitor)
     participant Backend as Your RPC Backend<br/>(System Prompts Here)
-    participant Storage as Key Storage<br/>(Vaultwarden/File/Client)
+    participant Storage as Key Storage<br/>(PostgreSQL/File/Client)
     participant AI as AI Provider<br/>(Anthropic/OpenAI/Google)
     
     Note over Client,AI: User triggers AI request
@@ -1247,7 +2149,7 @@ sequenceDiagram
     participant RPC as RPC Backend<br/>(Secure Vault Manager)
     participant OpenSaaS as OpenSaaS Service<br/>(User Management & Billing)
     participant DB as Secure Database<br/>(Encrypted User Mappings)
-    participant Vault as Vaultwarden Server<br/>(API Key Storage)
+    participant Vault as PostgreSQL Server<br/>(API Key Storage)
     participant AI as AI Provider<br/>(Anthropic/OpenAI)
     
     Note over Client,AI: Secure Server-Side Key Management
@@ -1264,7 +2166,7 @@ sequenceDiagram
         Client->>RPC: vaultwarden.storeApiKey(jwt, apiKey, provider)
         RPC->>RPC: Extract user identity (supports OAuth2 primary)
         RPC->>RPC: Generate secure vault password (64 chars, server-side)
-        RPC->>Vault: Create Vaultwarden account with server password
+        RPC->>Vault: Create PostgreSQL account with server password
         RPC->>DB: Store encrypted mapping with subscription tier
         
         Note over RPC: User onboarded when they store first API key!
@@ -1319,7 +2221,7 @@ sequenceDiagram
 | **Client** | ✅ Provides | ❌ Never sees | ✅ Provides once | ❌ Never sees | ❌ Never sees |
 | **RPC Backend** | ✅ Validates | ✅ Generates & stores | ✅ Retrieves & uses | ✅ Stores securely | ✅ Manages internally |
 | **Database** | ❌ | ✅ Encrypted storage | ❌ | ❌ | ✅ User mappings |
-| **Vaultwarden** | ❌ | ✅ Account auth | ✅ Encrypted storage | ❌ | ✅ Internal user |
+| **PostgreSQL** | ❌ | ✅ Account auth | ✅ Encrypted storage | ❌ | ✅ Internal user |
 | **OpenSaaS** | ✅ Issues | ❌ | ❌ | ❌ | ❌ |
 
 **True Zero-Knowledge Architecture**: Client provides JWT from any auth provider. Server handles all crypto securely!
@@ -1386,7 +2288,7 @@ JWT3: { userId: 'user-123', githubId: 'github-54321', googleId: 'google-98765' }
 | **VS Code Extension** | ✅ | ❌ | 🟡 (Client-managed only) | ❌ (User's machine) |
 | **Corporate Proxy** | ✅ | ❌ | ❌ | ❌ (Company network) |
 | **Your RPC Backend** | ✅ | ✅ | 🟡 (Depends on storage) | ✅ (Your server) |
-| **Vaultwarden Storage** | ❌ | ❌ | ✅ (Encrypted) | ✅ (Your infrastructure) |
+| **PostgreSQL Storage** | ❌ | ❌ | ✅ (Encrypted) | ✅ (Your infrastructure) |
 | **AI Provider** | ✅ | ✅ | ✅ | ❌ (External service) |
 
 **Key Insight**: Corporate proxies and extension users never see your valuable system prompts regardless of storage option!
@@ -1413,6 +2315,87 @@ pnpm run dev:docs
 - 🎮 **Interactive testing** - Try API methods directly in the browser
 - 📋 **Collapsible sections** - Organized, easy-to-navigate documentation
 
+### 🔧 **tRPC Documentation & Type Explorer**
+
+**tRPC provides even better documentation through TypeScript itself:**
+
+**Built-in Documentation:**
+- ✅ **TypeScript Intellisense** - Hover over any method to see full documentation
+- ✅ **Auto-completion** - VS Code shows all available methods and parameters
+- ✅ **Type Explorer** - Navigate through types with Go to Definition
+- ✅ **Runtime validation** - Zod schemas provide detailed error messages
+
+**Accessing tRPC Documentation:**
+
+```typescript
+// In your IDE, hover over any method for instant docs
+client.ai.executeAIRequest.mutate({
+  content: 'code here',     // Hover shows: string (required)
+  systemPrompt: 'review',   // Hover shows: available prompt names
+  options: {
+    maxTokens: 4096,       // Hover shows: number | undefined (1-200000)
+    temperature: 0.1       // Hover shows: number | undefined (0-2)
+  }
+});
+```
+
+**Live API Explorer (tRPC Panel):**
+
+tRPC Panel is a **web-based API explorer** (like Swagger UI) that you add to your server:
+
+```bash
+# Install tRPC Panel for interactive API exploration
+npm install trpc-panel
+
+# Add to your server setup
+import { renderTrpcPanel } from 'trpc-panel';
+
+// Serve interactive API docs at /panel
+app.use('/panel', (req, res) => {
+  return res.send(
+    renderTrpcPanel(appRouter, {
+      url: 'http://localhost:8000/trpc',
+      transformer: 'superjson'
+    })
+  );
+});
+```
+
+**tRPC Panel URL:** http://localhost:8000/panel (web interface, not VS Code extension)
+
+**Features:**
+- 🎯 **Live schema exploration** - Browse all procedures with real-time type info
+- 🔍 **Interactive testing** - Execute procedures directly in the browser
+- 📝 **Auto-generated docs** - Procedures, inputs, outputs all documented automatically
+- 🔄 **Real-time updates** - Documentation updates as you change your code
+
+**Comparison: Documentation Methods**
+
+| Feature | OpenRPC (JSON-RPC) | tRPC Built-in | tRPC Panel |
+|---------|-------------------|---------------|------------|
+| **Interactive Testing** | ✅ | ❌ | ✅ |
+| **Type Information** | 🟡 Manual schemas | ✅ Automatic from TS | ✅ Live from TS |
+| **IDE Integration** | ❌ | ✅ Full Intellisense | ❌ |
+| **Documentation Maintenance** | 🟡 Manual updates | ✅ Zero maintenance | ✅ Zero maintenance |
+| **External Sharing** | ✅ | ❌ | ✅ |
+| **Standards Compliance** | ✅ OpenRPC standard | ❌ | ❌ |
+
+**Clear Recommendation:**
+
+🎯 **Choose ONE protocol based on your tech stack:**
+
+**Use tRPC when:**
+- ✅ **Full TypeScript stack** - Both client and server are TypeScript
+- ✅ **Monorepo setup** - Shared types between frontend and backend
+- ✅ **React/Vue/Svelte + Node.js/Express** - Modern web app architecture
+- ✅ **VS Code extension + TypeScript backend** - Type safety across the stack
+
+**Use JSON-RPC when:**
+- ✅ **Mixed language stack** - FastAPI (Python) + React, Go backend + any frontend
+- ✅ **Third-party integrations** - External systems need to consume your API
+- ✅ **Legacy systems** - Existing JSON-RPC infrastructure
+- ✅ **Multiple client types** - Mobile apps, CLI tools, webhooks
+
 ## 🧪 **Testing**
 
 ### Test Coverage Requirements
@@ -1434,7 +2417,7 @@ pnpm test:integration
 # Test file storage
 STORAGE_TYPE=file pnpm test
 
-# Test Vaultwarden integration (requires Docker)
+# Test PostgreSQL integration (requires Docker)
 pnpm run vaultwarden:start
 STORAGE_TYPE=vaultwarden pnpm test
 
@@ -1448,21 +2431,21 @@ STORAGE_TYPE=client_managed pnpm test
 
 The authentication flow has multiple layers that should be tested independently before testing the complete integration:
 
-### **Phase 1: Test Vaultwarden Directly (Infrastructure)**
+### **Phase 1: Test PostgreSQL Directly (Infrastructure)**
 
-Test the Vaultwarden server and Bitwarden SDK integration directly without RPC:
+Test the PostgreSQL server and Bitwarden SDK integration directly without RPC:
 
 ```bash
-# 1. Start Vaultwarden infrastructure
+# 1. Start PostgreSQL infrastructure
 pnpm run vaultwarden:start
 
-# 2. Test direct Vaultwarden connection
+# 2. Test direct PostgreSQL connection
 npx ts-node test-vaultwarden-auth.ts
 # Gets access token programmatically
 # Tests basic API connectivity
 # Validates service account setup
 
-# 3. Test Vaultwarden secret operations
+# 3. Test PostgreSQL secret operations
 npx ts-node test-vaultwarden-direct.ts
 # Tests secret CRUD operations
 # Validates organization permissions
@@ -1470,7 +2453,7 @@ npx ts-node test-vaultwarden-direct.ts
 ```
 
 **What Phase 1 Tests:**
-- ✅ Vaultwarden server connectivity
+- ✅ PostgreSQL server connectivity
 - ✅ Service account authentication
 - ✅ Organization permissions
 - ✅ Secret storage/retrieval operations
@@ -1481,9 +2464,9 @@ npx ts-node test-vaultwarden-direct.ts
 Test the RPC methods that implement the auth flow:
 
 ```bash
-# Test Vaultwarden RPC integration
+# Test PostgreSQL RPC integration
 npx ts-node test-vaultwarden-session.ts
-# Tests VaultwardenRPCMethods
+# Tests PostgreSQLRPCMethods
 # Tests JWT validation
 # Tests auto-provisioning flow
 ```
@@ -1535,7 +2518,7 @@ const aiResult = await rpcClient.request('executeAIRequest', {
 
 ### **Testing REST API Directly (Without RPC)**
 
-For debugging, you can test Vaultwarden's REST API directly:
+For debugging, you can test PostgreSQL's REST API directly:
 
 ```bash
 # 1. Get access token
@@ -1585,7 +2568,7 @@ pnpm run vaultwarden:setup
 pnpm run vaultwarden:start
 pnpm run vaultwarden:logs  # Check for errors
 
-# 2. Phase 1: Direct Vaultwarden testing
+# 2. Phase 1: Direct PostgreSQL testing
 npx ts-node test-vaultwarden-auth.ts     # Get access token
 npx ts-node test-vaultwarden-direct.ts   # Test secret operations
 
@@ -1614,9 +2597,9 @@ pnpm test:integration                     # Full integration suite
 | Test File | Purpose | Validates |
 |-----------|---------|-----------|
 | `test-vaultwarden-auth.ts` | Get access tokens | Service account, basic auth |
-| `test-vaultwarden-direct.ts` | Direct Vaultwarden operations | Secret CRUD, organization permissions |
+| `test-vaultwarden-direct.ts` | Direct PostgreSQL operations | Secret CRUD, organization permissions |
 | `test-secure-vault-manager.ts` | Secure RPC integration | Server-side crypto, JWT validation |
-| Complete E2E test | Simplified full flow | OpenSaaS→Server→Vaultwarden→AI integration |
+| Complete E2E test | Simplified full flow | OpenSaaS→Server→PostgreSQL→AI integration |
 
 ### **Simplified Testing Benefits**
 
@@ -1634,7 +2617,7 @@ We welcome contributions that maintain the **simple, flexible** philosophy:
 ### 🎯 **Contribution Guidelines**
 - **Simplicity first** - Reject complexity that doesn't solve real problems
 - **Storage flexibility** - Support multiple key management approaches
-- **Standard tech** - HTTP, JSON-RPC, Express, Vaultwarden
+- **Standard tech** - HTTP, JSON-RPC, Express, PostgreSQL
 - **Clear docs** - Honest about what we protect vs. don't protect
 - **Minimal deps** - Keep the package lightweight and secure
 
@@ -1650,7 +2633,7 @@ pnpm test:coverage
 # Start development environment
 pnpm run dev:docs  # OpenRPC Inspector at localhost:3002
 
-# Test Vaultwarden integration
+# Test PostgreSQL integration
 pnpm run vaultwarden:setup
 pnpm run vaultwarden:start
 
@@ -1672,7 +2655,7 @@ MIT - Permissive licensing for easy adoption in commercial and open source proje
 **Real value comes from:**
 - 🔒 **System prompt protection** (works with any storage option)
 - 🏢 **Corporate proxy bypass** through backend architecture
-- ⚡ **Flexible deployment** - Vaultwarden, file storage, or client-managed
+- ⚡ **Flexible deployment** - PostgreSQL, file storage, or client-managed
 - 📦 **Standard protocols** (JSON-RPC 2.0, HTTPS)
 - 🎯 **Simple integration** for VS Code extensions
 

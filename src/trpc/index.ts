@@ -14,7 +14,11 @@ import superjson from 'superjson';
  * Create context for each request
  * This is where you'd add authentication, database connections, etc.
  */
-export function createTRPCContext(opts: CreateExpressContextOptions) {
+export function createTRPCContext(opts: CreateExpressContextOptions): {
+  req: Request;
+  res: Response;
+  user: { id: string; email: string } | null;
+} {
   return {
     req: opts.req,
     res: opts.res,
@@ -39,13 +43,13 @@ const t = initTRPC.context<Context>().create({
  * Export reusable router and procedure helpers
  * These are the building blocks for our API
  */
-export const createTRPCRouter = t.router;
-export const publicProcedure = t.procedure;
+export const createTRPCRouter: typeof t.router = t.router;
+export const publicProcedure: typeof t.procedure = t.procedure;
 
 /**
  * Protected procedure (can be extended for authentication)
  */
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+export const protectedProcedure: ReturnType<typeof t.procedure.use> = t.procedure.use(({ ctx, next }) => {
   // Add authentication logic here
   // For now, just pass through
   return next({

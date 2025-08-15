@@ -101,6 +101,11 @@ export declare class PostgreSQLRPCMethods {
         newApiKey: string;
     }): Promise<VaultOperationResult>;
     /**
+     * Reset database for testing purposes
+     * WARNING: This will delete all data - for testing only!
+     */
+    resetForTesting(): Promise<void>;
+    /**
      * Clean up resources
      */
     cleanup(): Promise<void>;

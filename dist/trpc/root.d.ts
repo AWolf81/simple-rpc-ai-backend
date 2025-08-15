@@ -4,16 +4,22 @@
  * Combines all sub-routers into the main application router.
  * This is the single source of truth for all tRPC procedures.
  */
+import { createTRPCRouter } from './index.js';
+import { type AIRouterConfig } from './routers/ai.js';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 /**
- * Main app router that combines all feature routers
+ * Create app router with configurable AI limits
  */
-export declare const appRouter: any;
+export declare function createAppRouter(aiConfig?: AIRouterConfig): ReturnType<typeof createTRPCRouter>;
+/**
+ * Default app router with default configuration
+ */
+export declare const appRouter: ReturnType<typeof createAppRouter>;
 /**
  * Export the app router type definition
  * This is used by the client for end-to-end type safety
  */
-export type AppRouter = typeof appRouter;
+export type AppRouter = ReturnType<typeof createAppRouter>;
 /**
  * Export input/output types for each router procedure
  */

@@ -27,7 +27,7 @@ export const v = {
 };
 
 // For backward compatibility, create an alias
-export const createRPCRouter = createTRPCRouter;
+export const createRPCRouter: typeof createTRPCRouter = createTRPCRouter;
 
 // Simple OpenRPC schema generator for tRPC routers
 export function generateOpenRPCSchema(

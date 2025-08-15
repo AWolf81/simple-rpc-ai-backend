@@ -12,7 +12,7 @@ import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 /**
  * Create app router with configurable AI limits
  */
-export function createAppRouter(aiConfig?: AIRouterConfig) {
+export function createAppRouter(aiConfig?: AIRouterConfig): ReturnType<typeof createTRPCRouter> {
   return createTRPCRouter({
     ai: createAIRouter(aiConfig),
     
@@ -26,7 +26,7 @@ export function createAppRouter(aiConfig?: AIRouterConfig) {
 /**
  * Default app router with default configuration
  */
-export const appRouter = createAppRouter();
+export const appRouter: ReturnType<typeof createAppRouter> = createAppRouter();
 
 /**
  * Export the app router type definition

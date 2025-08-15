@@ -11,7 +11,7 @@
  * - No multi-device sync needed
  */
 
-import { createSimpleAIServer } from '../../dist/server-simple.js';
+import { createRpcAiServer, AI_LIMIT_PRESETS } from '../../dist/rpc-ai-server.js';
 
 console.log(`
 🚀 Basic AI Server - Service Provider Keys
@@ -90,19 +90,10 @@ Focus on high-level design improvements.
   `.trim()
 };
 
-// Create and start the server with service provider keys
-const server = createSimpleAIServer({
-  // Simple single provider (uses ANTHROPIC_API_KEY env var)
-  serviceProviders: process.env.ANTHROPIC_API_KEY ? {
-    anthropic: {
-      apiKey: process.env.ANTHROPIC_API_KEY,
-      priority: 1
-    }
-  } : {
-    anthropic: { priority: 1 },
-    openai: { priority: 2 },
-    google: { priority: 3 }
-  },
+// Create and start the server with unified RPC backend
+const server = createRpcAiServer({
+  // Conservative limits for basic usage
+  aiLimits: AI_LIMIT_PRESETS.conservative,
   port: 8000,
   cors: {
     origin: ['vscode-webview://*', 'http://localhost:*'],
@@ -129,17 +120,15 @@ process.on('SIGINT', () => {
 });
 
 console.log(`
-📘 Basic Server Features:
-✅ Service provider AI keys (you pay for AI costs)
+📘 Unified RPC AI Server Features:
+✅ JSON-RPC protocol (universal compatibility)
+✅ Conservative AI limits (cost control)
 ✅ System prompt protection
 ✅ Corporate proxy bypass
 ✅ Rate limiting and CORS
-✅ Perfect for prototyping and paid services
-✅ Payment verification disabled for easy testing
-❌ No BYOK support
-❌ No user authentication
-❌ No multi-device sync
+✅ Perfect for simple AI applications
+✅ Client-managed API keys (pass in requests)
+✅ Works with VS Code extensions, web apps, CLI tools
 
-🚀 For BYOK and advanced features, use:
-   node examples/ai-server-example.js
+🚀 For tRPC and advanced features, see other examples
 `);

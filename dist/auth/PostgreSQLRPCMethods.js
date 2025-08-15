@@ -297,6 +297,22 @@ export class PostgreSQLRPCMethods {
         }
     }
     /**
+     * Reset database for testing purposes
+     * WARNING: This will delete all data - for testing only!
+     */
+    async resetForTesting() {
+        this.logger.warn('Resetting database for testing - ALL DATA WILL BE LOST');
+        // Get direct database access through the secret manager
+        const client = this.secretManager.client;
+        if (client) {
+            await client.query('DELETE FROM user_api_keys');
+            this.logger.info('Database reset completed');
+        }
+        else {
+            throw new Error('Database client not available for reset');
+        }
+    }
+    /**
      * Clean up resources
      */
     async cleanup() {

@@ -4,16 +4,22 @@
  * Combines all sub-routers into the main application router.
  * This is the single source of truth for all tRPC procedures.
  */
-import { createTRPCRouter } from './trpc.js';
-import { aiRouter } from './routers/ai.js';
+import { createTRPCRouter } from './index.js';
+import { createAIRouter } from './routers/ai.js';
 /**
- * Main app router that combines all feature routers
+ * Create app router with configurable AI limits
  */
-export const appRouter = createTRPCRouter({
-    ai: aiRouter,
-    // Add more routers here as needed:
-    // auth: authRouter,
-    // billing: billingRouter,
-    // etc.
-});
+export function createAppRouter(aiConfig) {
+    return createTRPCRouter({
+        ai: createAIRouter(aiConfig),
+        // Add more routers here as needed:
+        // auth: authRouter,
+        // billing: billingRouter,
+        // etc.
+    });
+}
+/**
+ * Default app router with default configuration
+ */
+export const appRouter = createAppRouter();
 //# sourceMappingURL=root.js.map

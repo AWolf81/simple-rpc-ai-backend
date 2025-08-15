@@ -8,9 +8,10 @@
 export { RPCClient } from './client.js'; // Basic JSON-RPC client (platform-agnostic)
 export { AIClient } from './client.js'; // Enhanced client with BYOK
 export { AIService } from './services/ai-service.js'; // Direct AI service usage
-export { createAIServer, createAIServerAsync } from './server.js'; // Server factories
-export { createSimpleAIServer } from './server-simple.js'; // Simplified server
-export { createTRPCServer } from './server-trpc.js'; // tRPC server with type safety
+// Recommended server - supports both JSON-RPC and tRPC
+export { createRpcAiServer, RpcAiServer } from './rpc-ai-server.js';
+// AI Limit Presets for common use cases
+export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
 // Custom function system
 export { FunctionRegistry } from './services/function-registry.js';
 export { PromptManager, promptManager } from './services/prompt-manager.js';
@@ -26,6 +27,6 @@ export { RateLimiter, DEFAULT_TIER_LIMITS } from './middleware/rate-limiter.js';
 // Usage tracking and billing
 export { UsageTracker, PROVIDER_PRICING } from './billing/usage-tracker.js';
 export { BillingEngine } from './billing/billing-engine.js';
-// Default export - progressive server for new projects (now async)
-export { createAIServer as default } from './server.js';
+// Default export - unified server for new projects
+export { createRpcAiServer as default } from './rpc-ai-server.js';
 //# sourceMappingURL=index.js.map

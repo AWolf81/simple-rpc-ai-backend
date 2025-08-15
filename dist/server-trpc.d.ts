@@ -7,6 +7,7 @@
  */
 import type { Express } from 'express';
 import type { AppRouter } from './trpc/root.js';
+import type { AIRouterConfig } from './trpc/routers/ai.js';
 export interface TRPCServerConfig {
     port?: number;
     cors?: {
@@ -18,11 +19,13 @@ export interface TRPCServerConfig {
         max?: number;
     };
     trpcPath?: string;
+    aiLimits?: AIRouterConfig;
 }
 export declare class TRPCServer {
     private app;
     private server?;
     private config;
+    private router;
     constructor(config?: TRPCServerConfig);
     private setupMiddleware;
     private setupRoutes;

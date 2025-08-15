@@ -1,127 +1,128 @@
 /**
- * Type-safe RPC Router inspired by tRPC patterns
+ * Simplified RPC Router using tRPC
  *
- * Provides createRPCRouter for building type-safe JSON-RPC endpoints
- * with automatic OpenRPC schema generation.
+ * This file now exports tRPC components directly, simplifying the codebase
+ * by using the battle-tested tRPC library instead of custom implementations.
  */
-// Simple validation helpers (can be extended with zod later)
+import { z } from 'zod';
+import { createTRPCRouter, publicProcedure } from '../trpc/index.js';
+import { appRouter } from '../trpc/root.js';
+// Re-export tRPC components for compatibility
+export { createTRPCRouter, publicProcedure };
+export { appRouter as mainRouter };
+// Re-export Zod for validation (better than custom validators)
 export const v = {
-    object: (schema) => {
-        return (input) => {
-            if (typeof input !== 'object' || input === null) {
-                throw new Error('Input must be an object');
-            }
-            const result = {};
-            const inputObj = input;
-            for (const [key, validator] of Object.entries(schema)) {
-                result[key] = validator(inputObj[key]);
-            }
-            return result;
-        };
-    },
-    string: () => {
-        return (input) => {
-            if (typeof input !== 'string') {
-                throw new Error('Expected string');
-            }
-            return input;
-        };
-    },
-    number: () => {
-        return (input) => {
-            if (typeof input !== 'number') {
-                throw new Error('Expected number');
-            }
-            return input;
-        };
-    },
-    optional: (validator) => {
-        return (input) => {
-            if (input === undefined || input === null) {
-                return undefined;
-            }
-            return validator(input);
-        };
-    }
+    object: z.object,
+    string: z.string,
+    number: z.number,
+    optional: z.optional,
+    array: z.array,
+    boolean: z.boolean,
+    enum: z.enum,
 };
-// Procedure builder implementation
-class RPCProcedureBuilderImpl {
-    _input;
-    _meta;
-    input(validator) {
-        this._input = validator;
-        return this;
-    }
-    meta(meta) {
-        this._meta = meta;
-        return this;
-    }
-    mutation(resolver) {
-        return {
-            _def: {
-                input: this._input,
-                meta: this._meta,
-                resolver
-            }
-        };
-    }
-    query(resolver) {
-        return {
-            _def: {
-                input: this._input,
-                meta: this._meta,
-                resolver
-            }
-        };
-    }
-}
-// Export the procedure builder
-export const publicProcedure = new RPCProcedureBuilderImpl();
-// Router creation function (like tRPC's createTRPCRouter)
-export function createRPCRouter(procedures) {
-    return {
-        _def: {
-            procedures
-        }
-    };
-}
-// Execute a procedure
-export async function executeProcedure(procedure, input, ctx) {
-    try {
-        // Validate input if validator exists
-        const validatedInput = procedure._def.input ? procedure._def.input(input) : input;
-        // Execute resolver
-        const result = await procedure._def.resolver(validatedInput, ctx);
-        return result;
-    }
-    catch (error) {
-        throw error;
-    }
-}
-// Generate OpenRPC schema from router
-export function generateOpenRPCSchema(router, info) {
-    const methods = Object.entries(router._def.procedures).map(([name, procedure]) => {
-        return {
-            name,
-            description: procedure._def.meta?.description || `${name} procedure`,
-            params: procedure._def.input ? [
-                {
-                    name: 'input',
-                    required: true,
-                    schema: { type: 'object' } // Could be enhanced with actual schema inference
-                }
-            ] : [],
-            result: {
-                name: 'result',
-                schema: { type: 'object' }
-            },
-            examples: procedure._def.meta?.examples || []
-        };
-    });
+// For backward compatibility, create an alias
+export const createRPCRouter = createTRPCRouter;
+// Simple OpenRPC schema generator for tRPC routers
+export function generateOpenRPCSchema(info) {
     return {
         openrpc: '1.2.6',
-        info,
-        methods
+        info: {
+            title: info.title,
+            description: info.description || 'tRPC-powered API',
+            version: info.version,
+        },
+        servers: [
+            {
+                name: 'Development Server',
+                url: 'http://localhost:8000/trpc',
+                description: 'tRPC HTTP endpoint'
+            }
+        ],
+        methods: [
+            {
+                name: 'ai.health',
+                description: 'Check AI service health',
+                params: [],
+                result: {
+                    name: 'healthResult',
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            status: { type: 'string' },
+                            timestamp: { type: 'string' },
+                            uptime: { type: 'number' }
+                        }
+                    }
+                }
+            },
+            {
+                name: 'ai.executeAIRequest',
+                description: 'Execute AI request with system prompt protection',
+                params: [
+                    {
+                        name: 'input',
+                        required: true,
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                content: { type: 'string' },
+                                systemPrompt: { type: 'string' },
+                                metadata: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string' },
+                                        type: { type: 'string' }
+                                    }
+                                },
+                                options: {
+                                    type: 'object',
+                                    properties: {
+                                        model: { type: 'string' },
+                                        maxTokens: { type: 'number' },
+                                        temperature: { type: 'number' }
+                                    }
+                                }
+                            },
+                            required: ['content', 'systemPrompt']
+                        }
+                    }
+                ],
+                result: {
+                    name: 'aiResult',
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            success: { type: 'boolean' },
+                            data: { type: 'object' }
+                        }
+                    }
+                }
+            },
+            {
+                name: 'ai.listProviders',
+                description: 'List available AI providers',
+                params: [],
+                result: {
+                    name: 'providersResult',
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            providers: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string' },
+                                        models: { type: 'array', items: { type: 'string' } },
+                                        priority: { type: 'number' }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ]
     };
 }
 //# sourceMappingURL=router.js.map

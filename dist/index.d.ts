@@ -7,17 +7,16 @@
 export { RPCClient } from './client.js';
 export { AIClient } from './client.js';
 export { AIService } from './services/ai-service.js';
-export { createAIServer, createAIServerAsync } from './server.js';
-export { createSimpleAIServer } from './server-simple.js';
-export { createTRPCServer } from './server-trpc.js';
+export { createRpcAiServer, RpcAiServer } from './rpc-ai-server.js';
+export type { RpcAiServerConfig } from './rpc-ai-server.js';
+export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
+export type { AIRouterConfig } from './trpc/routers/ai.js';
 export { FunctionRegistry } from './services/function-registry.js';
 export { PromptManager, promptManager } from './services/prompt-manager.js';
 export { UserManager, SimpleKeyManager, AuthManager, PostgreSQLAdapter, AIKeyValidator } from './auth/index.js';
 export type { ClientOptions } from './client.js';
 export type { AIServiceConfig } from './services/ai-service.js';
 export type { User, UserDevice, OAuthData, UserKey, AuthSession, DeviceInfo, AuthUpgradePrompt } from './auth/index.js';
-export type { AIServerConfig, AIServerAsyncConfig } from './server.js';
-export type { TRPCServerConfig, AppRouter } from './server-trpc.js';
 export type { PromptTemplate, PromptContext } from './services/prompt-manager.js';
 export type { CustomFunctionDefinition, CustomFunctionRequest, CustomFunctionResult } from './services/function-registry.js';
 export { createMonetizedAIServer } from './monetization/opensaas-server.js';
@@ -32,5 +31,5 @@ export type { UsageEvent, UsageSummary, QuotaStatus } from './billing/usage-trac
 export type { BillingEvent, BillingConfig, SubscriptionInfo } from './billing/billing-engine.js';
 export type { OpenSaaSMonetizationConfig, MonetizedAIServerConfig } from './monetization/opensaas-config.js';
 export type { MonetizedServerInstance } from './monetization/opensaas-server.js';
-export { createAIServer as default } from './server.js';
+export { createRpcAiServer as default } from './rpc-ai-server.js';
 //# sourceMappingURL=index.d.ts.map
