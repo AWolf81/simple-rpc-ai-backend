@@ -14,9 +14,10 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as trpcExpress from '@trpc/server/adapters/express';
 
-import { appRouter } from './trpc/root.js';
-import { createTRPCContext } from './trpc/trpc.js';
+import { createAppRouter } from './trpc/root.js';
+import { createTRPCContext } from './trpc/index.js';
 import type { AppRouter } from './trpc/root.js';
+import type { AIRouterConfig } from './trpc/routers/ai.js';
 
 export interface TRPCServerConfig {
   port?: number;
@@ -29,12 +30,14 @@ export interface TRPCServerConfig {
     max?: number;
   };
   trpcPath?: string;
+  aiLimits?: AIRouterConfig;
 }
 
 export class TRPCServer {
   private app: Express;
   private server?: Server;
   private config: TRPCServerConfig;
+  private router: AppRouter;
 
   constructor(config: TRPCServerConfig = {}) {
     this.config = {
@@ -42,6 +45,9 @@ export class TRPCServer {
       trpcPath: '/trpc',
       ...config
     };
+    
+    // Create router with configurable AI limits
+    this.router = createAppRouter(config.aiLimits);
     
     this.app = express();
     this.setupMiddleware();
@@ -87,7 +93,7 @@ export class TRPCServer {
     this.app.use(
       this.config.trpcPath!,
       trpcExpress.createExpressMiddleware({
-        router: appRouter,
+        router: this.router,
         createContext: createTRPCContext,
         onError: ({ path, error }) => {
           console.error(`❌ tRPC failed on ${path ?? "<no-path>"}:`, error);
@@ -292,7 +298,7 @@ export class TRPCServer {
   }
 
   public getRouter(): AppRouter {
-    return appRouter;
+    return this.router;
   }
 }
 

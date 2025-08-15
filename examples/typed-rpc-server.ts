@@ -1,150 +1,65 @@
 /**
- * Example: Type-safe RPC Server using tRPC-style patterns
+ * Example: Type-safe RPC Server using tRPC
  * 
- * Shows how to create a type-safe JSON-RPC server with automatic
- * OpenRPC schema generation, following tRPC patterns.
+ * Shows how to use the actual tRPC server with the simplified router.
+ * This example demonstrates the new streamlined approach.
  */
 
-import { createSimpleAIServer } from '../src/server-simple.js';
-import { createRPCRouter, publicProcedure, v, generateOpenRPCSchema } from '../src/rpc/router.js';
+import { createTRPCServer } from '../src/server-trpc.js';
+import { createTRPCRouter, publicProcedure, v, generateOpenRPCSchema } from '../src/rpc/router.js';
 import { AIService } from '../src/services/ai-service.js';
 
-// Define our AI router with type safety
-const aiRouter = createRPCRouter({
-  health: publicProcedure
-    .meta({
-      description: 'Check server health status',
-      examples: [{
-        name: 'Basic health check',
-        result: { status: 'healthy', timestamp: '2024-01-15T10:30:00Z' }
-      }]
-    })
-    .query(async () => {
-      return {
-        status: 'healthy' as const,
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime()
-      };
-    }),
-
-  executeAIRequest: publicProcedure
-    .input(v.object({
-      content: v.string(),
-      systemPrompt: v.string(),
-      options: v.optional(v.object({
-        model: v.optional(v.string()),
-        maxTokens: v.optional(v.number()),
-        temperature: v.optional(v.number())
-      }))
-    }))
-    .meta({
-      description: 'Execute AI analysis with system prompt protection',
-      examples: [{
-        name: 'Code analysis',
-        params: {
-          content: 'function add(a, b) { return a + b; }',
-          systemPrompt: 'Analyze this code for security issues'
-        },
-        result: {
-          content: 'The function appears secure with no obvious vulnerabilities.',
-          usage: { promptTokens: 15, completionTokens: 20, totalTokens: 35 },
-          model: 'claude-3-5-sonnet-20241022'
-        }
-      }]
-    })
-    .mutation(async ({ content, systemPrompt, options }, { req, res }) => {
-      // Initialize AI service (in real app, this would be injected)
-      const aiService = new AIService({
-        serviceProviders: {
-          anthropic: { priority: 1 },
-          openai: { priority: 2 }
-        }
-      });
-
-      const result = await aiService.execute({
-        content,
-        systemPrompt,
-        options
-      });
-
-      return result;
-    }),
-
-  // OpenRPC discovery method
-  'rpc.discover': publicProcedure
-    .meta({
-      description: 'OpenRPC service discovery method - returns API schema'
-    })
-    .query(async () => {
-      return generateOpenRPCSchema(aiRouter, {
-        title: 'Typed AI RPC Server',
-        description: 'Type-safe AI RPC server with OpenRPC support',
-        version: '1.0.0'
-      });
-    })
-});
-
-// Type inference - now we have full type safety!
-type AIRouter = typeof aiRouter;
-type AIRouterInputs = {
-  health: undefined;
-  executeAIRequest: {
-    content: string;
-    systemPrompt: string;
-    options?: {
-      model?: string;
-      maxTokens?: number;
-      temperature?: number;
-    };
-  };
-  'rpc.discover': undefined;
-};
-
-// Example usage
+// Example usage - now using actual tRPC server
 async function startTypedServer() {
-  const server = createSimpleAIServer({
+  const server = createTRPCServer({
     port: 8001,
     cors: { origin: '*' }
   });
 
-  // Add our typed router endpoints to the server
-  const app = server.getApp();
-  
-  // Enhanced OpenRPC endpoint that uses our typed schema
-  app.get('/openrpc.json', (req, res) => {
-    const schema = generateOpenRPCSchema(aiRouter, {
-      title: 'Typed AI RPC Server',
-      description: 'Type-safe AI RPC server with automatic OpenRPC generation',
-      version: '1.0.0'
-    });
-    
-    // Add server info
-    schema.servers = [{
-      name: 'Typed RPC Server',
-      url: 'http://localhost:8001/rpc',
-      description: 'Type-safe JSON-RPC endpoint'
-    }];
-    
-    res.json(schema);
-  });
-
   await server.start();
   
-  console.log('🎯 Typed AI RPC Server Features:');
-  console.log('   • Full TypeScript type safety');
-  console.log('   • Automatic OpenRPC schema generation');
-  console.log('   • tRPC-style procedure definitions');
-  console.log('   • Compatible with OpenRPC Playground');
-  console.log('');
-  console.log('🔗 Test with OpenRPC Playground:');
-  console.log('   1. Go to https://playground.open-rpc.org/');
-  console.log('   2. Enter: http://localhost:8001/openrpc.json');
-  console.log('   3. Click "Load" to explore the API');
+  console.log('🎯 tRPC AI Server Features:');
+  console.log('   • Full TypeScript type safety with tRPC');
+  console.log('   • Built-in input validation with Zod');
+  console.log('   • Modern HTTP-based RPC (not JSON-RPC)');
+  console.log('   • Automatic type inference');
   console.log('');
   console.log('📍 Endpoints:');
-  console.log('   • RPC: POST http://localhost:8001/rpc');
-  console.log('   • Schema: GET http://localhost:8001/openrpc.json');
+  console.log('   • tRPC: POST http://localhost:8001/trpc/*');
   console.log('   • Health: GET http://localhost:8001/health');
+  console.log('');
+  console.log('🔗 Example calls:');
+  console.log('   • Health: POST http://localhost:8001/trpc/ai.health');
+  console.log('   • AI Request: POST http://localhost:8001/trpc/ai.executeAIRequest');
+  console.log('   • List Providers: POST http://localhost:8001/trpc/ai.listProviders');
+}
+
+// Simple client example
+function createTRPCClientExample() {
+  // In a real app, you'd use @trpc/client:
+  /*
+  import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+  import type { AppRouter } from '../src/trpc/root.js';
+  
+  const client = createTRPCProxyClient<AppRouter>({
+    links: [
+      httpBatchLink({
+        url: 'http://localhost:8001/trpc',
+      }),
+    ],
+  });
+  
+  // Type-safe calls:
+  const health = await client.ai.health.query();
+  const result = await client.ai.executeAIRequest.mutate({
+    content: 'Hello world',
+    systemPrompt: 'You are a helpful assistant'
+  });
+  */
+  
+  console.log('📝 To use with tRPC client, install @trpc/client');
+  console.log('   npm install @trpc/client');
+  console.log('   See: https://trpc.io/docs/client');
 }
 
 // Start server if run directly
@@ -152,5 +67,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   startTypedServer().catch(console.error);
 }
 
-export { aiRouter, startTypedServer };
-export type { AIRouter, AIRouterInputs };
+export { startTypedServer, createTRPCClientExample };

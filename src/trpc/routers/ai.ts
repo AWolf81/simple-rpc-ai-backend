@@ -6,36 +6,86 @@
  */
 
 import { z } from 'zod';
-import { createTRPCRouter, publicProcedure } from '../trpc.js';
+import { createTRPCRouter, publicProcedure } from '../index.js';
 import { AIService } from '../../services/ai-service.js';
 
-// Initialize AI service (in production, this would be dependency injected)
-const aiService = new AIService({
-  serviceProviders: {
-    anthropic: { priority: 1 },
-    openai: { priority: 2 },
-    google: { priority: 3 }
-  }
-});
+// Configurable limits interface
+export interface AIRouterConfig {
+  content?: {
+    maxLength?: number;
+    minLength?: number;
+  };
+  tokens?: {
+    defaultMaxTokens?: number;
+    maxTokenLimit?: number;
+    minTokens?: number;
+  };
+  systemPrompt?: {
+    maxLength?: number;
+    minLength?: number;
+  };
+}
 
-// Input schemas
-const executeAIRequestSchema = z.object({
-  content: z.string().min(1).max(100000),
-  systemPrompt: z.string().min(1),
-  metadata: z.object({
-    name: z.string().optional(),
-    type: z.string().optional(),
-  }).optional(),
-  options: z.object({
-    model: z.string().optional(),
-    maxTokens: z.number().int().min(1).max(8192).optional(),
-    temperature: z.number().min(0).max(1).optional(),
-  }).optional(),
-});
+// Default configuration with reasonable limits
+const DEFAULT_CONFIG: Required<AIRouterConfig> = {
+  content: {
+    maxLength: 1_000_000, // 1MB of text (~200k words)
+    minLength: 1,
+  },
+  tokens: {
+    defaultMaxTokens: 4096, // Good default for most use cases
+    maxTokenLimit: 200_000, // Support for long context models
+    minTokens: 1,
+  },
+  systemPrompt: {
+    maxLength: 50_000, // Reasonable system prompt size
+    minLength: 1,
+  },
+};
 
-const healthSchema = z.object({}).optional();
+// Create configurable AI router
+export function createAIRouter(config: AIRouterConfig = {}): ReturnType<typeof createTRPCRouter> {
+  const mergedConfig = {
+    content: { ...DEFAULT_CONFIG.content, ...config.content },
+    tokens: { ...DEFAULT_CONFIG.tokens, ...config.tokens },
+    systemPrompt: { ...DEFAULT_CONFIG.systemPrompt, ...config.systemPrompt },
+  };
 
-export const aiRouter: any = createTRPCRouter({
+  // Initialize AI service (in production, this would be dependency injected)
+  const aiService = new AIService({
+    serviceProviders: {
+      anthropic: { priority: 1 },
+      openai: { priority: 2 },
+      google: { priority: 3 }
+    }
+  });
+
+  // Create dynamic schemas based on configuration  
+  const executeAIRequestSchema = z.object({
+    content: z.string()
+      .min(mergedConfig.content.minLength!)
+      .max(mergedConfig.content.maxLength!),
+    systemPrompt: z.string()
+      .min(mergedConfig.systemPrompt.minLength!)
+      .max(mergedConfig.systemPrompt.maxLength!),
+    metadata: z.object({
+      name: z.string().optional(),
+      type: z.string().optional(),
+    }).optional(),
+    options: z.object({
+      model: z.string().optional(),
+      maxTokens: z.number().int()
+        .min(mergedConfig.tokens.minTokens!)
+        .max(mergedConfig.tokens.maxTokenLimit!)
+        .default(mergedConfig.tokens.defaultMaxTokens!)
+        .optional(),
+      temperature: z.number().min(0).max(1).optional(),
+    }).optional(),
+  });
+
+  const healthSchema = z.object({}).optional();
+
+  return createTRPCRouter({
   /**
    * Health check procedure
    */
@@ -55,7 +105,7 @@ export const aiRouter: any = createTRPCRouter({
    */
   executeAIRequest: publicProcedure
     .input(executeAIRequestSchema)
-    .mutation(async ({ input }: any) => {
+    .mutation(async ({ input }) => {
       try {
         const result = await aiService.execute({
           content: input.content,
@@ -107,7 +157,7 @@ export const aiRouter: any = createTRPCRouter({
       provider: z.enum(['anthropic', 'openai', 'google']),
       apiKey: z.string().min(1),
     }))
-    .mutation(async ({ input }: any) => {
+    .mutation(async ({ input }) => {
       // Note: In production, never log API keys
       try {
         // Simple validation - in production, make a test API call
@@ -126,4 +176,8 @@ export const aiRouter: any = createTRPCRouter({
         };
       }
     }),
-});
+  });
+}
+
+// Default AI router instance with default configuration
+export const aiRouter = createAIRouter();

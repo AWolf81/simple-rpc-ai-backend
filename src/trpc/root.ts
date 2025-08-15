@@ -5,27 +5,34 @@
  * This is the single source of truth for all tRPC procedures.
  */
 
-import { createTRPCRouter } from './trpc.js';
-import { aiRouter } from './routers/ai.js';
+import { createTRPCRouter } from './index.js';
+import { createAIRouter, type AIRouterConfig } from './routers/ai.js';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 
 /**
- * Main app router that combines all feature routers
+ * Create app router with configurable AI limits
  */
-export const appRouter: any = createTRPCRouter({
-  ai: aiRouter,
-  
-  // Add more routers here as needed:
-  // auth: authRouter,
-  // billing: billingRouter,
-  // etc.
-});
+export function createAppRouter(aiConfig?: AIRouterConfig) {
+  return createTRPCRouter({
+    ai: createAIRouter(aiConfig),
+    
+    // Add more routers here as needed:
+    // auth: authRouter,
+    // billing: billingRouter,
+    // etc.
+  });
+}
+
+/**
+ * Default app router with default configuration
+ */
+export const appRouter = createAppRouter();
 
 /**
  * Export the app router type definition
  * This is used by the client for end-to-end type safety
  */
-export type AppRouter = typeof appRouter;
+export type AppRouter = ReturnType<typeof createAppRouter>;
 
 /**
  * Export input/output types for each router procedure
