@@ -26,6 +26,7 @@ export interface ExecuteRequest {
         maxTokens?: number;
         temperature?: number;
     };
+    apiKey?: string;
 }
 export interface ExecuteResult {
     content: string;
@@ -35,6 +36,8 @@ export interface ExecuteResult {
         totalTokens: number;
     };
     model: string;
+    provider?: string;
+    requestId?: string;
     finishReason?: string;
 }
 interface ServiceProvider {

@@ -7,11 +7,11 @@
 import { createTRPCRouter } from './index.js';
 import { createAIRouter } from './routers/ai.js';
 /**
- * Create app router with configurable AI limits
+ * Create app router with configurable AI limits and optional token tracking
  */
-export function createAppRouter(aiConfig) {
+export function createAppRouter(aiConfig, tokenTrackingEnabled, dbAdapter) {
     return createTRPCRouter({
-        ai: createAIRouter(aiConfig),
+        ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter),
         // Add more routers here as needed:
         // auth: authRouter,
         // billing: billingRouter,

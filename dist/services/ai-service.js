@@ -8,6 +8,7 @@ import { generateText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
+import crypto from 'crypto';
 function normalizeServiceProviders(spConfig) {
     if (!spConfig)
         return [];
@@ -107,7 +108,9 @@ export class AIService {
                     completionTokens: result.usage.completionTokens,
                     totalTokens: result.usage.totalTokens
                 },
-                model: model.modelId, //: result.model, // why was it result.model? we can use model
+                model: model.modelId,
+                provider: this.config.provider,
+                requestId: crypto.randomUUID(),
                 finishReason: result.finishReason
             };
         }

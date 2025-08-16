@@ -8,6 +8,10 @@ export class PostgreSQLAdapter {
     pool;
     logger;
     constructor(config, logger) {
+        // Support both connection string and config object
+        if (typeof config === 'string') {
+            config = this.parseConnectionString(config);
+        }
         this.logger = logger || winston.createLogger({
             level: 'info',
             format: winston.format.simple(),
@@ -84,6 +88,32 @@ export class PostgreSQLAdapter {
      */
     async run(query, params) {
         return this.execute(query, params);
+    }
+    /**
+     * Query method for virtual token service compatibility
+     */
+    async query(query, params) {
+        return this.all(query, params);
+    }
+    /**
+     * Get database connection for transactions
+     */
+    async getConnection() {
+        return this.pool.connect();
+    }
+    /**
+     * Parse PostgreSQL connection string
+     */
+    parseConnectionString(connectionString) {
+        const url = new URL(connectionString);
+        return {
+            host: url.hostname,
+            port: parseInt(url.port) || 5432,
+            database: url.pathname.slice(1), // Remove leading '/'
+            user: url.username,
+            password: url.password,
+            ssl: url.searchParams.get('sslmode') === 'require'
+        };
     }
     /**
      * Initialize database schema

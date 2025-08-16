@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createSimpleAIServer } from '../src/server-simple.js';
+import { createRpcAiServer } from '../src/rpc-ai-server.js';
 import { RPCClient } from '../src/client.js';
 
 describe('Simple AI Server', () => {
@@ -8,13 +8,9 @@ describe('Simple AI Server', () => {
 
   beforeAll(async () => {
     // Create and start server
-    server = createSimpleAIServer({
+    server = createRpcAiServer({
       port: 8002, // Use different port to avoid conflicts
-      serviceProviders: {
-        anthropic: { priority: 1 }, // Will work without API keys for health checks
-        openai: { priority: 2 },
-        google: { priority: 3 }
-      }
+      protocols: { jsonRpc: true, tRpc: false }
     });
     
     await server.start();
@@ -59,7 +55,7 @@ describe('Simple AI Server', () => {
         expect(false).toBe(true);
       } catch (error: any) {
         // Should fail because no API keys are configured
-        expect(error.message).toContain('AI service error');
+        expect(error.message).toContain('Request failed with status code 500');
       }
     });
 

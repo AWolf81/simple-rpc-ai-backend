@@ -9,15 +9,24 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as trpcExpress from '@trpc/server/adapters/express';
+import crypto from 'crypto';
 import { createAppRouter } from './trpc/root.js';
 import { createTRPCContext } from './trpc/index.js';
 import { AIService } from './services/ai-service.js';
+import { JWTMiddleware } from './auth/jwt-middleware.js';
+import { PostgreSQLAdapter } from './database/postgres-adapter.js';
+import { VirtualTokenService } from './services/virtual-token-service.js';
+import { UsageAnalyticsService } from './services/usage-analytics-service.js';
 export class RpcAiServer {
     app;
     server;
     config;
     router;
     aiService;
+    jwtMiddleware;
+    dbAdapter;
+    virtualTokenService;
+    usageAnalyticsService;
     /**
      * Opinionated protocol configuration:
      * - Default: JSON-RPC only (simpler, universal)
@@ -58,6 +67,15 @@ export class RpcAiServer {
             port: 8000,
             aiLimits: {},
             protocols,
+            tokenTracking: {
+                enabled: false,
+                platformFeePercent: 25,
+                webhookPath: '/webhooks/lemonsqueezy',
+                ...config.tokenTracking
+            },
+            jwt: {
+                ...config.jwt
+            },
             cors: {
                 origin: '*',
                 credentials: false,
@@ -72,12 +90,29 @@ export class RpcAiServer {
                 jsonRpc: '/rpc',
                 tRpc: '/trpc',
                 health: '/health',
+                webhooks: '/webhooks/lemonsqueezy',
                 ...config.paths
             },
             ...config
         };
-        // Create router with AI configuration
-        this.router = createAppRouter(this.config.aiLimits);
+        // Initialize database adapter if token tracking is enabled
+        if (this.config.tokenTracking.enabled && this.config.tokenTracking.databaseUrl) {
+            this.dbAdapter = new PostgreSQLAdapter(this.config.tokenTracking.databaseUrl);
+            this.virtualTokenService = new VirtualTokenService(this.dbAdapter);
+            this.usageAnalyticsService = new UsageAnalyticsService(this.dbAdapter);
+        }
+        // Initialize JWT middleware if configured
+        if (this.config.jwt.secret) {
+            this.jwtMiddleware = new JWTMiddleware({
+                opensaasPublicKey: this.config.jwt.secret,
+                audience: this.config.jwt.audience || 'rpc-ai-backend',
+                issuer: this.config.jwt.issuer || 'opensaas',
+                skipAuthForMethods: ['health', 'listProviders'],
+                requireAuthForAllMethods: false
+            });
+        }
+        // Create router with AI configuration and token tracking
+        this.router = createAppRouter(this.config.aiLimits, this.config.tokenTracking.enabled || false, this.dbAdapter);
         // Initialize AI service for JSON-RPC endpoint
         this.aiService = new AIService({
             serviceProviders: {
@@ -103,6 +138,10 @@ export class RpcAiServer {
         // Body parsing
         this.app.use(express.json({ limit: '50mb' }));
         this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+        // JWT Authentication (if enabled)
+        if (this.jwtMiddleware) {
+            this.app.use(this.jwtMiddleware.authenticate);
+        }
         // Rate limiting
         if (this.config.rateLimit.max > 0) {
             this.app.use(rateLimit({
@@ -262,6 +301,12 @@ export class RpcAiServer {
                 }
             });
         });
+        // LemonSqueezy webhook endpoint (if token tracking is enabled)
+        if (this.config.tokenTracking.enabled && this.virtualTokenService) {
+            this.app.post(this.config.tokenTracking.webhookPath, (req, res) => {
+                this.handleLemonSqueezyWebhook(req, res);
+            });
+        }
         // Catch all
         this.app.use('*', (req, res) => {
             res.status(404).json({
@@ -270,10 +315,76 @@ export class RpcAiServer {
                 availableEndpoints: {
                     health: this.config.paths.health,
                     ...(this.config.protocols.jsonRpc && { jsonRpc: this.config.paths.jsonRpc }),
-                    ...(this.config.protocols.tRpc && { tRpc: this.config.paths.tRpc })
+                    ...(this.config.protocols.tRpc && { tRpc: this.config.paths.tRpc }),
+                    ...(this.config.tokenTracking.enabled && { webhooks: this.config.tokenTracking.webhookPath })
                 }
             });
         });
+    }
+    /**
+     * Handle LemonSqueezy webhook for token top-ups
+     */
+    async handleLemonSqueezyWebhook(req, res) {
+        try {
+            const signature = req.headers['x-signature'];
+            const body = JSON.stringify(req.body);
+            // Verify webhook signature
+            if (this.config.tokenTracking.webhookSecret) {
+                const expectedSignature = crypto
+                    .createHmac('sha256', this.config.tokenTracking.webhookSecret)
+                    .update(body)
+                    .digest('hex');
+                if (signature !== `sha256=${expectedSignature}`) {
+                    console.error('❌ Invalid webhook signature');
+                    res.status(401).json({ error: 'Invalid signature' });
+                    return;
+                }
+            }
+            const webhookData = req.body;
+            const { meta, data } = webhookData;
+            // Handle successful payments
+            if (meta.event_name === 'order_created' && data.attributes.status === 'paid') {
+                const userId = data.attributes.user_email; // Use email as user ID for now
+                const orderValue = parseInt(data.attributes.order_value); // In cents
+                const variantId = data.attributes.variant_id;
+                const orderId = data.id;
+                const variantName = data.attributes.variant_name || '';
+                const productName = data.attributes.product_name || '';
+                // Determine purchase type based on variant/product name or other criteria
+                const isSubscription = variantName.toLowerCase().includes('subscription') ||
+                    productName.toLowerCase().includes('subscription');
+                const purchaseType = isSubscription ? 'subscription' : 'one_time';
+                // Check if already processed
+                if (this.usageAnalyticsService && !(await this.usageAnalyticsService.isPaymentProcessed(orderId))) {
+                    // Record purchase in analytics
+                    await this.usageAnalyticsService.recordPurchase({
+                        userId,
+                        paymentId: orderId,
+                        purchaseType,
+                        variantId,
+                        quantity: purchaseType === 'one_time' ? Math.floor(orderValue / 100) : undefined, // Assume $1 = 1 unit for one-time
+                        amountPaidCents: orderValue,
+                        currency: 'USD',
+                        lemonSqueezyData: webhookData
+                    });
+                    // If it's a token purchase (subscription), also add to virtual token service
+                    if (purchaseType === 'subscription' && this.virtualTokenService) {
+                        // Calculate tokens based on order value (example: 1 cent = 10 tokens)
+                        const tokensPurchased = orderValue * 10;
+                        await this.virtualTokenService.addTokensFromPayment(userId, tokensPurchased, orderId, variantId, orderValue, 'USD', webhookData);
+                        console.log(`✅ Processed subscription: ${tokensPurchased} tokens for user ${userId}`);
+                    }
+                    else {
+                        console.log(`✅ Processed one-time purchase: $${orderValue / 100} for user ${userId}`);
+                    }
+                }
+            }
+            res.status(200).json({ received: true });
+        }
+        catch (error) {
+            console.error('❌ Webhook processing error:', error);
+            res.status(500).json({ error: 'Webhook processing failed' });
+        }
     }
     getOpenRPCSchema() {
         return {
@@ -367,6 +478,13 @@ export class RpcAiServer {
                 }
                 if (this.config.aiLimits.tokens?.maxTokenLimit) {
                     console.log(`   • Token limit: ${this.config.aiLimits.tokens.maxTokenLimit.toLocaleString()}`);
+                }
+                if (this.config.tokenTracking.enabled) {
+                    console.log(`   • Token tracking: enabled (${this.config.tokenTracking.platformFeePercent}% platform fee)`);
+                    console.log(`   • Webhook: ${this.config.tokenTracking.webhookPath}`);
+                }
+                if (this.jwtMiddleware) {
+                    console.log(`   • JWT authentication: enabled`);
                 }
                 resolve();
             });

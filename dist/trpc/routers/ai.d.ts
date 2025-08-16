@@ -5,6 +5,7 @@
  * Integrates with our existing AI service.
  */
 import { createTRPCRouter } from '../index.js';
+import { PostgreSQLAdapter } from '../../database/postgres-adapter.js';
 export interface AIRouterConfig {
     content?: {
         maxLength?: number;
@@ -26,6 +27,6 @@ export declare const AI_LIMIT_PRESETS: {
     readonly generous: AIRouterConfig;
     readonly maximum: AIRouterConfig;
 };
-export declare function createAIRouter(config?: AIRouterConfig): ReturnType<typeof createTRPCRouter>;
+export declare function createAIRouter(config?: AIRouterConfig, tokenTrackingEnabled?: boolean, dbAdapter?: PostgreSQLAdapter): ReturnType<typeof createTRPCRouter>;
 export declare const aiRouter: ReturnType<typeof createAIRouter>;
 //# sourceMappingURL=ai.d.ts.map

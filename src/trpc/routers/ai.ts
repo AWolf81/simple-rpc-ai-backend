@@ -118,6 +118,7 @@ export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled
   // Initialize services if database is available
   let virtualTokenService: VirtualTokenService | null = null;
   let usageAnalyticsService: UsageAnalyticsService | null = null;
+  let hybridUserService: any | null = null; // TODO: Import proper type
   
   if (dbAdapter) {
     usageAnalyticsService = new UsageAnalyticsService(dbAdapter);
@@ -177,6 +178,7 @@ export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled
     .mutation(async ({ input, ctx }) => {
       const { content, systemPrompt, metadata, options } = input;
       const userId = ctx.user!.userId; // Guaranteed to exist (protectedProcedure)
+      const apiKey = ctx.req.headers['x-api-key'] as string | undefined; // Get API key from headers
 
       // Determine user type and execution path
       if (userId && usageAnalyticsService) {
@@ -326,6 +328,12 @@ export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled
           });
         }
       }
+      
+      // Default fallback - should not reach here normally
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Unable to process request - invalid execution path',
+      });
     }),
 
   /**
@@ -430,7 +438,7 @@ export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled
       }
 
       // Return status without exposing actual API keys
-      const providerStatus = Object.entries(profile.byokProviders || {}).reduce((acc, [provider, config]) => {
+      const providerStatus = Object.entries(profile.byokProviders || {}).reduce((acc: Record<string, any>, [provider, config]: [string, any]) => {
         acc[provider] = {
           enabled: config.enabled,
           hasApiKey: !!config.apiKey,
@@ -460,7 +468,7 @@ export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled
 
       const balances = await hybridUserService.getUserTokenBalances(ctx.user!.userId);
       return {
-        balances: balances.map(b => ({
+        balances: balances.map((b: any) => ({
           id: b.id,
           balanceType: b.balanceType,
           virtualTokenBalance: b.virtualTokenBalance,
@@ -470,9 +478,9 @@ export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled
           consumptionPriority: b.consumptionPriority
         })),
         summary: {
-          totalSubscriptionTokens: balances.filter(b => b.balanceType === 'subscription').reduce((sum, b) => sum + b.virtualTokenBalance, 0),
-          totalOneTimeTokens: balances.filter(b => b.balanceType === 'one_time').reduce((sum, b) => sum + b.virtualTokenBalance, 0),
-          totalTokens: balances.reduce((sum, b) => sum + b.virtualTokenBalance, 0)
+          totalSubscriptionTokens: balances.filter((b: any) => b.balanceType === 'subscription').reduce((sum: number, b: any) => sum + b.virtualTokenBalance, 0),
+          totalOneTimeTokens: balances.filter((b: any) => b.balanceType === 'one_time').reduce((sum: number, b: any) => sum + b.virtualTokenBalance, 0),
+          totalTokens: balances.reduce((sum: number, b: any) => sum + b.virtualTokenBalance, 0)
         }
       };
     }),
@@ -501,13 +509,13 @@ export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled
 
       return {
         totalTokensNeeded: plan.totalTokensNeeded,
-        plan: plan.plan.map(step => ({
+        plan: plan.plan.map((step: any) => ({
           type: step.type,
           tokensToConsume: step.tokensToConsume,
           reason: step.reason
         })),
         notifications: plan.notifications,
-        viable: plan.plan.reduce((sum, step) => sum + step.tokensToConsume, 0) >= input.estimatedTokens
+        viable: plan.plan.reduce((sum: number, step: any) => sum + step.tokensToConsume, 0) >= input.estimatedTokens
       };
     }),
 

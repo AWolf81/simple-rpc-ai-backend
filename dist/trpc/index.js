@@ -4,18 +4,18 @@
  * This file sets up the core tRPC configuration for our AI backend.
  * Following tRPC v10+ best practices for type-safe API development.
  */
-import { initTRPC } from '@trpc/server';
+import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 /**
  * Create context for each request
- * This is where you'd add authentication, database connections, etc.
+ * Extracts user information from JWT token if present
  */
 export function createTRPCContext(opts) {
+    const authReq = opts.req;
     return {
         req: opts.req,
         res: opts.res,
-        // Add user session, database, etc. here
-        user: null, // Will be populated by auth middleware
+        user: authReq.user || null, // Populated by JWT middleware if token is valid
     };
 }
 /**
@@ -34,15 +34,32 @@ const t = initTRPC.context().create({
 export const createTRPCRouter = t.router;
 export const publicProcedure = t.procedure;
 /**
- * Protected procedure (can be extended for authentication)
+ * Protected procedure - requires valid JWT authentication
  */
 export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
-    // Add authentication logic here
-    // For now, just pass through
+    if (!ctx.user) {
+        throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required. Please provide a valid JWT token.',
+        });
+    }
     return next({
         ctx: {
             ...ctx,
-            user: ctx.user, // Pass through user from context
+            user: ctx.user, // Guaranteed to be non-null after check
+        },
+    });
+});
+/**
+ * Token-protected procedure - requires JWT + checks token balance
+ */
+export const tokenProtectedProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+    // This will be used in AI router for token balance checking
+    // The actual token balance check will be done in the AI router
+    return next({
+        ctx: {
+            ...ctx,
+            // User is guaranteed to exist from protectedProcedure
         },
     });
 });

@@ -18,7 +18,7 @@ export interface DatabaseRow {
 export declare class PostgreSQLAdapter {
     private pool;
     private logger;
-    constructor(config: DatabaseConfig, logger?: winston.Logger);
+    constructor(config: DatabaseConfig | string, logger?: winston.Logger);
     /**
      * Execute a query that modifies data (INSERT, UPDATE, DELETE)
      */
@@ -41,6 +41,18 @@ export declare class PostgreSQLAdapter {
         changes: number;
         lastInsertRowid?: number;
     }>;
+    /**
+     * Query method for virtual token service compatibility
+     */
+    query(query: string, params?: any[]): Promise<DatabaseRow[]>;
+    /**
+     * Get database connection for transactions
+     */
+    getConnection(): Promise<import("pg").PoolClient>;
+    /**
+     * Parse PostgreSQL connection string
+     */
+    private parseConnectionString;
     /**
      * Initialize database schema
      */

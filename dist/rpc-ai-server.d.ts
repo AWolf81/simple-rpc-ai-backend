@@ -14,6 +14,18 @@ export interface RpcAiServerConfig {
         jsonRpc?: boolean;
         tRpc?: boolean;
     };
+    tokenTracking?: {
+        enabled?: boolean;
+        platformFeePercent?: number;
+        databaseUrl?: string;
+        webhookSecret?: string;
+        webhookPath?: string;
+    };
+    jwt?: {
+        secret?: string;
+        issuer?: string;
+        audience?: string;
+    };
     cors?: {
         origin?: string | string[];
         credentials?: boolean;
@@ -26,6 +38,7 @@ export interface RpcAiServerConfig {
         jsonRpc?: string;
         tRpc?: string;
         health?: string;
+        webhooks?: string;
     };
 }
 export declare class RpcAiServer {
@@ -34,6 +47,10 @@ export declare class RpcAiServer {
     private config;
     private router;
     private aiService;
+    private jwtMiddleware?;
+    private dbAdapter?;
+    private virtualTokenService?;
+    private usageAnalyticsService?;
     /**
      * Opinionated protocol configuration:
      * - Default: JSON-RPC only (simpler, universal)
@@ -44,6 +61,10 @@ export declare class RpcAiServer {
     constructor(config?: RpcAiServerConfig);
     private setupMiddleware;
     private setupRoutes;
+    /**
+     * Handle LemonSqueezy webhook for token top-ups
+     */
+    private handleLemonSqueezyWebhook;
     private getOpenRPCSchema;
     start(): Promise<void>;
     stop(): Promise<void>;
