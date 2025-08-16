@@ -12,7 +12,8 @@
     "./ai": "./dist/ai-service.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "mkdir -p dist/docker dist/database/migrations && cp -r docker/* dist/docker/ && cp docker-compose.postgres.yml dist/ && cp .env.postgres.example dist/ && cp src/database/migrations/*.sql dist/database/migrations/",
     "dev": "tsc --watch",
     "dev:server": "node --watch examples/servers/basic-server.js",
     "test": "vitest",
@@ -112,7 +113,11 @@
   "files": [
     "dist/**/*",
     "README.md",
-    "LICENSE"
+    "LICENSE.md",
+    "docker/**/*",
+    "docker-compose.postgres.yml",
+    ".env.postgres.example",
+    "src/database/migrations/*.sql"
   ],
   "repository": {
     "type": "git",
