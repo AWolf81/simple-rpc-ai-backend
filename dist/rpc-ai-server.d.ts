@@ -7,8 +7,8 @@
 import type { Express } from 'express';
 import type { AppRouter } from './trpc/root.js';
 import type { AIRouterConfig } from './trpc/routers/ai.js';
-type BuiltInProvider = 'anthropic' | 'openai' | 'google';
-interface CustomProvider {
+export type BuiltInProvider = 'anthropic' | 'openai' | 'google';
+export interface CustomProvider {
     name: string;
     baseUrl: string;
     apiKeyHeader?: string;

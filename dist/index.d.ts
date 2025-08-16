@@ -7,8 +7,8 @@
 export { RPCClient } from './client.js';
 export { AIClient } from './client.js';
 export { AIService } from './services/ai-service.js';
-export { createRpcAiServer, RpcAiServer } from './rpc-ai-server.js';
-export type { RpcAiServerConfig } from './rpc-ai-server.js';
+export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
+export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server.js';
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
 export type { AIRouterConfig } from './trpc/routers/ai.js';
 export { FunctionRegistry } from './services/function-registry.js';

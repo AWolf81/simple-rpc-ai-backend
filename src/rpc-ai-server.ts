@@ -25,10 +25,10 @@ import { VirtualTokenService } from './services/virtual-token-service.js';
 import { UsageAnalyticsService } from './services/usage-analytics-service.js';
 
 // Built-in provider types
-type BuiltInProvider = 'anthropic' | 'openai' | 'google';
+export type BuiltInProvider = 'anthropic' | 'openai' | 'google';
 
 // Custom provider interface
-interface CustomProvider {
+export interface CustomProvider {
   name: string;                          // e.g. 'deepseek', 'claude-custom'
   baseUrl: string;                       // Custom API endpoint
   apiKeyHeader?: string;                 // Default: 'Authorization'  

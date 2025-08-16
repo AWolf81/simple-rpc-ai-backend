@@ -9,7 +9,7 @@ export { RPCClient } from './client.js'; // Basic JSON-RPC client (platform-agno
 export { AIClient } from './client.js'; // Enhanced client with BYOK
 export { AIService } from './services/ai-service.js'; // Direct AI service usage
 // Recommended server - supports both JSON-RPC and tRPC
-export { createRpcAiServer, RpcAiServer } from './rpc-ai-server.js';
+export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
 // AI Limit Presets for common use cases
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
 // Custom function system
