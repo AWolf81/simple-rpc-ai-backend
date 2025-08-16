@@ -11,6 +11,7 @@ export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-a
 export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server.js';
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
 export type { AIRouterConfig } from './trpc/routers/ai.js';
+export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root.js';
 export { FunctionRegistry } from './services/function-registry.js';
 export { PromptManager, promptManager } from './services/prompt-manager.js';
 export { UserManager, SimpleKeyManager, AuthManager, PostgreSQLAdapter, AIKeyValidator } from './auth/index.js';

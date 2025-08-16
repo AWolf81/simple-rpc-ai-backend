@@ -17,6 +17,9 @@ export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-a
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
 export type { AIRouterConfig } from './trpc/routers/ai.js';
 
+// tRPC router types for client type safety
+export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root.js';
+
 
 // Custom function system
 export { FunctionRegistry } from './services/function-registry.js';
