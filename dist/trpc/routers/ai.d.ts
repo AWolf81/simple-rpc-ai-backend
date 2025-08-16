@@ -27,6 +27,6 @@ export declare const AI_LIMIT_PRESETS: {
     readonly generous: AIRouterConfig;
     readonly maximum: AIRouterConfig;
 };
-export declare function createAIRouter(config?: AIRouterConfig, tokenTrackingEnabled?: boolean, dbAdapter?: PostgreSQLAdapter): ReturnType<typeof createTRPCRouter>;
+export declare function createAIRouter(config?: AIRouterConfig, tokenTrackingEnabled?: boolean, dbAdapter?: PostgreSQLAdapter, serverProviders?: (string)[], byokProviders?: (string)[]): ReturnType<typeof createTRPCRouter>;
 export declare const aiRouter: ReturnType<typeof createAIRouter>;
 //# sourceMappingURL=ai.d.ts.map

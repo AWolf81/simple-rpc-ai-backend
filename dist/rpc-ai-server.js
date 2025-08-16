@@ -66,6 +66,9 @@ export class RpcAiServer {
         this.config = {
             port: 8000,
             aiLimits: {},
+            serverProviders: ['anthropic'], // Default: Anthropic only for easier onboarding
+            byokProviders: ['anthropic'], // Default: Anthropic BYOK only
+            customProviders: [], // Default: no custom providers
             protocols,
             tokenTracking: {
                 enabled: false,
@@ -112,14 +115,10 @@ export class RpcAiServer {
             });
         }
         // Create router with AI configuration and token tracking
-        this.router = createAppRouter(this.config.aiLimits, this.config.tokenTracking.enabled || false, this.dbAdapter);
-        // Initialize AI service for JSON-RPC endpoint
+        this.router = createAppRouter(this.config.aiLimits, this.config.tokenTracking.enabled || false, this.dbAdapter, this.config.serverProviders, this.config.byokProviders);
+        // Initialize AI service for JSON-RPC endpoint with configured providers
         this.aiService = new AIService({
-            serviceProviders: {
-                anthropic: { priority: 1 },
-                openai: { priority: 2 },
-                google: { priority: 3 }
-            }
+            serviceProviders: this.createServiceProvidersConfig(this.config.serverProviders)
         });
         this.app = express();
         this.setupMiddleware();
@@ -510,9 +509,35 @@ export class RpcAiServer {
     getRouter() {
         return this.router;
     }
+    createServiceProvidersConfig(providers) {
+        const config = {};
+        const builtInProviders = ['anthropic', 'openai', 'google'];
+        providers.forEach((provider, index) => {
+            if (builtInProviders.includes(provider)) {
+                // Built-in provider - use standard config
+                config[provider] = { priority: index + 1 };
+            }
+            else {
+                // Custom provider - find in customProviders config
+                const customProvider = this.config.customProviders?.find(cp => cp.name === provider);
+                if (customProvider) {
+                    config[provider] = {
+                        priority: index + 1,
+                        custom: true,
+                        ...customProvider
+                    };
+                }
+            }
+        });
+        return config;
+    }
     getConfig() {
         return this.config;
     }
+}
+// Helper function to create type-safe config with const assertions
+export function defineRpcAiServerConfig(config) {
+    return config;
 }
 // Factory function for easy usage
 export function createRpcAiServer(config = {}) {

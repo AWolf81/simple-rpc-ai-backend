@@ -24,12 +24,31 @@ import { PostgreSQLAdapter } from './database/postgres-adapter.js';
 import { VirtualTokenService } from './services/virtual-token-service.js';
 import { UsageAnalyticsService } from './services/usage-analytics-service.js';
 
+// Built-in provider types
+type BuiltInProvider = 'anthropic' | 'openai' | 'google';
+
+// Custom provider interface
+interface CustomProvider {
+  name: string;                          // e.g. 'deepseek', 'claude-custom'
+  baseUrl: string;                       // Custom API endpoint
+  apiKeyHeader?: string;                 // Default: 'Authorization'  
+  apiKeyPrefix?: string;                 // Default: 'Bearer '
+  modelMapping?: Record<string, string>; // Map generic -> provider-specific models
+  defaultModel?: string;                 // Default model to use
+  requestTransform?: (req: any) => any;  // Transform request format
+  responseTransform?: (res: any) => any; // Transform response format
+}
+
+// More practical approach: Use const assertions for type safety
 export interface RpcAiServerConfig {
   // Basic settings
   port?: number;
   
   // AI Configuration
   aiLimits?: AIRouterConfig;
+  serverProviders?: (BuiltInProvider | string)[];    // Built-in providers + custom names
+  byokProviders?: (BuiltInProvider | string)[];      // Built-in providers + custom names  
+  customProviders?: CustomProvider[];                // Register custom providers
   
   // Protocol support
   protocols?: {
@@ -130,6 +149,9 @@ export class RpcAiServer {
     this.config = {
       port: 8000,
       aiLimits: {},
+      serverProviders: ['anthropic'],  // Default: Anthropic only for easier onboarding
+      byokProviders: ['anthropic'],    // Default: Anthropic BYOK only
+      customProviders: [],             // Default: no custom providers
       protocols,
       tokenTracking: {
         enabled: false,
@@ -182,16 +204,14 @@ export class RpcAiServer {
     this.router = createAppRouter(
       this.config.aiLimits,
       this.config.tokenTracking.enabled || false,
-      this.dbAdapter
+      this.dbAdapter,
+      this.config.serverProviders,
+      this.config.byokProviders
     );
     
-    // Initialize AI service for JSON-RPC endpoint
+    // Initialize AI service for JSON-RPC endpoint with configured providers
     this.aiService = new AIService({
-      serviceProviders: {
-        anthropic: { priority: 1 },
-        openai: { priority: 2 },
-        google: { priority: 3 }
-      }
+      serviceProviders: this.createServiceProvidersConfig(this.config.serverProviders)
     });
 
     this.app = express();
@@ -627,9 +647,62 @@ export class RpcAiServer {
     return this.router;
   }
 
+  private createServiceProvidersConfig(providers: (BuiltInProvider | string)[]): any {
+    const config: any = {};
+    const builtInProviders: BuiltInProvider[] = ['anthropic', 'openai', 'google'];
+    
+    providers.forEach((provider, index) => {
+      if (builtInProviders.includes(provider as BuiltInProvider)) {
+        // Built-in provider - use standard config
+        config[provider] = { priority: index + 1 };
+      } else {
+        // Custom provider - find in customProviders config
+        const customProvider = this.config.customProviders?.find(cp => cp.name === provider);
+        if (customProvider) {
+          config[provider] = { 
+            priority: index + 1,
+            custom: true,
+            ...customProvider
+          };
+        }
+      }
+    });
+    return config;
+  }
+
   public getConfig(): Required<RpcAiServerConfig> {
     return this.config;
   }
+}
+
+// Helper function to create type-safe config with const assertions
+export function defineRpcAiServerConfig<
+  TServerProviders extends readonly (BuiltInProvider | string)[],
+  TByokProviders extends readonly (BuiltInProvider | string)[],
+  TCustomProviders extends readonly CustomProvider[]
+>(
+  config: {
+    port?: number;
+    aiLimits?: AIRouterConfig;
+    serverProviders?: TServerProviders;
+    byokProviders?: TByokProviders;
+    customProviders?: TCustomProviders;
+    protocols?: {
+      jsonRpc?: boolean;
+      tRpc?: boolean;
+    };
+    tokenTracking?: RpcAiServerConfig['tokenTracking'];
+    jwt?: RpcAiServerConfig['jwt'];
+    cors?: RpcAiServerConfig['cors'];
+    rateLimit?: RpcAiServerConfig['rateLimit'];
+    paths?: RpcAiServerConfig['paths'];
+  }
+): {
+  serverProviders: TServerProviders;
+  byokProviders: TByokProviders;
+  customProviders: TCustomProviders;
+} & RpcAiServerConfig {
+  return config as any;
 }
 
 // Factory function for easy usage

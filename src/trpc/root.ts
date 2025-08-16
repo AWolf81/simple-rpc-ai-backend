@@ -16,10 +16,12 @@ import type { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 export function createAppRouter(
   aiConfig?: AIRouterConfig, 
   tokenTrackingEnabled?: boolean,
-  dbAdapter?: PostgreSQLAdapter
+  dbAdapter?: PostgreSQLAdapter,
+  serverProviders?: string[],
+  byokProviders?: string[]
 ): ReturnType<typeof createTRPCRouter> {
   return createTRPCRouter({
-    ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter),
+    ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders),
     
     // Add more routers here as needed:
     // auth: authRouter,

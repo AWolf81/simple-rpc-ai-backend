@@ -98,21 +98,32 @@ const DEFAULT_CONFIG: Required<AIRouterConfig> = {
   },
 };
 
+// Helper to create service providers config from array
+function createServiceProvidersConfig(providers: string[]): any {
+  const config: any = {};
+  providers.forEach((provider, index) => {
+    config[provider] = { priority: index + 1 };
+  });
+  return config;
+}
+
 // Create configurable AI router
-export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled = false, dbAdapter?: PostgreSQLAdapter): ReturnType<typeof createTRPCRouter> {
+export function createAIRouter(
+  config: AIRouterConfig = {}, 
+  tokenTrackingEnabled = false, 
+  dbAdapter?: PostgreSQLAdapter,
+  serverProviders: (string)[] = ['anthropic'],
+  byokProviders: (string)[] = ['anthropic']
+): ReturnType<typeof createTRPCRouter> {
   const mergedConfig = {
     content: { ...DEFAULT_CONFIG.content, ...config.content },
     tokens: { ...DEFAULT_CONFIG.tokens, ...config.tokens },
     systemPrompt: { ...DEFAULT_CONFIG.systemPrompt, ...config.systemPrompt },
   };
 
-  // Initialize AI service (in production, this would be dependency injected)
+  // Initialize AI service with configured providers
   const aiService = new AIService({
-    serviceProviders: {
-      anthropic: { priority: 1 },
-      openai: { priority: 2 },
-      google: { priority: 3 }
-    }
+    serviceProviders: createServiceProvidersConfig(serverProviders)
   });
 
   // Initialize services if database is available
@@ -401,6 +412,17 @@ export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled
         throw new TRPCError({
           code: 'NOT_IMPLEMENTED',
           message: 'Hybrid user service is not enabled on this server.',
+        });
+      }
+
+      // Validate that requested providers are allowed for BYOK
+      const requestedProviders = Object.keys(input.providers);
+      const disallowedProviders = requestedProviders.filter(p => !byokProviders.includes(p));
+      
+      if (disallowedProviders.length > 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `BYOK not supported for providers: ${disallowedProviders.join(', ')}. Allowed providers: ${byokProviders.join(', ')}`
         });
       }
 
