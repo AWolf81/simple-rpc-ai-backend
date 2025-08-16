@@ -8,13 +8,18 @@
 import { createTRPCRouter } from './index.js';
 import { createAIRouter, type AIRouterConfig } from './routers/ai.js';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
+import type { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 
 /**
- * Create app router with configurable AI limits
+ * Create app router with configurable AI limits and optional token tracking
  */
-export function createAppRouter(aiConfig?: AIRouterConfig): ReturnType<typeof createTRPCRouter> {
+export function createAppRouter(
+  aiConfig?: AIRouterConfig, 
+  tokenTrackingEnabled?: boolean,
+  dbAdapter?: PostgreSQLAdapter
+): ReturnType<typeof createTRPCRouter> {
   return createTRPCRouter({
-    ai: createAIRouter(aiConfig),
+    ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter),
     
     // Add more routers here as needed:
     // auth: authRouter,

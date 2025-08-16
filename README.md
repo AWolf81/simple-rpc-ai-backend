@@ -1293,7 +1293,7 @@ async function analyzeWithVSCodeKeys() {
 | **API Key Security** | 🔒 AES-256-GCM encrypted | 🔒 AES-256-GCM encrypted | ✅ Client handles |
 | **Multi-user Support** | ✅ True user isolation | ❌ Single instance | ✅ Per client instance |
 | **Audit Trail** | ✅ Complete server logs | 🟡 Basic file logs | ❌ No audit trail |
-| **Setup Complexity** | 🟡 PostgreSQL required | ✅ Zero setup | ✅ Zero server setup |
+| **Setup Complexity** | 🟡 PostgreSQL + server | 🟢 Server only | 🟢 Server only |
 | **Corporate Compliance** | ✅ Enterprise ready | 🟡 Basic compliance | ✅ Zero storage risk |
 | **Backup & Recovery** | ✅ Database backups | 🟡 File-based | ✅ Client responsibility |
 | **Attack Surface** | 🟡 Database + server | 🟡 File system + server | 🟢 Minimal server |
@@ -1922,376 +1922,317 @@ monitor.onProviderStatusChange('anthropic', (hasKey) => {
 | **Setup Required** | ✅ Must store API key first | ❌ Works immediately |
 | **Usage Limits** | 🔒 Limited by their API key | ✅ Higher limits on server keys |
 
-## 🔐 **Authorization & Payment Features**
+## 🔐 **Authentication & Security**
 
-### **Progressive Authentication Flow**
+### **All Users Must Be Authenticated**
 
-The system supports **three authentication levels** with automatic upgrade paths:
+**IMPORTANT**: This backend requires authentication for ALL users, regardless of payment method. This ensures system prompt protection and prevents API abuse.
 
 ```typescript
-// 1. Anonymous Access (Limited)
-const client = new RPCClient('http://localhost:8000');
-const result = await client.request('executeAIRequest', {
-  content: 'Hello world',
-  systemPrompt: 'basic-assistant' // Limited to public prompts only
-});
-
-// 2. JWT-Based Authentication (Standard)
-const client = new RPCClient('http://localhost:8000');
-const result = await client.request('executeAIRequest', {
-  jwt: 'eyJ...opensaas-jwt',     // From OpenSaaS, Auth0, etc.
-  content: 'Hello world',
-  systemPrompt: 'code-expert'   // Access to user plan features
-});
-
-// 3. Progressive Upgrade (Device Sessions)
-await client.request('initializeSession', { deviceId: 'vscode-12345' });
-await client.request('upgradeToOAuth', { 
-  deviceId: 'vscode-12345', 
-  provider: 'google',
-  token: 'oauth-token' 
+// ✅ SECURE: All requests require JWT authentication
+const server = createRpcAiServer({
+  // Enable authentication and token tracking
+  tokenTracking: {
+    enabled: true,
+    databaseUrl: process.env.DATABASE_URL,
+    webhookSecret: process.env.LEMONSQUEEZY_WEBHOOK_SECRET
+  },
+  
+  // JWT configuration for user authentication
+  jwt: {
+    secret: process.env.OPENSAAS_JWT_SECRET,
+    issuer: 'opensaas',
+    audience: 'your-ai-backend'
+  }
 });
 ```
 
-### **Plan-Based Feature Access**
+### **Authentication Flow**
 
-Check user's subscription and usage status for client-side feature gating:
-
+#### **1. User Authentication (Required for All)**
 ```typescript
-// Check user's plan and usage limits
-const userStatus = await client.request('getUserUsageStatus', {
-  userId: 'user-123',
-  userPlan: 'pro' // or 'free', 'enterprise'
+// VS Code Extension Example
+const authSession = await vscode.authentication.getSession('opensaas', [], { 
+  createIfNone: true 
 });
 
-// Response includes comprehensive payment/usage info
-{
-  plan: {
-    planId: 'pro',
-    displayName: 'Pro Plan',
-    features: {
-      systemPrompts: ['code-expert', 'security-audit', 'custom-prompts'],
-      customSystemPrompts: true,
-      analyticsAccess: true,
-      priorityQueue: true
+// Store JWT securely
+await context.secrets.store('opensaas-jwt', authSession.accessToken);
+```
+
+#### **2. Making AI Requests (Same for All User Types)**
+```typescript
+// Client code - same for subscription, one-time, and BYOK users
+const jwtToken = await getStoredJWT();
+
+const response = await fetch('/trpc/ai.executeAIRequest', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${jwtToken}`,  // ✅ Always required
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    content: "function test() { return 42; }",
+    systemPrompt: "Review this code for best practices",
+    // ❌ NO apiKey parameter - handled server-side
+  })
+});
+```
+
+#### **3. BYOK Configuration (One-time Setup)**
+```typescript
+// Configure BYOK through authenticated endpoint
+await fetch('/trpc/ai.configureBYOK', {
+  method: 'POST', 
+  headers: { 'Authorization': `Bearer ${jwtToken}` },
+  body: JSON.stringify({
+    providers: {
+      anthropic: { enabled: true, apiKey: "sk-ant-..." },
+      openai: { enabled: true, apiKey: "sk-..." }
     },
-    rateLimits: {
-      requestsPerMinute: 100,
-      requestsPerHour: 1000,
-      requestsPerDay: 10000
-    }
-  },
-  quotaStatus: {
-    'anthropic': {
-      used: 15000,
-      limit: 100000,
-      resetDate: '2024-02-01T00:00:00Z',
-      percentUsed: 15
-    }
-  },
-  rateLimitStatus: {
-    requestsThisMinute: 5,
-    requestsThisHour: 45,
-    requestsThisDay: 230,
-    limits: { perMinute: 100, perHour: 1000, perDay: 10000 }
+    enabled: true
+  })
+});
+
+// ✅ API keys stored encrypted server-side
+// ✅ No API keys in subsequent requests
+```
+
+### **Payment Methods & User Types**
+
+| User Type | Authentication | Payment Method | Setup Required |
+|-----------|----------------|----------------|----------------|
+| **Subscription** | ✅ JWT Required | Platform tokens | Sign in only |
+| **One-time Purchase** | ✅ JWT Required | Platform tokens | Sign in only |
+| **BYOK** | ✅ JWT Required | User's API keys | Sign in + configure keys |
+
+### **Server-Side Payment Method Selection**
+
+The server automatically determines payment method based on user's configuration:
+
+```typescript
+// Server logic (automatic)
+async function executeAIRequest({ content, systemPrompt }, { user }) {
+  const userId = user.userId; // From validated JWT
+  
+  // 1. Check managed token balances
+  const managedTokens = await getUserTokenBalances(userId);
+  const totalTokens = managedTokens.reduce((sum, b) => sum + b.balance, 0);
+  
+  if (totalTokens >= estimatedTokens) {
+    // ✅ Use subscription/one-time tokens
+    return executeWithManagedTokens(userId, estimatedTokens);
   }
+  
+  // 2. Fallback to stored BYOK keys
+  const profile = await getUserProfile(userId);
+  const storedApiKey = profile.byokProviders?.anthropic?.apiKey;
+  
+  if (storedApiKey) {
+    // ✅ Use user's stored API key (encrypted)
+    return executeWithStoredBYOK(storedApiKey, content, systemPrompt);
+  }
+  
+  // 3. No payment method available
+  throw new Error('Please configure payment method or purchase tokens');
 }
 ```
 
-### **Client-Side Feature Gating Examples**
+### **Security Features**
 
-Use payment/plan information to control UI and features:
+#### **✅ System Prompt Protection**
+- Only authenticated users can access proprietary prompts
+- JWT validates requests come from authorized applications
+- No unauthorized access to valuable intellectual property
 
-```typescript
-// Feature access control
-if (userStatus.plan.features.customSystemPrompts) {
-  showCustomPromptEditor();
-}
+#### **✅ API Key Security** 
+- BYOK keys stored encrypted on server (AES-256-GCM)
+- No API keys transmitted in client requests
+- Keys associated with authenticated users only
 
-if (userStatus.plan.features.analyticsAccess) {
-  showUsageDashboard(userStatus.quotaStatus);
-}
+#### **✅ Origin Validation**
+- JWT issuer validation prevents arbitrary web apps from accessing API
+- Only authorized applications (VS Code extension, approved web apps) can connect
+- Enterprise-grade access control
 
-// Usage-based UI updates
-const anthropicQuota = userStatus.quotaStatus.anthropic;
-if (anthropicQuota.percentUsed > 90) {
-  showQuotaWarning(`${anthropicQuota.percentUsed}% of monthly quota used`);
-}
+#### **✅ Complete Audit Trail**
+- All usage tracked to authenticated users
+- Comprehensive analytics regardless of payment method
+- Enterprise compliance and abuse detection
 
-// Rate limit handling
-const canMakeRequest = await client.request('canUserMakeRequest', {
-  userId: 'user-123',
-  provider: 'anthropic',
-  userPlan: 'pro'
-});
-
-if (!canMakeRequest.allowed) {
-  showRateLimitMessage(canMakeRequest.reason, canMakeRequest.retryAfter);
-}
-```
-
-### **BYOK vs Server-Provided Keys**
-
-Support multiple key management strategies based on subscription:
+### **VS Code Extension Integration**
 
 ```typescript
-// Free users: Bring Your Own Key (BYOK)
-await client.request('storeUserKey', {
-  userId: 'user@company.com',
-  provider: 'anthropic',
-  apiKey: 'sk-ant-user-provided-key',
-  encrypted: true
-});
-
-// Pro users: Server-provided keys (automatic)
-const result = await client.request('executeAIRequest', {
-  jwt: 'eyJ...pro-user-jwt',
-  content: 'Analyze this code',
-  systemPrompt: 'security-expert' // Uses server's API keys automatically
-});
-
-// Check key source and quota remaining
-const keyInfo = await client.request('getApiKeyForUser', {
-  userId: 'user-123',
-  provider: 'anthropic',
-  userPlan: 'pro'
-});
-// Returns: { apiKey: '***', source: 'server_provided', quotaRemaining: 85000 }
-```
-
-### **Multi-Tenant Architecture**
-
-Support multiple subscription tiers with flexible configurations:
-
-```typescript
-// Enterprise tier with custom limits
-{
-  planId: 'enterprise',
-  keySource: 'server_provided', // Company provides API keys
-  allowedProviders: ['anthropic', 'openai', 'google'],
-  tokenQuotas: {
-    'anthropic': { maxTokensPerPeriod: 1000000, resetInterval: 'monthly' },
-    'openai': { maxTokensPerPeriod: 500000, resetInterval: 'monthly' }
-  },
-  features: {
-    systemPrompts: '*', // Access to all prompts
-    customSystemPrompts: true,
-    analyticsAccess: true,
-    priorityQueue: true
+// Extension activation
+export async function activate(context: vscode.ExtensionContext) {
+  // 1. Authenticate user
+  const authSession = await vscode.authentication.getSession('opensaas', [], { 
+    createIfNone: true 
+  });
+  
+  // 2. Store JWT securely
+  await context.secrets.store('opensaas-jwt', authSession.accessToken);
+  
+  // 3. Optional: Configure BYOK for this user
+  const apiKey = await vscode.window.showInputBox({
+    prompt: 'Enter your Anthropic API key (optional)',
+    password: true
+  });
+  
+  if (apiKey) {
+    await configureBYOK(authSession.accessToken, { 
+      anthropic: { enabled: true, apiKey } 
+    });
   }
 }
 
-// Startup tier with mixed approach  
-{
-  planId: 'startup',
-  keySource: 'server_optional', // Server keys available, BYOK allowed
-  allowedProviders: ['anthropic'],
-  tokenQuotas: {
-    'anthropic': { maxTokensPerPeriod: 50000, resetInterval: 'monthly' }
-  },
-  features: {
-    systemPrompts: ['basic-assistant', 'code-helper'],
-    customSystemPrompts: false,
-    analyticsAccess: false
-  }
+// Making AI requests
+async function reviewCode(code: string) {
+  const jwtToken = await context.secrets.get('opensaas-jwt');
+  
+  // Same request for all user types
+  const response = await fetch('/trpc/ai.executeAIRequest', {
+    headers: { 'Authorization': `Bearer ${jwtToken}` },
+    body: JSON.stringify({
+      content: code,
+      systemPrompt: "proprietary-code-review-prompt"
+    })
+  });
+  
+  const result = await response.json();
+  
+  // Server automatically selected payment method
+  console.log('Payment method used:', result.consumption?.plan);
+  
+  return result.data;
 }
 ```
 
-### **Available Authorization Methods**
+### **Enterprise Deployment**
 
-| Method | Description | Returns | Client Usage |
-|--------|-------------|---------|--------------|
-| `getUserUsageStatus` | Get plan, quotas, rate limits | Full user status | Feature gating, usage displays |
-| `canUserMakeRequest` | Check if request is allowed | `{allowed, reason, retryAfter}` | Pre-request validation |
-| `getAuthStatus` | Get authentication level | Device auth status | Progressive auth UI |
-| `shouldSuggestUpgrade` | Check if upgrade needed | Upgrade recommendations | Subscription prompts |
-
-## 🏗️ **RPC Architecture with System Prompt Protection**
-
-```mermaid
-sequenceDiagram
-    participant Client as RPC Client<br/>(VS Code/Web/CLI)
-    participant Proxy as Corporate Proxy<br/>(Traffic Monitor)
-    participant Backend as Your RPC Backend<br/>(System Prompts Here)
-    participant Storage as Key Storage<br/>(PostgreSQL/File/Client)
-    participant AI as AI Provider<br/>(Anthropic/OpenAI/Google)
-    
-    Note over Client,AI: User triggers AI request
-    
-    Client->>Proxy: JSON-RPC: executeAIRequest(userContent, promptName)
-    
-    Note over Proxy: ✅ Sees user content only<br/>❌ Never sees system prompts
-    
-    Proxy->>Backend: Forward RPC request
-    Backend->>Backend: Load system prompt by name (secure)
-    
-    alt Storage-Based Keys
-        Backend->>Storage: Get user's API key (encrypted)
-        Storage->>Backend: Return API key
-    else Client-Managed Keys
-        Note over Backend: API key provided in request
-    end
-    
-    Backend->>AI: generateText(systemPrompt + userContent)
-    AI->>Backend: Return AI response
-    Backend->>Client: JSON-RPC response with results
-    
-    Note over Client,AI: 🔒 System prompts protected<br/>🚀 Corporate proxy friendly<br/>⚡ Flexible key management
-```
-
-## 🔐 **Detailed Authentication Architecture**
-
-### **Secure Server-Side Architecture (Recommended)**
-
-```mermaid
-sequenceDiagram
-    participant Client as RPC Client<br/>(VS Code Extension)
-    participant RPC as RPC Backend<br/>(Secure Vault Manager)
-    participant OpenSaaS as OpenSaaS Service<br/>(User Management & Billing)
-    participant DB as Secure Database<br/>(Encrypted User Mappings)
-    participant Vault as PostgreSQL Server<br/>(API Key Storage)
-    participant AI as AI Provider<br/>(Anthropic/OpenAI)
-    
-    Note over Client,AI: Secure Server-Side Key Management
-    
-    rect rgb(240, 248, 255)
-        Note over Client, OpenSaaS: 1. User Registration & JWT Generation
-        Client->>OpenSaaS: User signs up / logs in
-        OpenSaaS->>OpenSaaS: Generate JWT with user claims
-        OpenSaaS->>Client: Return opensaasJWT
-    end
-    
-    rect rgb(255, 248, 240)
-        Note over Client, Vault: 2. User Onboarding (First API Key Storage)
-        Client->>RPC: vaultwarden.storeApiKey(jwt, apiKey, provider)
-        RPC->>RPC: Extract user identity (supports OAuth2 primary)
-        RPC->>RPC: Generate secure vault password (64 chars, server-side)
-        RPC->>Vault: Create PostgreSQL account with server password
-        RPC->>DB: Store encrypted mapping with subscription tier
-        
-        Note over RPC: User onboarded when they store first API key!
-    end
-    
-    rect rgb(248, 255, 248)
-        Note over Client, Vault: 3. Secure API Key Storage (Combined with Onboarding)
-        RPC->>DB: Get vault credentials for user (server-only)
-        RPC->>Vault: Authenticate with server-generated password
-        RPC->>Vault: Store API key directly in vault
-        RPC->>Client: {success: true, keyId}
-        
-        Note over Client: Onboarding + key storage in one seamless operation!
-    end
-    
-    rect rgb(240, 255, 240)
-        Note over Client, AI: 4. AI Request Flow (Free vs Pro Users)
-        Client->>RPC: executeAIRequest(jwt, content, systemPrompt, provider)
-        RPC->>RPC: Check user exists (must store API key first)
-        
-        alt Free User (BYOK)
-            RPC->>DB: Get vault credentials for user  
-            RPC->>Vault: Retrieve user's encrypted API key
-            Note over RPC: Uses user's own API key
-        else Pro User
-            RPC->>RPC: Get server-provided API key
-            Note over RPC: Uses company's API key pool
-        end
-        
-        RPC->>RPC: Combine content + server-side system prompt
-        RPC->>AI: Make AI request with appropriate key
-        AI->>RPC: Return AI response
-        RPC->>Client: AI response
-        
-        Note over Client: Pro users get instant access, Free users need BYOK setup!
-    end
-    
-    rect rgb(255, 255, 240)
-        Note over OpenSaaS, RPC: 5. Billing Integration (Background)
-        OpenSaaS->>RPC: Webhook: user.created, payment.completed, etc.
-        RPC->>RPC: Update billing preferences via SeamlessOpenSaaSIntegration
-        RPC->>RPC: Track usage with HybridBillingManager
-        
-        Note over RPC: Automatic credit management, usage tracking
-    end
-```
-
-### **🔒 Secure Server-Side Key Management**
-
-| Component | OpenSaaS JWT | Vault Password | API Keys | System Prompts | Vault User ID |
-|-----------|-------------|----------------|----------|----------------|---------------|
-| **Client** | ✅ Provides | ❌ Never sees | ✅ Provides once | ❌ Never sees | ❌ Never sees |
-| **RPC Backend** | ✅ Validates | ✅ Generates & stores | ✅ Retrieves & uses | ✅ Stores securely | ✅ Manages internally |
-| **Database** | ❌ | ✅ Encrypted storage | ❌ | ❌ | ✅ User mappings |
-| **PostgreSQL** | ❌ | ✅ Account auth | ✅ Encrypted storage | ❌ | ✅ Internal user |
-| **OpenSaaS** | ✅ Issues | ❌ | ❌ | ❌ | ❌ |
-
-**True Zero-Knowledge Architecture**: Client provides JWT from any auth provider. Server handles all crypto securely!
-
-### **🔄 Auth Provider Flexibility**
-
-The RPC backend works with **any JWT-issuing auth provider**:
-
-| Auth Provider | JWT Format | Integration |
-|---------------|------------|-------------|
-| **OpenSaaS** | `{ userId, email, subscriptionTier }` | ✅ Built-in support |
-| **Auth0** | `{ sub, email, custom_claims }` | ✅ Automatic mapping |
-| **Firebase** | `{ uid, email, firebase }` | ✅ Automatic mapping |  
-| **Custom Backend** | `{ user_id, email, roles }` | ✅ Configurable mapping |
-| **Enterprise SSO** | `{ employee_id, email, department }` | ✅ SAML/OIDC support |
-
-**Example with different auth providers:**
+#### **Corporate Authentication Setup**
 ```typescript
-// OpenSaaS JWT
-const openSaasResult = await client.request('executeAIRequest', {
-  jwt: 'eyJ...opensaas-jwt',  // { userId: 'user-123', email: 'john@co.com' }
-  content, systemPrompt, provider
+// Corporate backend configuration
+const server = createRpcAiServer({
+  jwt: {
+    secret: process.env.CORPORATE_JWT_SECRET,
+    issuer: 'corporate-sso',
+    audience: 'ai-backend.company.com'
+  },
+  
+  tokenTracking: {
+    enabled: true,
+    databaseUrl: process.env.CORPORATE_DB_URL
+  },
+  
+  cors: {
+    origin: ['https://vscode-extension.company.com'],
+    credentials: true
+  }
+});
+```
+
+#### **User Onboarding Flow**
+1. **IT Setup**: Deploy backend with corporate SSO integration
+2. **Developer Setup**: Install VS Code extension, sign in with corporate credentials
+3. **Payment Configuration**: IT configures team subscription or BYOK policies
+4. **Usage**: Developers make AI requests automatically with proper cost attribution
+
+### **Migration from Public API**
+
+If you currently allow unauthenticated access, here's how to migrate:
+
+#### **Before (Insecure)**
+```typescript
+// ❌ OLD: Allowed unauthenticated access
+app.post('/ai/request', (req, res) => {
+  const { content, systemPrompt, apiKey } = req.body;
+  // Anyone could call this with any API key
+});
+```
+
+#### **After (Secure)**
+```typescript
+// ✅ NEW: All users authenticated
+executeAIRequest: protectedProcedure
+  .mutation(async ({ input, ctx }) => {
+    const userId = ctx.user!.userId; // Guaranteed to exist
+    // Server determines payment method automatically
+  });
+```
+
+#### **Client Migration**
+```typescript
+// ❌ OLD: API keys in requests
+const response = await fetch('/ai/request', {
+  body: JSON.stringify({
+    content: code,
+    systemPrompt: prompt,
+    apiKey: "sk-ant-..." // ❌ Exposed in client
+  })
 });
 
-// Auth0 JWT  
-const auth0Result = await client.request('executeAIRequest', {
-  jwt: 'eyJ...auth0-jwt',     // { sub: 'auth0|user-123', email: 'john@co.com' }
-  content, systemPrompt, provider
+// ✅ NEW: JWT authentication only
+const response = await fetch('/trpc/ai.executeAIRequest', {
+  headers: { 'Authorization': `Bearer ${jwtToken}` }, // ✅ Secure
+  body: JSON.stringify({
+    content: code,
+    systemPrompt: prompt
+    // ❌ No apiKey - handled server-side
+  })
+});
+```
+
+### **Testing Authentication**
+
+```bash
+# Test server with authentication
+pnpm test:auth
+
+# Test VS Code extension integration
+pnpm test:vscode-auth
+
+# Test enterprise SSO integration  
+pnpm test:enterprise-auth
+```
+
+### **Common Authentication Patterns**
+
+#### **Multi-Provider Support**
+```typescript
+// Configure multiple BYOK providers
+await rpc.ai.configureBYOK({
+  providers: {
+    anthropic: { enabled: true, apiKey: "sk-ant-..." },
+    openai: { enabled: true, apiKey: "sk-..." },
+    google: { enabled: false }
+  }
 });
 
-// Same user, same vault, different auth provider!
+// Server automatically selects best provider
 ```
 
-### **👥 Multiple User ID Support**
-
-Users can have multiple IDs across different auth providers:
-
+#### **Hybrid Payment Methods**
 ```typescript
-// User starts with email/password
-JWT1: { userId: 'user-123', email: 'john@company.com' }
-// Creates vault: primaryUserId = 'user-123'
+// User can have subscription + BYOK fallback
+const result = await rpc.ai.executeAIRequest({
+  content: largeCodebase,
+  systemPrompt: "comprehensive-analysis"
+});
 
-// Later adds Google OAuth
-JWT2: { userId: 'user-123', googleId: 'google-98765', email: 'john@company.com' }
-// Updates vault: alternateUserIds = ['google-98765']
-
-// Later adds GitHub OAuth  
-JWT3: { userId: 'user-123', githubId: 'github-54321', googleId: 'google-98765' }
-// Updates vault: alternateUserIds = ['google-98765', 'github-54321']
-
-// Same user, same vault, multiple auth methods!
+// Server response shows payment method used
+console.log(result.consumption);
+// {
+//   plan: [
+//     { type: 'subscription', tokensUsed: 5000 },
+//     { type: 'byok', tokensUsed: 3000 }
+//   ],
+//   fallbackUsed: true,
+//   notifications: ["Subscription tokens exhausted, used BYOK"]
+// }
 ```
 
-**Benefits:**
-- ✅ **Seamless auth provider migration** - Users keep their API keys
-- ✅ **Multiple login methods** - Google, GitHub, SSO, email/password
-- ✅ **No duplicate accounts** - System recognizes same user across providers
-- ✅ **Enterprise flexibility** - Support any corporate auth system
-
-### **🔐 What's Protected Where**
-
-| Component | Sees User Code | Sees System Prompts | Sees API Keys | Your Control |
-|-----------|---------------|---------------------|---------------|--------------|
-| **VS Code Extension** | ✅ | ❌ | 🟡 (Client-managed only) | ❌ (User's machine) |
-| **Corporate Proxy** | ✅ | ❌ | ❌ | ❌ (Company network) |
-| **Your RPC Backend** | ✅ | ✅ | 🟡 (Depends on storage) | ✅ (Your server) |
-| **PostgreSQL Storage** | ❌ | ❌ | ✅ (Encrypted) | ✅ (Your infrastructure) |
-| **AI Provider** | ✅ | ✅ | ✅ | ❌ (External service) |
-
-**Key Insight**: Corporate proxies and extension users never see your valuable system prompts regardless of storage option!
+This authentication model ensures enterprise-grade security while maintaining developer-friendly experience across all payment methods.
 
 ## 📖 **OpenRPC Documentation & Playground**
 

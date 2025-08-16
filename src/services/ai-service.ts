@@ -9,6 +9,7 @@ import { generateText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
+import crypto from 'crypto';
 
 export interface AIServiceConfig {
   provider?: 'anthropic' | 'openai' | 'google'; // selected in constructor & used 
@@ -33,6 +34,7 @@ export interface ExecuteRequest {
     maxTokens?: number;
     temperature?: number;
   };
+  apiKey?: string; // For BYOK users
 }
 
 export interface ExecuteResult {
@@ -43,6 +45,8 @@ export interface ExecuteResult {
     totalTokens: number;
   };
   model: string;
+  provider?: string;
+  requestId?: string;
   finishReason?: string;
 }
 
@@ -182,7 +186,9 @@ export class AIService {
           completionTokens: result.usage.completionTokens,
           totalTokens: result.usage.totalTokens
         },
-        model: model.modelId, //: result.model, // why was it result.model? we can use model
+        model: model.modelId,
+        provider: this.config.provider,
+        requestId: crypto.randomUUID(),
         finishReason: result.finishReason
       };
 

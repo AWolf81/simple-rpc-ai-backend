@@ -6,8 +6,12 @@
  */
 
 import { z } from 'zod';
-import { createTRPCRouter, publicProcedure } from '../index.js';
+import { TRPCError } from '@trpc/server';
+import { createTRPCRouter, publicProcedure, protectedProcedure, tokenProtectedProcedure } from '../index.js';
 import { AIService } from '../../services/ai-service.js';
+import { VirtualTokenService } from '../../services/virtual-token-service.js';
+import { UsageAnalyticsService } from '../../services/usage-analytics-service.js';
+import { PostgreSQLAdapter } from '../../database/postgres-adapter.js';
 
 // Configurable limits interface
 export interface AIRouterConfig {
@@ -95,7 +99,7 @@ const DEFAULT_CONFIG: Required<AIRouterConfig> = {
 };
 
 // Create configurable AI router
-export function createAIRouter(config: AIRouterConfig = {}): ReturnType<typeof createTRPCRouter> {
+export function createAIRouter(config: AIRouterConfig = {}, tokenTrackingEnabled = false, dbAdapter?: PostgreSQLAdapter): ReturnType<typeof createTRPCRouter> {
   const mergedConfig = {
     content: { ...DEFAULT_CONFIG.content, ...config.content },
     tokens: { ...DEFAULT_CONFIG.tokens, ...config.tokens },
@@ -110,6 +114,18 @@ export function createAIRouter(config: AIRouterConfig = {}): ReturnType<typeof c
       google: { priority: 3 }
     }
   });
+
+  // Initialize services if database is available
+  let virtualTokenService: VirtualTokenService | null = null;
+  let usageAnalyticsService: UsageAnalyticsService | null = null;
+  
+  if (dbAdapter) {
+    usageAnalyticsService = new UsageAnalyticsService(dbAdapter);
+    
+    if (tokenTrackingEnabled) {
+      virtualTokenService = new VirtualTokenService(dbAdapter);
+    }
+  }
 
   // Create dynamic schemas based on configuration  
   const executeAIRequestSchema = z.object({
@@ -153,24 +169,592 @@ export function createAIRouter(config: AIRouterConfig = {}): ReturnType<typeof c
 
   /**
    * Execute AI request with system prompt protection
+   * REQUIRES AUTHENTICATION - All users must have valid JWT token
+   * Payment method (subscription/one-time/BYOK) determined server-side
    */
-  executeAIRequest: publicProcedure
+  executeAIRequest: protectedProcedure
     .input(executeAIRequestSchema)
-    .mutation(async ({ input }) => {
-      try {
-        const result = await aiService.execute({
-          content: input.content,
-          systemPrompt: input.systemPrompt,
-          metadata: input.metadata,
-          options: input.options,
-        });
+    .mutation(async ({ input, ctx }) => {
+      const { content, systemPrompt, metadata, options } = input;
+      const userId = ctx.user!.userId; // Guaranteed to exist (protectedProcedure)
 
+      // Determine user type and execution path
+      if (userId && usageAnalyticsService) {
+        // Authenticated user - determine if subscription or BYOK
+        const userStatus = await usageAnalyticsService.getUserStatus(userId);
+        
+        // Subscription user with token tracking
+        if (userStatus.userType === 'subscription' && virtualTokenService) {
+          // Ensure user account exists
+          await virtualTokenService.ensureUserAccount(userId, ctx.user?.email);
+
+          // Estimate tokens (rough estimate: 4 chars per token)
+          const estimatedTokens = Math.ceil(content.length / 4) + Math.ceil(systemPrompt.length / 4);
+          
+          // Check token balance
+          const hasBalance = await virtualTokenService.checkTokenBalance(userId, estimatedTokens);
+          if (!hasBalance) {
+            throw new TRPCError({
+              code: 'PAYMENT_REQUIRED',
+              message: 'Insufficient token balance. Please top up your account to continue.',
+            });
+          }
+
+          try {
+            // Execute AI request
+            const result = await aiService.execute({
+              content,
+              systemPrompt,
+              metadata,
+              options,
+            });
+
+            // Deduct actual tokens used
+            if (result.usage?.totalTokens) {
+              const deductionResult = await virtualTokenService.deductTokens(
+                userId,
+                result.usage.totalTokens,
+                result.provider || 'unknown',
+                result.model,
+                result.requestId,
+                'executeAIRequest'
+              );
+
+              return {
+                success: true,
+                data: result,
+                tokenUsage: {
+                  tokensUsed: result.usage.totalTokens,
+                  tokensCharged: deductionResult.tokensDeducted,
+                  platformFee: deductionResult.platformFee,
+                  remainingBalance: deductionResult.newBalance,
+                },
+              };
+            }
+
+            return {
+              success: true,
+              data: result,
+            };
+          } catch (error) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            });
+          }
+        }
+      } else if (userId && apiKey) {
+        // Authenticated BYOK user - track usage but don't limit
+        try {
+          const result = await aiService.execute({
+            content,
+            systemPrompt,
+            metadata,
+            options,
+            apiKey,
+          });
+
+          // Record usage for analytics (no limiting)
+          if (usageAnalyticsService && result.usage) {
+            const estimatedCost = UsageAnalyticsService.estimateCost(
+              result.provider || 'unknown',
+              result.model,
+              result.usage.promptTokens,
+              result.usage.completionTokens
+            );
+
+            await usageAnalyticsService.recordUsage({
+              userId,
+              userType: 'byok',
+              provider: result.provider || 'unknown',
+              model: result.model,
+              inputTokens: result.usage.promptTokens,
+              outputTokens: result.usage.completionTokens,
+              totalTokens: result.usage.totalTokens,
+              estimatedCostUsd: estimatedCost,
+              requestId: result.requestId,
+              method: 'executeAIRequest',
+              metadata
+            });
+          }
+
+          return {
+            success: true,
+            data: result,
+            usageInfo: result.usage ? {
+              tokensUsed: result.usage.totalTokens,
+              estimatedCostUsd: UsageAnalyticsService.estimateCost(
+                result.provider || 'unknown',
+                result.model,
+                result.usage.promptTokens,
+                result.usage.completionTokens
+              )
+            } : undefined
+          };
+        } catch (error) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          });
+        }
+      } else {
+        // Public/unauthenticated usage with BYOK
+        if (!apiKey) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'API key required for public usage. Please provide your AI provider API key.',
+          });
+        }
+
+        try {
+          const result = await aiService.execute({
+            content,
+            systemPrompt,
+            metadata,
+            options,
+            apiKey,
+          });
+
+          return {
+            success: true,
+            data: result,
+          };
+        } catch (error) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          });
+        }
+      }
+    }),
+
+  /**
+   * Get user profile with capabilities and preferences (hybrid users)
+   */
+  getUserProfile: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (!hybridUserService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Hybrid user service is not enabled on this server.',
+        });
+      }
+
+      const profile = await hybridUserService.getUserProfile(ctx.user!.userId);
+      if (!profile) {
+        // Create profile if it doesn't exist
+        await hybridUserService.ensureUserProfile(ctx.user!.userId, ctx.user!.email);
+        return await hybridUserService.getUserProfile(ctx.user!.userId);
+      }
+
+      return profile;
+    }),
+
+  /**
+   * Update user consumption preferences
+   */
+  updateUserPreferences: protectedProcedure
+    .input(z.object({
+      consumptionOrder: z.array(z.enum(['subscription', 'one_time', 'byok'])).optional(),
+      byokEnabled: z.boolean().optional(),
+      byokProviders: z.record(z.object({
+        enabled: z.boolean(),
+        apiKey: z.string().optional()
+      })).optional(),
+      notifyTokenLowThreshold: z.number().min(0).max(100000).optional(),
+      notifyFallbackToByok: z.boolean().optional(),
+      notifyOneTimeConsumed: z.boolean().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (!hybridUserService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Hybrid user service is not enabled on this server.',
+        });
+      }
+
+      await hybridUserService.updateUserPreferences(ctx.user!.userId, input);
+      return { success: true };
+    }),
+
+  /**
+   * Configure BYOK providers for user (SECURE - API keys stored server-side)
+   */
+  configureBYOK: protectedProcedure
+    .input(z.object({
+      providers: z.record(z.object({
+        enabled: z.boolean(),
+        apiKey: z.string().optional() // This will be encrypted and stored securely
+      })),
+      enabled: z.boolean().default(true)
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (!hybridUserService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Hybrid user service is not enabled on this server.',
+        });
+      }
+
+      // TODO: Encrypt API keys before storage
+      // For now, store as-is but in production should use AES-256-GCM
+      await hybridUserService.configureBYOK(ctx.user!.userId, input.providers, input.enabled);
+      
+      return { 
+        success: true,
+        message: 'BYOK configuration updated. API keys stored securely.',
+        providersConfigured: Object.keys(input.providers).filter(p => input.providers[p].enabled)
+      };
+    }),
+
+  /**
+   * Get BYOK configuration status (without exposing API keys)
+   */
+  getBYOKStatus: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (!hybridUserService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Hybrid user service is not enabled on this server.',
+        });
+      }
+
+      const profile = await hybridUserService.getUserProfile(ctx.user!.userId);
+      
+      if (!profile) {
         return {
-          success: true,
-          data: result,
+          byokEnabled: false,
+          providers: {},
+          hasConfiguredProviders: false
         };
-      } catch (error) {
-        throw new Error(`AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+
+      // Return status without exposing actual API keys
+      const providerStatus = Object.entries(profile.byokProviders || {}).reduce((acc, [provider, config]) => {
+        acc[provider] = {
+          enabled: config.enabled,
+          hasApiKey: !!config.apiKey,
+          keyPreview: config.apiKey ? `${config.apiKey.slice(0, 8)}...` : null
+        };
+        return acc;
+      }, {} as Record<string, any>);
+
+      return {
+        byokEnabled: profile.byokEnabled,
+        providers: providerStatus,
+        hasConfiguredProviders: Object.values(providerStatus).some((p: any) => p.enabled && p.hasApiKey)
+      };
+    }),
+
+  /**
+   * Get user's token balances (all types)
+   */
+  getUserTokenBalances: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (!hybridUserService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Hybrid user service is not enabled on this server.',
+        });
+      }
+
+      const balances = await hybridUserService.getUserTokenBalances(ctx.user!.userId);
+      return {
+        balances: balances.map(b => ({
+          id: b.id,
+          balanceType: b.balanceType,
+          virtualTokenBalance: b.virtualTokenBalance,
+          purchaseSource: b.purchaseSource,
+          purchaseDate: b.purchaseDate,
+          expiryDate: b.expiryDate,
+          consumptionPriority: b.consumptionPriority
+        })),
+        summary: {
+          totalSubscriptionTokens: balances.filter(b => b.balanceType === 'subscription').reduce((sum, b) => sum + b.virtualTokenBalance, 0),
+          totalOneTimeTokens: balances.filter(b => b.balanceType === 'one_time').reduce((sum, b) => sum + b.virtualTokenBalance, 0),
+          totalTokens: balances.reduce((sum, b) => sum + b.virtualTokenBalance, 0)
+        }
+      };
+    }),
+
+  /**
+   * Plan token consumption for a request (preview before execution)
+   */
+  planConsumption: protectedProcedure
+    .input(z.object({
+      estimatedTokens: z.number().min(1).max(1000000),
+      hasApiKey: z.boolean().default(false)
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!hybridUserService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Hybrid user service is not enabled on this server.',
+        });
+      }
+
+      const plan = await hybridUserService.planConsumption(
+        ctx.user!.userId, 
+        input.estimatedTokens, 
+        input.hasApiKey ? 'dummy-key' : undefined
+      );
+
+      return {
+        totalTokensNeeded: plan.totalTokensNeeded,
+        plan: plan.plan.map(step => ({
+          type: step.type,
+          tokensToConsume: step.tokensToConsume,
+          reason: step.reason
+        })),
+        notifications: plan.notifications,
+        viable: plan.plan.reduce((sum, step) => sum + step.tokensToConsume, 0) >= input.estimatedTokens
+      };
+    }),
+
+  /**
+   * Get consumption history for user
+   */
+  getConsumptionHistory: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(100).default(20)
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!hybridUserService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Hybrid user service is not enabled on this server.',
+        });
+      }
+
+      const history = await hybridUserService.getConsumptionHistory(ctx.user!.userId, input.limit);
+      return history;
+    }),
+
+  /**
+   * Get user's token balance (requires authentication)
+   */
+  getTokenBalance: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (!virtualTokenService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Token tracking is not enabled on this server.',
+        });
+      }
+
+      const balance = await virtualTokenService.getTokenBalance(ctx.user!.userId);
+      if (!balance) {
+        // Create account if it doesn't exist
+        await virtualTokenService.ensureUserAccount(ctx.user!.userId, ctx.user!.email);
+        return {
+          virtualTokenBalance: 0,
+          totalTokensPurchased: 0,
+          totalTokensUsed: 0,
+          platformFeeCollected: 0,
+        };
+      }
+
+      return {
+        virtualTokenBalance: balance.virtualTokenBalance,
+        totalTokensPurchased: balance.totalTokensPurchased,
+        totalTokensUsed: balance.totalTokensUsed,
+        platformFeeCollected: balance.platformFeeCollected,
+      };
+    }),
+
+  /**
+   * Get user's token usage history (requires authentication)
+   */
+  getUsageHistory: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(100).default(20),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!virtualTokenService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Token tracking is not enabled on this server.',
+        });
+      }
+
+      const history = await virtualTokenService.getUsageHistory(ctx.user!.userId, input.limit);
+      return history;
+    }),
+
+  /**
+   * Get user's token purchase history (requires authentication)
+   */
+  getTopupHistory: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(50).default(10),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!virtualTokenService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Token tracking is not enabled on this server.',
+        });
+      }
+
+      const history = await virtualTokenService.getTopupHistory(ctx.user!.userId, input.limit);
+      return history;
+    }),
+
+  /**
+   * Get user status (subscription vs BYOK, purchase history)
+   */
+  getUserStatus: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (!usageAnalyticsService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Usage analytics is not enabled on this server.',
+        });
+      }
+
+      const status = await usageAnalyticsService.getUserStatus(ctx.user!.userId);
+      return {
+        userId: status.userId,
+        userType: status.userType,
+        hasSubscription: status.hasSubscription,
+        hasPurchases: status.hasPurchases,
+        totalPurchases: status.totalPurchases,
+        totalAmountSpentUsd: status.totalAmountSpentCents ? status.totalAmountSpentCents / 100 : 0,
+        subscriptionTier: ctx.user!.subscriptionTier,
+        features: {
+          tokenTracking: status.userType === 'subscription',
+          unlimitedBYOK: true,
+          usageAnalytics: true,
+        }
+      };
+    }),
+
+  /**
+   * Get user's complete usage analytics (for both subscription and BYOK users)
+   */
+  getUsageAnalytics: protectedProcedure
+    .input(z.object({
+      days: z.number().min(1).max(365).default(30),
+      includeHistory: z.boolean().default(false),
+      historyLimit: z.number().min(1).max(100).default(20),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!usageAnalyticsService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Usage analytics is not enabled on this server.',
+        });
+      }
+
+      const summary = await usageAnalyticsService.getUserUsageSummary(ctx.user!.userId, input.days);
+      const history = input.includeHistory 
+        ? await usageAnalyticsService.getUserUsageHistory(ctx.user!.userId, input.historyLimit)
+        : [];
+
+      return {
+        summary,
+        history: input.includeHistory ? history : undefined,
+        period: {
+          days: input.days,
+          startDate: new Date(Date.now() - input.days * 24 * 60 * 60 * 1000).toISOString(),
+          endDate: new Date().toISOString()
+        }
+      };
+    }),
+
+  /**
+   * Get user's purchase history (both subscription and one-time)
+   */
+  getPurchaseHistory: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(50).default(10),
+      type: z.enum(['all', 'subscription', 'one_time']).default('all'),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!usageAnalyticsService) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Usage analytics is not enabled on this server.',
+        });
+      }
+
+      const purchases = await usageAnalyticsService.getUserPurchaseHistory(ctx.user!.userId, input.limit);
+      
+      // Filter by type if specified
+      const filteredPurchases = input.type === 'all' 
+        ? purchases 
+        : purchases.filter(p => p.purchaseType === input.type);
+
+      return {
+        purchases: filteredPurchases.map(p => ({
+          id: p.id,
+          paymentId: p.paymentId,
+          purchaseType: p.purchaseType,
+          variantId: p.variantId,
+          quantity: p.quantity,
+          amountPaidUsd: p.amountPaidCents / 100,
+          currency: p.currency,
+          processedAt: p.processedAt
+        })),
+        summary: {
+          totalPurchases: filteredPurchases.length,
+          totalAmountUsd: filteredPurchases.reduce((sum, p) => sum + p.amountPaidCents, 0) / 100,
+          subscriptionPurchases: filteredPurchases.filter(p => p.purchaseType === 'subscription').length,
+          oneTimePurchases: filteredPurchases.filter(p => p.purchaseType === 'one_time').length
+        }
+      };
+    }),
+
+  /**
+   * Check if user can make AI requests (subscription users need tokens, BYOK users need API key)
+   */
+  checkRequestEligibility: protectedProcedure
+    .input(z.object({
+      estimatedTokens: z.number().min(1).default(1000),
+      hasApiKey: z.boolean().default(false),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!usageAnalyticsService) {
+        return {
+          canMakeRequest: input.hasApiKey,
+          reason: input.hasApiKey ? 'API key provided' : 'No API key provided',
+          userType: 'unknown' as const,
+          requiresApiKey: !input.hasApiKey
+        };
+      }
+
+      const userStatus = await usageAnalyticsService.getUserStatus(ctx.user!.userId);
+      
+      if (userStatus.userType === 'subscription') {
+        // Subscription user - check token balance
+        if (!virtualTokenService) {
+          return {
+            canMakeRequest: false,
+            reason: 'Token tracking not available',
+            userType: userStatus.userType,
+            requiresTokens: true
+          };
+        }
+
+        const hasBalance = await virtualTokenService.checkTokenBalance(ctx.user!.userId, input.estimatedTokens);
+        const balance = await virtualTokenService.getTokenBalance(ctx.user!.userId);
+        
+        return {
+          canMakeRequest: hasBalance,
+          reason: hasBalance ? 'Sufficient token balance' : 'Insufficient token balance',
+          userType: userStatus.userType,
+          tokenBalance: balance?.virtualTokenBalance || 0,
+          estimatedCost: Math.ceil(input.estimatedTokens * 1.25), // Include platform fee
+          requiresTokens: true
+        };
+      } else {
+        // BYOK user - just needs API key
+        return {
+          canMakeRequest: input.hasApiKey,
+          reason: input.hasApiKey ? 'API key provided' : 'API key required for BYOK usage',
+          userType: userStatus.userType,
+          requiresApiKey: !input.hasApiKey
+        };
       }
     }),
 

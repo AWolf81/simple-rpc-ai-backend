@@ -2,411 +2,358 @@
 
 ## Overview
 
-The **Simple RPC AI Backend** is a platform-agnostic JSON-RPC server designed for AI integration in VS Code extensions, web applications, and CLI tools. It provides secure, corporate-friendly AI communication with system prompt protection and multi-provider support.
+The **Simple RPC AI Backend** is a unified TypeScript server that provides both JSON-RPC and tRPC endpoints for AI integration. It's designed for VS Code extensions, web applications, and CLI tools with a focus on simplicity, type safety, and corporate-friendly deployment.
 
 ## Core Principles
 
-### <Ø **Simplicity First**
-- Clean JSON-RPC 2.0 protocol
-- Minimal dependencies 
-- Standard HTTP transport
-- Clear separation of concerns
+### üéØ **Simplicity First**
+- One unified server for all needs
+- Minimal configuration required
+- Sensible defaults for everything
+- Clear, opinionated architecture
 
-### = **Security by Design**
+### ‚ö° **Protocol Flexibility**
+- JSON-RPC for universal compatibility
+- tRPC for TypeScript projects with type safety
+- Configurable protocol selection
+- Shared AI processing backend
+
+### üîí **Corporate Friendly**
 - System prompts stay server-side
-- Corporate proxy bypass architecture
-- Zero client-side secrets
-- Secure session management
+- Works behind corporate proxies
+- No complex authentication required
+- Client-managed API keys supported
 
-### < **Platform Agnostic**
-- Works in Node.js, browsers, CLI tools
-- No VS Code-specific dependencies in core
-- Standard web technologies (HTTP, JSON)
-
-## System Architecture
+## Unified Server Architecture
 
 ```mermaid
 graph TB
     subgraph "Client Applications"
-        A1[VS Code Extension]
-        A2[Web Application]
-        A3[CLI Tool]
+        A1[VS Code Extension<br/>JSON-RPC]
+        A2[TypeScript Web App<br/>tRPC]
+        A3[CLI Tool<br/>JSON-RPC]
+        A4[Python/Go App<br/>JSON-RPC]
     end
     
     subgraph "Corporate Network"
         P[Corporate Proxy]
     end
     
-    subgraph "Your Infrastructure"
-        subgraph "RPC Server"
-            S[Express Server]
-            R[JSON-RPC Handler]
-            AUTH[Auth Manager]
+    subgraph "Unified RPC AI Server"
+        subgraph "Protocol Layer"
+            JSONRPC[JSON-RPC Endpoint<br/>/rpc]
+            TRPC[tRPC Endpoint<br/>/trpc]
+        end
+        
+        subgraph "AI Processing"
+            ROUTER[tRPC Router]
             AI[AI Service]
+            LIMITS[AI Limits]
         end
         
-        subgraph "Storage"
-            DB[(SQLite Database)]
-            KEYS[Encrypted Keys]
+        subgraph "Infrastructure"
+            EXPRESS[Express Server]
+            MIDDLEWARE[Security Middleware]
         end
-        
-        subgraph "AI Providers"
-            ANT[Anthropic]
-            OAI[OpenAI]
-            GOO[Google]
-        end
+    end
+    
+    subgraph "AI Providers"
+        ANT[Anthropic Claude]
+        OAI[OpenAI GPT]
+        GOO[Google Gemini]
     end
     
     A1 --> P
     A2 --> P
     A3 --> P
-    P --> S
-    S --> R
-    R --> AUTH
-    R --> AI
-    AUTH --> DB
-    AUTH --> KEYS
+    A4 --> P
+    P --> JSONRPC
+    P --> TRPC
+    JSONRPC --> ROUTER
+    TRPC --> ROUTER
+    ROUTER --> AI
+    ROUTER --> LIMITS
     AI --> ANT
     AI --> OAI
     AI --> GOO
+    
+    EXPRESS --> MIDDLEWARE
+    MIDDLEWARE --> JSONRPC
+    MIDDLEWARE --> TRPC
 ```
 
 ## Component Architecture
 
-### 1. **JSON-RPC Client (`src/client.ts`)**
+### 1. **Unified Server (`src/rpc-ai-server.ts`)**
 
-**Purpose**: Platform-agnostic communication with backend servers.
+**Purpose**: Single server supporting both JSON-RPC and tRPC protocols.
 
 ```typescript
-// Clean, minimal API
-const client = new RPCClient('http://localhost:8000');
-const result = await client.request('executeAIRequest', params);
+import { createRpcAiServer, AI_LIMIT_PRESETS } from 'simple-rpc-ai-backend';
+
+// Default: JSON-RPC only (simple, universal)
+const server = createRpcAiServer();
+
+// TypeScript projects: tRPC only (better DX)
+const server = createRpcAiServer({
+  protocols: { tRpc: true }  // Auto-disables JSON-RPC
+});
 ```
 
 **Key Features**:
-- Uses `json-rpc-2.0` library (zero dependencies)
-- Automatic error handling and retries
-- Support for notifications
-- Protocol-agnostic transport
+- **Protocol Selection**: Choose JSON-RPC, tRPC, or both
+- **Opinionated Defaults**: Zero config for common use cases
+- **AI Limit Presets**: Conservative, standard, generous, maximum
+- **Auto-Configuration**: Smart protocol enabling/disabling
 
-**Design Decisions**:
--  Removed app-specific methods (`analyzeCode`) to keep generic
--  Uses proven `json-rpc-2.0` library vs custom implementation
--  HTTP-only (no WebSocket complexity for AI use cases)
+### 2. **Protocol Endpoints**
 
-### 2. **Express Server (`src/server.ts`)**
+#### **JSON-RPC Endpoint (`/rpc`)**
+- **Target**: Universal compatibility (any language)
+- **Transport**: Standard HTTP POST with JSON
+- **Use Cases**: VS Code extensions, CLI tools, Python/Go clients
+- **Authentication**: Client-managed API keys
 
-**Purpose**: HTTP server with JSON-RPC endpoint and security middleware.
+```bash
+POST /rpc
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "method": "executeAIRequest",
+  "params": {
+    "content": "code to analyze",
+    "systemPrompt": "security_review",
+    "apiKey": "user-provided-key"
+  },
+  "id": 1
+}
+```
+
+#### **tRPC Endpoint (`/trpc`)**
+- **Target**: TypeScript applications with type safety
+- **Transport**: HTTP with TypeScript client
+- **Use Cases**: React/Vue apps, TypeScript VS Code extensions, monorepos
+- **Type Safety**: End-to-end TypeScript inference
 
 ```typescript
-const server = createAIServer({
-  serviceProviders: ['anthropic', 'openai'],
-  requirePayment: { enabled: false }
+const result = await client.ai.executeAIRequest.mutate({
+  content: code,           // TypeScript knows this is required
+  systemPrompt: 'review',  // Auto-complete available prompts
+  options: {
+    maxTokens: 4096,       // Type-checked at compile time
+    temperature: 0.1
+  }
 });
 ```
 
-**Middleware Stack**:
-1. **Helmet** - Security headers
-2. **CORS** - Cross-origin support (VS Code webviews)
-3. **Rate Limiting** - DOS protection
-4. **JSON Parser** - Request parsing
+### 3. **AI Processing Core (`src/trpc/routers/ai.ts`)**
 
-**Endpoints**:
-- `POST /rpc` - JSON-RPC 2.0 requests
-- `GET /health` - Health check
-- `GET /config` - Server discovery
+**Purpose**: Unified AI request processing for both protocols.
 
-### 3. **Authentication System (`src/auth/`)**
+**Features**:
+- **Multi-Provider Support**: Anthropic, OpenAI, Google
+- **Configurable Limits**: Content size, token limits, system prompt size
+- **Input Validation**: Zod schemas for type safety
+- **Error Handling**: Standardized error responses
 
-**Purpose**: Progressive authentication with device linking and BYOK support.
-
-**Architecture**:
-```
-Anonymous Session í OAuth Upgrade í Pro Features
-      ì               ì              ì
-   Device ID      GitHub/Google   Payment Required
-```
-
-**Components**:
-- **AuthManager** - Session lifecycle
-- **UserManager** - User data persistence  
-- **KeyManager** - Encrypted API key storage
-- **SQLiteAdapter** - Database abstraction
-
-**Security Features**:
-- AES-256-GCM key encryption
-- Device-based session management
-- OAuth integration (GitHub, Google, Microsoft)
-
-### 4. **AI Service (`src/ai-service.ts`)**
-
-**Purpose**: Multi-provider AI request handling with fallback strategies.
-
-**Provider Support**:
-- **Anthropic** (Claude models)
-- **OpenAI** (GPT models)
-- **Google** (Gemini models)
-
-**Configuration Flexibility**:
+**AI Limit Presets**:
 ```typescript
-// Simple array
-serviceProviders: ['anthropic', 'openai']
-
-// Complex objects with fallbacks
-serviceProviders: [
-  { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' },
-  { provider: 'openai' }  // Fallback
-]
+export const AI_LIMIT_PRESETS = {
+  conservative: {
+    content: { maxLength: 100_000 },    // 100KB
+    tokens: { defaultMaxTokens: 2048, maxTokenLimit: 8_192 }
+  },
+  standard: {
+    content: { maxLength: 500_000 },    // 500KB  
+    tokens: { defaultMaxTokens: 4096, maxTokenLimit: 32_000 }
+  },
+  generous: {
+    content: { maxLength: 2_000_000 },  // 2MB
+    tokens: { defaultMaxTokens: 8192, maxTokenLimit: 100_000 }
+  }
+};
 ```
 
-**Fallback Strategies**:
-- **Priority** - Try providers in order
-- **Round Robin** - Distribute load
-- **Fastest First** - Performance optimization
+### 4. **Client Libraries**
 
-## Security Architecture
-
-### = **System Prompt Protection**
-
-**Problem**: Traditional approaches expose valuable prompts to:
-- Corporate network monitoring
-- Client-side inspection
-- Extension marketplace reverse engineering
-
-**Solution**: Server-side prompt storage
+#### **Platform-Agnostic JSON-RPC Client (`src/client.ts`)**
 ```typescript
-// L Client-side prompt (exposed)
-const prompt = "You are a senior security engineer...";
-const result = await aiProvider.generate(userCode + prompt);
+import { RPCClient } from 'simple-rpc-ai-backend';
 
-//  Server-side prompt (protected)
+const client = new RPCClient('http://localhost:8000');
 const result = await client.request('executeAIRequest', {
-  content: userCode,
-  systemPrompt: 'security_review' // Reference only
+  content: 'code',
+  systemPrompt: 'security_review',
+  apiKey: 'user-key'
 });
 ```
 
-### <‚ **Corporate Proxy Bypass**
-
-**Challenge**: Corporate firewalls block AI provider APIs.
-
-**Solution**: Backend proxy architecture
-```
-VS Code Extension í Corporate Proxy í Your RPC Server í AI Providers
-   (User code)      (Monitors only)    (System prompts)    (Full context)
-```
-
-**Benefits**:
--  Corporate proxies see user code only
--  System prompts never traverse corporate network
--  Single point of AI provider management
-
-### = **BYOK (Bring Your Own Key) Support**
-
-**User Key Flow**:
-1. User stores encrypted API keys
-2. Server decrypts for AI requests
-3. Payment verification (optional)
-4. Fallback to service provider keys
-
-**Service Provider Flow**:
-1. Server uses configured provider keys
-2. Payment/usage tracking
-3. Rate limiting and quotas
-
-## Data Flow Patterns
-
-### 1. **Simple AI Request**
-```
-Client í POST /rpc í JSON-RPC Parser í AI Service í Provider í Response
-```
-
-### 2. **BYOK AI Request**
-```
-Client í POST /rpc í Auth Check í User Key Decrypt í AI Service í Response
-```
-
-### 3. **Progressive Authentication**
-```
-Anonymous Device í Generate Session í OAuth Upgrade í Store Credentials
-```
-
-## Database Schema
-
-### **Users Table**
-```sql
-CREATE TABLE users (
-  id TEXT PRIMARY KEY,
-  email TEXT UNIQUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### **User Devices Table**
-```sql
-CREATE TABLE user_devices (
-  device_id TEXT PRIMARY KEY,
-  user_id TEXT,
-  device_name TEXT,
-  auth_level TEXT CHECK(auth_level IN ('anonymous', 'oauth', 'pro')),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users (id)
-);
-```
-
-### **User Keys Table**
-```sql
-CREATE TABLE user_keys (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id TEXT NOT NULL,
-  provider TEXT NOT NULL,
-  encrypted_key TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users (id),
-  UNIQUE(user_id, provider)
-);
-```
-
-## Configuration Patterns
-
-### **Server Configuration**
+#### **TypeScript tRPC Client (External)**
 ```typescript
-interface AIServerConfig {
-  port?: number;
-  database?: {
-    type?: 'sqlite' | 'postgresql';
-    path?: string; // SQLite file path
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import type { AppRouter } from './server';
+
+const client = createTRPCProxyClient<AppRouter>({
+  links: [httpBatchLink({ url: 'http://localhost:8000/trpc' })]
+});
+```
+
+## Configuration Architecture
+
+### **Server Configuration Interface**
+```typescript
+export interface RpcAiServerConfig {
+  port?: number;                    // Default: 8000
+  
+  protocols?: {
+    jsonRpc?: boolean;              // Default: true
+    tRpc?: boolean;                 // Default: false
   };
-  masterEncryptionKey?: string;
-  oauth?: {
-    github?: { clientId: string; clientSecret: string };
-    google?: { clientId: string; clientSecret: string };
+  
+  aiLimits?: AIRouterConfig;        // Default: standard preset
+  
+  cors?: {
+    origin?: string | string[];     // Default: '*'
+    credentials?: boolean;          // Default: false
   };
-  mode?: 'simple' | 'byok' | 'hybrid';
-  serviceProviders?: ServiceProvidersConfig;
-  requirePayment?: {
-    enabled?: boolean;
-    checkFunction?: (userId: string) => Promise<boolean>;
+  
+  rateLimit?: {
+    windowMs?: number;              // Default: 15 minutes
+    max?: number;                   // Default: 1000
+  };
+  
+  paths?: {
+    jsonRpc?: string;               // Default: '/rpc'
+    tRpc?: string;                  // Default: '/trpc'
+    health?: string;                // Default: '/health'
   };
 }
 ```
 
-### **Service Provider Configuration**
+### **Opinionated Configuration Logic**
 ```typescript
-// Flexible configuration patterns
-type ServiceProvidersConfig = 
-  | string[]  // ['anthropic', 'openai']
-  | ProviderConfig[]  // [{ provider: 'anthropic', model: '...' }]
-  | MixedConfig[];  // ['anthropic', { provider: 'openai', model: '...' }]
+// Default: JSON-RPC only
+createRpcAiServer() 
+// ‚Üí { jsonRpc: true, tRpc: false }
+
+// TypeScript projects: tRPC only
+createRpcAiServer({ protocols: { tRpc: true } })
+// ‚Üí { jsonRpc: false, tRpc: true }
+
+// Explicit control: enable both
+createRpcAiServer({ 
+  protocols: { jsonRpc: true, tRpc: true } 
+})
+```
+
+## Security Architecture
+
+### üîí **System Prompt Protection**
+- **Server-Side Storage**: Prompts never leave the server
+- **Reference-Only**: Clients send prompt names, not content
+- **Corporate Bypass**: Proxies see user code, not proprietary prompts
+
+### üîë **Client-Managed API Keys**
+- **Pass-Through**: API keys provided in request parameters
+- **No Storage**: Server doesn't store or manage keys
+- **User Control**: Users manage their own AI provider accounts
+
+### üåê **CORS & Security**
+- **Development**: Permissive CORS for easy setup
+- **Production**: Configurable origin restrictions
+- **Rate Limiting**: Configurable per-IP limits
+- **Security Headers**: Helmet.js middleware
+
+## Data Flow Patterns
+
+### **JSON-RPC Request Flow**
+```
+Client ‚Üí HTTP POST ‚Üí Express ‚Üí JSON-RPC Parser ‚Üí tRPC Router ‚Üí AI Service ‚Üí Provider
+```
+
+### **tRPC Request Flow**
+```
+Client ‚Üí tRPC Client ‚Üí HTTP ‚Üí Express ‚Üí tRPC Middleware ‚Üí tRPC Router ‚Üí AI Service ‚Üí Provider
+```
+
+### **Shared AI Processing**
+Both protocols use the same underlying AI processing:
+```
+Request ‚Üí Input Validation ‚Üí AI Limits Check ‚Üí Provider Selection ‚Üí AI Request ‚Üí Response
 ```
 
 ## Deployment Patterns
 
 ### **Development Setup**
 ```bash
-# Local development
-npm start
-# Server: http://localhost:8000
-# VS Code extension connects automatically
+# Simple setup
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
+const server = createRpcAiServer();
+await server.start();
 ```
 
 ### **Production Deployment**
-```bash
-# Docker deployment
-docker build -t ai-backend .
-docker run -p 8000:8000 -e ANTHROPIC_API_KEY=$KEY ai-backend
-
-# Cloud deployment (Vercel, Railway, etc.)
-# Environment variables for AI provider keys
+```typescript
+const server = createRpcAiServer({
+  aiLimits: AI_LIMIT_PRESETS.conservative,
+  cors: { origin: 'https://yourapp.com' },
+  rateLimit: { max: 100 }
+});
 ```
 
-### **Corporate Deployment**
-```bash
-# Behind corporate firewall
-# Internal server with AI provider access
-# VS Code extensions connect to internal endpoint
+### **Monorepo TypeScript Project**
+```
+project/
+‚îú‚îÄ‚îÄ packages/
+‚îÇ   ‚îú‚îÄ‚îÄ backend/          # tRPC server
+‚îÇ   ‚îî‚îÄ‚îÄ extension/        # VS Code extension with shared types
+‚îî‚îÄ‚îÄ package.json          # npm workspaces
 ```
 
 ## Testing Strategy
 
-### **Unit Tests**
-- JSON-RPC client functionality
-- Authentication flows
-- AI service provider switching
-- Database operations
+### **Protocol Testing**
+- JSON-RPC endpoint compatibility
+- tRPC type safety and validation
+- Cross-protocol AI processing consistency
 
-### **Integration Tests**
-- End-to-end request flows
-- VS Code extension integration
-- Multi-provider fallbacks
-- Error handling scenarios
+### **AI Integration Testing**
+- Multi-provider fallback logic
+- Limit enforcement testing
+- Error handling validation
 
-### **Security Tests**
-- Key encryption/decryption
-- Session management
-- SQL injection prevention
+### **Security Testing**
+- Rate limiting effectiveness
 - CORS policy validation
+- Input sanitization testing
 
-## Performance Considerations
+## Protocol Decision Matrix
 
-### **Response Times**
-- **Target**: < 500ms for AI requests
-- **Caching**: Provider responses where appropriate
-- **Connection Pooling**: Reuse HTTP connections
-
-### **Scalability**
-- **Stateless Design**: Horizontal scaling friendly
-- **Database**: SQLite for simple deployments, PostgreSQL for scale
-- **Rate Limiting**: Per-user and global limits
-
-### **Memory Management**
-- **Key Storage**: Encrypted at rest, decrypted in memory only during use
-- **Session Cleanup**: Automatic cleanup of expired sessions
-- **Connection Management**: Proper cleanup of AI provider connections
-
-## Extension Points
-
-### **Custom AI Providers**
-```typescript
-// Add new provider to AI service
-const customProvider = {
-  name: 'custom',
-  generateText: async (prompt: string) => { ... }
-};
-```
-
-### **Authentication Plugins**
-```typescript
-// Custom OAuth providers
-const customAuth = {
-  provider: 'corporate-sso',
-  authenticate: async (token: string) => { ... }
-};
-```
-
-### **Billing Integration**
-```typescript
-// Custom billing verification
-const checkPayment = async (userId: string) => {
-  return await corporateBilling.hasValidSubscription(userId);
-};
-```
+| Use Case | Recommended Protocol | Reasoning |
+|----------|---------------------|-----------|
+| **VS Code extension (standalone)** | JSON-RPC | Simple, universal, minimal bundle |
+| **VS Code extension (monorepo)** | tRPC | Shared types, better DX |
+| **React/Vue web app** | tRPC | Type safety, auto-completion |
+| **CLI tools** | JSON-RPC | Universal compatibility |
+| **Python/Go clients** | JSON-RPC | Language agnostic |
+| **Multi-language project** | JSON-RPC | Works with any language |
+| **Full TypeScript stack** | tRPC | End-to-end type safety |
 
 ## Future Considerations
 
 ### **Planned Enhancements**
-- WebSocket support for streaming responses
+- Streaming response support
+- Additional AI provider integrations
+- Performance monitoring and metrics
 - Plugin system for custom providers
-- Advanced caching strategies
-- Monitoring and observability
 
-### **Scalability Roadmap**
-- Redis session storage
-- Kubernetes deployment configs
-- Load balancer configurations
-- Multi-region deployments
+### **Architecture Evolution**
+- WebSocket support for real-time features
+- Redis caching for high-scale deployments
+- Kubernetes deployment configurations
+- Multi-region deployment support
 
 ---
 
-This architecture balances simplicity with flexibility, providing a solid foundation for AI-powered applications while maintaining security and corporate compliance requirements.
+This architecture provides a simple, unified approach to AI backend services while maintaining flexibility for different client types and deployment scenarios. The dual-protocol design allows universal compatibility while providing enhanced developer experience for TypeScript projects.

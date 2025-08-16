@@ -24,7 +24,11 @@ export class PostgreSQLAdapter {
   private pool: Pool;
   private logger: winston.Logger;
 
-  constructor(config: DatabaseConfig, logger?: winston.Logger) {
+  constructor(config: DatabaseConfig | string, logger?: winston.Logger) {
+    // Support both connection string and config object
+    if (typeof config === 'string') {
+      config = this.parseConnectionString(config);
+    }
     this.logger = logger || winston.createLogger({
       level: 'info',
       format: winston.format.simple(),
@@ -100,6 +104,35 @@ export class PostgreSQLAdapter {
    */
   async run(query: string, params?: any[]): Promise<{ changes: number; lastInsertRowid?: number }> {
     return this.execute(query, params);
+  }
+
+  /**
+   * Query method for virtual token service compatibility
+   */
+  async query(query: string, params?: any[]): Promise<DatabaseRow[]> {
+    return this.all(query, params);
+  }
+
+  /**
+   * Get database connection for transactions
+   */
+  async getConnection() {
+    return this.pool.connect();
+  }
+
+  /**
+   * Parse PostgreSQL connection string
+   */
+  private parseConnectionString(connectionString: string): DatabaseConfig {
+    const url = new URL(connectionString);
+    return {
+      host: url.hostname,
+      port: parseInt(url.port) || 5432,
+      database: url.pathname.slice(1), // Remove leading '/'
+      user: url.username,
+      password: url.password,
+      ssl: url.searchParams.get('sslmode') === 'require'
+    };
   }
 
   /**
