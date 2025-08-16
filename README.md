@@ -1143,51 +1143,35 @@ cp -r node_modules/simple-rpc-ai-backend/docker ./
 **2. Create your secure AI backend server:**
 
 ```javascript
-// your-ai-backend/server.js - Secure Server-Side Implementation
-import { createRpcAiServer, SecureVaultManager } from 'simple-rpc-ai-backend';
-
-// Initialize secure vault manager
-const vaultManager = new SecureVaultManager({
-  bitwardenConfig: loadPostgreSQLConfig(),
-  databaseMasterKey: process.env.DATABASE_MASTER_KEY, // 64-char hex key
-  userBridge: new UserIdentityBridge()
-});
+// your-ai-backend/server.js - PostgreSQL-powered secure backend
+import { createRpcAiServer, AI_LIMIT_PRESETS } from 'simple-rpc-ai-backend';
 
 const server = createRpcAiServer({
-  vaultManager,
-  prompts: {
-    // Your proprietary system prompts (server-side only!)
-    myCustomAnalysis: `
-      You are an expert in my domain-specific requirements.
-      Analyze the code for: [your specific criteria]  
-      Provide recommendations in this format: [your format]
-    `,
-    security_review: `
-      You are a senior security engineer. Review code for vulnerabilities...
-    `
+  port: 8000,
+  
+  // Enable token tracking with PostgreSQL
+  tokenTracking: {
+    enabled: true,
+    databaseUrl: process.env.DATABASE_URL,
+    platformFeePercent: 25, // 25% platform fee
+    webhookSecret: process.env.LEMONSQUEEZY_WEBHOOK_SECRET,
   },
-  serviceProviders: ['anthropic', 'openai', 'google'],
-  port: 8000
-});
-
-// Register secure RPC methods (automatic onboarding built-in)
-server.addMethod('vaultwarden.storeApiKey', async (params) => {
-  // Auto-onboards user if needed - no explicit onboarding call required
-  return await vaultManager.storeApiKey(
-    params.opensaasJWT, 
-    params.apiKey, 
-    params.provider
-  );
-});
-
-server.addMethod('executeAIRequest', async (params) => {
-  // Auto-onboards user + retrieves keys automatically
-  return await vaultManager.executeAIRequestWithAutoKey(
-    params.opensaasJWT,
-    params.content,
-    params.systemPrompt,
-    params.provider
-  );
+  
+  // JWT authentication for user identification
+  jwt: {
+    secret: process.env.JWT_SECRET,
+    issuer: 'your-opensaas-app',
+    audience: 'your-ai-service'
+  },
+  
+  // Standard limits for production
+  aiLimits: AI_LIMIT_PRESETS.standard,
+  
+  // CORS for your frontend domains
+  cors: {
+    origin: ['https://your-app.com', 'vscode-webview://*'],
+    credentials: true
+  }
 });
 
 server.start();
@@ -1196,31 +1180,45 @@ server.start();
 **3. Ultra-simple client integration:**
 
 ```javascript
-// your-vscode-extension/src/extension.js - Zero Crypto Complexity!
-import { RPCClient } from 'simple-rpc-ai-backend';
+// your-vscode-extension/src/extension.js - tRPC Client for TypeScript
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import superjson from 'superjson';
 
-const client = new RPCClient('http://localhost:8000');
+// Type-safe tRPC client
+const client = createTRPCProxyClient({
+  transformer: superjson,
+  links: [
+    httpBatchLink({
+      url: 'http://localhost:8000/trpc',
+      headers: {
+        authorization: `Bearer ${opensaasJWT}`, // Your JWT token
+      },
+    }),
+  ],
+});
 
 export async function activate(context) {
-  // Get OpenSaaS JWT (from your auth system)
-  const opensaasJWT = await getOpenSaaSJWT();
-  
-  // Store API key once - server auto-onboards user transparently!
-  await client.request('vaultwarden.storeApiKey', {
-    opensaasJWT,
-    apiKey: await getApiKeyFromUser(), 
-    provider: 'anthropic'
+  // Store user's API key (one-time setup)
+  await client.configureBYOK.mutate({
+    providers: {
+      anthropic: {
+        enabled: true,
+        apiKey: await getApiKeyFromUser()
+      }
+    }
   });
 
-  // Use AI - server handles everything automatically!
-  const result = await client.request('executeAIRequest', {
-    opensaasJWT,
+  // Use AI with system prompt protection
+  const result = await client.executeAIRequest.mutate({
     content: code,
-    systemPrompt: 'myCustomAnalysis',
-    provider: 'anthropic'  // Server retrieves key + onboards if needed
+    systemPrompt: "You are an expert code reviewer...",
+    options: {
+      model: 'claude-3-5-sonnet-20241022',
+      maxTokens: 4096
+    }
   });
   
-  // That's it! Zero onboarding calls, zero crypto, zero vault management!
+  // Zero crypto complexity, full type safety!
 }
 ```
 
@@ -1898,20 +1896,24 @@ monitor.onProviderStatusChange('anthropic', (hasKey) => {
 | `getAuthStatus` | Get authentication level | `deviceId` |
 | `upgradeToOAuth` | Upgrade to OAuth | `deviceId`, `provider`, `token` |
 
-### Secure PostgreSQL Integration
+### tRPC Methods Available
 
-| Method | Description | Parameters | Security |
-|--------|-------------|------------|----------|
-| `vaultwarden.storeApiKey` | Store API key (onboards user if needed) | `jwt`, `apiKey`, `provider` | ✅ BYOK - User provides own keys |
-| `executeAIRequest` | Execute AI request | `jwt`, `content`, `systemPrompt`, `provider` | ✅ Pro users use server keys, Free users use BYOK |
+| Method | Description | Type | Authentication |
+|--------|-------------|------|----------------|
+| `configureBYOK` | Configure user's API keys | Mutation | ✅ JWT Required |
+| `executeAIRequest` | Execute AI request with system prompt protection | Mutation | ✅ JWT Required |
+| `getUserProfile` | Get user capabilities and preferences | Query | ✅ JWT Required |
+| `getUserTokenBalances` | Get user's token balances (subscription/one-time) | Query | ✅ JWT Required |
+| `getUsageAnalytics` | Get usage analytics and history | Query | ✅ JWT Required |
+| `health` | Check server health | Query | 🌐 Public |
 
-### **💡 Corrected User Flow**
+### **💡 Current User Flow**
 
-1. **User Authentication** - Sign up/login with OpenSaaS, Auth0, OAuth2, etc.
-2. **API Key Storage** (Free users) - Store their own API key: `storeApiKey(jwt, apiKey, provider)`
-3. **AI Requests** - Execute AI requests: `executeAIRequest(jwt, content, prompt, provider)`
-   - **Free users**: Uses their stored BYOK API key
-   - **Pro users**: Uses server-provided API key automatically
+1. **User Authentication** - JWT token from your OpenSaaS application
+2. **API Key Configuration** - `configureBYOK()` to store encrypted API keys
+3. **AI Requests** - `executeAIRequest()` with system prompt protection
+   - **Subscription users**: Uses virtual token balance
+   - **BYOK users**: Uses their stored API keys
 
 ### **🆓 Free vs 💎 Pro Users**
 
@@ -2413,8 +2415,8 @@ npx ts-node test-vaultwarden-session.ts
 ```
 
 **What Phase 2 Tests:**
-- ✅ `vaultwarden.storeApiKey` - JWT validation + auto-onboarding + key encryption
-- ✅ `executeAIRequest` - Auto-onboarding + key retrieval + AI execution
+- ✅ `configureBYOK` - JWT validation + encrypted key storage
+- ✅ `executeAIRequest` - System prompt protection + usage tracking
 
 ### **Phase 3: Test Complete End-to-End Flow**
 
@@ -2436,25 +2438,29 @@ const mockJWT = generateMockOpenSaaSJWT({
   subscriptionTier: 'pro'
 });
 
-// 2. Test API key storage with automatic onboarding
-const storeResult = await rpcClient.request('vaultwarden.storeApiKey', {
-  opensaasJWT: mockJWT,
-  apiKey: 'sk-ant-test-key-12345',  // Server auto-onboards user if needed
-  provider: 'anthropic'
+// 2. Configure BYOK API keys (encrypted storage)
+const storeResult = await trpcClient.configureBYOK.mutate({
+  providers: {
+    anthropic: {
+      enabled: true,
+      apiKey: 'sk-ant-test-key-12345'
+    }
+  }
 });
-// Result: { success: true, keyId: 'vault-item-id' }
-// User was onboarded transparently during this call!
+// Result: { success: true, providersConfigured: ['anthropic'] }
 
-// 3. Test AI request - works even for brand new users
-const aiResult = await rpcClient.request('executeAIRequest', {
-  opensaasJWT: mockJWT,
+// 3. Execute AI request with system prompt protection
+const aiResult = await trpcClient.executeAIRequest.mutate({
   content: 'function test() { return "hello"; }',
-  systemPrompt: 'code_review', 
-  provider: 'anthropic'  // Auto-onboards + retrieves key + executes AI
+  systemPrompt: 'You are an expert code reviewer. Analyze for bugs and improvements.',
+  options: {
+    model: 'claude-3-5-sonnet-20241022',
+    maxTokens: 4096
+  }
 });
-// Result: AI analysis response
+// Result: AI analysis response with usage tracking
 
-// That's it! Zero onboarding calls needed - server handles everything automatically!
+// Modern tRPC-based implementation with full type safety!
 ```
 
 ### **Testing REST API Directly (Without RPC)**
