@@ -11,7 +11,7 @@
  * - No multi-device sync needed
  */
 
-import { createRpcAiServer, AI_LIMIT_PRESETS } from '../../dist/rpc-ai-server.js';
+import { createRpcAiServer, AI_LIMIT_PRESETS } from '../../dist/index.js';
 
 console.log(`
 🚀 Basic AI Server - Service Provider Keys

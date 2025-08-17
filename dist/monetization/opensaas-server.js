@@ -17,7 +17,7 @@ import { mergeOpenSaaSConfig, validateOpenSaaSConfig } from './opensaas-config.j
  */
 export async function createMonetizedAIServer(config) {
     const app = express();
-    const port = config.port ?? 8000;
+    const port = config.port ?? 8080;
     // Validate OpenSaaS configuration
     if (!config.opensaasMonetization) {
         throw new Error('OpenSaaS monetization configuration is required');

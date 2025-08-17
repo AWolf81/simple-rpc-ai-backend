@@ -35,8 +35,8 @@ export interface CustomProvider {
   apiKeyPrefix?: string;                 // Default: 'Bearer '
   modelMapping?: Record<string, string>; // Map generic -> provider-specific models
   defaultModel?: string;                 // Default model to use
-  requestTransform?: (req: any) => any;  // Transform request format
-  responseTransform?: (res: any) => any; // Transform response format
+  requestTransform?: (req: unknown) => unknown;  // Transform request format
+  responseTransform?: (res: unknown) => unknown; // Transform response format
 }
 
 // More practical approach: Use const assertions for type safety
@@ -91,6 +91,7 @@ export interface RpcAiServerConfig {
     health?: string;      // Default: '/health'
     webhooks?: string;    // Default: '/webhooks/lemonsqueezy'
   };
+
 }
 
 export class RpcAiServer {
@@ -257,7 +258,7 @@ export class RpcAiServer {
 
   private setupRoutes() {
     // Health endpoint
-    this.app.get(this.config.paths.health!, (req: Request, res: Response) => {
+    this.app.get(this.config.paths.health!, (_req: Request, res: Response) => {
       res.json({
         status: 'healthy',
         timestamp: new Date().toISOString(),
@@ -282,6 +283,7 @@ export class RpcAiServer {
           },
         })
       );
+
     }
 
     // JSON-RPC endpoint (if enabled)
@@ -386,7 +388,7 @@ export class RpcAiServer {
 
     // OpenRPC schema endpoint (for JSON-RPC discovery)
     if (this.config.protocols.jsonRpc) {
-      this.app.get('/openrpc.json', (req: Request, res: Response) => {
+      this.app.get('/openrpc.json', (_req: Request, res: Response) => {
         res.json(this.getOpenRPCSchema());
       });
     }
@@ -422,7 +424,7 @@ export class RpcAiServer {
     }
 
     // Catch all
-    this.app.use('*', (req: Request, res: Response) => {
+    this.app.use('*', (_req: Request, res: Response) => {
       res.status(404).json({
         error: 'Not found',
         message: 'This endpoint does not exist.',
@@ -647,8 +649,8 @@ export class RpcAiServer {
     return this.router;
   }
 
-  private createServiceProvidersConfig(providers: (BuiltInProvider | string)[]): any {
-    const config: any = {};
+  private createServiceProvidersConfig(providers: (BuiltInProvider | string)[]): Record<string, unknown> {
+    const config: Record<string, unknown> = {};
     const builtInProviders: BuiltInProvider[] = ['anthropic', 'openai', 'google'];
     
     providers.forEach((provider, index) => {
@@ -676,33 +678,8 @@ export class RpcAiServer {
 }
 
 // Helper function to create type-safe config with const assertions
-export function defineRpcAiServerConfig<
-  TServerProviders extends readonly (BuiltInProvider | string)[],
-  TByokProviders extends readonly (BuiltInProvider | string)[],
-  TCustomProviders extends readonly CustomProvider[]
->(
-  config: {
-    port?: number;
-    aiLimits?: AIRouterConfig;
-    serverProviders?: TServerProviders;
-    byokProviders?: TByokProviders;
-    customProviders?: TCustomProviders;
-    protocols?: {
-      jsonRpc?: boolean;
-      tRpc?: boolean;
-    };
-    tokenTracking?: RpcAiServerConfig['tokenTracking'];
-    jwt?: RpcAiServerConfig['jwt'];
-    cors?: RpcAiServerConfig['cors'];
-    rateLimit?: RpcAiServerConfig['rateLimit'];
-    paths?: RpcAiServerConfig['paths'];
-  }
-): {
-  serverProviders: TServerProviders;
-  byokProviders: TByokProviders;
-  customProviders: TCustomProviders;
-} & RpcAiServerConfig {
-  return config as any;
+export function defineRpcAiServerConfig(config: RpcAiServerConfig): RpcAiServerConfig {
+  return config;
 }
 
 // Factory function for easy usage

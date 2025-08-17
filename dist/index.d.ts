@@ -6,12 +6,16 @@
  */
 export { RPCClient } from './client.js';
 export { AIClient } from './client.js';
+export { createTypedAIClient, createAIServiceClient } from './client.js';
+export type { TypedAIClient } from './client.js';
 export { AIService } from './services/ai-service.js';
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
 export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server.js';
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
 export type { AIRouterConfig } from './trpc/routers/ai.js';
 export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root.js';
+export { TrpcPanelServer, startTrpcPanel, createLocalPanelServer } from './dev/trpc-panel-server.js';
+export type { PanelServerConfig } from './dev/trpc-panel-server.js';
 export { FunctionRegistry } from './services/function-registry.js';
 export { PromptManager, promptManager } from './services/prompt-manager.js';
 export { UserManager, SimpleKeyManager, AuthManager, PostgreSQLAdapter, AIKeyValidator } from './auth/index.js';

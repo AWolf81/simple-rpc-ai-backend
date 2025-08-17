@@ -8,7 +8,7 @@
  * 4. LemonSqueezy webhook integration
  */
 
-import { createRpcAiServer } from '../../dist/rpc-ai-server.js';
+import { createRpcAiServer } from '../../dist/index.js';
 
 async function runTokenTrackingExample() {
   console.log('🚀 Starting RPC AI Server with Virtual Token Tracking...\n');

@@ -157,7 +157,7 @@ export class RpcAiServer {
     }
     setupRoutes() {
         // Health endpoint
-        this.app.get(this.config.paths.health, (req, res) => {
+        this.app.get(this.config.paths.health, (_req, res) => {
             res.json({
                 status: 'healthy',
                 timestamp: new Date().toISOString(),
@@ -274,7 +274,7 @@ export class RpcAiServer {
         }
         // OpenRPC schema endpoint (for JSON-RPC discovery)
         if (this.config.protocols.jsonRpc) {
-            this.app.get('/openrpc.json', (req, res) => {
+            this.app.get('/openrpc.json', (_req, res) => {
                 res.json(this.getOpenRPCSchema());
             });
         }
@@ -307,7 +307,7 @@ export class RpcAiServer {
             });
         }
         // Catch all
-        this.app.use('*', (req, res) => {
+        this.app.use('*', (_req, res) => {
             res.status(404).json({
                 error: 'Not found',
                 message: 'This endpoint does not exist.',

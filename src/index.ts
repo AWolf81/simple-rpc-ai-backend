@@ -8,6 +8,10 @@
 // Core components
 export { RPCClient } from './client.js';          // Basic JSON-RPC client (platform-agnostic)
 export { AIClient } from './client.js';           // Enhanced client with BYOK
+
+// tRPC Client Support
+export { createTypedAIClient, createAIServiceClient } from './client.js';
+export type { TypedAIClient } from './client.js';
 export { AIService } from './services/ai-service.js';      // Direct AI service usage
 // Recommended server - supports both JSON-RPC and tRPC
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
@@ -19,6 +23,10 @@ export type { AIRouterConfig } from './trpc/routers/ai.js';
 
 // tRPC router types for client type safety
 export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root.js';
+
+// Development tools (separate from main server)
+export { TrpcPanelServer, startTrpcPanel, createLocalPanelServer } from './dev/trpc-panel-server.js';
+export type { PanelServerConfig } from './dev/trpc-panel-server.js';
 
 
 // Custom function system

@@ -4,7 +4,7 @@
  * Shows how to set up a unified RPC server with tRPC enabled for TypeScript projects
  */
 
-import { createRpcAiServer, AI_LIMIT_PRESETS } from '../../dist/rpc-ai-server.js';
+import { createRpcAiServer, AI_LIMIT_PRESETS } from '../../dist/index.js';
 
 console.log(`
 🚀 tRPC AI Server Example

@@ -9,7 +9,7 @@
  * With smart consumption order and fallback logic
  */
 
-import { createRpcAiServer } from '../../dist/rpc-ai-server.js';
+import { createRpcAiServer } from '../../dist/index.js';
 
 async function runHybridUserExample() {
   console.log('🚀 Starting RPC AI Server with Hybrid User Support...\n');

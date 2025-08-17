@@ -10,10 +10,11 @@
  * ```typescript
  * import { RPCClient } from 'simple-rpc-ai-backend';
  *
- * const client = new RPCClient('http://localhost:8000');
+ * const client = new RPCClient('http://localhost:8080');
  * const result = await client.request('methodName', { param1: 'value' });
  * ```
  */
+import { createTRPCProxyClient } from '@trpc/client';
 export interface ClientOptions {
     timeout?: number;
 }
@@ -119,4 +120,51 @@ export declare class AIClient extends RPCClient {
      */
     private generateDeviceId;
 }
+/**
+ * tRPC Client Support
+ *
+ * Simple, type-safe tRPC client with automatic type inference
+ */
+/**
+ * Create a typed tRPC client with automatic type inference
+ * Provides easy access to AI router procedures with proper typing
+ *
+ * Usage:
+ * ```typescript
+ * const client = createTypedAIClient({
+ *   links: [httpBatchLink({ url: 'http://localhost:8000/trpc' })]
+ * });
+ *
+ * // Fully typed without any casts
+ * const result = await client.ai.executeAIRequest.mutate({ content: "test", systemPrompt: "You are helpful" });
+ * const health = await client.ai.health.query();
+ * ```
+ */
+export declare function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient>[0]): import("@trpc/client").TRPCClient<import("@trpc/server").TRPCBuiltRouter<{
+    ctx: {
+        req: import("express").Request;
+        res: import("express").Response;
+        user: import("./index.js").OpenSaaSJWTPayload | null;
+    };
+    meta: object;
+    errorShape: import("@trpc/server").TRPCDefaultErrorShape;
+    transformer: true;
+}, import("@trpc/server").TRPCDecorateCreateRouterOptions<import("@trpc/server").TRPCCreateRouterOptions>>>;
+/**
+ * Type alias for the typed AI client
+ */
+export type TypedAIClient = ReturnType<typeof createTypedAIClient>;
+/**
+ * Helper for creating a ready-to-use AI service client with authentication
+ */
+export declare const createAIServiceClient: (serverUrl: string, authToken?: string) => import("@trpc/client").TRPCClient<import("@trpc/server").TRPCBuiltRouter<{
+    ctx: {
+        req: import("express").Request;
+        res: import("express").Response;
+        user: import("./index.js").OpenSaaSJWTPayload | null;
+    };
+    meta: object;
+    errorShape: import("@trpc/server").TRPCDefaultErrorShape;
+    transformer: true;
+}, import("@trpc/server").TRPCDecorateCreateRouterOptions<import("@trpc/server").TRPCCreateRouterOptions>>>;
 //# sourceMappingURL=client.d.ts.map

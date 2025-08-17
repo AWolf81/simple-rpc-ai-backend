@@ -36,7 +36,7 @@ export interface MonetizedServerInstance {
  */
 export async function createMonetizedAIServer(config: MonetizedAIServerConfig): Promise<MonetizedServerInstance> {
   const app = express();
-  const port = config.port ?? 8000;
+  const port = config.port ?? 8080;
 
   // Validate OpenSaaS configuration
   if (!config.opensaasMonetization) {

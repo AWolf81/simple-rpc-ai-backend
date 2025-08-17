@@ -90,7 +90,7 @@ export declare class AIService {
      * Get current configuration (without API key)
      */
     getConfig(): {
-        provider: "google" | "anthropic" | "openai" | undefined;
+        provider: "anthropic" | "openai" | "google" | undefined;
         model: string;
         maxTokens: number | undefined;
         temperature: number | undefined;

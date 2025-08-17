@@ -15,8 +15,8 @@ export interface CustomProvider {
     apiKeyPrefix?: string;
     modelMapping?: Record<string, string>;
     defaultModel?: string;
-    requestTransform?: (req: any) => any;
-    responseTransform?: (res: any) => any;
+    requestTransform?: (req: unknown) => unknown;
+    responseTransform?: (res: unknown) => unknown;
 }
 export interface RpcAiServerConfig {
     port?: number;
@@ -87,26 +87,7 @@ export declare class RpcAiServer {
     private createServiceProvidersConfig;
     getConfig(): Required<RpcAiServerConfig>;
 }
-export declare function defineRpcAiServerConfig<TServerProviders extends readonly (BuiltInProvider | string)[], TByokProviders extends readonly (BuiltInProvider | string)[], TCustomProviders extends readonly CustomProvider[]>(config: {
-    port?: number;
-    aiLimits?: AIRouterConfig;
-    serverProviders?: TServerProviders;
-    byokProviders?: TByokProviders;
-    customProviders?: TCustomProviders;
-    protocols?: {
-        jsonRpc?: boolean;
-        tRpc?: boolean;
-    };
-    tokenTracking?: RpcAiServerConfig['tokenTracking'];
-    jwt?: RpcAiServerConfig['jwt'];
-    cors?: RpcAiServerConfig['cors'];
-    rateLimit?: RpcAiServerConfig['rateLimit'];
-    paths?: RpcAiServerConfig['paths'];
-}): {
-    serverProviders: TServerProviders;
-    byokProviders: TByokProviders;
-    customProviders: TCustomProviders;
-} & RpcAiServerConfig;
+export declare function defineRpcAiServerConfig(config: RpcAiServerConfig): RpcAiServerConfig;
 export declare function createRpcAiServer(config?: RpcAiServerConfig): RpcAiServer;
 export type { AppRouter };
 //# sourceMappingURL=rpc-ai-server.d.ts.map

@@ -22,7 +22,7 @@ await server.start();
 import { AI_LIMIT_PRESETS } from 'simple-rpc-ai-backend';
 
 const server = createRpcAiServer({
-  port: 8080,
+  port: 8000,
   aiLimits: AI_LIMIT_PRESETS.standard    // Balanced limits for most apps
 });
 await server.start();
@@ -2284,44 +2284,47 @@ client.ai.executeAIRequest.mutate({
 
 **Live API Explorer (tRPC Panel):**
 
-tRPC Panel is a **web-based API explorer** (like Swagger UI) that you add to your server:
+tRPC Panel runs as a **separate development server** for clean separation of concerns:
 
-```bash
-# Install tRPC Panel for interactive API exploration
-npm install trpc-panel
+```typescript
+import { createRpcAiServer, createLocalPanelServer } from 'simple-rpc-ai-backend';
 
-# Add to your server setup
-import { renderTrpcPanel } from 'trpc-panel';
-
-// Serve interactive API docs at /panel
-app.use('/panel', (req, res) => {
-  return res.send(
-    renderTrpcPanel(appRouter, {
-      url: 'http://localhost:8000/trpc',
-      transformer: 'superjson'
-    })
-  );
+// 1. Start your main RPC server (port 8000)
+const server = createRpcAiServer({
+  port: 8000,
+  protocols: { tRpc: true }  // Enable tRPC for panel integration
 });
+await server.start();
+
+// 2. Start separate panel server (port 8080) 
+const panelServer = createLocalPanelServer(server.getRouter(), 8080);
+await panelServer.start();
 ```
 
-**tRPC Panel URL:** http://localhost:8000/panel (web interface, not VS Code extension)
+**URLs:**
+- **Main API:** http://localhost:8000/trpc/* (your application endpoints)  
+- **Development Panel:** http://localhost:8080/ (interactive testing interface)
 
 **Features:**
 - 🎯 **Live schema exploration** - Browse all procedures with real-time type info
-- 🔍 **Interactive testing** - Execute procedures directly in the browser
+- 🔍 **Interactive testing** - Execute procedures directly in the browser  
 - 📝 **Auto-generated docs** - Procedures, inputs, outputs all documented automatically
 - 🔄 **Real-time updates** - Documentation updates as you change your code
+- 🏗️ **Clean separation** - Panel excluded from production builds
+- 🚀 **Independent operation** - Start/stop panel without affecting main server
 
 **Comparison: Documentation Methods**
 
-| Feature | OpenRPC (JSON-RPC) | tRPC Built-in | tRPC Panel |
-|---------|-------------------|---------------|------------|
-| **Interactive Testing** | ✅ | ❌ | ✅ |
-| **Type Information** | 🟡 Manual schemas | ✅ Automatic from TS | ✅ Live from TS |
-| **IDE Integration** | ❌ | ✅ Full Intellisense | ❌ |
-| **Documentation Maintenance** | 🟡 Manual updates | ✅ Zero maintenance | ✅ Zero maintenance |
-| **External Sharing** | ✅ | ❌ | ✅ |
-| **Standards Compliance** | ✅ OpenRPC standard | ❌ | ❌ |
+| Feature | OpenRPC (JSON-RPC) | tRPC Panel |
+|---------|-------------------|------------|
+| **Interactive Testing** | ✅ Inspector UI | ✅ Web interface |
+| **Type Information** | 🟡 Manual schemas | ✅ Live from TypeScript |
+| **IDE Integration** | ❌ External tool | ✅ Full TypeScript Intellisense |
+| **Documentation Maintenance** | 🟡 Manual updates | ✅ Zero maintenance |
+| **External Sharing** | ✅ Standards-based | ✅ Web interface |
+| **Production Impact** | ✅ No overhead | ✅ Excluded from build |
+| **Development Setup** | 🟡 Single command | 🟡 Two servers |
+| **Standards Compliance** | ✅ OpenRPC standard | 🟡 Proprietary format |
 
 **Clear Recommendation:**
 
@@ -2338,6 +2341,103 @@ app.use('/panel', (req, res) => {
 - ✅ **Third-party integrations** - External systems need to consume your API
 - ✅ **Legacy systems** - Existing JSON-RPC infrastructure
 - ✅ **Multiple client types** - Mobile apps, CLI tools, webhooks
+
+## 🛠️ **Development Tools Setup**
+
+### 📡 **JSON-RPC Development with OpenRPC Inspector**
+
+For JSON-RPC endpoints, use the OpenRPC Inspector (Swagger-like UI):
+
+```bash
+# Start main server + OpenRPC inspector
+pnpm run dev:docs
+```
+
+**URLs:**
+- **Main API:** http://localhost:8000/rpc (JSON-RPC endpoint)
+- **OpenRPC Inspector:** http://localhost:3002 (interactive documentation)
+
+**Features:**
+- 🎮 **Interactive testing** - Execute JSON-RPC methods directly in browser
+- 📋 **Complete schema** - All methods, parameters, and responses documented
+- 🎨 **Modern UI** - Clean interface similar to Swagger UI
+- 📖 **Standards compliant** - Full OpenRPC specification
+
+### ⚡ **tRPC Development with Panel Server**
+
+For tRPC endpoints, use the separate panel server approach:
+
+```bash
+# Terminal 1: Start your main server
+node your-server.js
+
+# Terminal 2: Start panel server (separate process)
+node -e "
+import { createLocalPanelServer, createRpcAiServer } from 'simple-rpc-ai-backend';
+const server = createRpcAiServer({ protocols: { tRpc: true } });
+await server.start();
+const panel = createLocalPanelServer(server.getRouter(), 8080);
+await panel.start();
+"
+```
+
+**Or use the included example:**
+
+```bash
+# Run the complete panel example
+node examples/dev-tools/trpc-panel-example.js
+```
+
+**URLs:**
+- **Main API:** http://localhost:8000/trpc/* (tRPC endpoint)
+- **Development Panel:** http://localhost:8080/ (interactive testing interface)
+
+**Benefits:**
+- 🏗️ **Clean separation** - Panel runs independently from main server
+- 🚀 **Production ready** - Panel excluded from production builds
+- 🔄 **Live updates** - Schema changes reflected immediately
+- 💻 **Resource isolation** - Panel doesn't affect main server performance
+
+### 🎯 **Quick Development Workflow**
+
+**Choose your approach based on protocol:**
+
+| Protocol | Start Command | API URL | Dev Tools URL | Use Case |
+|----------|---------------|---------|---------------|----------|
+| **JSON-RPC** | `pnpm run dev:docs` | `localhost:8000/rpc` | `localhost:3002` | Universal compatibility |
+| **tRPC** | `node examples/dev-tools/trpc-panel-example.js` | `localhost:8000/trpc/*` | `localhost:8080/` | TypeScript projects |
+
+### 🔧 **Custom Development Setup**
+
+**Advanced: Custom panel configuration**
+
+```typescript
+import { TrpcPanelServer } from 'simple-rpc-ai-backend';
+
+const panelServer = new TrpcPanelServer({
+  port: 8080,
+  path: '/api-docs',  // Custom path
+  trpcUrl: 'http://localhost:8000/trpc',
+  router: yourRouter,
+  transformer: 'superjson'
+});
+
+await panelServer.start();
+```
+
+**Development vs Production:**
+
+```typescript
+// Development: Both servers
+if (process.env.NODE_ENV === 'development') {
+  const panelServer = createLocalPanelServer(server.getRouter());
+  await panelServer.start();
+}
+
+// Production: Main server only
+const server = createRpcAiServer({/* config */});
+await server.start();
+```
 
 ## 🧪 **Testing**
 
