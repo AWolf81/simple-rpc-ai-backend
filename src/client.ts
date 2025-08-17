@@ -285,7 +285,7 @@ export class AIClient extends RPCClient {
  * const health = await client.ai.health.query();
  * ```
  */
-export function createTypedAIClient(config: CreateTRPCClientOptions<AppRouter>) {
+export function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient<AppRouter>>[0]) {
   return createTRPCProxyClient<AppRouter>(config);
 }
 
