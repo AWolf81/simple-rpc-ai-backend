@@ -19,7 +19,7 @@ export function createAppRouter(
   dbAdapter?: PostgreSQLAdapter,
   serverProviders?: string[],
   byokProviders?: string[]
-): ReturnType<typeof createTRPCRouter> {
+) {
   return createTRPCRouter({
     ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders),
     

@@ -150,7 +150,18 @@ export declare function createTypedAIClient(config: CreateTRPCClientOptions<AppR
     meta: object;
     errorShape: import("@trpc/server").TRPCDefaultErrorShape;
     transformer: true;
-}, import("@trpc/server").TRPCDecorateCreateRouterOptions<import("@trpc/server").TRPCCreateRouterOptions>>>;
+}, import("@trpc/server").TRPCDecorateCreateRouterOptions<{
+    ai: import("@trpc/server").TRPCBuiltRouter<{
+        ctx: {
+            req: import("express").Request;
+            res: import("express").Response;
+            user: import("./index.js").OpenSaaSJWTPayload | null;
+        };
+        meta: object;
+        errorShape: import("@trpc/server").TRPCDefaultErrorShape;
+        transformer: true;
+    }, import("@trpc/server").TRPCDecorateCreateRouterOptions<import("@trpc/server").TRPCCreateRouterOptions>>;
+}>>>;
 /**
  * Type alias for the typed AI client
  */
