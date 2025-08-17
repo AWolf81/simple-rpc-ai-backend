@@ -20,7 +20,7 @@ export declare const appRouter: ReturnType<typeof createAppRouter>;
  * Export the app router type definition
  * This is used by the client for end-to-end type safety
  */
-export type AppRouter = ReturnType<typeof createAppRouter>;
+export type AppRouter = typeof appRouter;
 /**
  * Export input/output types for each router procedure
  */
