@@ -12,6 +12,9 @@ import type { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 
 /**
  * Create app router with configurable AI limits and optional token tracking
+ * 
+ * Since this is a dedicated AI backend, all procedures are at the root level
+ * for cleaner API: client.executeAIRequest.mutate() instead of client.ai.executeAIRequest.mutate()
  */
 export function createAppRouter(
   aiConfig?: AIRouterConfig, 
@@ -19,15 +22,9 @@ export function createAppRouter(
   dbAdapter?: PostgreSQLAdapter,
   serverProviders?: string[],
   byokProviders?: string[]
-): ReturnType<typeof createTRPCRouter> {
-  return createTRPCRouter({
-    ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders),
-    
-    // Add more routers here as needed:
-    // auth: authRouter,
-    // billing: billingRouter,
-    // etc.
-  });
+): ReturnType<typeof createAIRouter> {
+  // Return AI router directly as the root router for simpler API
+  return createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders);
 }
 
 /**

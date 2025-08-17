@@ -174,15 +174,15 @@ const result = await client.request('executeAIRequest', {
 
 **Example - React Web App:**
 ```typescript
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
-import type { AppRouter } from 'simple-rpc-ai-backend';
+import { createTypedAIClient } from 'simple-rpc-ai-backend';
+import { httpBatchLink } from '@trpc/client';
 
-const client = createTRPCProxyClient<AppRouter>({
+const client = createTypedAIClient({
   links: [httpBatchLink({ url: 'http://localhost:8000/trpc' })],
 });
 
 // Full type safety and auto-completion
-const result = await client.ai.executeAIRequest.mutate({
+const result = await client.executeAIRequest.mutate({
   content: code,              // TypeScript knows this is required
   systemPrompt: 'code_review', // Auto-complete available prompts
   options: {
@@ -255,12 +255,12 @@ export type AppRouter = typeof server.getRouter;
 ```typescript
 // packages/vscode-extension/src/extension.ts
 import * as vscode from 'vscode';
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
-import type { AppRouter } from '../../backend/src/server'; // Shared types!
+import { createTypedAIClient } from 'simple-rpc-ai-backend';
+import { httpBatchLink } from '@trpc/client';
 
 export function activate(context: vscode.ExtensionContext) {
   // Type-safe client with zero manual type definitions
-  const client = createTRPCProxyClient<AppRouter>({
+  const client = createTypedAIClient({
     links: [
       httpBatchLink({
         url: 'http://localhost:8000/trpc',
@@ -274,7 +274,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     try {
       // Full type safety - VS Code will auto-complete everything!
-      const result = await client.ai.executeAIRequest.mutate({
+      const result = await client.executeAIRequest.mutate({
         content: editor.document.getText(),     // TypeScript knows this is required
         systemPrompt: 'security_review',       // Auto-complete shows available prompts
         options: {
@@ -438,10 +438,10 @@ export type { AppRouter } from './server.js';
 
 ```typescript
 // packages/extension/src/ai-client.ts
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
-import type { AppRouter } from '@your-project/backend/src/types';
+import { createTypedAIClient } from 'simple-rpc-ai-backend';
+import { httpBatchLink } from '@trpc/client';
 
-export const aiClient = createTRPCProxyClient<AppRouter>({
+export const aiClient = createTypedAIClient({
   links: [
     httpBatchLink({
       url: 'http://localhost:3000/trpc',
@@ -861,10 +861,10 @@ export function activate(context: vscode.ExtensionContext) {
 **React web application:**
 ```typescript
 import React, { useState } from 'react';
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
-import type { AppRouter } from 'simple-rpc-ai-backend';
+import { createTypedAIClient } from 'simple-rpc-ai-backend';
+import { httpBatchLink } from '@trpc/client';
 
-const client = createTRPCProxyClient<AppRouter>({
+const client = createTypedAIClient({
   links: [
     httpBatchLink({
       url: 'http://localhost:8000/trpc',
@@ -881,7 +881,7 @@ function CodeAnalyzer() {
     setLoading(true);
     try {
       // Full type safety - TypeScript knows all parameter types
-      const response = await client.ai.executeAIRequest.mutate({
+      const response = await client.executeAIRequest.mutate({
         content: code,
         systemPrompt: 'security_review',
         options: {
@@ -926,10 +926,10 @@ export default CodeAnalyzer;
 ```typescript
 // pages/api/ai-proxy.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
-import type { AppRouter } from 'simple-rpc-ai-backend';
+import { createTypedAIClient } from 'simple-rpc-ai-backend';
+import { httpBatchLink } from '@trpc/client';
 
-const client = createTRPCProxyClient<AppRouter>({
+const client = createTypedAIClient({
   links: [
     httpBatchLink({
       url: process.env.AI_BACKEND_URL || 'http://localhost:8000/trpc',
@@ -946,7 +946,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { content, systemPrompt } = req.body;
     
     // Type-safe proxy to AI backend
-    const result = await client.ai.executeAIRequest.mutate({
+    const result = await client.executeAIRequest.mutate({
       content,
       systemPrompt,
       options: {
@@ -1181,11 +1181,12 @@ server.start();
 
 ```javascript
 // your-vscode-extension/src/extension.js - tRPC Client for TypeScript
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import { createTypedAIClient } from 'simple-rpc-ai-backend';
+import { httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 
 // Type-safe tRPC client
-const client = createTRPCProxyClient({
+const client = createTypedAIClient({
   transformer: superjson,
   links: [
     httpBatchLink({
@@ -2272,7 +2273,7 @@ pnpm run dev:docs
 
 ```typescript
 // In your IDE, hover over any method for instant docs
-client.ai.executeAIRequest.mutate({
+client.executeAIRequest.mutate({
   content: 'code here',     // Hover shows: string (required)
   systemPrompt: 'review',   // Hover shows: available prompt names
   options: {

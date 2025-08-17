@@ -125,6 +125,14 @@
     "overrides": {
       "nanoid": "^3.3.8",
       "esbuild": "^0.25.0"
+    },
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "@trpc/server"
+      ],
+      "allowedVersions": {
+        "trpc-panel>@trpc/server": "11"
+      }
     }
   }
 }

@@ -156,6 +156,19 @@ export declare function createTypedAIClient(config: Parameters<typeof createTRPC
 export type TypedAIClient = ReturnType<typeof createTypedAIClient>;
 /**
  * Helper for creating a ready-to-use AI service client with authentication
+ *
+ * @deprecated Use createTypedAIClient directly for better type safety:
+ * ```typescript
+ * import { createTypedAIClient } from 'simple-rpc-ai-backend';
+ * import { httpBatchLink } from '@trpc/client';
+ *
+ * const client = createTypedAIClient({
+ *   links: [httpBatchLink({
+ *     url: `${serverUrl}/trpc`,
+ *     headers: { authorization: `Bearer ${token}` }
+ *   })]
+ * });
+ * ```
  */
 export declare const createAIServiceClient: (serverUrl: string, authToken?: string) => import("@trpc/client").TRPCClient<import("@trpc/server").TRPCBuiltRouter<{
     ctx: {

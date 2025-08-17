@@ -98,6 +98,26 @@ await client.initialize();
 const result = await client.executeAIRequest(content, systemPrompt);
 ```
 
+### tRPC Client Development (Recommended for TypeScript)
+```typescript
+import { createTypedAIClient } from 'simple-rpc-ai-backend';
+import { httpBatchLink } from '@trpc/client';
+
+const client = createTypedAIClient({
+  links: [
+    httpBatchLink({ 
+      url: 'http://localhost:8000/trpc',
+      headers: { authorization: `Bearer ${authToken}` }
+    })
+  ]
+});
+
+// Full type safety - no 'as any' casts needed
+await client.health.query();
+await client.executeAIRequest.mutate({ content, systemPrompt });
+await client.configureBYOK.mutate({ provider, apiKey });
+```
+
 ### Server Development
 ```typescript
 import { createAIServer } from 'simple-rpc-ai-backend';
