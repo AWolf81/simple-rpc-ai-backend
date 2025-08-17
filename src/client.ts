@@ -18,6 +18,7 @@
 import { JSONRPCClient } from 'json-rpc-2.0';
 import { createTRPCProxyClient, type CreateTRPCClientOptions } from '@trpc/client';
 import type { AppRouter } from './trpc/root.js';
+import type { AIRouterType } from './trpc/routers/ai.js';
 
 export interface ClientOptions {
   timeout?: number;
@@ -285,8 +286,14 @@ export class AIClient extends RPCClient {
  * const health = await client.ai.health.query();
  * ```
  */
-export function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient<AppRouter>>[0]) {
-  return createTRPCProxyClient<AppRouter>(config);
+export function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient>[0]) {
+  const client = createTRPCProxyClient<AppRouter>(config);
+  
+  // Create a typed wrapper that preserves procedure methods
+  // This ensures TypeScript can properly infer .query() vs .mutate()
+  return {
+    ai: client.ai as AIRouterType
+  };
 }
 
 /**

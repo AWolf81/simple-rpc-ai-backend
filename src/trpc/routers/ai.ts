@@ -846,3 +846,10 @@ export function createAIRouter(
 
 // Default AI router instance with default configuration
 export const aiRouter: ReturnType<typeof createAIRouter> = createAIRouter();
+
+/**
+ * Static type definition for the AI router
+ * This captures the shape of all AI procedures independently of runtime configuration
+ * Used for proper TypeScript inference in client code
+ */
+export type AIRouterType = ReturnType<typeof createAIRouter>;

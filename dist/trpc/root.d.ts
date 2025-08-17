@@ -38,11 +38,14 @@ export declare const appRouter: ReturnType<typeof createAppRouter>;
 /**
  * Export the app router type definition
  * This is used by the client for end-to-end type safety
+ *
+ * Using the runtime type but with explicit static typing for better inference
  */
-export type AppRouter = typeof appRouter;
+export type AppRouter = ReturnType<typeof createAppRouter>;
 /**
  * Export input/output types for each router procedure
+ * Using the runtime router for input/output inference since the static type doesn't work here
  */
-export type RouterInputs = inferRouterInputs<AppRouter>;
-export type RouterOutputs = inferRouterOutputs<AppRouter>;
+export type RouterInputs = inferRouterInputs<typeof appRouter>;
+export type RouterOutputs = inferRouterOutputs<typeof appRouter>;
 //# sourceMappingURL=root.d.ts.map

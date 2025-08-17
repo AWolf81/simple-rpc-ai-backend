@@ -221,6 +221,11 @@ export class AIClient extends RPCClient {
  * ```
  */
 export function createTypedAIClient(config) {
-    return createTRPCProxyClient(config);
+    const client = createTRPCProxyClient(config);
+    // Create a typed wrapper that preserves procedure methods
+    // This ensures TypeScript can properly infer .query() vs .mutate()
+    return {
+        ai: client.ai
+    };
 }
 //# sourceMappingURL=client.js.map

@@ -29,4 +29,10 @@ export declare const AI_LIMIT_PRESETS: {
 };
 export declare function createAIRouter(config?: AIRouterConfig, tokenTrackingEnabled?: boolean, dbAdapter?: PostgreSQLAdapter, serverProviders?: (string)[], byokProviders?: (string)[]): ReturnType<typeof createTRPCRouter>;
 export declare const aiRouter: ReturnType<typeof createAIRouter>;
+/**
+ * Static type definition for the AI router
+ * This captures the shape of all AI procedures independently of runtime configuration
+ * Used for proper TypeScript inference in client code
+ */
+export type AIRouterType = ReturnType<typeof createAIRouter>;
 //# sourceMappingURL=ai.d.ts.map

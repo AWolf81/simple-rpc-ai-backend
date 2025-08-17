@@ -15,7 +15,7 @@
  * ```
  */
 import { createTRPCProxyClient } from '@trpc/client';
-import type { AppRouter } from './trpc/root.js';
+import type { AIRouterType } from './trpc/routers/ai.js';
 export interface ClientOptions {
     timeout?: number;
 }
@@ -141,27 +141,9 @@ export declare class AIClient extends RPCClient {
  * const health = await client.ai.health.query();
  * ```
  */
-export declare function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient<AppRouter>>[0]): import("@trpc/client").TRPCClient<import("@trpc/server").TRPCBuiltRouter<{
-    ctx: {
-        req: import("express").Request;
-        res: import("express").Response;
-        user: import("./index.js").OpenSaaSJWTPayload | null;
-    };
-    meta: object;
-    errorShape: import("@trpc/server").TRPCDefaultErrorShape;
-    transformer: true;
-}, import("@trpc/server").TRPCDecorateCreateRouterOptions<{
-    ai: import("@trpc/server").TRPCBuiltRouter<{
-        ctx: {
-            req: import("express").Request;
-            res: import("express").Response;
-            user: import("./index.js").OpenSaaSJWTPayload | null;
-        };
-        meta: object;
-        errorShape: import("@trpc/server").TRPCDefaultErrorShape;
-        transformer: true;
-    }, import("@trpc/server").TRPCDecorateCreateRouterOptions<import("@trpc/server").TRPCCreateRouterOptions>>;
-}>>>;
+export declare function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient>[0]): {
+    ai: AIRouterType;
+};
 /**
  * Type alias for the typed AI client
  */
