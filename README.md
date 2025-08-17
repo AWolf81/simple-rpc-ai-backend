@@ -182,7 +182,7 @@ const client = createTypedAIClient({
 });
 
 // Full type safety and auto-completion
-const result = await client.executeAIRequest.mutate({
+const result = await client.ai.executeAIRequest.mutate({
   content: code,              // TypeScript knows this is required
   systemPrompt: 'code_review', // Auto-complete available prompts
   options: {
@@ -274,7 +274,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     try {
       // Full type safety - VS Code will auto-complete everything!
-      const result = await client.executeAIRequest.mutate({
+      const result = await client.ai.executeAIRequest.mutate({
         content: editor.document.getText(),     // TypeScript knows this is required
         systemPrompt: 'security_review',       // Auto-complete shows available prompts
         options: {
@@ -881,7 +881,7 @@ function CodeAnalyzer() {
     setLoading(true);
     try {
       // Full type safety - TypeScript knows all parameter types
-      const response = await client.executeAIRequest.mutate({
+      const response = await client.ai.executeAIRequest.mutate({
         content: code,
         systemPrompt: 'security_review',
         options: {
@@ -946,7 +946,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { content, systemPrompt } = req.body;
     
     // Type-safe proxy to AI backend
-    const result = await client.executeAIRequest.mutate({
+    const result = await client.ai.executeAIRequest.mutate({
       content,
       systemPrompt,
       options: {
@@ -2273,7 +2273,7 @@ pnpm run dev:docs
 
 ```typescript
 // In your IDE, hover over any method for instant docs
-client.executeAIRequest.mutate({
+client.ai.executeAIRequest.mutate({
   content: 'code here',     // Hover shows: string (required)
   systemPrompt: 'review',   // Hover shows: available prompt names
   options: {

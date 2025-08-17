@@ -113,9 +113,9 @@ const client = createTypedAIClient({
 });
 
 // Full type safety - no 'as any' casts needed
-await client.health.query();
-await client.executeAIRequest.mutate({ content, systemPrompt });
-await client.configureBYOK.mutate({ provider, apiKey });
+await client.ai.health.query();
+await client.ai.executeAIRequest.mutate({ content, systemPrompt });
+await client.ai.configureBYOK.mutate({ provider, apiKey });
 ```
 
 ### Server Development
