@@ -16,7 +16,7 @@
  */
 
 import { JSONRPCClient } from 'json-rpc-2.0';
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import { createTRPCProxyClient, type CreateTRPCClientOptions } from '@trpc/client';
 import type { AppRouter } from './trpc/root.js';
 
 export interface ClientOptions {
@@ -285,7 +285,7 @@ export class AIClient extends RPCClient {
  * const health = await client.ai.health.query();
  * ```
  */
-export function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient<AppRouter>>[0]) {
+export function createTypedAIClient(config: CreateTRPCClientOptions<AppRouter>) {
   return createTRPCProxyClient<AppRouter>(config);
 }
 

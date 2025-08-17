@@ -14,7 +14,7 @@
  * const result = await client.request('methodName', { param1: 'value' });
  * ```
  */
-import { createTRPCProxyClient } from '@trpc/client';
+import { type CreateTRPCClientOptions } from '@trpc/client';
 import type { AppRouter } from './trpc/root.js';
 export interface ClientOptions {
     timeout?: number;
@@ -141,7 +141,7 @@ export declare class AIClient extends RPCClient {
  * const health = await client.ai.health.query();
  * ```
  */
-export declare function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient<AppRouter>>[0]): import("@trpc/client").TRPCClient<import("@trpc/server").TRPCBuiltRouter<{
+export declare function createTypedAIClient(config: CreateTRPCClientOptions<AppRouter>): import("@trpc/client").TRPCClient<import("@trpc/server").TRPCBuiltRouter<{
     ctx: {
         req: import("express").Request;
         res: import("express").Response;
