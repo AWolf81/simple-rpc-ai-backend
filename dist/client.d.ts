@@ -15,6 +15,7 @@
  * ```
  */
 import { createTRPCProxyClient } from '@trpc/client';
+import type { AppRouter } from './trpc/root.js';
 export interface ClientOptions {
     timeout?: number;
 }
@@ -140,7 +141,7 @@ export declare class AIClient extends RPCClient {
  * const health = await client.ai.health.query();
  * ```
  */
-export declare function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient>[0]): import("@trpc/client").TRPCClient<import("@trpc/server").TRPCBuiltRouter<{
+export declare function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient<AppRouter>>[0]): import("@trpc/client").TRPCClient<import("@trpc/server").TRPCBuiltRouter<{
     ctx: {
         req: import("express").Request;
         res: import("express").Response;
@@ -154,30 +155,4 @@ export declare function createTypedAIClient(config: Parameters<typeof createTRPC
  * Type alias for the typed AI client
  */
 export type TypedAIClient = ReturnType<typeof createTypedAIClient>;
-/**
- * Helper for creating a ready-to-use AI service client with authentication
- *
- * @deprecated Use createTypedAIClient directly for better type safety:
- * ```typescript
- * import { createTypedAIClient } from 'simple-rpc-ai-backend';
- * import { httpBatchLink } from '@trpc/client';
- *
- * const client = createTypedAIClient({
- *   links: [httpBatchLink({
- *     url: `${serverUrl}/trpc`,
- *     headers: { authorization: `Bearer ${token}` }
- *   })]
- * });
- * ```
- */
-export declare const createAIServiceClient: (serverUrl: string, authToken?: string) => import("@trpc/client").TRPCClient<import("@trpc/server").TRPCBuiltRouter<{
-    ctx: {
-        req: import("express").Request;
-        res: import("express").Response;
-        user: import("./index.js").OpenSaaSJWTPayload | null;
-    };
-    meta: object;
-    errorShape: import("@trpc/server").TRPCDefaultErrorShape;
-    transformer: true;
-}, import("@trpc/server").TRPCDecorateCreateRouterOptions<import("@trpc/server").TRPCCreateRouterOptions>>>;
 //# sourceMappingURL=client.d.ts.map

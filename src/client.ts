@@ -285,7 +285,7 @@ export class AIClient extends RPCClient {
  * const health = await client.ai.health.query();
  * ```
  */
-export function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient>[0]) {
+export function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient<AppRouter>>[0]) {
   return createTRPCProxyClient<AppRouter>(config);
 }
 
@@ -293,38 +293,3 @@ export function createTypedAIClient(config: Parameters<typeof createTRPCProxyCli
  * Type alias for the typed AI client
  */
 export type TypedAIClient = ReturnType<typeof createTypedAIClient>;
-
-/**
- * Helper for creating a ready-to-use AI service client with authentication
- * 
- * @deprecated Use createTypedAIClient directly for better type safety:
- * ```typescript
- * import { createTypedAIClient } from 'simple-rpc-ai-backend';
- * import { httpBatchLink } from '@trpc/client';
- * 
- * const client = createTypedAIClient({
- *   links: [httpBatchLink({ 
- *     url: `${serverUrl}/trpc`,
- *     headers: { authorization: `Bearer ${token}` }
- *   })]
- * });
- * ```
- */
-export const createAIServiceClient = (serverUrl: string, authToken?: string) => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  
-  if (authToken) {
-    headers.authorization = `Bearer ${authToken}`;
-  }
-
-  return createTypedAIClient({
-    links: [
-      httpBatchLink({ 
-        url: `${serverUrl}/trpc`,
-        headers
-      })
-    ]
-  });
-};

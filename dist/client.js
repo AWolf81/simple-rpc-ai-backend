@@ -15,7 +15,7 @@
  * ```
  */
 import { JSONRPCClient } from 'json-rpc-2.0';
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import { createTRPCProxyClient } from '@trpc/client';
 /**
  * Platform-agnostic JSON-RPC client for backend servers
  *
@@ -223,36 +223,4 @@ export class AIClient extends RPCClient {
 export function createTypedAIClient(config) {
     return createTRPCProxyClient(config);
 }
-/**
- * Helper for creating a ready-to-use AI service client with authentication
- *
- * @deprecated Use createTypedAIClient directly for better type safety:
- * ```typescript
- * import { createTypedAIClient } from 'simple-rpc-ai-backend';
- * import { httpBatchLink } from '@trpc/client';
- *
- * const client = createTypedAIClient({
- *   links: [httpBatchLink({
- *     url: `${serverUrl}/trpc`,
- *     headers: { authorization: `Bearer ${token}` }
- *   })]
- * });
- * ```
- */
-export const createAIServiceClient = (serverUrl, authToken) => {
-    const headers = {
-        'Content-Type': 'application/json',
-    };
-    if (authToken) {
-        headers.authorization = `Bearer ${authToken}`;
-    }
-    return createTypedAIClient({
-        links: [
-            httpBatchLink({
-                url: `${serverUrl}/trpc`,
-                headers
-            })
-        ]
-    });
-};
 //# sourceMappingURL=client.js.map

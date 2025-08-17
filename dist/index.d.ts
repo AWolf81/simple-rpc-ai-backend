@@ -6,7 +6,7 @@
  */
 export { RPCClient } from './client.js';
 export { AIClient } from './client.js';
-export { createTypedAIClient, createAIServiceClient } from './client.js';
+export { createTypedAIClient } from './client.js';
 export type { TypedAIClient } from './client.js';
 export { AIService } from './services/ai-service.js';
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
