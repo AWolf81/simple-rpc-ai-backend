@@ -25,11 +25,11 @@ export function createTRPCContext(opts: CreateExpressContextOptions): {
   // Start with JWT middleware user if available
   let user = authReq.user || null;
   
-  // Development mode: Handle OpenSaaS session tokens
+  // Development mode: Handle OpenSaaS JWT tokens and session tokens
   if (!user && opts.req.headers.authorization?.startsWith('Bearer ')) {
     const token = opts.req.headers.authorization.substring(7);
     
-    // Check if it looks like an OpenSaaS session token (development mode only)
+    // Handle OpenSaaS session tokens (old format)
     if (token.startsWith('jwt_token_') && process.env.NODE_ENV !== 'production') {
       console.log('🔧 Development mode: Creating mock user for OpenSaaS session token:', token.slice(0, 20) + '...');
       
@@ -51,6 +51,44 @@ export function createTRPCContext(opts: CreateExpressContextOptions): {
       };
       
       console.log('✅ Mock user created:', { userId: user.userId, email: user.email, tier: user.subscriptionTier });
+    }
+    // Handle OpenSaaS JWT tokens (new format)
+    else if (token.startsWith('eyJ') && process.env.NODE_ENV !== 'production') {
+      try {
+        console.log('🔧 Development mode: Parsing OpenSaaS JWT token:', token.slice(0, 20) + '...');
+        
+        // Decode JWT payload (skip signature verification in development)
+        const parts = token.split('.');
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        
+        console.log('📄 JWT payload:', payload);
+        
+        // Convert OpenSaaS JWT to our expected format
+        user = {
+          userId: payload.userId || payload.sub || 'unknown',
+          email: payload.email || 'unknown@example.com',
+          subscriptionTier: payload.subscriptionTier || 'pro', // Default to pro in development
+          monthlyTokenQuota: payload.monthlyTokenQuota || 100000,
+          rpmLimit: payload.rpmLimit || 100,
+          tpmLimit: payload.tpmLimit || 10000,
+          features: payload.features || ['basic_ai', 'advanced_ai'],
+          iat: payload.iat,
+          exp: payload.exp,
+          iss: payload.iss,
+          aud: payload.aud,
+          organizationId: payload.organizationId
+        };
+        
+        console.log('✅ OpenSaaS user authenticated:', { 
+          userId: user.userId, 
+          email: user.email, 
+          tier: user.subscriptionTier,
+          issuer: user.iss
+        });
+        
+      } catch (error) {
+        console.warn('⚠️ Failed to parse OpenSaaS JWT in development mode:', error instanceof Error ? error.message : String(error));
+      }
     }
   }
   
