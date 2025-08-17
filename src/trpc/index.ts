@@ -22,10 +22,42 @@ export function createTRPCContext(opts: CreateExpressContextOptions): {
 } {
   const authReq = opts.req as AuthenticatedRequest;
   
+  // Start with JWT middleware user if available
+  let user = authReq.user || null;
+  
+  // Development mode: Handle OpenSaaS session tokens
+  if (!user && opts.req.headers.authorization?.startsWith('Bearer ')) {
+    const token = opts.req.headers.authorization.substring(7);
+    
+    // Check if it looks like an OpenSaaS session token (development mode only)
+    if (token.startsWith('jwt_token_') && process.env.NODE_ENV !== 'production') {
+      console.log('🔧 Development mode: Creating mock user for OpenSaaS session token:', token.slice(0, 20) + '...');
+      
+      // Extract user ID from session token
+      const userId = token.includes('_') ? token.split('_')[2] || 'dev-user' : 'dev-user';
+      
+      user = {
+        userId: `dev-${userId.slice(-8)}`,
+        email: 'dev@example.com',
+        subscriptionTier: 'pro',
+        monthlyTokenQuota: 100000,
+        rpmLimit: 100,
+        tpmLimit: 10000,
+        features: ['basic_ai', 'advanced_ai'],
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 86400, // 24 hours
+        iss: 'dev-mode',
+        aud: 'ai-backend'
+      };
+      
+      console.log('✅ Mock user created:', { userId: user.userId, email: user.email, tier: user.subscriptionTier });
+    }
+  }
+  
   return {
     req: opts.req,
     res: opts.res,
-    user: authReq.user || null, // Populated by JWT middleware if token is valid
+    user, // Populated by JWT middleware if token is valid, or mock user in dev mode
   };
 }
 

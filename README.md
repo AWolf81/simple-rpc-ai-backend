@@ -1126,6 +1126,50 @@ npm install git+https://github.com/AWolf81/simple-rpc-ai-backend.git
 pnpm add git+https://github.com/AWolf81/simple-rpc-ai-backend.git
 ```
 
+### 📡 **Provider Registry Setup (Recommended)**
+
+The backend now integrates with [`@anolilab/ai-model-registry`](https://www.npmjs.com/package/@anolilab/ai-model-registry) for up-to-date provider and model information. 
+
+#### **Automatic Setup (Production)**
+```bash
+# For production builds with fresh provider data
+pnpm run build:prod
+```
+
+#### **Manual Setup (Development)**
+```bash
+# Download provider data for all configured providers
+pnpm run registry:setup
+
+# Or download data for specific providers only
+pnpm run registry:download -- anthropic
+pnpm run registry:download -- openai
+
+# Regular development build (uses cached data)
+pnpm run build
+```
+
+#### **Configuration**
+Control which providers to download:
+
+```bash
+# Environment variables (optional)
+export AI_SERVICE_PROVIDERS=anthropic,openai,google
+export AI_BYOK_PROVIDERS=anthropic,openai,google,groq
+
+# Then run setup
+pnpm run registry:setup
+```
+
+#### **What This Provides**
+- ✅ **Rich Provider Metadata** - Descriptions, capabilities, pricing info
+- ✅ **Up-to-date Model Lists** - Latest models and context lengths
+- ✅ **Pricing Information** - Input/output costs per 1k tokens
+- ✅ **Graceful Fallbacks** - Works even if registry is unavailable
+- ✅ **Filtered Data** - Only downloads configured providers
+
+> **Note**: Setup is **not automatic** by default. Use `build:prod` for production or run `registry:setup` manually for development. The system gracefully falls back to built-in provider data if registry is unavailable.
+
 ### Option A: Secure Enterprise Setup with PostgreSQL
 
 **1. Add PostgreSQL infrastructure to your project:**
@@ -1907,6 +1951,40 @@ monitor.onProviderStatusChange('anthropic', (hasKey) => {
 | `getUserTokenBalances` | Get user's token balances (subscription/one-time) | Query | ✅ JWT Required |
 | `getUsageAnalytics` | Get usage analytics and history | Query | ✅ JWT Required |
 | `health` | Check server health | Query | 🌐 Public |
+| **`listProviders`** | **Get service providers with rich metadata** | **Query** | **🌐 Public** |
+| **`listProvidersBYOK`** | **Get BYOK providers with rich metadata** | **Query** | **🌐 Public** |
+
+#### **🆕 Enhanced Provider Methods**
+
+The new provider methods integrate with [`@anolilab/ai-model-registry`](https://www.npmjs.com/package/@anolilab/ai-model-registry) to provide:
+
+```typescript
+// Get service providers (server-managed)
+const serviceProviders = await client.ai.listProviders.query();
+// Returns: { providers: ProviderConfig[], source: 'registry', lastUpdated: string }
+
+// Get BYOK providers (user-managed keys)
+const byokProviders = await client.ai.listProvidersBYOK.query();
+// Returns: { providers: ProviderConfig[], source: 'registry', lastUpdated: string }
+```
+
+**Enhanced Provider Data Structure:**
+```typescript
+interface ProviderConfig {
+  name: string;                    // Provider identifier
+  displayName: string;             // Human-readable name
+  models: ModelConfig[];           // Available models
+  priority: number;                // Display priority
+  isServiceProvider: boolean;      // Available as service provider
+  isByokProvider: boolean;         // Available for BYOK
+  metadata: {
+    description?: string;          // Provider description
+    website?: string;              // Provider website
+    apiKeyRequired: boolean;       // Requires API key
+    supportedFeatures: string[];   // Capabilities
+  };
+}
+```
 
 ### **💡 Current User Flow**
 

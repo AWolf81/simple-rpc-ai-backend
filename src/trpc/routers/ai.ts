@@ -12,6 +12,7 @@ import { AIService } from '../../services/ai-service.js';
 import { VirtualTokenService } from '../../services/virtual-token-service.js';
 import { UsageAnalyticsService } from '../../services/usage-analytics-service.js';
 import { PostgreSQLAdapter } from '../../database/postgres-adapter.js';
+import { ProviderRegistryService } from '../../services/provider-registry.js';
 
 // Configurable limits interface
 export interface AIRouterConfig {
@@ -120,6 +121,9 @@ export function createAIRouter(
     tokens: { ...DEFAULT_CONFIG.tokens, ...config.tokens },
     systemPrompt: { ...DEFAULT_CONFIG.systemPrompt, ...config.systemPrompt },
   };
+
+  // Initialize provider registry service
+  const providerRegistry = new ProviderRegistryService(serverProviders, byokProviders);
 
   // Initialize AI service with configured providers
   const aiService = new AIService({
@@ -789,29 +793,47 @@ export function createAIRouter(
     }),
 
   /**
-   * List available AI providers
+   * List available AI service providers
+   * Enhanced with @anolilab/ai-model-registry integration
    */
   listProviders: publicProcedure
     .query(async () => {
-      return {
-        providers: [
-          {
-            name: 'anthropic',
-            models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'],
-            priority: 1,
-          },
-          {
-            name: 'openai', 
-            models: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
-            priority: 2,
-          },
-          {
-            name: 'google',
-            models: ['gemini-1.5-pro', 'gemini-1.5-flash'],
-            priority: 3,
-          },
-        ],
-      };
+      try {
+        const providers = await providerRegistry.getConfiguredProviders('service');
+        return {
+          providers,
+          source: 'registry',
+          lastUpdated: new Date().toISOString()
+        };
+      } catch (error) {
+        console.warn('Failed to fetch providers from registry:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch provider information'
+        });
+      }
+    }),
+
+  /**
+   * List available BYOK (Bring Your Own Key) providers
+   * Returns only providers configured for BYOK usage
+   */
+  listProvidersBYOK: publicProcedure
+    .query(async () => {
+      try {
+        const providers = await providerRegistry.getConfiguredProviders('byok');
+        return {
+          providers,
+          source: 'registry',
+          lastUpdated: new Date().toISOString()
+        };
+      } catch (error) {
+        console.warn('Failed to fetch BYOK providers from registry:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch BYOK provider information'
+        });
+      }
     }),
 
   /**
