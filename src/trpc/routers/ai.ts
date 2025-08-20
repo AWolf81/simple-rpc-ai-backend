@@ -837,6 +837,45 @@ export function createAIRouter(
     }),
 
   /**
+   * Get AI model registry health status
+   * Returns detailed health information about the registry integration
+   */
+  getRegistryHealth: publicProcedure
+    .query(async () => {
+      try {
+        const healthStatus = await providerRegistry.getHealthStatus();
+        return {
+          ...healthStatus,
+          checkedAt: new Date().toISOString(),
+          version: process.env.npm_package_version || 'unknown'
+        };
+      } catch (error) {
+        console.warn('Failed to check registry health:', error);
+        return {
+          status: 'error' as const,
+          available: false,
+          lastUpdate: null,
+          providers: {
+            configured: [],
+            available: [],
+            failed: []
+          },
+          pricing: {
+            overrides: 0,
+            totalOverrideCount: 0
+          },
+          errors: [`Health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
+          performance: {
+            responseTimeMs: 0,
+            cacheHit: false
+          },
+          checkedAt: new Date().toISOString(),
+          version: process.env.npm_package_version || 'unknown'
+        };
+      }
+    }),
+
+  /**
    * Validate AI provider configuration
    */
   validateProvider: publicProcedure

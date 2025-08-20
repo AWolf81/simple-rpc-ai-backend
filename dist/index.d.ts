@@ -13,6 +13,7 @@ export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-a
 export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server.js';
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
 export type { AIRouterConfig, AIRouterType } from './trpc/routers/ai.js';
+export type { ProviderConfig, ModelConfig, PricingInfo, RegistryHealthStatus } from './services/provider-registry.js';
 export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root.js';
 export { TrpcPanelServer, startTrpcPanel, createLocalPanelServer } from './dev/trpc-panel-server.js';
 export type { PanelServerConfig } from './dev/trpc-panel-server.js';

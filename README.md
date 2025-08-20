@@ -735,6 +735,106 @@ const tRpcServer = createRpcAiServer({
 });
 ```
 
+## 🆓 **Free Tier (Optional - Platform Pays)**
+
+The Simple RPC AI Backend supports an **optional free tier** that provides immediate AI access to users without requiring API keys. This is **disabled by default** to protect platform costs.
+
+### **🚨 Cost Implications**
+
+**Important:** The free tier creates costs for **you (the platform operator)**, not the end user:
+
+- ✅ **End users:** Get immediate AI access with no API keys required
+- 💰 **Platform operator:** Pays for all AI API costs from server-side budget
+- 📊 **Cost estimate:** ~$0.05-$0.50 per user per day at conservative limits
+
+### **💡 Minimal Usage Model (5-10 Prompts)**
+
+For users to try basic functionality before upgrading:
+
+```typescript
+// Minimal free tier - allows 5-10 basic prompts
+const server = createRpcAiServer({
+  freeTier: {
+    enabled: true,  // MUST be explicitly enabled
+    providers: {
+      'gpt-4o-mini': {
+        tokensPerDay: 8000,       // ~5-10 prompts (avg 800-1600 tokens each)
+        tokensPerMonth: 50000,    // Conservative monthly limit
+        requestsPerHour: 20,      // Prevent rapid-fire requests
+        maxTokensPerRequest: 2048 // Reasonable response size
+      }
+    },
+    serverApiKeys: {
+      openai: process.env.OPENAI_API_KEY  // Platform's API key
+    }
+  }
+});
+```
+
+### **🔧 Production Free Tier Setup**
+
+```typescript
+// More generous free tier for user acquisition
+const server = createRpcAiServer({
+  freeTier: {
+    enabled: true,
+    providers: {
+      'gpt-4o-mini': {
+        tokensPerDay: 25000,      // ~$0.75/day per user at limit
+        tokensPerMonth: 500000,   // ~$15/month per user at limit
+        requestsPerHour: 60,      // 1 per minute
+        maxTokensPerRequest: 4096
+      },
+      'gemini-2.0-flash': {
+        tokensPerDay: 50000,      // Cheaper option
+        tokensPerMonth: 1000000,
+        requestsPerHour: 100,
+        maxTokensPerRequest: 8192
+      }
+    },
+    serverApiKeys: {
+      openai: process.env.OPENAI_API_KEY,
+      google: process.env.GOOGLE_API_KEY
+    },
+    upgradeThreshold: 0.8  // Show upgrade message at 80% usage
+  }
+});
+```
+
+### **📋 Free Tier Features**
+
+- **🔒 Server-side API keys:** Users never see your API keys
+- **📊 Token tracking:** Per-user daily/monthly/hourly limits
+- **⚡ Rate limiting:** Prevents abuse and runaway costs
+- **📈 Upgrade prompts:** Automatic suggestions when approaching limits
+- **🔧 Provider flexibility:** Support any AI provider with server-side keys
+- **💰 Cost control:** Conservative defaults protect your budget
+
+### **⚠️ Production Considerations**
+
+**Before enabling free tier in production:**
+
+1. **Budget planning:** Calculate costs based on expected user volume
+2. **Monitoring:** Track usage and costs per user
+3. **Abuse prevention:** Set conservative rate limits
+4. **Upgrade funnel:** Clear path for users to BYOK or paid plans
+5. **Terms of service:** Free tier usage limits and fair use policy
+
+**Example monthly cost calculation:**
+- 1000 active users × $15 max per user = $15,000/month maximum
+- Actual costs typically 10-30% of maximum due to usage patterns
+
+### **🚫 Disable Free Tier (Default)**
+
+```typescript
+// Free tier disabled by default - no platform costs
+const server = createRpcAiServer({
+  // freeTier: { enabled: false }  // Default - commented out
+});
+```
+
+Users must bring their own API keys (BYOK) or use paid server-side keys.
+
 ## 🔐 **API Key Management Options**
 
 This package offers **flexible storage options** for API keys and system configuration:
@@ -1425,6 +1525,7 @@ After reading [Kir Shatrov's reverse engineering of Claude Code](https://kirshat
 - ✅ **System Prompt Protection** - Keep sensitive prompts on your secure server (never client-side)
 - ✅ **Business Logic Security** - Your proprietary AI techniques stay hidden
 - ✅ **Corporate Proxy Bypass** - AI requests go through your backend, not blocked
+- ✅ **MCP Integration** - Model Context Protocol support for documentation search and tool integration
 - ✅ **Flexible Key Management** - PostgreSQL, file storage, or client-managed keys
 - ✅ **Zero Extension Setup** - Users don't need API keys or configuration (optional)
 - ✅ **Multi-Provider Support** - Switch AI providers without extension updates
@@ -1953,6 +2054,7 @@ monitor.onProviderStatusChange('anthropic', (hasKey) => {
 | `health` | Check server health | Query | 🌐 Public |
 | **`listProviders`** | **Get service providers with rich metadata** | **Query** | **🌐 Public** |
 | **`listProvidersBYOK`** | **Get BYOK providers with rich metadata** | **Query** | **🌐 Public** |
+| **`getRegistryHealth`** | **Get AI model registry health status** | **Query** | **🌐 Public** |
 
 #### **🆕 Enhanced Provider Methods**
 
@@ -1966,6 +2068,10 @@ const serviceProviders = await client.ai.listProviders.query();
 // Get BYOK providers (user-managed keys)
 const byokProviders = await client.ai.listProvidersBYOK.query();
 // Returns: { providers: ProviderConfig[], source: 'registry', lastUpdated: string }
+
+// Check registry health status
+const health = await client.ai.getRegistryHealth.query();
+// Returns: RegistryHealthStatus with detailed status information
 ```
 
 **Enhanced Provider Data Structure:**
@@ -1984,6 +2090,53 @@ interface ProviderConfig {
     supportedFeatures: string[];   // Capabilities
   };
 }
+
+interface RegistryHealthStatus {
+  status: 'healthy' | 'degraded' | 'unavailable' | 'unknown' | 'error';
+  available: boolean;
+  lastUpdate: string | null;
+  providers: {
+    configured: string[];    // Providers configured in your server
+    available: string[];     // Providers available from registry
+    failed: string[];        // Providers that failed to load
+  };
+  pricing: {
+    overrides: number;       // Number of pricing override keys
+    totalOverrideCount: number; // Total pricing overrides applied
+  };
+  errors: string[];          // Any errors encountered
+  performance: {
+    responseTimeMs: number;  // Registry response time
+    cacheHit: boolean;       // Whether response was cached
+  };
+  checkedAt: string;         // When this health check was performed
+  version: string;           // Package version
+}
+```
+
+#### **🏥 Registry Health Monitoring**
+
+Monitor the AI model registry status for operational monitoring:
+
+```typescript
+// Basic health check
+const health = await client.ai.getRegistryHealth.query();
+
+if (health.status === 'healthy') {
+  console.log('✅ Registry is operating normally');
+} else if (health.status === 'degraded') {
+  console.log('⚠️ Some providers failing:', health.providers.failed);
+} else if (health.status === 'unavailable') {
+  console.log('❌ Registry unavailable, using fallbacks');
+}
+
+// Performance monitoring
+if (health.performance.responseTimeMs > 5000) {
+  console.log('🐌 Slow registry response time');
+}
+
+// Error analysis
+health.errors.forEach(error => console.log('🚨', error));
 ```
 
 ### **💡 Current User Flow**
@@ -2787,22 +2940,107 @@ MIT - Permissive licensing for easy adoption in commercial and open source proje
 
 **This package focuses on practical solutions** that solve real problems for real developers, with the storage flexibility you need for any deployment scenario.
 
-## 🔮 **Future: Model Context Protocol (MCP) Integration**
+## 🔧 **Model Context Protocol (MCP) Integration**
 
 ### **What is MCP?**
 The Model Context Protocol (MCP) is a 2024 standard adopted by OpenAI, Google DeepMind, and Anthropic for AI tool integration. It's built on JSON-RPC 2.0 (same as our package).
 
-### **Could We Support Both?**
-**YES** - Our architecture could easily support both protocols:
+### **✅ Full MCP Support Implemented**
+We now provide comprehensive MCP integration for enhanced AI capabilities:
 
 ```typescript
-// Hybrid server supporting both protocols
-app.post('/rpc', async (req, res) => {
-  if (req.body.method.startsWith('tools/')) {
-    return handleMCPRequest(req, res);    // MCP tool protocol
+import { createRpcAiServer, RefMCPIntegration } from 'simple-rpc-ai-backend';
+
+// Server with MCP support
+const server = createRpcAiServer({
+  mcp: {
+    enableMCP: true,
+    defaultConfig: {
+      enableRefTools: true,      // Documentation search
+      enableFilesystemTools: false // Disabled for security
+    }
   }
-  return handleAIRequest(req, res);       // Our AI backend protocol
+});
+
+// Ref MCP for documentation search
+const refIntegration = new RefMCPIntegration({
+  documentationPaths: ['./docs', './README.md'],
+  remoteDocUrls: ['https://nodejs.org/api/'],
+  githubRepos: [{ owner: 'microsoft', repo: 'vscode-extension-samples' }]
+});
+
+await refIntegration.initialize();
+
+// Search documentation
+const docs = await refIntegration.searchDocumentation({
+  query: 'VS Code extension API',
+  maxResults: 10
+});
+
+// Read URL content
+const content = await refIntegration.readURL({
+  url: 'https://code.visualstudio.com/api',
+  format: 'markdown'
 });
 ```
 
-**Current Status**: Our JSON-RPC 2.0 foundation makes future MCP integration straightforward if needed. Our focus remains on system prompt protection and flexible key management.
+### **🚀 Key MCP Features**
+
+#### **📚 Ref MCP Integration**
+- **Documentation Search**: Query local MD, PDF, HTML files and remote documentation
+- **GitHub Integration**: Access repository documentation and code examples
+- **URL Reading**: Convert web content to markdown for AI consumption
+- **VS Code Optimized**: Built-in support for VS Code extension development
+
+#### **⚙️ Server Management**
+- **Multiple Server Types**: Support for stdio and HTTP MCP servers
+- **Auto-Registration**: Predefined servers with smart defaults
+- **Custom Servers**: Easy configuration for project-specific tools
+- **Health Monitoring**: Real-time server status and tool availability
+
+#### **🤖 AI Tool Integration**
+- **Enhanced AI Responses**: AI models can automatically use MCP tools
+- **Tool Filtering**: Whitelist/blacklist specific tools per request
+- **Usage Tracking**: Monitor tool calls and performance metrics
+- **Type Safety**: Full TypeScript support throughout the stack
+
+### **📖 MCP Endpoints Available**
+
+#### **tRPC Endpoints** (Type-safe)
+- `mcp.health` - Check MCP service health
+- `mcp.listServers` - List registered MCP servers
+- `mcp.listTools` - Get available tools
+- `mcp.executeTool` - Execute a specific tool
+- `mcp.searchDocumentation` - Search documentation with Ref MCP
+- `mcp.readURL` - Read and convert URL content
+- `mcp.searchCodeExamples` - Find language-specific code examples
+- `mcp.searchAPIDocumentation` - Search API references
+
+#### **JSON-RPC Endpoints** (Universal)
+All tRPC endpoints are also available via JSON-RPC for cross-language compatibility.
+
+### **🆚 VS Code Extension Integration**
+
+Perfect for VS Code extension developers:
+
+```typescript
+import { VSCodeRefIntegration } from 'simple-rpc-ai-backend';
+
+// Create workspace-specific integration
+const vscodeIntegration = VSCodeRefIntegration.createForWorkspace('/workspace/path');
+await vscodeIntegration.initialize();
+
+// Search VS Code API
+const apiDocs = await VSCodeRefIntegration.searchVSCodeAPI(
+  vscodeIntegration, 
+  'TreeDataProvider'
+);
+
+// Get extension documentation
+const extensionDocs = await VSCodeRefIntegration.getExtensionDocs(
+  vscodeIntegration,
+  'ms-python.python'
+);
+```
+
+**Current Status**: ✅ **Fully Implemented** - MCP integration is production-ready with comprehensive documentation search, tool management, and VS Code optimization. Maintains our core focus on system prompt protection and corporate-friendly deployment.

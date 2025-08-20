@@ -91,5 +91,28 @@ export declare class ProviderRegistryService {
      * Update configuration
      */
     updateConfiguration(serviceProviders: string[], byokProviders: string[]): void;
+    /**
+     * Get registry health status
+     */
+    getHealthStatus(): Promise<RegistryHealthStatus>;
+}
+export interface RegistryHealthStatus {
+    status: 'healthy' | 'degraded' | 'unavailable' | 'unknown';
+    available: boolean;
+    lastUpdate: string | null;
+    providers: {
+        configured: string[];
+        available: string[];
+        failed: string[];
+    };
+    pricing: {
+        overrides: number;
+        totalOverrideCount: number;
+    };
+    errors: string[];
+    performance: {
+        responseTimeMs: number;
+        cacheHit: boolean;
+    };
 }
 //# sourceMappingURL=provider-registry.d.ts.map

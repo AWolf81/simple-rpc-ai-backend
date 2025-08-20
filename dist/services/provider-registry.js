@@ -318,5 +318,66 @@ export class ProviderRegistryService {
         this.serviceProviders = serviceProviders;
         this.byokProviders = byokProviders;
     }
+    /**
+     * Get registry health status
+     */
+    async getHealthStatus() {
+        const healthCheck = {
+            status: 'unknown',
+            available: false,
+            lastUpdate: this.lastRegistryUpdate?.toISOString() || null,
+            providers: {
+                configured: [...new Set([...this.serviceProviders, ...this.byokProviders])],
+                available: [],
+                failed: []
+            },
+            pricing: {
+                overrides: this.pricingOverrides.size,
+                totalOverrideCount: Array.from(this.pricingOverrides.values()).reduce((total, overrides) => total + overrides.length, 0)
+            },
+            errors: [],
+            performance: {
+                responseTimeMs: 0,
+                cacheHit: false
+            }
+        };
+        const startTime = Date.now();
+        try {
+            // Test registry connectivity
+            const providers = await getRegistryProviders();
+            const responseTime = Date.now() - startTime;
+            if (providers.length > 0) {
+                healthCheck.status = 'healthy';
+                healthCheck.available = true;
+                healthCheck.providers.available = providers;
+                healthCheck.performance.responseTimeMs = responseTime;
+                healthCheck.performance.cacheHit = registryAvailable === true;
+                // Test a few configured providers
+                for (const provider of healthCheck.providers.configured.slice(0, 3)) {
+                    try {
+                        await getRegistryModels({ provider });
+                    }
+                    catch (error) {
+                        healthCheck.providers.failed.push(provider);
+                        healthCheck.errors.push(`Failed to fetch models for ${provider}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                    }
+                }
+                if (healthCheck.providers.failed.length > 0) {
+                    healthCheck.status = 'degraded';
+                }
+            }
+            else {
+                healthCheck.status = 'unavailable';
+                healthCheck.errors.push('Registry returned no providers');
+            }
+        }
+        catch (error) {
+            healthCheck.status = 'unavailable';
+            healthCheck.available = false;
+            healthCheck.performance.responseTimeMs = Date.now() - startTime;
+            healthCheck.errors.push(`Registry connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+        return healthCheck;
+    }
 }
 //# sourceMappingURL=provider-registry.js.map

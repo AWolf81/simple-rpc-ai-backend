@@ -21,6 +21,9 @@ export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-a
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
 export type { AIRouterConfig, AIRouterType } from './trpc/routers/ai.js';
 
+// Provider Registry types
+export type { ProviderConfig, ModelConfig, PricingInfo, RegistryHealthStatus } from './services/provider-registry.js';
+
 // tRPC router types for client type safety
 export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root.js';
 
@@ -32,6 +35,13 @@ export type { PanelServerConfig } from './dev/trpc-panel-server.js';
 // Custom function system
 export { FunctionRegistry } from './services/function-registry.js';
 export { PromptManager, promptManager } from './services/prompt-manager.js';
+
+// MCP (Model Context Protocol) Integration
+export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService, setDefaultMCPServiceInstance } from './services/mcp-service.js';
+export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp-registry.js';
+export { MCPAIService } from './services/mcp-ai-service.js';
+export { RefMCPIntegration, VSCodeRefIntegration } from './services/ref-mcp-integration.js';
+export { createMCPRouter } from './trpc/routers/mcp.js';
 
 // Authentication system exports
 export {
@@ -74,6 +84,41 @@ export type {
   CustomFunctionRequest,
   CustomFunctionResult
 } from './services/function-registry.js';
+
+// MCP Types
+export type {
+  MCPServiceConfig,
+  AIToolRequest,
+  AIToolResponse,
+  MCPToolDefinition
+} from './services/mcp-service.js';
+
+export type {
+  MCPServerConfig,
+  MCPTool,
+  MCPServerStatus,
+  MCPToolRequest,
+  MCPToolResponse
+} from './services/mcp-registry.js';
+
+export type {
+  MCPAIServiceConfig,
+  EnhancedExecuteRequest,
+  EnhancedExecuteResult
+} from './services/mcp-ai-service.js';
+
+export type {
+  RefMCPConfig,
+  DocumentationSearchRequest,
+  DocumentationSearchResult,
+  URLReadRequest,
+  URLReadResult
+} from './services/ref-mcp-integration.js';
+
+export type {
+  MCPRouterConfig,
+  MCPRouterType
+} from './trpc/routers/mcp.js';
 
 // OpenSaaS Monetization exports
 export { createMonetizedAIServer } from './monetization/opensaas-server.js';

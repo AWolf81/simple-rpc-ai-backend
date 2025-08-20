@@ -7,6 +7,7 @@
 
 import { createTRPCRouter } from './index.js';
 import { createAIRouter, type AIRouterConfig, type AIRouterType } from './routers/ai.js';
+import { createMCPRouter, type MCPRouterConfig, type MCPRouterType } from './routers/mcp.js';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { PostgreSQLAdapter } from '../database/postgres-adapter.js';
 
@@ -18,10 +19,12 @@ export function createAppRouter(
   tokenTrackingEnabled?: boolean,
   dbAdapter?: PostgreSQLAdapter,
   serverProviders?: string[],
-  byokProviders?: string[]
+  byokProviders?: string[],
+  mcpConfig?: MCPRouterConfig
 ) {
   return createTRPCRouter({
     ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders),
+    mcp: createMCPRouter(mcpConfig),
     
     // Add more routers here as needed:
     // auth: authRouter,
