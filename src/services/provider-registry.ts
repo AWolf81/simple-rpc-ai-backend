@@ -112,33 +112,37 @@ export interface PricingOverride {
 export class ProviderRegistryService {
   private serviceProviders: string[];
   private byokProviders: string[];
+  private freeProviders: string[] = []; // Free tier disabled by default
   private pricingOverrides: Map<string, PricingOverride[]> = new Map();
   private lastRegistryUpdate: Date | null = null;
 
-  constructor(serviceProviders: string[] = [], byokProviders: string[] = []) {
+  constructor(serviceProviders: string[] = [], byokProviders: string[] = [], freeProviders: string[] = []) {
     this.serviceProviders = serviceProviders;
     this.byokProviders = byokProviders;
+    this.freeProviders = freeProviders; // Must be explicitly enabled
   }
 
   /**
    * Get filtered providers based on configuration
    */
-  async getConfiguredProviders(type: 'service' | 'byok' | 'all' = 'all'): Promise<ProviderConfig[]> {
+  async getConfiguredProviders(type: 'service' | 'byok' | 'free' | 'all' = 'all'): Promise<ProviderConfig[]> {
     try {
       // Get all providers from registry
       const registryProviders = await getRegistryProviders();
       const filteredProviders: ProviderConfig[] = [];
 
       // Get all unique configured providers
-      const allConfiguredProviders = [...new Set([...this.serviceProviders, ...this.byokProviders])];
+      const allConfiguredProviders = [...new Set([...this.serviceProviders, ...this.byokProviders, ...this.freeProviders])];
 
       for (const providerName of allConfiguredProviders) {
         const isServiceProvider = this.serviceProviders.includes(providerName);
         const isByokProvider = this.byokProviders.includes(providerName);
+        const isFreeProvider = this.freeProviders.includes(providerName);
 
         // Filter by type if specified
         if (type === 'service' && !isServiceProvider) continue;
         if (type === 'byok' && !isByokProvider) continue;
+        if (type === 'free' && !isFreeProvider) continue;
 
         // Get models for this provider
         const models = await this.getProviderModels(providerName);
@@ -147,13 +151,13 @@ export class ProviderRegistryService {
           name: providerName,
           displayName: this.getProviderDisplayName(providerName),
           models,
-          priority: this.calculatePriority(providerName, isServiceProvider),
+          priority: this.calculatePriority(providerName, isServiceProvider, isFreeProvider),
           isServiceProvider,
           isByokProvider,
           metadata: {
-            description: `AI provider: ${providerName}`,
-            website: `https://${providerName}.com`,
-            apiKeyRequired: true,
+            description: isFreeProvider ? 'Free tier AI models with usage limits' : `AI provider: ${providerName}`,
+            website: isFreeProvider ? undefined : `https://${providerName}.com`,
+            apiKeyRequired: !isFreeProvider,
             supportedFeatures: ['text-generation', 'chat']
           }
         };
@@ -173,6 +177,30 @@ export class ProviderRegistryService {
    * Get models for a specific provider
    */
   private async getProviderModels(providerName: string): Promise<ModelConfig[]> {
+    // Handle free tier provider specially
+    if (providerName === 'free') {
+      return [
+        {
+          id: 'gpt-4o-mini',
+          name: 'GPT-4o Mini (Free)',
+          description: 'Fast, cost-effective AI model with 128K context. Free tier: 50K tokens/day, 1M tokens/month.',
+          contextLength: 128000,
+          inputCostPer1k: 0, // Free for users
+          outputCostPer1k: 0, // Free for users
+          capabilities: ['text', 'vision', 'speed', 'cost-effective']
+        },
+        {
+          id: 'gemini-2.0-flash',
+          name: 'Gemini 2.0 Flash (Free)',
+          description: 'Next-generation AI with 1M context window. Free tier: 100K tokens/day, 2M tokens/month.',
+          contextLength: 1000000,
+          inputCostPer1k: 0, // Free for users
+          outputCostPer1k: 0, // Free for users
+          capabilities: ['text', 'vision', 'speed', 'large-context']
+        }
+      ];
+    }
+
     try {
       const models = await getRegistryModels({ provider: providerName });
       
@@ -201,7 +229,8 @@ export class ProviderRegistryService {
       'google': 'Google',
       'meta': 'Meta',
       'groq': 'Groq',
-      'deepseek': 'DeepSeek'
+      'deepseek': 'DeepSeek',
+      'free': 'Free Tier'
     };
     return displayNames[providerName] || providerName.charAt(0).toUpperCase() + providerName.slice(1);
   }
@@ -259,9 +288,10 @@ export class ProviderRegistryService {
   }
 
   /**
-   * Calculate provider priority (service providers get higher priority)
+   * Calculate provider priority (free tier gets highest priority, then service providers)
    */
-  private calculatePriority(providerName: string, isServiceProvider: boolean): number {
+  private calculatePriority(providerName: string, isServiceProvider: boolean, isFreeProvider: boolean = false): number {
+    if (isFreeProvider) return 10; // Highest priority for free tier
     const basePriority = isServiceProvider ? 100 : 200;
     const providerIndex = [...this.serviceProviders, ...this.byokProviders].indexOf(providerName);
     return basePriority + providerIndex;
@@ -310,8 +340,35 @@ export class ProviderRegistryService {
   /**
    * Fallback providers when registry is unavailable
    */
-  private getFallbackProviders(type: 'service' | 'byok' | 'all'): ProviderConfig[] {
+  private getFallbackProviders(type: 'service' | 'byok' | 'free' | 'all'): ProviderConfig[] {
     const fallbackData = [
+      {
+        name: 'free',
+        displayName: 'Free Tier',
+        models: [
+          {
+            id: 'gpt-4o-mini',
+            name: 'GPT-4o Mini (Free)',
+            description: 'Fast, cost-effective AI model with 128K context. Free tier: 50K tokens/day, 1M tokens/month.',
+            contextLength: 128000,
+            inputCostPer1k: 0,
+            outputCostPer1k: 0,
+            capabilities: ['text', 'vision', 'speed', 'cost-effective']
+          },
+          {
+            id: 'gemini-2.0-flash',
+            name: 'Gemini 2.0 Flash (Free)',
+            description: 'Next-generation AI with 1M context window. Free tier: 100K tokens/day, 2M tokens/month.',
+            contextLength: 1000000,
+            inputCostPer1k: 0,
+            outputCostPer1k: 0,
+            capabilities: ['text', 'vision', 'speed', 'large-context']
+          }
+        ],
+        priority: 10,
+        isServiceProvider: false,
+        isByokProvider: false
+      },
       {
         name: 'anthropic',
         displayName: 'Anthropic',
@@ -380,7 +437,8 @@ export class ProviderRegistryService {
     return fallbackData.filter(provider => {
       if (type === 'service') return provider.isServiceProvider;
       if (type === 'byok') return provider.isByokProvider;
-      return provider.isServiceProvider || provider.isByokProvider;
+      if (type === 'free') return provider.name === 'free';
+      return provider.isServiceProvider || provider.isByokProvider || provider.name === 'free';
     }) as ProviderConfig[];
   }
 
@@ -408,4 +466,89 @@ export class ProviderRegistryService {
     this.serviceProviders = serviceProviders;
     this.byokProviders = byokProviders;
   }
+
+  /**
+   * Get registry health status
+   */
+  async getHealthStatus(): Promise<RegistryHealthStatus> {
+    const healthCheck: RegistryHealthStatus = {
+      status: 'unknown',
+      available: false,
+      lastUpdate: this.lastRegistryUpdate?.toISOString() || null,
+      providers: {
+        configured: [...new Set([...this.serviceProviders, ...this.byokProviders])],
+        available: [],
+        failed: []
+      },
+      pricing: {
+        overrides: this.pricingOverrides.size,
+        totalOverrideCount: Array.from(this.pricingOverrides.values()).reduce((total, overrides) => total + overrides.length, 0)
+      },
+      errors: [],
+      performance: {
+        responseTimeMs: 0,
+        cacheHit: false
+      }
+    };
+
+    const startTime = Date.now();
+
+    try {
+      // Test registry connectivity
+      const providers = await getRegistryProviders();
+      const responseTime = Date.now() - startTime;
+
+      if (providers.length > 0) {
+        healthCheck.status = 'healthy';
+        healthCheck.available = true;
+        healthCheck.providers.available = providers;
+        healthCheck.performance.responseTimeMs = responseTime;
+        healthCheck.performance.cacheHit = registryAvailable === true;
+        
+        // Test a few configured providers
+        for (const provider of healthCheck.providers.configured.slice(0, 3)) {
+          try {
+            await getRegistryModels({ provider });
+          } catch (error) {
+            healthCheck.providers.failed.push(provider);
+            healthCheck.errors.push(`Failed to fetch models for ${provider}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+
+        if (healthCheck.providers.failed.length > 0) {
+          healthCheck.status = 'degraded';
+        }
+      } else {
+        healthCheck.status = 'unavailable';
+        healthCheck.errors.push('Registry returned no providers');
+      }
+    } catch (error) {
+      healthCheck.status = 'unavailable';
+      healthCheck.available = false;
+      healthCheck.performance.responseTimeMs = Date.now() - startTime;
+      healthCheck.errors.push(`Registry connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    return healthCheck;
+  }
+}
+
+export interface RegistryHealthStatus {
+  status: 'healthy' | 'degraded' | 'unavailable' | 'unknown';
+  available: boolean;
+  lastUpdate: string | null;
+  providers: {
+    configured: string[];
+    available: string[];
+    failed: string[];
+  };
+  pricing: {
+    overrides: number;
+    totalOverrideCount: number;
+  };
+  errors: string[];
+  performance: {
+    responseTimeMs: number;
+    cacheHit: boolean;
+  };
 }

@@ -143,6 +143,78 @@ pnpm run build:prod
 node scripts/setup-providers.js --help
 ```
 
+## Registry Health Monitoring
+
+Monitor the health and status of the AI model registry integration:
+
+### Health Check Scripts
+
+```bash
+# Single health check
+pnpm run registry:health
+
+# Continuous monitoring (every 5 minutes)
+pnpm run registry:monitor
+
+# Custom monitoring interval (every 10 minutes)
+node examples/registry-health-monitoring.js --continuous 10
+```
+
+### Programmatic Health Monitoring
+
+```typescript
+import { createTypedAIClient } from 'simple-rpc-ai-backend';
+
+const client = createTypedAIClient({
+  links: [httpBatchLink({ url: 'http://localhost:8000/trpc' })]
+});
+
+// Get detailed health status
+const health = await client.ai.getRegistryHealth.query();
+
+console.log('Registry Status:', health.status);
+console.log('Response Time:', health.performance.responseTimeMs, 'ms');
+console.log('Available Providers:', health.providers.available);
+console.log('Failed Providers:', health.providers.failed);
+console.log('Pricing Overrides:', health.pricing.overrides);
+```
+
+### Health Status Values
+
+| Status | Description | Action Required |
+|--------|-------------|-----------------|
+| `healthy` | ✅ All systems operational | None |
+| `degraded` | ⚠️ Some providers failing | Check error details, consider `registry:setup` |
+| `unavailable` | ❌ Registry offline | Check network, verify installation |
+| `unknown` | ❓ Status unclear | Investigate connection issues |
+| `error` | 💥 Health check failed | Check server logs |
+
+### Alerting Integration
+
+For production monitoring, integrate with your alerting system:
+
+```typescript
+// Example: Slack alerting
+async function checkAndAlert() {
+  const health = await client.ai.getRegistryHealth.query();
+  
+  if (health.status === 'unavailable') {
+    await sendSlackAlert({
+      channel: '#ai-ops',
+      message: `🚨 AI Registry Down! Status: ${health.status}`,
+      details: health.errors.join('\n')
+    });
+  }
+  
+  if (health.performance.responseTimeMs > 10000) {
+    await sendSlackAlert({
+      channel: '#ai-ops', 
+      message: `🐌 Slow Registry Response: ${health.performance.responseTimeMs}ms`
+    });
+  }
+}
+```
+
 ## Pricing Change Detection
 
 During re-aggregation, the system checks for pricing changes:
