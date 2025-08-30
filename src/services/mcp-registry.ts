@@ -633,6 +633,22 @@ export const PREDEFINED_MCP_SERVERS: MCPServerConfig[] = [
     enabled: true
   },
   {
+    id: 'web-search',
+    name: 'Web Search MCP',
+    description: 'Web search capabilities using open-webSearch',
+    type: 'stdio',
+    command: 'npx',
+    args: ['-y', 'open-websearch@latest'],
+    env: {
+      // Configure search providers - can be overridden
+      SEARCH_PROVIDERS: 'duckduckgo,google,bing',
+      MAX_RESULTS: '10',
+      SAFE_SEARCH: 'moderate'
+    },
+    autoRestart: true,
+    enabled: true
+  },
+  {
     id: 'filesystem-tools',
     name: 'Filesystem Tools',
     description: 'File system access and manipulation tools',

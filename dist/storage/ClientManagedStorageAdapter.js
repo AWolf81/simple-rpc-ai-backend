@@ -97,4 +97,3 @@ export class ClientManagedStorageAdapter {
         }
     }
 }
-//# sourceMappingURL=ClientManagedStorageAdapter.js.map

@@ -240,4 +240,3 @@ export class FileStorageAdapter {
         fs.writeFileSync(this.filePath, encryptedData, 'utf8');
     }
 }
-//# sourceMappingURL=FileStorageAdapter.js.map

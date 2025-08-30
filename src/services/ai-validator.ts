@@ -98,13 +98,13 @@ export class AIKeyValidator implements AIProviderValidator {
         return {
           isValid: true,
           provider: 'anthropic',
-          model: data.model || 'claude-3-haiku-20240307'
+          model: (data as any).model || 'claude-3-haiku-20240307'
         };
       } else {
         const errorData = await response.json().catch(() => ({}));
         return {
           isValid: false,
-          error: errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`,
+          error: (errorData as any).error?.message || `HTTP ${response.status}: ${response.statusText}`,
           provider: 'anthropic'
         };
       }
@@ -152,13 +152,13 @@ export class AIKeyValidator implements AIProviderValidator {
         return {
           isValid: true,
           provider: 'openai',
-          model: data.model || 'gpt-3.5-turbo'
+          model: (data as any).model || 'gpt-3.5-turbo'
         };
       } else {
         const errorData = await response.json().catch(() => ({}));
         return {
           isValid: false,
-          error: errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`,
+          error: (errorData as any).error?.message || `HTTP ${response.status}: ${response.statusText}`,
           provider: 'openai'
         };
       }
@@ -208,7 +208,7 @@ export class AIKeyValidator implements AIProviderValidator {
         const errorData = await response.json().catch(() => ({}));
         return {
           isValid: false,
-          error: errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`,
+          error: (errorData as any).error?.message || `HTTP ${response.status}: ${response.statusText}`,
           provider: 'google'
         };
       }

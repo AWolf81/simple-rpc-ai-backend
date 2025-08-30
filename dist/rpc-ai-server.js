@@ -4,6 +4,7 @@
  * One server that supports both JSON-RPC and tRPC endpoints for AI applications.
  * Provides simple configuration for basic use cases and advanced options for complex scenarios.
  */
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,21 +13,24 @@ import * as trpcExpress from '@trpc/server/adapters/express';
 import crypto from 'crypto';
 import { createAppRouter } from './trpc/root.js';
 import { createTRPCContext } from './trpc/index.js';
-import { AIService } from './services/ai-service.js';
 import { JWTMiddleware } from './auth/jwt-middleware.js';
 import { PostgreSQLAdapter } from './database/postgres-adapter.js';
 import { VirtualTokenService } from './services/virtual-token-service.js';
 import { UsageAnalyticsService } from './services/usage-analytics-service.js';
+import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods.js';
+import { RPC_METHODS } from './constants.js';
+import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge.js';
 export class RpcAiServer {
     app;
     server;
     config;
     router;
-    aiService;
     jwtMiddleware;
     dbAdapter;
     virtualTokenService;
     usageAnalyticsService;
+    postgresRPCMethods;
+    jsonRpcBridge;
     /**
      * Opinionated protocol configuration:
      * - Default: JSON-RPC only (simpler, universal)
@@ -69,6 +73,8 @@ export class RpcAiServer {
             serverProviders: ['anthropic'], // Default: Anthropic only for easier onboarding
             byokProviders: ['anthropic'], // Default: Anthropic BYOK only
             customProviders: [], // Default: no custom providers
+            systemPrompts: config.systemPrompts || {}, // Default: use built-in prompts
+            secretManager: {}, // Default: no secret manager
             protocols,
             tokenTracking: {
                 enabled: false,
@@ -96,6 +102,22 @@ export class RpcAiServer {
                 webhooks: '/webhooks/lemonsqueezy',
                 ...config.paths
             },
+            mcp: {
+                enableMCP: false,
+                auth: {
+                    requireAuthForToolsList: false, // tools/list is public by default
+                    requireAuthForToolsCall: true, // tools/call requires auth by default
+                    publicTools: ['greeting'], // greeting can be public by default
+                    ...config.mcp?.auth
+                },
+                defaultConfig: {
+                    enableWebSearchTool: false,
+                    enableRefTools: false,
+                    enableFilesystemTools: false,
+                    ...config.mcp?.defaultConfig
+                },
+                ...config.mcp
+            },
             ...config
         };
         // Initialize database adapter if token tracking is enabled
@@ -103,6 +125,18 @@ export class RpcAiServer {
             this.dbAdapter = new PostgreSQLAdapter(this.config.tokenTracking.databaseUrl);
             this.virtualTokenService = new VirtualTokenService(this.dbAdapter);
             this.usageAnalyticsService = new UsageAnalyticsService(this.dbAdapter);
+        }
+        // Initialize PostgreSQL RPC Methods if secret manager is configured
+        if (this.config.secretManager && this.config.secretManager.encryptionKey) {
+            const { type, host, port, database, user, password, encryptionKey } = this.config.secretManager;
+            if (type === 'postgresql' && host && port && database && user && password) {
+                try {
+                    this.postgresRPCMethods = new PostgreSQLRPCMethods({ host, port, database, user, password }, encryptionKey);
+                }
+                catch (error) {
+                    console.error('❌ Failed to initialize PostgreSQL RPC Methods:', error);
+                }
+            }
         }
         // Initialize JWT middleware if configured
         if (this.config.jwt.secret) {
@@ -115,24 +149,29 @@ export class RpcAiServer {
             });
         }
         // Create router with AI configuration and token tracking
-        this.router = createAppRouter(this.config.aiLimits, this.config.tokenTracking.enabled || false, this.dbAdapter, this.config.serverProviders, this.config.byokProviders);
-        // Initialize AI service for JSON-RPC endpoint with configured providers
-        this.aiService = new AIService({
-            serviceProviders: this.createServiceProvidersConfig(this.config.serverProviders)
-        });
+        this.router = createAppRouter(this.config.aiLimits, this.config.tokenTracking.enabled || false, this.dbAdapter, this.config.serverProviders, this.config.byokProviders, this.postgresRPCMethods);
+        // Initialize tRPC to JSON-RPC bridge (if JSON-RPC is enabled)
+        if (this.config.protocols.jsonRpc) {
+            this.jsonRpcBridge = createTRPCToJSONRPCBridge(this.router);
+        }
         this.app = express();
         this.setupMiddleware();
         this.setupRoutes();
     }
     setupMiddleware() {
-        // Security
-        this.app.use(helmet());
-        // CORS
+        // Security - with CORS-friendly settings
+        this.app.use(helmet({
+            crossOriginResourcePolicy: false, // Allow cross-origin for OpenRPC tools
+            crossOriginOpenerPolicy: false,
+            contentSecurityPolicy: false // Disable CSP for development
+        }));
+        // CORS - permissive for OpenRPC tools
         this.app.use(cors({
             origin: this.config.cors.origin,
             credentials: this.config.cors.credentials,
-            methods: ['GET', 'POST', 'OPTIONS'],
-            allowedHeaders: ['Content-Type', 'Authorization']
+            methods: ['GET', 'POST', 'OPTIONS', 'HEAD'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+            optionsSuccessStatus: 200 // Some legacy browsers choke on 204
         }));
         // Body parsing
         this.app.use(express.json({ limit: '50mb' }));
@@ -179,107 +218,67 @@ export class RpcAiServer {
                 },
             }));
         }
+        // MCP endpoint will be set up in start() method since it requires async
         // JSON-RPC endpoint (if enabled)
         if (this.config.protocols.jsonRpc) {
-            this.app.post(this.config.paths.jsonRpc, async (req, res) => {
-                try {
-                    const { method, params, id } = req.body;
-                    // Handle JSON-RPC methods compatible with tRPC
-                    switch (method) {
-                        case 'health':
-                        case 'ai.health':
-                            return res.json({
-                                jsonrpc: '2.0',
-                                id,
-                                result: {
-                                    status: 'healthy',
-                                    timestamp: new Date().toISOString(),
-                                    uptime: process.uptime()
-                                }
-                            });
-                        case 'executeAIRequest':
-                        case 'ai.executeAIRequest': {
-                            const { content, systemPrompt, options } = params;
-                            if (!content || !systemPrompt) {
-                                return res.json({
-                                    jsonrpc: '2.0',
-                                    id,
-                                    error: {
-                                        code: -32602,
-                                        message: 'Invalid params: content and systemPrompt are required'
-                                    }
-                                });
-                            }
-                            const result = await this.aiService.execute({
-                                content,
-                                systemPrompt,
-                                options
-                            });
-                            return res.json({
-                                jsonrpc: '2.0',
-                                id,
-                                result: {
-                                    success: true,
-                                    data: result
-                                }
-                            });
-                        }
-                        case 'listProviders':
-                        case 'ai.listProviders':
-                            return res.json({
-                                jsonrpc: '2.0',
-                                id,
-                                result: {
-                                    providers: [
-                                        {
-                                            name: 'anthropic',
-                                            models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'],
-                                            priority: 1,
-                                        },
-                                        {
-                                            name: 'openai',
-                                            models: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
-                                            priority: 2,
-                                        },
-                                        {
-                                            name: 'google',
-                                            models: ['gemini-1.5-pro', 'gemini-1.5-flash'],
-                                            priority: 3,
-                                        },
-                                    ],
-                                }
-                            });
-                        default:
-                            return res.json({
-                                jsonrpc: '2.0',
-                                id,
-                                error: {
-                                    code: -32601,
-                                    message: `Method not found: ${method}`
-                                }
-                            });
-                    }
-                }
-                catch (error) {
-                    return res.status(500).json({
-                        jsonrpc: '2.0',
-                        id: req.body?.id || null,
-                        error: {
-                            code: -32603,
-                            message: `Internal error: ${error instanceof Error ? error.message : 'Unknown error'}`
-                        }
-                    });
-                }
+            // Handle OPTIONS preflight for CORS
+            this.app.options(this.config.paths.jsonRpc, (_req, res) => {
+                res.header('Access-Control-Allow-Origin', '*');
+                res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                res.sendStatus(200);
             });
+            // Handle GET requests to RPC endpoint (for discovery/testing)
+            this.app.get(this.config.paths.jsonRpc, (_req, res) => {
+                res.header('Access-Control-Allow-Origin', '*');
+                res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                res.json({
+                    message: 'JSON-RPC endpoint - use POST method',
+                    endpoint: this.config.paths.jsonRpc,
+                    methods: [RPC_METHODS.HEALTH, RPC_METHODS.EXECUTE_AI_REQUEST, RPC_METHODS.LIST_PROVIDERS, RPC_METHODS.STORE_USER_KEY, RPC_METHODS.GET_USER_KEY, RPC_METHODS.GET_USER_PROVIDERS, RPC_METHODS.VALIDATE_USER_KEY, RPC_METHODS.ROTATE_USER_KEY, RPC_METHODS.DELETE_USER_KEY],
+                    example: {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: { jsonrpc: '2.0', method: 'health', params: [], id: 1 }
+                    }
+                });
+            });
+            // Use the tRPC to JSON-RPC bridge instead of manual route handling
+            this.app.post(this.config.paths.jsonRpc, this.jsonRpcBridge.createHandler());
         }
         // OpenRPC schema endpoint (for JSON-RPC discovery)
-        if (this.config.protocols.jsonRpc) {
+        if (this.config.protocols.jsonRpc && this.jsonRpcBridge) {
             this.app.get('/openrpc.json', (_req, res) => {
-                res.json(this.getOpenRPCSchema());
+                // Explicit CORS headers for OpenRPC tools
+                res.header('Access-Control-Allow-Origin', '*');
+                res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                // Use bridge to generate schema from tRPC router
+                const serverUrl = process.env.OPENRPC_SERVER_URL || `http://localhost:${this.config.port}${this.config.paths.jsonRpc}`;
+                res.json(this.jsonRpcBridge.generateOpenRPCSchema(serverUrl));
             });
         }
         // Root endpoint - helpful information
-        this.app.get('/', (req, res) => {
+        this.app.get('/', (_req, res) => {
+            const hardcodedEndpoints = [
+                this.config.paths.health,
+                this.config.paths.jsonRpc,
+                '/openrpc.json',
+                this.config.paths.tRpc + '/*'
+            ];
+            const routes = {};
+            if (this.app._router) {
+                this.app._router.stack.forEach((layer) => {
+                    if (layer.route && layer.route.path) {
+                        const path = layer.route.path;
+                        if (!hardcodedEndpoints.includes(path)) {
+                            const methods = Object.keys(layer.route.methods).map(m => m.toUpperCase());
+                            routes[path] = methods;
+                        }
+                    }
+                });
+            }
             res.json({
                 name: 'Simple RPC AI Backend',
                 version: '0.1.0',
@@ -292,11 +291,13 @@ export class RpcAiServer {
                     }),
                     ...(this.config.protocols.tRpc && {
                         tRpc: this.config.paths.tRpc + '/*'
-                    })
+                    }),
+                    mcp: '/mcp',
+                    custom: routes
                 },
                 configuration: {
                     protocols: this.config.protocols,
-                    aiLimits: this.config.aiLimits,
+                    aiLimits: this.config.aiLimits
                 }
             });
         });
@@ -306,19 +307,6 @@ export class RpcAiServer {
                 this.handleLemonSqueezyWebhook(req, res);
             });
         }
-        // Catch all
-        this.app.use('*', (_req, res) => {
-            res.status(404).json({
-                error: 'Not found',
-                message: 'This endpoint does not exist.',
-                availableEndpoints: {
-                    health: this.config.paths.health,
-                    ...(this.config.protocols.jsonRpc && { jsonRpc: this.config.paths.jsonRpc }),
-                    ...(this.config.protocols.tRpc && { tRpc: this.config.paths.tRpc }),
-                    ...(this.config.tokenTracking.enabled && { webhooks: this.config.tokenTracking.webhookPath })
-                }
-            });
-        });
     }
     /**
      * Handle LemonSqueezy webhook for token top-ups
@@ -385,78 +373,46 @@ export class RpcAiServer {
             res.status(500).json({ error: 'Webhook processing failed' });
         }
     }
-    getOpenRPCSchema() {
-        return {
-            openrpc: "1.2.6",
-            info: {
-                title: "Simple RPC AI Backend",
-                description: "Unified AI server with system prompt protection",
-                version: "0.1.0"
-            },
-            servers: [{
-                    name: "Unified AI Server",
-                    url: `http://localhost:${this.config.port}${this.config.paths.jsonRpc}`,
-                    description: "JSON-RPC endpoint"
-                }],
-            methods: [
-                {
-                    name: "health",
-                    description: "Check server health",
-                    params: [],
-                    result: {
-                        name: "healthResult",
-                        schema: {
-                            type: "object",
-                            properties: {
-                                status: { type: "string" },
-                                timestamp: { type: "string" },
-                                uptime: { type: "number" }
-                            }
-                        }
-                    }
-                },
-                {
-                    name: "executeAIRequest",
-                    description: "Execute AI request with system prompt protection",
-                    params: [
-                        {
-                            name: "content",
-                            required: true,
-                            schema: { type: "string" }
-                        },
-                        {
-                            name: "systemPrompt",
-                            required: true,
-                            schema: { type: "string" }
-                        },
-                        {
-                            name: "options",
-                            required: false,
-                            schema: {
-                                type: "object",
-                                properties: {
-                                    model: { type: "string" },
-                                    maxTokens: { type: "number" },
-                                    temperature: { type: "number" }
-                                }
-                            }
-                        }
-                    ],
-                    result: {
-                        name: "aiResult",
-                        schema: {
-                            type: "object",
-                            properties: {
-                                success: { type: "boolean" },
-                                data: { type: "object" }
-                            }
-                        }
-                    }
-                }
-            ]
-        };
+    /**
+     * Setup the new router-based MCP server with dual transport (stdio + HTTP)
+     */
+    async setupMCPServer() {
+        console.log(`🚀 Setting up MCP server...`);
+        // Import the MCPProtocolHandler from the router
+        const { MCPProtocolHandler } = await import('./trpc/routers/mcp.js');
+        // Create the MCP protocol handler with the app router
+        const mcpHandler = new MCPProtocolHandler(this.router);
+        // Setup HTTP transport for web clients (like MCP Jam)
+        mcpHandler.setupMCPEndpoint(this.app, '/mcp');
+        console.log(`🤖 MCP server ready with tRPC integration:`);
+        console.log(`   • HTTP/JSON-RPC: http://localhost:${this.config.port}/mcp`);
+        console.log(`   • Auto-discovered tools from tRPC procedures with mcp metadata`);
+        console.log(`   • Supports: initialize, tools/list, tools/call`);
     }
-    async start() {
+    async start(setupRoutes) {
+        // Setup MCP endpoint (always enabled for SDK integration)
+        // Setup new router-based MCP server with HTTP transport
+        await this.setupMCPServer();
+        if (setupRoutes) {
+            setupRoutes(this.app);
+        }
+        // Catch-all (moved from rpc-ai-server setupRoutes method to run after the custom setup routes - if any)
+        // Catch-all 404 middleware — place this LAST
+        this.app.use((req, res) => {
+            console.log('Requested URL:', req.originalUrl);
+            console.log('Matched route:', req.route?.path || '(none)');
+            console.log('Method:', req.method);
+            res.status(404).json({
+                error: 'Not found',
+                message: 'This endpoint does not exist.',
+                availableEndpoints: {
+                    health: this.config.paths.health,
+                    ...(this.config.protocols.jsonRpc && { jsonRpc: this.config.paths.jsonRpc }),
+                    ...(this.config.protocols.tRpc && { tRpc: this.config.paths.tRpc }),
+                    ...(this.config.tokenTracking.enabled && { webhooks: this.config.tokenTracking.webhookPath })
+                }
+            });
+        });
         return new Promise((resolve, reject) => {
             this.server = this.app.listen(this.config.port, () => {
                 console.log(`🚀 RPC AI Server running on port ${this.config.port}`);
@@ -514,8 +470,23 @@ export class RpcAiServer {
         const builtInProviders = ['anthropic', 'openai', 'google'];
         providers.forEach((provider, index) => {
             if (builtInProviders.includes(provider)) {
-                // Built-in provider - use standard config
-                config[provider] = { priority: index + 1 };
+                // Built-in provider - get API key from environment variables
+                let apiKey;
+                switch (provider) {
+                    case 'anthropic':
+                        apiKey = process.env.ANTHROPIC_API_KEY;
+                        break;
+                    case 'openai':
+                        apiKey = process.env.OPENAI_API_KEY;
+                        break;
+                    case 'google':
+                        apiKey = process.env.GOOGLE_API_KEY;
+                        break;
+                }
+                config[provider] = {
+                    priority: index + 1,
+                    ...(apiKey && { apiKey })
+                };
             }
             else {
                 // Custom provider - find in customProviders config
@@ -526,6 +497,9 @@ export class RpcAiServer {
                         custom: true,
                         ...customProvider
                     };
+                }
+                else {
+                    console.warn(`Custom provider '${provider}' not found in customProviders config`);
                 }
             }
         });
@@ -543,4 +517,3 @@ export function defineRpcAiServerConfig(config) {
 export function createRpcAiServer(config = {}) {
     return new RpcAiServer(config);
 }
-//# sourceMappingURL=rpc-ai-server.js.map

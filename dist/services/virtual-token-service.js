@@ -219,4 +219,3 @@ export class VirtualTokenService {
         return parseInt(result[0].count) > 0;
     }
 }
-//# sourceMappingURL=virtual-token-service.js.map

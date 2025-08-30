@@ -10,6 +10,26 @@ export { AIClient } from './client.js'; // Enhanced client with BYOK
 // tRPC Client Support
 export { createTypedAIClient } from './client.js';
 export { AIService } from './services/ai-service.js'; // Direct AI service usage
+export { generateTRPCMethods, createAppRouter } from './trpc/root.js';
+// export { createTestRouter } from './trpc/test-router.js';
+// OpenAPI-related exports temporarily disabled
+// export { 
+//   openApiCompatMiddleware, 
+//   openApiCompatProcedure, 
+//   createOpenApiCompatRouter,
+//   patchTrpcToOpenApi,
+//   makeRouterOpenApiCompatible 
+// } from './trpc/openapi-compat-middleware.js';
+// getRawInput fix for trpc-to-openapi compatibility (disabled)
+// export {
+//   openApiProcedure,
+//   createOpenApiRouter,
+//   createFixedProcedure,
+//   procedures,
+//   createGetRawInputTestRouter,
+//   wrapRouterWithGetRawInputFix,
+//   debugProcedureInputs
+// } from './trpc/getrawinput-fix.js';
 // Recommended server - supports both JSON-RPC and tRPC
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
 // AI Limit Presets for common use cases
@@ -19,6 +39,11 @@ export { TrpcPanelServer, startTrpcPanel, createLocalPanelServer } from './dev/t
 // Custom function system
 export { FunctionRegistry } from './services/function-registry.js';
 export { PromptManager, promptManager } from './services/prompt-manager.js';
+// MCP (Model Context Protocol) Integration
+export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService, setDefaultMCPServiceInstance } from './services/mcp-service.js';
+export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp-registry.js';
+export { MCPAIService } from './services/mcp-ai-service.js';
+export { RefMCPIntegration, VSCodeRefIntegration } from './services/ref-mcp-integration.js';
 // Authentication system exports
 export { UserManager, SimpleKeyManager, AuthManager, PostgreSQLAdapter, AIKeyValidator } from './auth/index.js';
 // OpenSaaS Monetization exports
@@ -33,4 +58,3 @@ export { UsageTracker, PROVIDER_PRICING } from './billing/usage-tracker.js';
 export { BillingEngine } from './billing/billing-engine.js';
 // Default export - unified server for new projects
 export { createRpcAiServer as default } from './rpc-ai-server.js';
-//# sourceMappingURL=index.js.map

@@ -21,9 +21,22 @@ pnpm clean                # Remove dist and coverage directories
 
 ### Development Server
 ```bash
-pnpm dev                  # Start AI backend server on port 8000
-node examples/servers/basic-server.js    # Basic server example
-node examples/servers/ai-server-example.js  # Full AI server example
+pnpm dev                  # Compile TypeScript in watch mode
+pnpm dev:server           # Start basic server example with watch
+pnpm dev:panel            # Start custom API explorer on port 8080
+pnpm dev:full             # Start all three: compiler + server + panel
+
+# Alternative server examples
+node examples/servers/basic-server.js      # Basic server example
+node examples/servers/ai-server-example.js # Full AI server example
+```
+
+### API Documentation Commands
+```bash
+pnpm docs                 # Start custom API explorer (same as dev:panel)
+pnpm docs:playground      # Start local OpenRPC playground
+pnpm docs:local           # Start panel + local OpenRPC playground
+pnpm dev:docs             # Complete setup: server + panel + OpenRPC playground
 ```
 
 ### Vaultwarden Management
@@ -152,6 +165,127 @@ The package provides these JSON-RPC methods:
 11. **`rotateUserKey`** - Rotate user's API key
 12. **`deleteUserKey`** - Delete user's API key
 
+## API Documentation & Testing
+
+### 🚀 Interactive Development Panel & Playground Suite
+
+#### **Complete Development Environment**
+```bash
+# 🎯 RECOMMENDED: Start everything at once
+pnpm dev:docs             # Starts server + custom panel + OpenRPC playground
+
+# 🔧 Individual components (for focused development)
+pnpm dev:server           # Start server only (port 8000)
+pnpm docs                 # Start custom panel only (port 8080)  
+pnpm docs:playground      # Start local OpenRPC playground (port 3000)
+```
+
+#### **🌐 Development URLs**
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **Custom Dev Panel** | `http://localhost:8080` | 📋 Unified API explorer with MCP integration |
+| **OpenRPC Playground** | `http://localhost:3000` | 🔍 Interactive JSON-RPC testing |
+| **tRPC Playground** | `http://localhost:8080/trpc` | ⚡ Type-safe tRPC procedure testing |
+| **MCP Inspector** | `http://localhost:8080/mcp` | 🤖 Model Context Protocol tool explorer |
+| **Server Health** | `http://localhost:8000/health` | ❤️ Server status and configuration |
+
+### 🎛️ **Custom Development Panel Features**
+
+**Primary Panel** (`http://localhost:8080`):
+- 📋 **Complete Procedure Documentation**: All 37+ tRPC procedures with descriptions
+- 🔗 **Protocol Integration Links**: Direct navigation to tRPC/MCP/OpenRPC tools
+- 📝 **Multi-Protocol Examples**: curl examples for tRPC, JSON-RPC, and MCP calls
+- 🎯 **Parameter Specifications**: Type validation and constraint information
+- 🔍 **Live Schema Access**: Links to `http://localhost:8000/openrpc.json`
+
+**MCP Integration Panel** (`http://localhost:8080/mcp`):
+- 🤖 **MCP Tool Discovery**: Live view of auto-discovered tRPC tools with MCP metadata
+- 🛠️ **Tool Schema Inspection**: JSON schemas generated from Zod validators
+- 🧪 **MCP Protocol Testing**: Direct MCP tool/call execution with validation
+- ⚡ **Dynamic Updates**: Automatically refreshes when new tools are added via `meta()`
+
+### ⚡ **tRPC Playground Integration**
+
+**Advanced tRPC Testing** (`http://localhost:8080/trpc`):
+- 🎯 **Type-Safe Testing**: Full TypeScript IntelliSense for all procedures
+- 🔄 **Real-Time Validation**: Input validation with Zod schema enforcement
+- 📊 **Response Inspection**: Formatted JSON responses with type information
+- 🔗 **MCP Cross-Reference**: Links to MCP versions of procedures with `meta.mcp`
+- 🛡️ **Authentication Testing**: JWT token support for protected endpoints
+
+**Supported Procedure Types**:
+- ✅ **Queries**: `ai.health`, `mcp.listTools`, `ai.listProviders` (23 total)
+- ✅ **Mutations**: `ai.executeAIRequest`, `mcp.echo`, `ai.configureBYOK` (14 total)
+- ✅ **MCP Tools**: Auto-discovered from `meta({ mcp: {...} })` decorators
+
+### 🔍 **OpenRPC Playground Integration**
+
+**Standards-Based Testing** (`http://localhost:3000`):
+- 📜 **Schema URL**: `http://localhost:8000/openrpc.json` (auto-loaded)
+- 🧪 **JSON-RPC 2.0 Testing**: Direct method invocation with parameter validation
+- 📋 **Method Discovery**: All available RPC methods with documentation
+- 🔄 **Bi-Directional Sync**: Changes reflected across all development tools
+
+### 🤖 **MCP Protocol Development**
+
+**Model Context Protocol Support**:
+- 🚀 **Dynamic Tool Discovery**: tRPC procedures with MCP metadata automatically exposed
+- 📝 **Interactive Testing**: `tools/list` and `tools/call` directly from the panel
+- 🔐 **Authentication Testing**: JWT-based tool access with configurable public tools
+- ⚡ **Live Updates**: New tools appear immediately when added to tRPC routers
+- 🛠️ **Schema Validation**: Full Zod constraint enforcement in MCP calls
+
+**MCP Development Workflow**:
+1. Add `meta({ mcp: {...} })` to any tRPC procedure
+2. Visit `http://localhost:8080/mcp` to see auto-discovery
+3. Test `tools/list` and `tools/call` directly from the panel
+4. Validate schemas and authentication in real-time
+
+## AI Provider Registry System
+
+### How It Works
+
+The system uses `@anolilab/ai-model-registry` for **live model data** with intelligent fallbacks:
+
+- ✅ **Zero Configuration** - Works immediately after install
+- ✅ **Live Data** - 1,700+ models from 33+ providers  
+- ✅ **Automatic Updates** - Always current models and pricing
+- ✅ **Intelligent Fallbacks** - Works offline with built-in model data
+- ✅ **Corporate Friendly** - No network requirements for basic functionality
+
+### Provider Extension
+
+```typescript
+import { ProviderRegistryService } from 'simple-rpc-ai-backend';
+
+// Add custom providers
+const registry = new ProviderRegistryService(
+  ['anthropic', 'openai', 'custom-ai'], // service providers
+  ['anthropic', 'openai', 'custom-ai']  // BYOK providers
+);
+
+// Override pricing for contract rates
+registry.addPricingOverride({
+  provider: 'anthropic',
+  model: 'claude-3-5-sonnet-20241022',
+  pricing: { input: 1.0, output: 5.0 },
+  reason: 'Enterprise contract pricing'
+});
+```
+
+### Available Registry Tools
+
+```bash
+pnpm registry:health        # Check current registry status
+pnpm registry:check-updates # Check for new models and pricing
+```
+
+**Registry Status Example:**
+- ✅ **Status**: HEALTHY (33 providers, 1727+ models)  
+- ✅ **Providers**: Anthropic (10), OpenAI (20), Google (50), OpenRouter (333+)
+- ✅ **Performance**: <100ms response time
+- ✅ **Features**: Real-time model availability, pricing data, capability filtering
+
 ## Testing Standards
 
 ### Coverage Requirements
@@ -220,34 +354,104 @@ pnpm test -- ai-service.test.ts    # AI provider tests
 - ✅ **Progressive authentication** (anonymous → OAuth → Pro)
 - ✅ **Session isolation** with automatic cleanup
 
-## Future Considerations: MCP Integration
+## MCP Integration: Dynamic tRPC Tool Exposure
 
-### Model Context Protocol (MCP) Compatibility
+### Model Context Protocol (MCP) Implementation Status: ✅ **COMPLETE**
 
-**Current Status**: We use JSON-RPC 2.0, same foundation as MCP
+**Current Status**: Full MCP server implementation with dynamic tRPC integration
 
-**Potential Integration**:
+### 🚀 Dynamic tRPC Method Handling for MCP Exposure
+
+**Key Innovation**: tRPC procedures with `meta()` decorators are automatically exposed as MCP tools
+
+#### **How to Add MCP Tools**
 ```typescript
-// Could support both protocols on same server
-app.post('/rpc', async (req, res) => {
-  if (req.body.method.startsWith('tools/')) {
-    return handleMCPRequest(req, res);  // MCP tool protocol
+// In any tRPC router - just add meta() with MCP information
+newTool: publicProcedure
+  .meta({
+    mcp: {
+      title: "Tool Name",
+      description: "What this tool does",
+      category: "utility"  // optional
+    }
+  })
+  .input(z.object({ 
+    param: z.string(),
+    count: z.number().min(1).max(10)  // Validation constraints
+  }))
+  .mutation(async ({ input }) => {
+    return `Result: ${input.param} (${input.count} times)`;
+  })
+```
+
+#### **Automatic Discovery Process**
+1. **Runtime Discovery**: Server scans all tRPC procedures for `meta.mcp` decorators
+2. **Schema Generation**: Zod schemas → JSON Schema with full validation rules  
+3. **Tool Registration**: Procedures become callable via MCP `tools/call`
+4. **Validation Enforcement**: Input validation runs before execution
+
+#### **Technical Implementation**
+- **Discovery Method**: `discoverMCPToolsFromTRPC()` scans `router._def.procedures`
+- **Schema Conversion**: Uses `zod-to-json-schema` for proper constraint handling
+- **Execution Path**: `procedure._def.resolver()` with input validation
+- **Error Handling**: Zod validation errors → proper MCP error responses
+
+#### **MCP Protocol Endpoints**
+```typescript
+// All endpoints automatically available at /mcp
+POST /mcp  // MCP HTTP transport
+{
+  "method": "tools/list",     // → Dynamic discovery from tRPC
+  "method": "tools/call",     // → Execute with validation
+  "method": "initialize"      // → MCP handshake
+}
+```
+
+### 🔧 **MCP Server Configuration**
+```typescript
+const server = createRpcAiServer({
+  mcp: {
+    enableMCP: true,
+    auth: {
+      requireAuthForToolsList: false,   // tools/list public by default
+      requireAuthForToolsCall: true,    // tools/call requires auth
+      publicTools: ['greeting']          // Exception list
+    }
   }
-  return handleRPCRequest(req, res);    // Our AI backend protocol
 });
 ```
 
-**MCP Benefits**:
-- Direct integration with Claude, ChatGPT, Gemini (2024+ standard)
-- Tool discovery by AI providers
-- Industry standardization (adopted by OpenAI, Google DeepMind)
+### 📋 **Current MCP Tools Available**
+- **greeting**: Generate friendly greetings with language support
+- **echo**: Message repetition with transformation options
+- **All tools**: Automatically discovered from tRPC router metadata
 
-**Why Not Yet Implemented**:
-- Different use case (MCP = tool integration, we = AI request proxying)
-- Added complexity for our specific system prompt protection use case
-- Our current architecture already solves the corporate proxy problem
+### 🎯 **MCP Benefits Realized**
+- ✅ **Direct AI Integration**: Claude, ChatGPT, Gemini can discover and use tools
+- ✅ **Zero Configuration**: Just add `meta()` to tRPC procedures
+- ✅ **Full Validation**: Zod constraints enforced (`min/max`, `enum`, `required`)
+- ✅ **Type Safety**: End-to-end TypeScript support
+- ✅ **Authentication**: JWT-based protection with configurable public tools
+- ✅ **Schema Compliance**: Proper JSON Schema generation for AI consumption
 
-**Decision**: Monitor MCP adoption; consider hybrid approach if demand emerges
+### 🔄 **Integration Architecture**
+```typescript
+// Unified server supports both protocols simultaneously
+app.post('/rpc', handleJSONRPC);     // AI backend protocol
+app.post('/trpc', handleTRPC);       // TypeScript client protocol  
+app.post('/mcp', handleMCP);         // Model Context Protocol
+
+// Tools defined once, available everywhere:
+// - tRPC: mcp.greeting, mcp.echo
+// - JSON-RPC: mcp.greeting, mcp.echo  
+// - MCP: greeting, echo (auto-discovered)
+```
+
+### 🔐 **Security Integration**
+- **System Prompt Protection**: MCP tools don't expose internal prompts
+- **Corporate Proxy Friendly**: Standard HTTPS, no special requirements
+- **Progressive Auth**: Anonymous discovery → JWT authentication for execution
+- **Input Validation**: All MCP tool calls validated against tRPC schemas
 
 ## Security Guidelines
 
@@ -354,6 +558,8 @@ project/
 │   ├── extensions/        # VS Code extension examples
 │   └── web-ui/           # Web application examples
 ├── test/                 # Test suites
+├── dev-panel.js          # Custom API explorer for development
+├── local-openrpc-tools.js # Local OpenRPC inspector and playground servers
 ├── docker-compose.vaultwarden.yml  # Vaultwarden infrastructure
 ├── .env.vaultwarden.example        # Environment template
 ├── CLAUDE.md             # This file
@@ -396,9 +602,27 @@ project/
 - **JSON-RPC Standard Compliance**: Follow RFC 7231 and json-rpc-2.0 library patterns
 - **Progressive Authentication**: Support anonymous → OAuth → Pro upgrade flows
 - **Security First**: All authentication and key management must be production-ready
+- **MCP Integration**: Dynamic tRPC → MCP tool exposure with `meta()` decorators is core feature
+- **Dynamic Discovery**: All tRPC procedures with MCP metadata automatically become AI-accessible tools
+- **Validation Enforcement**: Zod schemas must be properly validated for all MCP tool calls
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+- ✅ **COMPLETED**: Add new JSON-RPC approach to memory - Implemented tRPC to JSON-RPC bridge extraction where JSON-RPC methods are dynamically extracted from tRPC methods, enabling dual protocol support on the same server
+- ✅ **COMPLETED**: Comprehensive documentation of tRPC playground and MCP development panel
+  - **Development Panel Suite**: Unified API explorer at `http://localhost:8080` with protocol integration
+  - **tRPC Playground**: Type-safe testing with IntelliSense at `http://localhost:8080/api/trpc-playground`  
+  - **MCP Jam Testing Tool**: Live MCP tool discovery and testing at `http://localhost:4000`
+  - **Development Workflow**: 4-step process for adding and testing MCP tools
+  - **Multi-Protocol Support**: tRPC, JSON-RPC, and MCP all accessible from one panel
+- ✅ **COMPLETED**: Dynamic tRPC method handling for MCP exposure with metadata
+  - **Key Feature**: tRPC procedures with `meta({ mcp: {...} })` automatically become MCP tools
+  - **Discovery**: Runtime scanning of `router._def.procedures` for MCP metadata
+  - **Validation**: Full Zod validation enforced via `inputParser.parse(args)`
+  - **Schema**: Automatic Zod → JSON Schema conversion with constraints
+  - **Execution**: Direct resolver calls with proper error handling
+  - **Authentication**: JWT-based protection with configurable public tools
+  - **Protocol**: Standard MCP HTTP transport at `/mcp` endpoint

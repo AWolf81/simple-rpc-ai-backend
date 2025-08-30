@@ -205,4 +205,3 @@ export function getTierConfig(tier, customTiers) {
 export function mergeWithDefaultTiers(customTiers) {
     return { ...DEFAULT_TIER_CONFIGS, ...customTiers };
 }
-//# sourceMappingURL=jwt-middleware.js.map

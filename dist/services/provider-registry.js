@@ -11,15 +11,22 @@ async function getRegistryProviders() {
         return [];
     }
     try {
-        // Use eval to avoid TypeScript module resolution issues at build time
-        const registryModule = '@anolilab/ai-model-registry';
-        const registry = await eval('import')(registryModule);
+        // Use dynamic import with string to avoid TypeScript module resolution at build time
+        const registry = await import('@anolilab/ai-model-registry');
+        // Test the function directly
+        if (typeof registry.getProviders !== 'function') {
+            throw new Error('getProviders function not found');
+        }
+        const providers = registry.getProviders();
+        if (!Array.isArray(providers)) {
+            throw new Error('getProviders did not return an array');
+        }
         registryAvailable = true;
-        return registry.getProviders?.() || [];
+        return providers;
     }
     catch (error) {
         registryAvailable = false;
-        console.warn('AI model registry not available, using fallback');
+        console.warn('AI model registry not available, using fallback:', error instanceof Error ? error.message : String(error));
         return [];
     }
 }
@@ -28,11 +35,21 @@ async function getRegistryModels(options) {
         return [];
     }
     try {
-        // Use eval to avoid TypeScript module resolution issues at build time
-        const registryModule = '@anolilab/ai-model-registry';
-        const registry = await eval('import')(registryModule);
+        // Use dynamic import with string to avoid TypeScript module resolution at build time
+        const registry = await import('@anolilab/ai-model-registry');
         registryAvailable = true;
-        return registry.getModels?.(options) || [];
+        // Convert provider name to the format expected by the registry
+        const providerNameMap = {
+            'anthropic': 'Anthropic',
+            'openai': 'OpenAI',
+            'google': 'Google',
+            'openrouter': 'OpenRouter',
+            'meta': 'Meta',
+            'groq': 'Groq'
+        };
+        const registryProviderName = providerNameMap[options.provider] ||
+            options.provider.charAt(0).toUpperCase() + options.provider.slice(1);
+        return registry.getModelsByProvider?.(registryProviderName) || [];
     }
     catch (error) {
         registryAvailable = false;
@@ -43,11 +60,13 @@ async function getRegistryModels(options) {
 export class ProviderRegistryService {
     serviceProviders;
     byokProviders;
+    freeProviders = []; // Free tier disabled by default
     pricingOverrides = new Map();
     lastRegistryUpdate = null;
-    constructor(serviceProviders = [], byokProviders = []) {
+    constructor(serviceProviders = [], byokProviders = [], freeProviders = []) {
         this.serviceProviders = serviceProviders;
         this.byokProviders = byokProviders;
+        this.freeProviders = freeProviders; // Must be explicitly enabled
     }
     /**
      * Get filtered providers based on configuration
@@ -58,14 +77,17 @@ export class ProviderRegistryService {
             const registryProviders = await getRegistryProviders();
             const filteredProviders = [];
             // Get all unique configured providers
-            const allConfiguredProviders = [...new Set([...this.serviceProviders, ...this.byokProviders])];
+            const allConfiguredProviders = [...new Set([...this.serviceProviders, ...this.byokProviders, ...this.freeProviders])];
             for (const providerName of allConfiguredProviders) {
                 const isServiceProvider = this.serviceProviders.includes(providerName);
                 const isByokProvider = this.byokProviders.includes(providerName);
+                const isFreeProvider = this.freeProviders.includes(providerName);
                 // Filter by type if specified
                 if (type === 'service' && !isServiceProvider)
                     continue;
                 if (type === 'byok' && !isByokProvider)
+                    continue;
+                if (type === 'free' && !isFreeProvider)
                     continue;
                 // Get models for this provider
                 const models = await this.getProviderModels(providerName);
@@ -73,13 +95,13 @@ export class ProviderRegistryService {
                     name: providerName,
                     displayName: this.getProviderDisplayName(providerName),
                     models,
-                    priority: this.calculatePriority(providerName, isServiceProvider),
+                    priority: this.calculatePriority(providerName, isServiceProvider, isFreeProvider),
                     isServiceProvider,
                     isByokProvider,
                     metadata: {
-                        description: `AI provider: ${providerName}`,
-                        website: `https://${providerName}.com`,
-                        apiKeyRequired: true,
+                        description: isFreeProvider ? 'Free tier AI models with usage limits' : `AI provider: ${providerName}`,
+                        website: isFreeProvider ? undefined : `https://${providerName}.com`,
+                        apiKeyRequired: !isFreeProvider,
                         supportedFeatures: ['text-generation', 'chat']
                     }
                 };
@@ -97,6 +119,29 @@ export class ProviderRegistryService {
      * Get models for a specific provider
      */
     async getProviderModels(providerName) {
+        // Handle free tier provider specially
+        if (providerName === 'free') {
+            return [
+                {
+                    id: 'gpt-4o-mini',
+                    name: 'GPT-4o Mini (Free)',
+                    description: 'Fast, cost-effective AI model with 128K context. Free tier: 50K tokens/day, 1M tokens/month.',
+                    contextLength: 128000,
+                    inputCostPer1k: 0, // Free for users
+                    outputCostPer1k: 0, // Free for users
+                    capabilities: ['text', 'vision', 'speed', 'cost-effective']
+                },
+                {
+                    id: 'gemini-2.0-flash',
+                    name: 'Gemini 2.0 Flash (Free)',
+                    description: 'Next-generation AI with 1M context window. Free tier: 100K tokens/day, 2M tokens/month.',
+                    contextLength: 1000000,
+                    inputCostPer1k: 0, // Free for users
+                    outputCostPer1k: 0, // Free for users
+                    capabilities: ['text', 'vision', 'speed', 'large-context']
+                }
+            ];
+        }
         try {
             const models = await getRegistryModels({ provider: providerName });
             return models.map((model) => ({
@@ -124,7 +169,8 @@ export class ProviderRegistryService {
             'google': 'Google',
             'meta': 'Meta',
             'groq': 'Groq',
-            'deepseek': 'DeepSeek'
+            'deepseek': 'DeepSeek',
+            'free': 'Free Tier'
         };
         return displayNames[providerName] || providerName.charAt(0).toUpperCase() + providerName.slice(1);
     }
@@ -179,9 +225,11 @@ export class ProviderRegistryService {
         return fallbackModels[providerName] || [];
     }
     /**
-     * Calculate provider priority (service providers get higher priority)
+     * Calculate provider priority (free tier gets highest priority, then service providers)
      */
-    calculatePriority(providerName, isServiceProvider) {
+    calculatePriority(providerName, isServiceProvider, isFreeProvider = false) {
+        if (isFreeProvider)
+            return 10; // Highest priority for free tier
         const basePriority = isServiceProvider ? 100 : 200;
         const providerIndex = [...this.serviceProviders, ...this.byokProviders].indexOf(providerName);
         return basePriority + providerIndex;
@@ -225,6 +273,33 @@ export class ProviderRegistryService {
      */
     getFallbackProviders(type) {
         const fallbackData = [
+            {
+                name: 'free',
+                displayName: 'Free Tier',
+                models: [
+                    {
+                        id: 'gpt-4o-mini',
+                        name: 'GPT-4o Mini (Free)',
+                        description: 'Fast, cost-effective AI model with 128K context. Free tier: 50K tokens/day, 1M tokens/month.',
+                        contextLength: 128000,
+                        inputCostPer1k: 0,
+                        outputCostPer1k: 0,
+                        capabilities: ['text', 'vision', 'speed', 'cost-effective']
+                    },
+                    {
+                        id: 'gemini-2.0-flash',
+                        name: 'Gemini 2.0 Flash (Free)',
+                        description: 'Next-generation AI with 1M context window. Free tier: 100K tokens/day, 2M tokens/month.',
+                        contextLength: 1000000,
+                        inputCostPer1k: 0,
+                        outputCostPer1k: 0,
+                        capabilities: ['text', 'vision', 'speed', 'large-context']
+                    }
+                ],
+                priority: 10,
+                isServiceProvider: false,
+                isByokProvider: false
+            },
             {
                 name: 'anthropic',
                 displayName: 'Anthropic',
@@ -294,7 +369,9 @@ export class ProviderRegistryService {
                 return provider.isServiceProvider;
             if (type === 'byok')
                 return provider.isByokProvider;
-            return provider.isServiceProvider || provider.isByokProvider;
+            if (type === 'free')
+                return provider.name === 'free';
+            return provider.isServiceProvider || provider.isByokProvider || provider.name === 'free';
         });
     }
     /**
@@ -352,10 +429,14 @@ export class ProviderRegistryService {
                 healthCheck.providers.available = providers;
                 healthCheck.performance.responseTimeMs = responseTime;
                 healthCheck.performance.cacheHit = registryAvailable === true;
-                // Test a few configured providers
+                // Test a few configured providers  
                 for (const provider of healthCheck.providers.configured.slice(0, 3)) {
                     try {
-                        await getRegistryModels({ provider });
+                        const models = await getRegistryModels({ provider });
+                        if (models.length === 0) {
+                            healthCheck.providers.failed.push(provider);
+                            healthCheck.errors.push(`No models found for ${provider} - check provider name capitalization`);
+                        }
                     }
                     catch (error) {
                         healthCheck.providers.failed.push(provider);
@@ -380,4 +461,3 @@ export class ProviderRegistryService {
         return healthCheck;
     }
 }
-//# sourceMappingURL=provider-registry.js.map

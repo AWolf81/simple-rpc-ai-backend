@@ -5,4 +5,3 @@
  * Supports Vaultwarden, file-based, and client-managed storage
  */
 export {};
-//# sourceMappingURL=StorageAdapter.js.map

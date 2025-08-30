@@ -260,4 +260,3 @@ Provide actionable recommendations with expected impact levels.`,
 }
 // Global prompt manager instance
 export const promptManager = new PromptManager();
-//# sourceMappingURL=prompt-manager.js.map

@@ -6,12 +6,12 @@
  */
 
 import { z } from 'zod';
-import { createTRPCRouter, publicProcedure } from '../trpc/index.js';
+import { router, publicProcedure } from '../trpc/index.js';
 import { appRouter } from '../trpc/root.js';
 import type { AppRouter } from '../trpc/root.js';
 
 // Re-export tRPC components for compatibility
-export { createTRPCRouter, publicProcedure };
+export { router as createTRPCRouter, publicProcedure };
 export { appRouter as mainRouter };
 export type { AppRouter };
 
@@ -27,7 +27,7 @@ export const v = {
 };
 
 // For backward compatibility, create an alias
-export const createRPCRouter: typeof createTRPCRouter = createTRPCRouter;
+export const createRPCRouter: typeof router = router;
 
 // Simple OpenRPC schema generator for tRPC routers
 export function generateOpenRPCSchema(

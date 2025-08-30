@@ -207,4 +207,3 @@ export class PostgreSQLAdapter {
     }
 }
 // PostgreSQL adapter - no aliases to avoid confusion
-//# sourceMappingURL=postgres-adapter.js.map

@@ -1,0 +1,1398 @@
+{
+  "generated": "2025-08-30T19:57:54.351Z",
+  "version": "1.0.0",
+  "description": "tRPC procedure documentation extracted from router",
+  "procedures": {
+    "ai.test": {
+      "path": "/ai/test",
+      "type": "mutation",
+      "description": "Echo test endpoint for AI service validation",
+      "summary": "Test AI endpoint",
+      "tags": [
+        "AI",
+        "Testing"
+      ],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "message": {
+            "type": "ZodString",
+            "description": null
+          }
+        }
+      },
+      "output": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "message": {
+            "type": "ZodString",
+            "description": null
+          }
+        }
+      },
+      "meta": {
+        "mcp": {
+          "enabled": true,
+          "description": "Just a echo test endpoint"
+        },
+        "openapi": {
+          "method": "POST",
+          "path": "/ai/test",
+          "tags": [
+            "AI",
+            "Testing"
+          ],
+          "summary": "Test AI endpoint",
+          "description": "Echo test endpoint for AI service validation"
+        }
+      },
+      "method": "POST"
+    },
+    "ai.health": {
+      "path": "ai.health",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodVoid",
+        "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.executeAIRequest": {
+      "path": "ai.executeAIRequest",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "content": {
+            "type": "ZodString",
+            "description": null
+          },
+          "systemPrompt": {
+            "type": "ZodString",
+            "description": null
+          },
+          "metadata": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodObject",
+              "description": null,
+              "properties": {
+                "name": {
+                  "type": "ZodOptional",
+                  "description": null,
+                  "innerType": {
+                    "type": "ZodString",
+                    "description": null
+                  }
+                },
+                "type": {
+                  "type": "ZodOptional",
+                  "description": null,
+                  "innerType": {
+                    "type": "ZodString",
+                    "description": null
+                  }
+                }
+              }
+            }
+          },
+          "options": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodObject",
+              "description": null,
+              "properties": {
+                "model": {
+                  "type": "ZodOptional",
+                  "description": null,
+                  "innerType": {
+                    "type": "ZodString",
+                    "description": null
+                  }
+                },
+                "maxTokens": {
+                  "type": "ZodOptional",
+                  "description": null,
+                  "innerType": {
+                    "type": "ZodDefault",
+                    "description": null,
+                    "innerType": {
+                      "type": "ZodNumber",
+                      "description": null
+                    }
+                  }
+                },
+                "temperature": {
+                  "type": "ZodOptional",
+                  "description": null,
+                  "innerType": {
+                    "type": "ZodNumber",
+                    "description": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getUserProfile": {
+      "path": "ai.getUserProfile",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodVoid",
+        "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.updateUserPreferences": {
+      "path": "ai.updateUserPreferences",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "consumptionOrder": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodArray",
+              "description": null
+            }
+          },
+          "byokEnabled": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          },
+          "byokProviders": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodRecord",
+              "description": null
+            }
+          },
+          "notifyTokenLowThreshold": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          },
+          "notifyFallbackToByok": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          },
+          "notifyOneTimeConsumed": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.configureBYOK": {
+      "path": "ai.configureBYOK",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "providers": {
+            "type": "ZodRecord",
+            "description": null
+          },
+          "enabled": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getBYOKStatus": {
+      "path": "ai.getBYOKStatus",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodVoid",
+        "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getUserTokenBalances": {
+      "path": "ai.getUserTokenBalances",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodVoid",
+        "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.planConsumption": {
+      "path": "ai.planConsumption",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "estimatedTokens": {
+            "type": "ZodNumber",
+            "description": null
+          },
+          "hasApiKey": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getConsumptionHistory": {
+      "path": "ai.getConsumptionHistory",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "limit": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getTokenBalance": {
+      "path": "ai.getTokenBalance",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodVoid",
+        "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getUsageHistory": {
+      "path": "ai.getUsageHistory",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "limit": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getTopupHistory": {
+      "path": "ai.getTopupHistory",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "limit": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getUserStatus": {
+      "path": "ai.getUserStatus",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodVoid",
+        "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getUsageAnalytics": {
+      "path": "ai.getUsageAnalytics",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "days": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          },
+          "includeHistory": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          },
+          "historyLimit": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getPurchaseHistory": {
+      "path": "ai.getPurchaseHistory",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "limit": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          },
+          "type": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodEnum",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.checkRequestEligibility": {
+      "path": "ai.checkRequestEligibility",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "estimatedTokens": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          },
+          "hasApiKey": {
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.listProviders": {
+      "path": "ai.listProviders",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodVoid",
+        "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.listProvidersBYOK": {
+      "path": "ai.listProvidersBYOK",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodVoid",
+        "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getRegistryHealth": {
+      "path": "ai.getRegistryHealth",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodVoid",
+        "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.validateProvider": {
+      "path": "ai.validateProvider",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "provider": {
+            "type": "ZodEnum",
+            "description": null
+          },
+          "apiKey": {
+            "type": "ZodString",
+            "description": null
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.storeUserKey": {
+      "path": "ai.storeUserKey",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "email": {
+            "type": "ZodString",
+            "description": null
+          },
+          "provider": {
+            "type": "ZodEnum",
+            "description": null
+          },
+          "apiKey": {
+            "type": "ZodString",
+            "description": null
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getUserKey": {
+      "path": "ai.getUserKey",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "email": {
+            "type": "ZodString",
+            "description": null
+          },
+          "provider": {
+            "type": "ZodEnum",
+            "description": null
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.getUserProviders": {
+      "path": "ai.getUserProviders",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "email": {
+            "type": "ZodString",
+            "description": null
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.validateUserKey": {
+      "path": "ai.validateUserKey",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "email": {
+            "type": "ZodString",
+            "description": null
+          },
+          "provider": {
+            "type": "ZodEnum",
+            "description": null
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.rotateUserKey": {
+      "path": "ai.rotateUserKey",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "email": {
+            "type": "ZodString",
+            "description": null
+          },
+          "provider": {
+            "type": "ZodEnum",
+            "description": null
+          },
+          "newApiKey": {
+            "type": "ZodString",
+            "description": null
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.deleteUserKey": {
+      "path": "ai.deleteUserKey",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "email": {
+            "type": "ZodString",
+            "description": null
+          },
+          "provider": {
+            "type": "ZodEnum",
+            "description": null
+          }
+        }
+      },
+      "output": null,
+      "meta": null
+    },
+    "mcp.hello": {
+      "path": "/mcp/hello",
+      "type": "query",
+      "description": "Generate a friendly greeting message for a given name",
+      "summary": "Generate greeting",
+      "tags": [
+        "MCP",
+        "Greetings"
+      ],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "name": {
+            "type": "ZodString",
+            "description": "The name to greet"
+          }
+        }
+      },
+      "output": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "greeting": {
+            "type": "ZodString",
+            "description": null
+          }
+        }
+      },
+      "meta": {
+        "mcp": {
+          "name": "greeting",
+          "description": "Generate a friendly greeting message for a given name"
+        },
+        "openapi": {
+          "method": "GET",
+          "path": "/mcp/hello",
+          "tags": [
+            "MCP",
+            "Greetings"
+          ],
+          "summary": "Generate greeting",
+          "description": "Generate a friendly greeting message for a given name"
+        }
+      },
+      "method": "GET"
+    },
+    "mcp.echo": {
+      "path": "mcp.echo",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "message": {
+            "type": "ZodString",
+            "description": "Message to echo"
+          },
+          "transform": {
+            "type": "ZodDefault",
+            "description": "How to transform the message",
+            "innerType": {
+              "type": "ZodEnum",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "echo",
+          "description": "Echo back a message with optional transformation"
+        }
+      }
+    },
+    "mcp.status": {
+      "path": "mcp.status",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "detailed": {
+            "type": "ZodDefault",
+            "description": "Include detailed information",
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "status",
+          "description": "Get server status and information"
+        }
+      }
+    },
+    "mcp.calculate": {
+      "path": "mcp.calculate",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "expression": {
+            "type": "ZodString",
+            "description": "Mathematical expression (e.g., \"2 + 3 * 4\")"
+          },
+          "precision": {
+            "type": "ZodDefault",
+            "description": "Decimal precision for results",
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "calculate",
+          "description": "Perform basic mathematical calculations"
+        }
+      }
+    },
+    "mcp.longRunningTask": {
+      "path": "mcp.longRunningTask",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "duration": {
+            "type": "ZodNumber",
+            "description": "Task duration in seconds"
+          },
+          "steps": {
+            "type": "ZodNumber",
+            "description": "Number of steps to complete"
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "longRunningTask",
+          "description": "Demonstrate a long-running task with progress reporting and cancellation support"
+        },
+        "mcpExtensions": {
+          "supportsProgress": true,
+          "supportsCancellation": true
+        }
+      }
+    },
+    "mcp.cancellableTask": {
+      "path": "mcp.cancellableTask",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "iterations": {
+            "type": "ZodDefault",
+            "description": "Number of iterations to perform",
+            "innerType": {
+              "type": "ZodNumber",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "cancellableTask",
+          "description": "A task that can be cancelled mid-execution"
+        },
+        "mcpExtensions": {
+          "supportsCancellation": true
+        }
+      }
+    },
+    "mcp.cancelTask": {
+      "path": "mcp.cancelTask",
+      "type": "mutation",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "taskId": {
+            "type": "ZodString",
+            "description": "ID of the task to cancel"
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "cancelTask",
+          "description": "Cancel a running task by its task ID"
+        }
+      }
+    },
+    "mcp.listRunningTasks": {
+      "path": "mcp.listRunningTasks",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "includeCompleted": {
+            "type": "ZodDefault",
+            "description": "Include completed tasks in the list",
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "listRunningTasks",
+          "description": "List all currently running tasks"
+        }
+      }
+    },
+    "mcp.getTaskProgress": {
+      "path": "mcp.getTaskProgress",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "taskId": {
+            "type": "ZodString",
+            "description": "ID of the task to check progress for"
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "getTaskProgress",
+          "description": "Get real-time progress for a specific task"
+        }
+      }
+    }
+  },
+  "mcp": {
+    "available": true,
+    "methods": {
+      "ai.test": {
+        "description": "Just a echo test endpoint",
+        "category": "general",
+        "type": "mutation",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "test",
+                "arguments": {
+                  "message": "Hello MCP"
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/ai.test",
+            "method": "POST",
+            "example": "curl -X POST \"http://localhost:8000/trpc/ai.test?batch=1\" -H \"Content-Type: application/json\" -d '[{\"0\":{\"json\":{\"message\":\"Hello MCP\"}}}]'"
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "ai.test",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "ai.test",
+              "params": {
+                "message": "Hello MCP"
+              }
+            }
+          }
+        }
+      },
+      "mcp.hello": {
+        "description": "Generate a friendly greeting message for a given name",
+        "category": "general",
+        "type": "query",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "hello",
+                "arguments": {
+                  "name": "World"
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.hello",
+            "method": "GET",
+            "example": "curl -X GET \"http://localhost:8000/trpc/mcp.hello?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22name%22%3A%22World%22%7D%7D%7D\""
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.hello",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.hello",
+              "params": {
+                "name": "World"
+              }
+            }
+          }
+        }
+      },
+      "mcp.echo": {
+        "description": "Echo back a message with optional transformation",
+        "category": "general",
+        "type": "mutation",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "echo",
+                "arguments": {
+                  "message": "Hello MCP",
+                  "transform": "example"
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.echo",
+            "method": "POST",
+            "example": "curl -X POST \"http://localhost:8000/trpc/mcp.echo?batch=1\" -H \"Content-Type: application/json\" -d '[{\"0\":{\"json\":{\"message\":\"Hello MCP\",\"transform\":\"example\"}}}]'"
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.echo",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.echo",
+              "params": {
+                "message": "Hello MCP",
+                "transform": "example"
+              }
+            }
+          }
+        }
+      },
+      "mcp.status": {
+        "description": "Get server status and information",
+        "category": "general",
+        "type": "query",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "status",
+                "arguments": {
+                  "detailed": false
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.status",
+            "method": "GET",
+            "example": "curl -X GET \"http://localhost:8000/trpc/mcp.status?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22detailed%22%3Afalse%7D%7D%7D\""
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.status",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.status",
+              "params": {
+                "detailed": false
+              }
+            }
+          }
+        }
+      },
+      "mcp.calculate": {
+        "description": "Perform basic mathematical calculations",
+        "category": "general",
+        "type": "mutation",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "calculate",
+                "arguments": {
+                  "expression": "example",
+                  "precision": 42
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.calculate",
+            "method": "POST",
+            "example": "curl -X POST \"http://localhost:8000/trpc/mcp.calculate?batch=1\" -H \"Content-Type: application/json\" -d '[{\"0\":{\"json\":{\"expression\":\"example\",\"precision\":42}}}]'"
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.calculate",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.calculate",
+              "params": {
+                "expression": "example",
+                "precision": 42
+              }
+            }
+          }
+        }
+      },
+      "mcp.longRunningTask": {
+        "description": "Demonstrate a long-running task with progress reporting and cancellation support",
+        "category": "general",
+        "type": "mutation",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "longRunningTask",
+                "arguments": {
+                  "duration": 42,
+                  "steps": 42
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.longRunningTask",
+            "method": "POST",
+            "example": "curl -X POST \"http://localhost:8000/trpc/mcp.longRunningTask?batch=1\" -H \"Content-Type: application/json\" -d '[{\"0\":{\"json\":{\"duration\":42,\"steps\":42}}}]'"
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.longRunningTask",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.longRunningTask",
+              "params": {
+                "duration": 42,
+                "steps": 42
+              }
+            }
+          }
+        }
+      },
+      "mcp.cancellableTask": {
+        "description": "A task that can be cancelled mid-execution",
+        "category": "general",
+        "type": "mutation",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "cancellableTask",
+                "arguments": {
+                  "iterations": 42
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.cancellableTask",
+            "method": "POST",
+            "example": "curl -X POST \"http://localhost:8000/trpc/mcp.cancellableTask?batch=1\" -H \"Content-Type: application/json\" -d '[{\"0\":{\"json\":{\"iterations\":42}}}]'"
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.cancellableTask",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.cancellableTask",
+              "params": {
+                "iterations": 42
+              }
+            }
+          }
+        }
+      },
+      "mcp.cancelTask": {
+        "description": "Cancel a running task by its task ID",
+        "category": "general",
+        "type": "mutation",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "cancelTask",
+                "arguments": {
+                  "taskId": "example"
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.cancelTask",
+            "method": "POST",
+            "example": "curl -X POST \"http://localhost:8000/trpc/mcp.cancelTask?batch=1\" -H \"Content-Type: application/json\" -d '[{\"0\":{\"json\":{\"taskId\":\"example\"}}}]'"
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.cancelTask",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.cancelTask",
+              "params": {
+                "taskId": "example"
+              }
+            }
+          }
+        }
+      },
+      "mcp.listRunningTasks": {
+        "description": "List all currently running tasks",
+        "category": "general",
+        "type": "query",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "listRunningTasks",
+                "arguments": {
+                  "includeCompleted": false
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.listRunningTasks",
+            "method": "GET",
+            "example": "curl -X GET \"http://localhost:8000/trpc/mcp.listRunningTasks?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22includeCompleted%22%3Afalse%7D%7D%7D\""
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.listRunningTasks",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.listRunningTasks",
+              "params": {
+                "includeCompleted": false
+              }
+            }
+          }
+        }
+      },
+      "mcp.getTaskProgress": {
+        "description": "Get real-time progress for a specific task",
+        "category": "general",
+        "type": "query",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "getTaskProgress",
+                "arguments": {
+                  "taskId": "example"
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.getTaskProgress",
+            "method": "GET",
+            "example": "curl -X GET \"http://localhost:8000/trpc/mcp.getTaskProgress?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22taskId%22%3A%22example%22%7D%7D%7D\""
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.getTaskProgress",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.getTaskProgress",
+              "params": {
+                "taskId": "example"
+              }
+            }
+          }
+        }
+      }
+    },
+    "endpoint": "http://localhost:8000/mcp",
+    "protocolVersion": "2024-11-05"
+  },
+  "stats": {
+    "totalProcedures": 36,
+    "queries": 22,
+    "mutations": 14,
+    "subscriptions": 0,
+    "mcpMethods": 10
+  }
+}

@@ -5,10 +5,10 @@
  * by using the battle-tested tRPC library instead of custom implementations.
  */
 import { z } from 'zod';
-import { createTRPCRouter, publicProcedure } from '../trpc/index.js';
+import { router, publicProcedure } from '../trpc/index.js';
 import { appRouter } from '../trpc/root.js';
 // Re-export tRPC components for compatibility
-export { createTRPCRouter, publicProcedure };
+export { router as createTRPCRouter, publicProcedure };
 export { appRouter as mainRouter };
 // Re-export Zod for validation (better than custom validators)
 export const v = {
@@ -21,7 +21,7 @@ export const v = {
     enum: z.enum,
 };
 // For backward compatibility, create an alias
-export const createRPCRouter = createTRPCRouter;
+export const createRPCRouter = router;
 // Simple OpenRPC schema generator for tRPC routers
 export function generateOpenRPCSchema(info) {
     return {
@@ -125,4 +125,3 @@ export function generateOpenRPCSchema(info) {
         ]
     };
 }
-//# sourceMappingURL=router.js.map

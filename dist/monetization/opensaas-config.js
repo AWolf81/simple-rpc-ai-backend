@@ -190,4 +190,3 @@ export function createOpenSaaSConfig(params) {
     }
     return mergeOpenSaaSConfig(config);
 }
-//# sourceMappingURL=opensaas-config.js.map

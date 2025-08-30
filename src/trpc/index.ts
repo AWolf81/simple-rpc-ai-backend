@@ -8,6 +8,23 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import type { Request, Response } from 'express';
+import { type McpMeta } from "trpc-to-mcp";
+
+// Extended meta type that supports both MCP and OpenAPI
+export interface ExtendedMeta extends McpMeta {
+  openapi?: {
+    method: string;
+    path: string;
+    tags?: string[];
+    summary?: string;
+    description?: string;
+  };
+  mcpExtensions?: {
+    supportsProgress?: boolean;
+    supportsCancellation?: boolean;
+  };
+}
+// OpenAPI removed - using custom tRPC methods extraction instead
 import type { AuthenticatedRequest, OpenSaaSJWTPayload } from '../auth/jwt-middleware.js';
 import superjson from 'superjson';
 
@@ -104,18 +121,21 @@ export type Context = ReturnType<typeof createTRPCContext>;
 /**
  * Initialize tRPC with context and transformer
  */
-const t = initTRPC.context<Context>().create({
-  transformer: superjson,
-  errorFormatter({ shape }) {
-    return shape;
-  },
+const t = initTRPC
+  .context<Context>()
+  .meta<ExtendedMeta>()
+  .create({
+    transformer: superjson,
+    errorFormatter({ shape }) {
+      return shape;
+    },
 });
 
 /**
  * Export reusable router and procedure helpers
  * These are the building blocks for our API
  */
-export const createTRPCRouter: typeof t.router = t.router;
+export const router: typeof t.router = t.router;
 export const publicProcedure: typeof t.procedure = t.procedure;
 
 /**

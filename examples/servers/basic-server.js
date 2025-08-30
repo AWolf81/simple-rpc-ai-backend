@@ -96,7 +96,12 @@ const server = createRpcAiServer({
   aiLimits: AI_LIMIT_PRESETS.conservative,
   port: 8000,
   cors: {
-    origin: ['vscode-webview://*', 'http://localhost:*'],
+    origin: [
+      'vscode-webview://*', 
+      'http://localhost:*',
+      'https://inspector.open-rpc.org',
+      'https://playground.open-rpc.org'
+    ],
     credentials: true
   },
   rateLimit: {

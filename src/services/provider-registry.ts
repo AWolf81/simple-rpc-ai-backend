@@ -37,14 +37,24 @@ async function getRegistryProviders(): Promise<string[]> {
   }
   
   try {
-    // Use eval to avoid TypeScript module resolution issues at build time
-    const registryModule = '@anolilab/ai-model-registry';
-    const registry = await eval('import')(registryModule);
+    // Use dynamic import with string to avoid TypeScript module resolution at build time
+    const registry = await import('@anolilab/ai-model-registry' as any);
+    
+    // Test the function directly
+    if (typeof registry.getProviders !== 'function') {
+      throw new Error('getProviders function not found');
+    }
+    
+    const providers = registry.getProviders();
+    if (!Array.isArray(providers)) {
+      throw new Error('getProviders did not return an array');
+    }
+    
     registryAvailable = true;
-    return registry.getProviders?.() || [];
+    return providers;
   } catch (error) {
     registryAvailable = false;
-    console.warn('AI model registry not available, using fallback');
+    console.warn('AI model registry not available, using fallback:', error instanceof Error ? error.message : String(error));
     return [];
   }
 }
@@ -55,11 +65,24 @@ async function getRegistryModels(options: { provider: string }): Promise<Registr
   }
   
   try {
-    // Use eval to avoid TypeScript module resolution issues at build time
-    const registryModule = '@anolilab/ai-model-registry';
-    const registry = await eval('import')(registryModule);
+    // Use dynamic import with string to avoid TypeScript module resolution at build time
+    const registry = await import('@anolilab/ai-model-registry' as any);
     registryAvailable = true;
-    return registry.getModels?.(options) || [];
+    
+    // Convert provider name to the format expected by the registry
+    const providerNameMap: Record<string, string> = {
+      'anthropic': 'Anthropic',
+      'openai': 'OpenAI',
+      'google': 'Google',
+      'openrouter': 'OpenRouter',
+      'meta': 'Meta',
+      'groq': 'Groq'
+    };
+    
+    const registryProviderName = providerNameMap[options.provider] || 
+      options.provider.charAt(0).toUpperCase() + options.provider.slice(1);
+    
+    return registry.getModelsByProvider?.(registryProviderName) || [];
   } catch (error) {
     registryAvailable = false;
     console.warn(`Models not available for ${options.provider}, using fallback`);
@@ -505,10 +528,14 @@ export class ProviderRegistryService {
         healthCheck.performance.responseTimeMs = responseTime;
         healthCheck.performance.cacheHit = registryAvailable === true;
         
-        // Test a few configured providers
+        // Test a few configured providers  
         for (const provider of healthCheck.providers.configured.slice(0, 3)) {
           try {
-            await getRegistryModels({ provider });
+            const models = await getRegistryModels({ provider });
+            if (models.length === 0) {
+              healthCheck.providers.failed.push(provider);
+              healthCheck.errors.push(`No models found for ${provider} - check provider name capitalization`);
+            }
           } catch (error) {
             healthCheck.providers.failed.push(provider);
             healthCheck.errors.push(`Failed to fetch models for ${provider}: ${error instanceof Error ? error.message : 'Unknown error'}`);

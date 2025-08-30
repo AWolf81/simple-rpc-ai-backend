@@ -81,7 +81,10 @@ export function createTRPCContext(opts) {
 /**
  * Initialize tRPC with context and transformer
  */
-const t = initTRPC.context().create({
+const t = initTRPC
+    .context()
+    .meta()
+    .create({
     transformer: superjson,
     errorFormatter({ shape }) {
         return shape;
@@ -91,7 +94,7 @@ const t = initTRPC.context().create({
  * Export reusable router and procedure helpers
  * These are the building blocks for our API
  */
-export const createTRPCRouter = t.router;
+export const router = t.router;
 export const publicProcedure = t.procedure;
 /**
  * Protected procedure - requires valid JWT authentication
@@ -123,4 +126,3 @@ export const tokenProtectedProcedure = protectedProcedure.use(async ({ ctx, next
         },
     });
 });
-//# sourceMappingURL=index.js.map

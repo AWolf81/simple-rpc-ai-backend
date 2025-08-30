@@ -488,4 +488,3 @@ async function handleDiscover() {
         ]
     };
 }
-//# sourceMappingURL=opensaas-server.js.map

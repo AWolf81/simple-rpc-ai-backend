@@ -238,7 +238,7 @@ export class FreeTierService {
     }>;
     recommendUpgrade: boolean;
   }> {
-    const summary = [];
+    const summary: any[] = [];
     let shouldRecommendUpgrade = false;
 
     for (const model of this.getAvailableModels()) {

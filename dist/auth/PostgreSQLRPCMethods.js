@@ -320,4 +320,3 @@ export class PostgreSQLRPCMethods {
         await this.secretManager.cleanup();
     }
 }
-//# sourceMappingURL=PostgreSQLRPCMethods.js.map

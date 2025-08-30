@@ -219,7 +219,11 @@ describe('MCP Router', () => {
     it('should handle initialization errors', async () => {
       mockMCPService.initialize.mockRejectedValue(new Error('Init failed'));
 
-      await expect(mcpRouter.createCaller({}).initialize({}))
+      await expect(mcpRouter.createCaller({}).initialize({
+        mcpConfig: {
+          enableRefTools: true
+        }
+      }))
         .rejects.toThrow('MCP initialization failed: Init failed');
     });
   });

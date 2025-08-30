@@ -113,6 +113,16 @@
               }
             }
           }
+        },
+        {
+          "name": "apiKey",
+          "description": "Optional API key for BYOK (Bring Your Own Key) usage",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User's API key for the AI provider"
+          }
         }
       ],
       "result": {
@@ -164,6 +174,30 @@
             "model": "claude-3-5-sonnet-20241022",
             "tokensUsed": 45,
             "processingTime": 1250
+          }
+        },
+        {
+          "name": "BYOK example with API key",
+          "params": [
+            {
+              "name": "content",
+              "value": "const password = '123456';"
+            },
+            {
+              "name": "systemPrompt",
+              "value": "security_review"
+            },
+            {
+              "name": "apiKey",
+              "value": "sk-ant-api03-your-api-key-here"
+            }
+          ],
+          "result": {
+            "analysis": "Security vulnerability detected: hardcoded password should be moved to environment variables or secure configuration.",
+            "provider": "anthropic",
+            "model": "claude-3-5-sonnet-20241022",
+            "tokensUsed": 52,
+            "processingTime": 1380
           }
         }
       ]
@@ -455,16 +489,41 @@
       }
     },
     {
+      "name": "listProviders",
+      "description": "List available AI providers",
+      "params": [],
+      "result": {
+        "name": "providersResult",
+        "description": "Available AI providers and their models",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "providers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "models": { "type": "array", "items": { "type": "string" } },
+                  "priority": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "name": "storeUserKey",
-      "description": "Store encrypted API key for user (BYOK - Bring Your Own Key)",
+      "description": "Store encrypted API key for BYOK usage",
       "params": [
         {
-          "name": "userId",
-          "description": "User identifier",
+          "name": "email",
+          "description": "User email address",
           "required": true,
           "schema": {
             "type": "string",
-            "minLength": 1
+            "format": "email"
           }
         },
         {
@@ -487,7 +546,7 @@
         }
       ],
       "result": {
-        "name": "storeKeyResult",
+        "name": "keyOperationResult",
         "description": "Key storage result",
         "schema": {
           "type": "object",
@@ -496,9 +555,17 @@
               "type": "boolean",
               "description": "Whether key was stored successfully"
             },
-            "keyId": {
+            "secretId": {
               "type": "string",
               "description": "Identifier for the stored key"
+            },
+            "message": {
+              "type": "string",
+              "description": "Success message"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
             }
           },
           "required": ["success"]
@@ -506,16 +573,16 @@
       }
     },
     {
-      "name": "validateUserKey",
-      "description": "Validate user's stored API key by testing with provider",
+      "name": "getUserKey",
+      "description": "Get user API key status (without exposing the key)",
       "params": [
         {
-          "name": "userId",
-          "description": "User identifier",
+          "name": "email",
+          "description": "User email address",
           "required": true,
           "schema": {
             "type": "string",
-            "minLength": 1
+            "format": "email"
           }
         },
         {
@@ -529,26 +596,213 @@
         }
       ],
       "result": {
-        "name": "validateKeyResult",
+        "name": "keyStatusResult",
+        "description": "Key status result",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean"
+            },
+            "message": {
+              "type": "string",
+              "description": "Status message or encrypted key preview"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          },
+          "required": ["success"]
+        }
+      }
+    },
+    {
+      "name": "getUserProviders",
+      "description": "Get all configured providers for a user",
+      "params": [
+        {
+          "name": "email",
+          "description": "User email address",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      ],
+      "result": {
+        "name": "userProvidersResult",
+        "description": "User's configured providers",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean"
+            },
+            "providers": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of provider names"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          },
+          "required": ["success"]
+        }
+      }
+    },
+    {
+      "name": "validateUserKey",
+      "description": "Validate user's stored API key",
+      "params": [
+        {
+          "name": "email",
+          "description": "User email address",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        {
+          "name": "provider",
+          "description": "AI provider name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": ["anthropic", "openai", "google"]
+          }
+        }
+      ],
+      "result": {
+        "name": "keyValidationResult",
         "description": "Key validation result",
         "schema": {
           "type": "object",
           "properties": {
-            "isValid": {
+            "success": {
+              "type": "boolean"
+            },
+            "valid": {
               "type": "boolean",
               "description": "Whether the API key is valid"
             },
             "error": {
               "type": "string",
               "description": "Error message if validation failed"
-            },
-            "lastValidated": {
-              "type": "string",
-              "format": "date-time",
-              "description": "Timestamp of validation"
             }
           },
-          "required": ["isValid"]
+          "required": ["success"]
+        }
+      }
+    },
+    {
+      "name": "rotateUserKey",
+      "description": "Update/rotate user's API key",
+      "params": [
+        {
+          "name": "email",
+          "description": "User email address",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        {
+          "name": "provider",
+          "description": "AI provider name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": ["anthropic", "openai", "google"]
+          }
+        },
+        {
+          "name": "newApiKey",
+          "description": "New API key to store",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "result": {
+        "name": "keyOperationResult",
+        "description": "Key rotation result",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean"
+            },
+            "secretId": {
+              "type": "string",
+              "description": "New key identifier"
+            },
+            "message": {
+              "type": "string",
+              "description": "Success message"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          },
+          "required": ["success"]
+        }
+      }
+    },
+    {
+      "name": "deleteUserKey",
+      "description": "Delete user's stored API key",
+      "params": [
+        {
+          "name": "email",
+          "description": "User email address",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        {
+          "name": "provider",
+          "description": "AI provider name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": ["anthropic", "openai", "google"]
+          }
+        }
+      ],
+      "result": {
+        "name": "keyOperationResult",
+        "description": "Key deletion result",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean"
+            },
+            "deleted": {
+              "type": "boolean",
+              "description": "Whether the key was deleted"
+            },
+            "message": {
+              "type": "string",
+              "description": "Success message"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          },
+          "required": ["success"]
         }
       }
     },
@@ -560,7 +814,7 @@
         "name": "openrpcDocument",
         "description": "The OpenRPC schema document for this service",
         "schema": {
-          "type": "object",
+          "$ref": "https://raw.githubusercontent.com/open-rpc/meta-schema/master/schema.json",
           "description": "Complete OpenRPC specification document"
         }
       },

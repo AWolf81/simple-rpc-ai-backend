@@ -175,4 +175,3 @@ export class UserIdentityBridge {
     }
 }
 export default UserIdentityBridge;
-//# sourceMappingURL=UserIdentityBridge.js.map

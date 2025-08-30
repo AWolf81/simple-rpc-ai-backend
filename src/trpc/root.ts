@@ -5,14 +5,19 @@
  * This is the single source of truth for all tRPC procedures.
  */
 
-import { createTRPCRouter } from './index.js';
-import { createAIRouter, type AIRouterConfig, type AIRouterType } from './routers/ai.js';
-import { createMCPRouter, type MCPRouterConfig, type MCPRouterType } from './routers/mcp.js';
+import { router } from './index.js';
+import { createAIRouter, type AIRouterConfig } from './routers/ai.js';
+//import { createMCPRouter, type MCPRouterConfig } from './routers/mcp_old.js';
+import { createMCPRouter, MCPRouterConfig } from './routers/mcp.js'
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { PostgreSQLAdapter } from '../database/postgres-adapter.js';
+import type { PostgreSQLRPCMethods } from '../auth/PostgreSQLRPCMethods.js';
+// OpenAPI generation removed - using trpc-methods.json instead
+
 
 /**
  * Create app router with configurable AI limits and optional token tracking
+ * NESTED VERSION with proper namespaces for better organization
  */
 export function createAppRouter(
   aiConfig?: AIRouterConfig, 
@@ -20,23 +25,48 @@ export function createAppRouter(
   dbAdapter?: PostgreSQLAdapter,
   serverProviders?: string[],
   byokProviders?: string[],
+  postgresRPCMethods?: PostgreSQLRPCMethods,
   mcpConfig?: MCPRouterConfig
 ) {
-  return createTRPCRouter({
-    ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders),
-    mcp: createMCPRouter(mcpConfig),
-    
-    // Add more routers here as needed:
-    // auth: authRouter,
-    // billing: billingRouter,
-    // etc.
+  // Create the MCP router and extract its SDK integration
+
+  const mcpRouter = createMCPRouter();
+
+  console.log("MCP enabled?", mcpConfig?.enableMCP); // todo add handling
+
+  // Create the main app router
+  const appRouter = router({
+    ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders, postgresRPCMethods),
+    mcp: mcpRouter
   });
+
+  //const mcpServer = createMcpServer(implementation, appRouter);
+  // Attach the SDK integration from MCP router to the main app router
+  /*const mcpSdkIntegration = (mcpRouter as any).sdkIntegration;
+  if (mcpSdkIntegration) {
+    (appRouter as any).sdkIntegration = mcpSdkIntegration;
+    console.log('✅ SDK integration attached to app router');
+  } else {
+    console.warn('⚠️  No SDK integration found on MCP router');
+  }*/
+  
+  return appRouter;
 }
 
 /**
  * Default app router with default configuration
  */
 export const appRouter: ReturnType<typeof createAppRouter> = createAppRouter();
+
+/**
+ * Generate tRPC methods documentation (replaces OpenAPI)
+ * The actual generation is handled by tools/generate-trpc-methods.js
+ */
+export function generateTRPCMethods() {
+  // This is now handled by the build script
+  // The methods are available in dist/trpc-methods.json
+  throw new Error('tRPC methods are generated at build time. Check dist/trpc-methods.json');
+}
 
 /**
  * Export the app router type definition

@@ -315,7 +315,7 @@ export class AuthManager {
     const devices = await this.userManager.getUserDevices(session.userId);
     const hasValidKeys = await this.keyManager.hasValidKeys(session.userId);
 
-    const availableUpgrades = [];
+    const availableUpgrades: string[] = [];
     if (session.authLevel === 'anonymous') {
       availableUpgrades.push('oauth', 'multi_device');
     }

@@ -260,4 +260,3 @@ export class AuthManager {
         return [];
     }
 }
-//# sourceMappingURL=auth-manager.js.map

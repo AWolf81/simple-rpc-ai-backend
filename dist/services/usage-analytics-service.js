@@ -191,4 +191,3 @@ export class UsageAnalyticsService {
         return (inputTokens * rates.input + outputTokens * rates.output) / 1000;
     }
 }
-//# sourceMappingURL=usage-analytics-service.js.map

@@ -149,4 +149,3 @@ export function createLocalPanelServer(router, port = 8080) {
         transformer: 'superjson'
     });
 }
-//# sourceMappingURL=trpc-panel-server.js.map

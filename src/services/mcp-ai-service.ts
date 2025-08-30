@@ -65,6 +65,7 @@ export class MCPAIService {
       mcp: config.mcp || {}
     };
 
+    console.log("mcp config", this.mcpConfig)
     if (this.mcpConfig.enableMCPTools) {
       this.mcpService = new MCPService(this.mcpConfig.mcp);
     }
@@ -102,7 +103,7 @@ export class MCPAIService {
     const availableTools = this.getFilteredTools(request.tools);
     
     // Create enhanced system prompt with tool information
-    const enhancedSystemPrompt = this.createToolAwareSystemPrompt(systemPrompt, availableTools);
+    const enhancedSystemPrompt = this.createToolAwareSystemPrompt(systemPrompt || '', availableTools);
     
     // For now, use basic AI service and add tool information to system prompt
     // TODO: Implement proper tool calling when AI SDK supports it better

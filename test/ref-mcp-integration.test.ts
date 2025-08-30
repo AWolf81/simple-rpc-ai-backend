@@ -451,7 +451,19 @@ describe('error handling and edge cases', () => {
       initialize: vi.fn(),
       executeToolForAI: vi.fn(),
       getHealthStatus: vi.fn(),
-      shutdown: vi.fn()
+      shutdown: vi.fn(),
+      getAvailableToolsForAI: vi.fn().mockReturnValue([
+        {
+          name: 'ref_search_documentation',
+          description: 'Search documentation',
+          parameters: { type: 'object' }
+        },
+        {
+          name: 'ref_read_url',
+          description: 'Read URL content',
+          parameters: { type: 'object' }
+        }
+      ])
     };
 
     (MCPService as any).mockImplementation(() => mockMCPService);

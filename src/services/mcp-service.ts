@@ -15,6 +15,7 @@ export interface MCPServiceConfig {
   autoRegisterPredefined?: boolean;
   toolExecutionTimeout?: number;
   enableRefTools?: boolean;
+  enableWebSearch?: boolean;
   enableFilesystemTools?: boolean;
 }
 
@@ -72,6 +73,7 @@ export class MCPService extends EventEmitter {
       autoRegisterPredefined: true,
       toolExecutionTimeout: 30000,
       enableRefTools: true,
+      enableWebSearch: true,
       enableFilesystemTools: false,
       ...config
     };
@@ -118,6 +120,9 @@ export class MCPService extends EventEmitter {
     const serversToRegister = PREDEFINED_MCP_SERVERS.filter(server => {
       // Check specific feature flags
       if (server.id === 'ref-tools' && !this.config.enableRefTools) {
+        return false;
+      }
+      if (server.id === 'web-search' && !this.config.enableWebSearch) {
         return false;
       }
       if (server.id === 'filesystem-tools' && !this.config.enableFilesystemTools) {

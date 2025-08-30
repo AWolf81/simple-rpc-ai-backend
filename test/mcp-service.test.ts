@@ -124,10 +124,16 @@ describe('MCPService', () => {
       mockRegistry.registerServer.mockRejectedValue(new Error('Registration failed'));
       const emitSpy = vi.spyOn(mcpService, 'emit');
       
-      await expect(mcpService.initialize()).rejects.toThrow('Registration failed');
-      expect(emitSpy).toHaveBeenCalledWith('error', expect.objectContaining({
-        phase: 'initialization'
-      }));
+      try {
+        await mcpService.initialize();
+        // If we reach here, the test should fail because we expected an error
+        expect.fail('Expected initialization to throw an error, but it succeeded');
+      } catch (error: any) {
+        expect(error.message).toBe('Registration failed');
+        expect(emitSpy).toHaveBeenCalledWith('error', expect.objectContaining({
+          phase: 'initialization'
+        }));
+      }
     });
   });
 

@@ -197,4 +197,3 @@ export class UserManager {
         return 0;
     }
 }
-//# sourceMappingURL=user-manager.js.map

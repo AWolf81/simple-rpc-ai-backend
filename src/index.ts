@@ -13,6 +13,28 @@ export { AIClient } from './client.js';           // Enhanced client with BYOK
 export { createTypedAIClient } from './client.js';
 export type { TypedAIClient } from './client.js';
 export { AIService } from './services/ai-service.js';      // Direct AI service usage
+export { generateTRPCMethods, createAppRouter } from './trpc/root.js';
+// export { createTestRouter } from './trpc/test-router.js';
+// OpenAPI-related exports temporarily disabled
+// export { 
+//   openApiCompatMiddleware, 
+//   openApiCompatProcedure, 
+//   createOpenApiCompatRouter,
+//   patchTrpcToOpenApi,
+//   makeRouterOpenApiCompatible 
+// } from './trpc/openapi-compat-middleware.js';
+
+// getRawInput fix for trpc-to-openapi compatibility (disabled)
+// export {
+//   openApiProcedure,
+//   createOpenApiRouter,
+//   createFixedProcedure,
+//   procedures,
+//   createGetRawInputTestRouter,
+//   wrapRouterWithGetRawInputFix,
+//   debugProcedureInputs
+// } from './trpc/getrawinput-fix.js';
+
 // Recommended server - supports both JSON-RPC and tRPC
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
 export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server.js';
@@ -41,7 +63,6 @@ export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService
 export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp-registry.js';
 export { MCPAIService } from './services/mcp-ai-service.js';
 export { RefMCPIntegration, VSCodeRefIntegration } from './services/ref-mcp-integration.js';
-export { createMCPRouter } from './trpc/routers/mcp.js';
 
 // Authentication system exports
 export {
@@ -117,7 +138,7 @@ export type {
 
 export type {
   MCPRouterConfig,
-  MCPRouterType
+  //MCPRouterType
 } from './trpc/routers/mcp.js';
 
 // OpenSaaS Monetization exports

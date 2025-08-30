@@ -228,4 +228,3 @@ export function createTypedAIClient(config) {
         ai: client.ai
     };
 }
-//# sourceMappingURL=client.js.map

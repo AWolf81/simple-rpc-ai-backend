@@ -246,4 +246,3 @@ export class SeamlessOpenSaaSIntegration {
         };
     }
 }
-//# sourceMappingURL=opensaas-integration.js.map
