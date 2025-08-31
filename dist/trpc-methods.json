@@ -1,5 +1,5 @@
 {
-  "generated": "2025-08-30T19:57:54.351Z",
+  "generated": "2025-08-31T18:51:39.752Z",
   "version": "1.0.0",
   "description": "tRPC procedure documentation extracted from router",
   "procedures": {
@@ -17,8 +17,16 @@
         "description": null,
         "properties": {
           "message": {
-            "type": "ZodString",
-            "description": null
+            "type": "ZodDefault",
+            "description": null,
+            "innerType": {
+              "type": "ZodOptional",
+              "description": null,
+              "innerType": {
+                "type": "ZodString",
+                "description": null
+              }
+            }
           }
         }
       },
@@ -720,8 +728,16 @@
         "description": null,
         "properties": {
           "name": {
-            "type": "ZodString",
-            "description": "The name to greet"
+            "type": "ZodDefault",
+            "description": "The name to greet",
+            "innerType": {
+              "type": "ZodOptional",
+              "description": null,
+              "innerType": {
+                "type": "ZodString",
+                "description": null
+              }
+            }
           }
         }
       },
@@ -764,8 +780,16 @@
         "description": null,
         "properties": {
           "message": {
-            "type": "ZodString",
-            "description": "Message to echo"
+            "type": "ZodDefault",
+            "description": "Message to echo",
+            "innerType": {
+              "type": "ZodOptional",
+              "description": null,
+              "innerType": {
+                "type": "ZodString",
+                "description": null
+              }
+            }
           },
           "transform": {
             "type": "ZodDefault",
@@ -796,12 +820,8 @@
         "description": null,
         "properties": {
           "detailed": {
-            "type": "ZodDefault",
-            "description": "Include detailed information",
-            "innerType": {
-              "type": "ZodBoolean",
-              "description": null
-            }
+            "type": "ZodBoolean",
+            "description": "Include detailed system information?"
           }
         }
       },
@@ -824,8 +844,16 @@
         "description": null,
         "properties": {
           "expression": {
-            "type": "ZodString",
-            "description": "Mathematical expression (e.g., \"2 + 3 * 4\")"
+            "type": "ZodDefault",
+            "description": "Mathematical expression (e.g., \"2 + 3 * 4\")",
+            "innerType": {
+              "type": "ZodOptional",
+              "description": null,
+              "innerType": {
+                "type": "ZodString",
+                "description": null
+              }
+            }
           },
           "precision": {
             "type": "ZodDefault",
@@ -856,12 +884,28 @@
         "description": null,
         "properties": {
           "duration": {
-            "type": "ZodNumber",
-            "description": "Task duration in seconds"
+            "type": "ZodDefault",
+            "description": "Task duration in seconds",
+            "innerType": {
+              "type": "ZodOptional",
+              "description": null,
+              "innerType": {
+                "type": "ZodNumber",
+                "description": null
+              }
+            }
           },
           "steps": {
-            "type": "ZodNumber",
-            "description": "Number of steps to complete"
+            "type": "ZodDefault",
+            "description": "Number of steps to complete",
+            "innerType": {
+              "type": "ZodOptional",
+              "description": null,
+              "innerType": {
+                "type": "ZodNumber",
+                "description": null
+              }
+            }
           }
         }
       },
@@ -919,8 +963,16 @@
         "description": null,
         "properties": {
           "taskId": {
-            "type": "ZodString",
-            "description": "ID of the task to cancel"
+            "type": "ZodDefault",
+            "description": "ID of the task to cancel",
+            "innerType": {
+              "type": "ZodOptional",
+              "description": null,
+              "innerType": {
+                "type": "ZodString",
+                "description": null
+              }
+            }
           }
         }
       },
@@ -971,8 +1023,16 @@
         "description": null,
         "properties": {
           "taskId": {
-            "type": "ZodString",
-            "description": "ID of the task to check progress for"
+            "type": "ZodDefault",
+            "description": "ID of the task to check progress for",
+            "innerType": {
+              "type": "ZodOptional",
+              "description": null,
+              "innerType": {
+                "type": "ZodString",
+                "description": null
+              }
+            }
           }
         }
       },
@@ -989,6 +1049,7 @@
     "available": true,
     "methods": {
       "ai.test": {
+        "title": "Just a echo test endpoint",
         "description": "Just a echo test endpoint",
         "category": "general",
         "type": "mutation",
@@ -1028,6 +1089,7 @@
         }
       },
       "mcp.hello": {
+        "title": "greeting",
         "description": "Generate a friendly greeting message for a given name",
         "category": "general",
         "type": "query",
@@ -1067,6 +1129,7 @@
         }
       },
       "mcp.echo": {
+        "title": "echo",
         "description": "Echo back a message with optional transformation",
         "category": "general",
         "type": "mutation",
@@ -1108,6 +1171,7 @@
         }
       },
       "mcp.status": {
+        "title": "status",
         "description": "Get server status and information",
         "category": "general",
         "type": "query",
@@ -1147,6 +1211,7 @@
         }
       },
       "mcp.calculate": {
+        "title": "calculate",
         "description": "Perform basic mathematical calculations",
         "category": "general",
         "type": "mutation",
@@ -1188,6 +1253,7 @@
         }
       },
       "mcp.longRunningTask": {
+        "title": "longRunningTask",
         "description": "Demonstrate a long-running task with progress reporting and cancellation support",
         "category": "general",
         "type": "mutation",
@@ -1229,6 +1295,7 @@
         }
       },
       "mcp.cancellableTask": {
+        "title": "cancellableTask",
         "description": "A task that can be cancelled mid-execution",
         "category": "general",
         "type": "mutation",
@@ -1268,6 +1335,7 @@
         }
       },
       "mcp.cancelTask": {
+        "title": "cancelTask",
         "description": "Cancel a running task by its task ID",
         "category": "general",
         "type": "mutation",
@@ -1307,6 +1375,7 @@
         }
       },
       "mcp.listRunningTasks": {
+        "title": "listRunningTasks",
         "description": "List all currently running tasks",
         "category": "general",
         "type": "query",
@@ -1346,6 +1415,7 @@
         }
       },
       "mcp.getTaskProgress": {
+        "title": "getTaskProgress",
         "description": "Get real-time progress for a specific task",
         "category": "general",
         "type": "query",

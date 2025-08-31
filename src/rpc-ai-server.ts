@@ -26,6 +26,7 @@ import { UsageAnalyticsService } from './services/usage-analytics-service.js';
 import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods.js';
 import { RPC_METHODS } from './constants.js';
 import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge.js';
+import { MCPExtensionConfig } from './mcp/mcp-config.js';
 
 // Built-in provider types
 export type BuiltInProvider = 'anthropic' | 'openai' | 'google';
@@ -110,6 +111,12 @@ export interface RpcAiServerConfig {
   // MCP configuration
   mcp?: {
     enableMCP?: boolean;
+    transports?: {
+      http?: boolean;        // HTTP transport (default: true)
+      stdio?: boolean;       // STDIO transport for Claude Desktop (default: false)  
+      sse?: boolean;         // Server-Sent Events transport (default: false)
+      sseEndpoint?: string;  // SSE endpoint path (default: '/sse')
+    };
     auth?: {
       requireAuthForToolsList?: boolean;  // Default: false (tools/list is public)
       requireAuthForToolsCall?: boolean;  // Default: true (tools/call requires auth)
@@ -119,7 +126,12 @@ export interface RpcAiServerConfig {
       enableWebSearchTool?: boolean;   // build-in websearch tool
       enableRefTools?: boolean;        // Documentation search
       enableFilesystemTools?: boolean; // Disabled for security
-    }
+    };
+    
+    /**
+     * MCP extensions configuration - customize prompts and resources
+     */
+    extensions?: MCPExtensionConfig;
   }
 }
 
@@ -213,7 +225,14 @@ export class RpcAiServer {
         ...config.paths
       },
       mcp: {
-        enableMCP: false,
+        enableMCP: config.mcp?.enableMCP || false,
+        transports: {
+          http: true,    // HTTP transport enabled by default
+          stdio: false,  // STDIO transport disabled by default
+          sse: false,    // SSE transport disabled by default  
+          sseEndpoint: '/sse',
+          ...config.mcp?.transports
+        },
         auth: {
           requireAuthForToolsList: false,  // tools/list is public by default
           requireAuthForToolsCall: true,   // tools/call requires auth by default
@@ -226,7 +245,7 @@ export class RpcAiServer {
           enableFilesystemTools: false,
           ...config.mcp?.defaultConfig
         },
-        ...config.mcp
+        extensions: config.mcp?.extensions
       },
       ...config
     };
@@ -541,24 +560,67 @@ export class RpcAiServer {
 
 
   /**
-   * Setup the new router-based MCP server with dual transport (stdio + HTTP)
+   * Setup the new router-based MCP server with configurable transports
    */
   private async setupMCPServer(): Promise<void> {
     console.log(`🚀 Setting up MCP server...`);
-    
-    // Import the MCPProtocolHandler from the router
+
+    // Import MCP server components
+    const { createMCPServer } = await import('./mcp-server.js');
     const { MCPProtocolHandler } = await import('./trpc/routers/mcp.js');
-    
-    // Create the MCP protocol handler with the app router
-    const mcpHandler = new MCPProtocolHandler(this.router);
-    
-    // Setup HTTP transport for web clients (like MCP Jam)
-    mcpHandler.setupMCPEndpoint(this.app, '/mcp');
-    
+
+    const transports = this.config.mcp.transports || {
+      http: true,
+      stdio: false,
+      sse: false,
+      sseEndpoint: '/sse'
+    };
+
+    // Create unified MCP server manager
+    const mcpServer = createMCPServer({
+      name: 'simple-rpc-ai-backend',
+      version: '1.0.0',
+      enableStdio: transports.stdio,
+      enableSSE: transports.sse,
+      sseEndpoint: transports.sseEndpoint
+    });
+
+    // Setup transports based on configuration
+    const enabledTransports: string[] = [];
+
+    // HTTP transport (for MCP Jam, testing)
+    if (transports.http) {
+      const httpHandler = new MCPProtocolHandler(this.router);
+      httpHandler.setupMCPEndpoint(this.app, '/mcp');
+      enabledTransports.push('HTTP');
+    }
+
+    // SSE transport (for web clients)
+    if (transports.sse) {
+      mcpServer.setupSSE(this.app);
+      enabledTransports.push('SSE');
+    }
+
+    // STDIO transport (for Claude Desktop) - handled separately since it's blocking
+    if (transports.stdio) {
+      enabledTransports.push('STDIO');
+      console.log(`⚠️  STDIO transport enabled but not started (use standalone server)`);
+      console.log(`   Start with: node dist/mcp-stdio-server.js`);
+    }
+
     console.log(`🤖 MCP server ready with tRPC integration:`);
-    console.log(`   • HTTP/JSON-RPC: http://localhost:${this.config.port}/mcp`);
+    if (transports.http) {
+      console.log(`   • HTTP: http://localhost:${this.config.port}/mcp`);
+    }
+    if (transports.sse) {
+      console.log(`   • SSE: http://localhost:${this.config.port}${transports.sseEndpoint}`);
+    }
+    if (transports.stdio) {
+      console.log(`   • STDIO: node dist/mcp-stdio-server.js`);
+    }
+    console.log(`   • Transports: ${enabledTransports.join(', ')}`);
     console.log(`   • Auto-discovered tools from tRPC procedures with mcp metadata`);
-    console.log(`   • Supports: initialize, tools/list, tools/call`);
+    console.log(`   • Supports: initialize, ping, tools/list, tools/call, notifications/progress`);
   }
 
   public async start(setupRoutes?: (app: Application) => void): Promise<void> {

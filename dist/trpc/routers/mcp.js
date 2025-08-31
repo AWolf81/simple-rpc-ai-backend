@@ -327,6 +327,8 @@ export class MCPProtocolHandler {
         // Validate input if parser exists
         if (procedure._def.inputs?.[0]) {
             const parser = procedure._def.inputs[0];
+            // Note: Removed MCP Jam compatibility fallback since mode is now required
+            // MCP clients MUST provide the mode parameter
             console.log(`📝 Parsing args with Zod schema...`);
             args = parser.parse(args);
             console.log(`✅ Parsed args:`, JSON.stringify(args, null, 2));
@@ -371,7 +373,7 @@ export function createMCPRouter() {
             }
         })
             .input(z.object({
-            name: z.string().min(1).describe('The name to greet')
+            name: z.string().min(1).optional().default('World').describe('The name to greet')
         }))
             .output(z.object({ greeting: z.string() }))
             .query(({ input }) => {
@@ -386,7 +388,7 @@ export function createMCPRouter() {
             }
         })
             .input(z.object({
-            message: z.string().min(1).describe('Message to echo'),
+            message: z.string().min(1).optional().default('Hello from MCP!').describe('Message to echo'),
             transform: z.enum(['uppercase', 'lowercase', 'reverse', 'none']).default('none').describe('How to transform the message')
         }))
             .mutation(({ input }) => {
@@ -417,9 +419,10 @@ export function createMCPRouter() {
             }
         })
             .input(z.object({
-            detailed: z.boolean().default(false).describe('Include detailed information')
+            detailed: z.boolean().describe('Include detailed system information?')
         }))
             .query(({ input }) => {
+            console.log('🔍 Status called with input:', JSON.stringify(input, null, 2));
             const baseStatus = {
                 server: 'Simple RPC AI Backend',
                 version: '0.1.0',
@@ -427,7 +430,8 @@ export function createMCPRouter() {
                 uptime: Math.floor(process.uptime()),
                 timestamp: new Date().toISOString()
             };
-            if (input.detailed) {
+            // if (input.mode === 'detailed') {  // enum approach
+            if (input.detailed) { // boolean approach
                 return {
                     ...baseStatus,
                     details: {
@@ -451,7 +455,7 @@ export function createMCPRouter() {
             }
         })
             .input(z.object({
-            expression: z.string().min(1).describe('Mathematical expression (e.g., "2 + 3 * 4")'),
+            expression: z.string().min(1).optional().default('2 + 2').describe('Mathematical expression (e.g., "2 + 3 * 4")'),
             precision: z.number().min(0).max(10).default(2).describe('Decimal precision for results')
         }))
             .mutation(({ input }) => {
@@ -487,8 +491,8 @@ export function createMCPRouter() {
             }
         })
             .input(z.object({
-            duration: z.number().min(1).max(60).describe('Task duration in seconds'),
-            steps: z.number().min(1).max(100).describe('Number of steps to complete')
+            duration: z.number().min(1).max(60).optional().default(5).describe('Task duration in seconds'),
+            steps: z.number().min(1).max(100).optional().default(10).describe('Number of steps to complete')
         }))
             .mutation(async ({ input, ctx }) => {
             console.log('📥 Long-running task received input:', JSON.stringify(input, null, 2));
@@ -617,7 +621,7 @@ export function createMCPRouter() {
             }
         })
             .input(z.object({
-            taskId: z.string().min(1).describe('ID of the task to cancel')
+            taskId: z.string().min(1).optional().default('demo-task').describe('ID of the task to cancel')
         }))
             .mutation(({ input }) => {
             const { taskId } = input;
@@ -711,7 +715,7 @@ export function createMCPRouter() {
             }
         })
             .input(z.object({
-            taskId: z.string().min(1).describe('ID of the task to check progress for')
+            taskId: z.string().min(1).optional().default('demo-task').describe('ID of the task to check progress for')
         }))
             .query(({ input }) => {
             const { taskId } = input;

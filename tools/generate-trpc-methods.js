@@ -112,7 +112,7 @@ async function extractTRPCMethods() {
       const httpMethod = method.type === 'mutation' ? 'POST' : 'GET';
       
       mcpMethods[name] = {
-        title: mcpMeta.title,
+        title: mcpMeta.title || mcpMeta.name || mcpMeta.description || `Tool ${name}`,
         description: mcpMeta.description,
         category: mcpMeta.category || 'general',
         type: method.type,

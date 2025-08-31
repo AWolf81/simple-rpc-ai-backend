@@ -2710,8 +2710,8 @@ pnpm test:integration
 STORAGE_TYPE=file pnpm test
 
 # Test PostgreSQL integration (requires Docker)
-pnpm run vaultwarden:start
-STORAGE_TYPE=vaultwarden pnpm test
+docker-compose -f docker-compose.postgres.yml up -d
+STORAGE_TYPE=postgres pnpm test
 
 # Test client-managed keys
 STORAGE_TYPE=client_managed pnpm test
@@ -2729,16 +2729,16 @@ Test the PostgreSQL server and Bitwarden SDK integration directly without RPC:
 
 ```bash
 # 1. Start PostgreSQL infrastructure
-pnpm run vaultwarden:start
+docker-compose -f docker-compose.postgres.yml up -d
 
 # 2. Test direct PostgreSQL connection
-npx ts-node test-vaultwarden-auth.ts
+pnpm test -- --grep="postgresql connection"
 # Gets access token programmatically
 # Tests basic API connectivity
 # Validates service account setup
 
 # 3. Test PostgreSQL secret operations
-npx ts-node test-vaultwarden-direct.ts
+pnpm test -- --grep="encrypted key storage"
 # Tests secret CRUD operations
 # Validates organization permissions
 # Tests user API key workflow
@@ -2757,7 +2757,7 @@ Test the RPC methods that implement the auth flow:
 
 ```bash
 # Test PostgreSQL RPC integration
-npx ts-node test-vaultwarden-session.ts
+pnpm test -- --grep="RPC integration"
 # Tests PostgreSQLRPCMethods
 # Tests JWT validation
 # Tests auto-provisioning flow
@@ -3069,42 +3069,49 @@ const greetingSchema = input(z.object({
 ### **What is MCP?**
 The Model Context Protocol (MCP) is a 2024 standard adopted by OpenAI, Google DeepMind, and Anthropic for AI tool integration. It's built on JSON-RPC 2.0 (same as our package).
 
-### **✅ Full MCP Support Implemented**
-We now provide comprehensive MCP integration for enhanced AI capabilities:
+### **✅ Full MCP Support with tRPC Decorator Pattern**
+Our MCP implementation uses an opinionated decorator pattern that automatically exposes tRPC procedures as MCP tools:
 
 ```typescript
-import { createRpcAiServer, RefMCPIntegration } from 'simple-rpc-ai-backend';
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
+import { input } from './schemas/schema-registry';
 
 // Server with MCP support
 const server = createRpcAiServer({
   mcp: {
     enableMCP: true,
-    defaultConfig: {
-      enableRefTools: true,      // Documentation search
-      enableFilesystemTools: false // Disabled for security
+    auth: {
+      requireAuthForToolsList: false,   // Public discovery
+      requireAuthForToolsCall: true,    // Authenticated execution
+      publicTools: ['greeting']          // Exception list
     }
   }
 });
 
-// Ref MCP for documentation search
-const refIntegration = new RefMCPIntegration({
-  documentationPaths: ['./docs', './README.md'],
-  remoteDocUrls: ['https://nodejs.org/api/'],
-  githubRepos: [{ owner: 'microsoft', repo: 'vscode-extension-samples' }]
-});
+// Define tools using tRPC with MCP metadata
+const greetingSchema = input(z.object({
+  name: z.string().describe('Name to greet').default("World"),
+  language: z.enum(["en", "es", "fr"]).describe('Language for greeting').default("en")
+}), 'greeting');
 
-await refIntegration.initialize();
-
-// Search documentation
-const docs = await refIntegration.searchDocumentation({
-  query: 'VS Code extension API',
-  maxResults: 10
-});
-
-// Read URL content
-const content = await refIntegration.readURL({
-  url: 'https://code.visualstudio.com/api',
-  format: 'markdown'
+export const mcpRouter = router({
+  greeting: publicProcedure
+    .meta({
+      mcp: {
+        title: "Greeting Tool",
+        description: "Generate friendly greetings in multiple languages",
+        category: "utility"
+      }
+    })
+    .input(greetingSchema)  // Automatic JSON Schema generation
+    .query(({ input }) => {
+      const greetings = {
+        en: `Hello, ${input.name}! 👋`,
+        es: `¡Hola, ${input.name}! 👋`, 
+        fr: `Bonjour, ${input.name}! 👋`
+      };
+      return greetings[input.language];
+    })
 });
 ```
 
@@ -3112,99 +3119,80 @@ const content = await refIntegration.readURL({
 
 #### **⚡ Dynamic tRPC → MCP Tool Discovery**
 - **Seamless Integration**: tRPC procedures with `meta({ mcp: {...} })` decorators automatically become MCP tools
-- **Runtime Discovery**: Server scans router procedures and exposes them as AI-accessible tools  
-- **Type-Safe Validation**: Zod schemas from tRPC procedures are enforced for MCP tool calls
-- **Schema Registry Integration**: Uses our [Input Schema Registry](#%EF%B8%8F-input-schema-registry-system) for reliable schema extraction
-- **Zero Configuration**: Add `.meta({ mcp: { title, description, category } })` to any tRPC procedure
+- **Runtime Discovery**: Server scans `router._def.procedures` and exposes them as AI-accessible tools  
+- **Type-Safe Validation**: Full Zod schema validation enforced for all MCP tool calls
+- **Schema Registry Integration**: Uses our [Input Schema Registry](#%EF%B8%8F-input-schema-registry-system) for reliable JSON Schema generation
+- **Zero Configuration**: Just add `.meta({ mcp: { title, description } })` to any tRPC procedure
 
-```typescript
-import { input } from 'simple-rpc-ai-backend';
+#### **🛠️ MCP Development Experience**
+- **Automatic Discovery**: Tools appear immediately when you add `meta({ mcp: {...} })` 
+- **Live Testing**: Use MCP Jam client at `http://localhost:4000` for interactive testing
+- **Schema Validation**: Full constraint enforcement (min/max, enum, required fields)
+- **Parameter Handling**: Proper handling of optional parameters and defaults
+- **Error Handling**: Meaningful error messages with validation details
 
-// Define schema using input schema registry
-const greetingSchema = input(z.object({
-  name: z.string().default("World"),
-  language: z.enum(["en", "es", "fr"]).default("en")
-}), 'greeting');
+#### **🔒 MCP Security & Authentication**  
+- **Progressive Authentication**: Public tool discovery, authenticated execution
+- **JWT Protection**: Standard Bearer token authentication for tool calls
+- **Public Tool Exceptions**: Configure specific tools as public (e.g., greeting, status)
+- **Input Validation**: All tool calls validated against tRPC Zod schemas
+- **Corporate Friendly**: Works through corporate proxies, no special network requirements
 
-// Define tRPC procedure with MCP metadata
-export const mcpRouter = router({
-  greeting: publicProcedure
-    .meta({
-      mcp: {
-        title: "Greeting Tool", 
-        description: "Generate a friendly greeting message",
-        category: "utility"
-      }
-    })
-    .input(greetingSchema)  // ✅ Uses schema registry for reliable extraction
-    .query(({ input }) => {
-      const greetings = {
-        en: `Hello, ${input.name}! 👋`,
-        es: `¡Hola, ${input.name}! 👋`,
-        fr: `Bonjour, ${input.name}! 👋`
-      };
-      return greetings[input.language];
-    }),
-    
-  // Tool automatically available to AI models via MCP
-});
-```
-
-#### **📚 Ref MCP Integration**
-- **Documentation Search**: Query local MD, PDF, HTML files and remote documentation
-- **GitHub Integration**: Access repository documentation and code examples
-- **URL Reading**: Convert web content to markdown for AI consumption
-- **VS Code Optimized**: Built-in support for VS Code extension development
-
-#### **⚙️ Server Management**
-- **Multiple Server Types**: Support for stdio and HTTP MCP servers
-- **Auto-Registration**: Predefined servers with smart defaults
-- **Custom Servers**: Easy configuration for project-specific tools
-- **Health Monitoring**: Real-time server status and tool availability
-
-#### **🤖 AI Tool Integration**
-- **Enhanced AI Responses**: AI models can automatically use MCP tools
-- **Tool Filtering**: Whitelist/blacklist specific tools per request
-- **Usage Tracking**: Monitor tool calls and performance metrics
-- **Type Safety**: Full TypeScript support throughout the stack
+#### **📊 MCP Protocol Features**
+- **Standard Compliance**: Full MCP HTTP transport implementation
+- **Tool Categories**: Organize tools by category (utility, ai, data, etc.)
+- **Rich Descriptions**: Support for detailed tool and parameter descriptions  
+- **Multiple Formats**: Tools available via MCP, tRPC, and JSON-RPC simultaneously
+- **Live Updates**: New tools appear immediately without server restart
 
 ### **📖 MCP Endpoints Available**
 
-#### **tRPC Endpoints** (Type-safe)
-- `mcp.health` - Check MCP service health
-- `mcp.listServers` - List registered MCP servers
-- `mcp.listTools` - Get available tools
-- `mcp.executeTool` - Execute a specific tool
-- `mcp.searchDocumentation` - Search documentation with Ref MCP
-- `mcp.readURL` - Read and convert URL content
-- `mcp.searchCodeExamples` - Find language-specific code examples
-- `mcp.searchAPIDocumentation` - Search API references
+#### **Core MCP Endpoints** (Direct MCP Protocol)
+- `initialize` - MCP handshake and capability negotiation
+- `tools/list` - Discover all available MCP tools (auto-generated from tRPC)
+- `tools/call` - Execute MCP tools with full validation
 
-#### **JSON-RPC Endpoints** (Universal)
-All tRPC endpoints are also available via JSON-RPC for cross-language compatibility.
+#### **tRPC MCP Tools** (Type-safe, with automatic MCP exposure)
+- `mcp.greeting` - Generate friendly greetings (example tool)
+- `mcp.echo` - Echo messages with transformations
+- `mcp.status` - Get server health and system information
+- `mcp.calculate` - Perform calculations with full validation
 
-### **🆚 VS Code Extension Integration**
+#### **JSON-RPC Bridge** (Universal)
+All tRPC procedures are also available via JSON-RPC for cross-language compatibility, including MCP-decorated tools.
 
-Perfect for VS Code extension developers:
+### **🎯 MCP Development Workflow**
+
+Adding new MCP tools is simple with our decorator pattern:
 
 ```typescript
-import { VSCodeRefIntegration } from 'simple-rpc-ai-backend';
+// 1. Define schema with input() helper
+const myToolSchema = input(z.object({
+  query: z.string().describe('Search query'),
+  limit: z.number().min(1).max(100).default(10).describe('Result limit')
+}), 'myTool');
 
-// Create workspace-specific integration
-const vscodeIntegration = VSCodeRefIntegration.createForWorkspace('/workspace/path');
-await vscodeIntegration.initialize();
+// 2. Add tRPC procedure with MCP metadata  
+const router = createTRPCRouter({
+  myTool: publicProcedure
+    .meta({
+      mcp: {
+        title: "My Custom Tool",
+        description: "Does something useful for AI",
+        category: "utility"
+      }
+    })
+    .input(myToolSchema)
+    .query(({ input }) => {
+      // Implementation here
+      return `Processing: ${input.query} (limit: ${input.limit})`;
+    })
+});
 
-// Search VS Code API
-const apiDocs = await VSCodeRefIntegration.searchVSCodeAPI(
-  vscodeIntegration, 
-  'TreeDataProvider'
-);
-
-// Get extension documentation
-const extensionDocs = await VSCodeRefIntegration.getExtensionDocs(
-  vscodeIntegration,
-  'ms-python.python'
-);
+// 3. Tool automatically available at:
+// - MCP: POST /mcp (tools/list, tools/call)
+// - tRPC: GET /trpc/myTool (type-safe)
+// - JSON-RPC: POST /rpc (universal)
 ```
 
-**Current Status**: ✅ **Fully Implemented** - MCP integration is production-ready with comprehensive documentation search, tool management, and VS Code optimization. Maintains our core focus on system prompt protection and corporate-friendly deployment.
+**Current Status**: ✅ **Production Ready** - MCP integration provides seamless tRPC → MCP tool discovery with decorator pattern, full validation, authentication, and live testing capabilities. Maintains our core focus on system prompt protection and corporate-friendly deployment.

@@ -175,7 +175,7 @@ export function createAIRouter(
    * Simple test procedure with minimal Zod schema
    */
   test: publicProcedure
-    .input(z.object({ message: z.string() }))
+    .input(z.object({ message: z.string().optional().default('Hello from test tool!') }))
     .output(z.object({ message: z.string() }))
     .meta({ 
       mcp: { enabled: true, description: "Just a echo test endpoint" },

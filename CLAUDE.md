@@ -39,15 +39,6 @@ pnpm docs:local           # Start panel + local OpenRPC playground
 pnpm dev:docs             # Complete setup: server + panel + OpenRPC playground
 ```
 
-### Vaultwarden Management
-```bash
-pnpm run vaultwarden:setup    # Setup Vaultwarden infrastructure
-pnpm run vaultwarden:start    # Start Vaultwarden services
-pnpm run vaultwarden:stop     # Stop Vaultwarden services
-pnpm run vaultwarden:logs     # View service logs
-pnpm run vaultwarden:backup   # Create encrypted backup
-pnpm run vaultwarden:restore  # Restore from backup
-```
 
 ## Architecture Overview
 
@@ -588,6 +579,107 @@ project/
 - **Core tests**: ✅ Complete (simple server tested)
 - **Complex server**: 🗑️ Deprecated (use simple server instead)
 
+## MCP Troubleshooting Guide
+
+### **Issue: MCP UI Controls Show But Arguments Not Sent**
+
+**Problem**: MCP clients like MCP Jam show UI controls (toggles, inputs) but changing them has no effect on the server.
+
+**Symptoms**:
+- UI control appears (toggle, dropdown, text input)
+- Changing the control value doesn't affect tool execution
+- Server logs show same arguments regardless of UI changes
+- Tool always behaves as if default values are used
+
+**Root Cause**: MCP clients like MCP Jam have known bugs with parameter UI controls where the UI shows controls but doesn't send the user's input to the server.
+
+**Debug Steps**:
+
+1. **Check Server Logs** for the exact MCP request:
+```bash
+# Look for logs like:
+📡 MCP Request: {
+  "method": "tools/call",
+  "params": { 
+    "name": "toolName",
+    "arguments": { "param": "value" }  // ← Check if arguments are present
+  }
+}
+```
+
+2. **Compare Working vs Broken Tools**:
+```typescript
+// Tools that work usually have required parameters:
+calculate: publicProcedure
+  .input(z.object({
+    expression: z.string().min(1)  // ✅ Required - MCP sends arguments
+  }))
+
+// Tools that don't work often have optional-only parameters:
+status: publicProcedure
+  .input(z.object({
+    detailed: z.boolean().optional().default(false)  // ❌ MCP may skip arguments
+  }))
+```
+
+3. **Fix: Make Parameters Required in Schema**:
+```typescript
+// Instead of optional with defaults:
+status: publicProcedure
+  .input(z.object({
+    detailed: z.boolean().optional().default(false)  // ❌ Arguments skipped
+  }))
+
+// Make required, handle defaults in code:
+status: publicProcedure  
+  .input(z.object({
+    detailed: z.boolean().describe('Include detailed information?')  // ✅ Forces arguments
+  }))
+  .query(({ input }) => {
+    const detailed = input.detailed ?? false;  // Handle missing in code
+  })
+```
+
+**Solution**: Avoid `.optional().default()` patterns for user-controllable parameters. Make them required in the schema and handle missing values in your application logic.
+
+**Workarounds**:
+
+1. **Direct API Testing** (Most reliable):
+```bash
+# Test status basic mode
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "status", "arguments": {"mode": "basic"}}}'
+
+# Test status detailed mode  
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "status", "arguments": {"mode": "detailed"}}}'
+```
+
+2. **Alternative MCP Clients**: Try different MCP clients that handle parameters correctly
+3. **Development Panel**: Use `http://localhost:8080/mcp` for parameter testing
+
+### **Issue: MCP Tools Not Discovered**
+
+**Problem**: tRPC procedures not appearing in `tools/list`.
+
+**Check**:
+1. **MCP enabled**: `mcp: { enableMCP: true }` in server config
+2. **Metadata present**: Procedure has `.meta({ mcp: { description: '...' } })`
+3. **Server logs**: Look for "Auto-discovered tools from tRPC procedures" message
+4. **Build status**: Ensure `pnpm build` completes without errors
+
+### **Issue: MCP Tool Execution Fails**
+
+**Problem**: `tools/call` returns validation errors.
+
+**Debug Steps**:
+1. Check server logs for Zod validation errors
+2. Verify input schema matches the arguments sent
+3. Test the same procedure via tRPC directly
+4. Check for parameter name mismatches
+
 ## Communication Guidelines
 - Be proactive about detecting JSON-RPC and AI integration planning
 - Always consider corporate proxy bypass and system prompt protection
@@ -605,6 +697,7 @@ project/
 - **MCP Integration**: Dynamic tRPC → MCP tool exposure with `meta()` decorators is core feature
 - **Dynamic Discovery**: All tRPC procedures with MCP metadata automatically become AI-accessible tools
 - **Validation Enforcement**: Zod schemas must be properly validated for all MCP tool calls
+- **Parameter Design**: Avoid `.optional().default()` for user-controllable parameters in MCP tools
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
