@@ -153,6 +153,7 @@ export function createAIRouter(
     systemPrompt: z.string()
       .min(mergedConfig.systemPrompt.minLength!)
       .max(mergedConfig.systemPrompt.maxLength!),
+    apiKey: z.string().optional(),
     metadata: z.object({
       name: z.string().optional(),
       type: z.string().optional(),
@@ -212,18 +213,12 @@ export function createAIRouter(
    */
   executeAIRequest: publicProcedure
     .input(executeAIRequestSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { content, systemPrompt, metadata, options } = input;
-      // Simplified for OpenAPI testing - no auth/context
-      return {
-        success: true,
-        message: "AI request would be processed here",
-        input: { content: content.substring(0, 50) + "..." }
-      };
-    }),
+      const { user } = ctx;
+      const userId = user?.userId;
+      const apiKey = input.apiKey || ctx.apiKey;
 
-  // TEMPORARILY COMMENTED OUT - OLD IMPLEMENTATION
-  /*
       // Determine user type and execution path
       if (userId && usageAnalyticsService) {
         // Authenticated user - determine if subscription or BYOK

@@ -14,6 +14,8 @@ export function createTRPCContext(opts) {
     const authReq = opts.req;
     // Start with JWT middleware user if available
     let user = authReq.user || null;
+    // Extract API key from header for BYOK scenarios
+    const apiKey = opts.req.headers['x-api-key'];
     // Development mode: Handle OpenSaaS JWT tokens and session tokens
     if (!user && opts.req.headers.authorization?.startsWith('Bearer ')) {
         const token = opts.req.headers.authorization.substring(7);
@@ -76,6 +78,7 @@ export function createTRPCContext(opts) {
         req: opts.req,
         res: opts.res,
         user, // Populated by JWT middleware if token is valid, or mock user in dev mode
+        apiKey,
     };
 }
 /**
