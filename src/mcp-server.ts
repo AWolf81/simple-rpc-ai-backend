@@ -392,10 +392,12 @@ export class MCPServerManager {
 
     app.get('/.well-known/oauth-protected-resource/mcp', (req, res) => {
       console.log('🔐 OAuth protected resource discovery');
+      const baseUrl = req.protocol + '://' + req.get('host');
       res.json({
-        resource_server: req.protocol + '://' + req.get('host'),
-        authorization_servers: [req.protocol + '://' + req.get('host')],
-        scopes_supported: ['mcp']
+        resource: baseUrl,
+        authorization_servers: [baseUrl],
+        scopes_supported: ['mcp'],
+        bearer_methods_supported: ['header']
       });
     });
 

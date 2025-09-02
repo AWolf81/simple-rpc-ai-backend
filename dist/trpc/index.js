@@ -12,6 +12,13 @@ import superjson from 'superjson';
  */
 export function createTRPCContext(opts) {
     const authReq = opts.req;
+    // Debug: Log what user context we have
+    console.log('🔍 tRPC Context Creation:');
+    console.log(`   Path: ${opts.req.path}`);
+    console.log(`   Method: ${opts.req.method}`);
+    console.log(`   Has authReq.user: ${!!authReq.user}`);
+    console.log(`   User email: ${authReq.user?.email || 'none'}`);
+    console.log(`   Auth header: ${opts.req.headers.authorization ? 'present' : 'missing'}`);
     // Start with JWT middleware user if available
     let user = authReq.user || null;
     // Extract API key from header for BYOK scenarios
@@ -129,3 +136,56 @@ export const tokenProtectedProcedure = protectedProcedure.use(async ({ ctx, next
         },
     });
 });
+/**
+ * MCP Authentication Middleware
+ * Can be applied to any procedure type (public, protected, etc.)
+ * Checks MCP-specific auth requirements from meta.mcpAuth
+ */
+export function withMCPAuth(procedure) {
+    return procedure.use(({ meta, ctx, next }) => {
+        const mcpAuth = meta?.mcpAuth;
+        // If no MCP auth config, continue normally
+        if (!mcpAuth) {
+            return next();
+        }
+        // Check if authentication is required
+        const requireAuth = mcpAuth.requireAuth ?? (mcpAuth.canAccess !== undefined);
+        if (requireAuth && !ctx.user) {
+            throw new TRPCError({
+                code: 'UNAUTHORIZED',
+                message: mcpAuth.accessDeniedMessage || 'Authentication required for this MCP tool',
+            });
+        }
+        // Check role-based access
+        if (mcpAuth.roles && mcpAuth.roles.length > 0) {
+            const userRole = ctx.user?.subscriptionTier || 'free';
+            if (!mcpAuth.roles.includes(userRole)) {
+                throw new TRPCError({
+                    code: 'FORBIDDEN',
+                    message: mcpAuth.accessDeniedMessage || `Access denied. Required roles: ${mcpAuth.roles.join(', ')}`,
+                });
+            }
+        }
+        // Check custom access function
+        if (mcpAuth.canAccess) {
+            const hasAccess = mcpAuth.canAccess({ user: ctx.user, apiKey: ctx.apiKey });
+            if (!hasAccess) {
+                throw new TRPCError({
+                    code: 'FORBIDDEN',
+                    message: mcpAuth.accessDeniedMessage || 'Access denied for this MCP tool',
+                });
+            }
+        }
+        return next();
+    });
+}
+/**
+ * Convenience functions for common MCP procedure patterns
+ * These combine base procedures with MCP auth middleware
+ */
+/** Public procedure with optional MCP auth */
+export const mcpPublicProcedure = withMCPAuth(publicProcedure);
+/** Protected procedure with MCP auth */
+export const mcpProtectedProcedure = withMCPAuth(protectedProcedure);
+/** Token-protected procedure with MCP auth */
+export const mcpTokenProtectedProcedure = withMCPAuth(tokenProtectedProcedure);

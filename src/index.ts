@@ -93,6 +93,10 @@ export type {
   AuthUpgradePrompt
 } from './auth/index.js';
 
+// OAuth2 middleware for easy integration
+export type { OAuthConfig } from './auth/oauth-middleware.js';
+export { createOAuthMiddleware, createOAuthRoutes } from './auth/oauth-middleware.js';
+
 
 // Custom function types
 export type {

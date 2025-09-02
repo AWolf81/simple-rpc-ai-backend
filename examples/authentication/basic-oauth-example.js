@@ -1,163 +1,122 @@
 /**
- * MCP OIDC-compliant Authentication Example - Hybrid with Redirects
+ * MCP Google OAuth2 Authentication Example (Perfect DX)
  *
- * This file uses a hybrid approach with redirects to solve the MCP auth flow:
- * 1. The oidc-provider is mounted on /oidc to handle the OIDC flow.
- * 2. Root-level discovery endpoints (/.well-known/*) are added to redirect clients
- *    to the correct discovery documents under /oidc.
- * 3. A custom middleware protects all other routes (e.g., /mcp) and provides the
- *    WWW-Authenticate header for MCP-compliant discovery.
- *
- * To run this example:
- * node examples/authentication/basic-oauth-example.js
+ * This example demonstrates the perfect DX for OAuth2 integration with MCP servers.
+ * Just add the oauth config to createRpcAiServer - everything else is automatic!
  */
 
-import express from 'express';
-import Provider from 'oidc-provider';
-import session from 'express-session';
 import { createRpcAiServer } from '../../dist/index.js';
+import { config } from 'dotenv';
+
+// Load environment variables from .env.oauth if it exists
+config({ path: '.env.oauth' });
 
 // --- Configuration ---
-process.env.NODE_ENV = 'development'; // Explicitly set NODE_ENV for oidc-provider development features
-
 const SERVER_PORT = 8082;
-const ISSUER = `http://localhost:${SERVER_PORT}/oidc`;
-const PROTECTED_RESOURCE_METADATA_URL = `${ISSUER}/.well-known/oauth-protected-resource`;
 
-console.log('NODE_ENV:', process.env.NODE_ENV); // Log NODE_ENV
+const {
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  TOKEN_ENCRYPTION_KEY,
+} = process.env;
 
-// --- 1. AI Server Setup ---
-const aiServer = createRpcAiServer({
+if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+  console.error('❌ Missing required environment variables:');
+  console.error('   GOOGLE_CLIENT_ID=your_client_id');
+  console.error('   GOOGLE_CLIENT_SECRET=your_client_secret');
+  console.error('');
+  console.error('   Get these from: https://console.developers.google.com');
+  console.error('   Redirect URI: http://localhost:8082/oauth/callback');
+  console.error('');
+  process.exit(1);
+}
+
+// --- Perfect DX: One-line OAuth integration! ---
+const server = createRpcAiServer({
   port: SERVER_PORT,
-  protocols: { tRpc: true },
-  aiLimits: {},
-  mcp: { enableMCP: true },
-});
-
-const app = aiServer.getApp();
-
-// --- 2. Root-level Discovery Redirects ---
-app.get('/.well-known/openid-configuration', (req, res) => {
-  res.redirect(301, `${ISSUER}/.well-known/openid-configuration`);
-});
-app.get('/.well-known/oauth-authorization-server', (req, res) => {
-  res.redirect(301, `${ISSUER}/.well-known/oauth-authorization-server`);
-});
-app.get('/.well-known/oauth-protected-resource', (req, res) => {
-  res.redirect(301, `${ISSUER}/.well-known/oauth-protected-resource`);
-});
-
-
-// --- 3. Custom Authentication Middleware for MCP ---
-const mcpAuthMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log(`🛡️  Unauthenticated request to ${req.path}, sending WWW-Authenticate header.`);
-    res.setHeader('WWW-Authenticate', `Bearer resource="${PROTECTED_RESOURCE_METADATA_URL}"`);
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  console.log(`✅ Authenticated request to ${req.path} with token.`);
-  next();
-};
-app.use('/mcp', mcpAuthMiddleware);
-
-
-// --- 4. oidc-provider Configuration ---
-const oidcConfig = {
-  clients: [
-    {
-      client_id: 'mcp-client',
-      client_secret: 'mcp-client-secret',
-      grant_types: ['authorization_code', 'refresh_token'],
-      redirect_uris: ['http://localhost:4000/oauth/callback/debug'],
-      response_types: ['code'],
+  
+  // AI configuration
+  serverProviders: ['anthropic', 'openai', 'google'],
+  byokProviders: ['anthropic', 'openai', 'google'],
+  
+  // Enable protocols
+  protocols: {
+    tRPC: true      // Enable tRPC for type safety
+  },
+  
+  // Enable MCP with OAuth2
+  mcp: {
+    enableMCP: true,
+    transports: {
+      http: true,   // Standard HTTP transport - MCP Jam uses POST /mcp
+      sse: false,   // Disable SSE transport - conflicts with GET /mcp requests
+      stdio: false  // Keep STDIO disabled
     },
-  ],
-  findAccount: async (ctx, id) => {
-    if (id === 'user-123') {
-      return {
-        accountId: id,
-        async claims(use, scope) {
-          return { sub: id, name: 'Test User', email: 'test@example.com' };
-        },
-      };
+    auth: {
+      requireAuthForToolsList: false,
+      requireAuthForToolsCall: true
     }
-    return undefined;
   },
-  features: {
-    clientCredentials: { enabled: true },
-    registration: { enabled: true },
-    introspection: { enabled: true },
-    revocation: { enabled: true },
-    devInteractions: { enabled: false },
+  
+  // 🚀 Perfect DX: OAuth configuration with HTTPS URLs for MCP compliance!
+  oauth: {
+    provider: 'google',
+    clientId: GOOGLE_CLIENT_ID,
+    clientSecret: GOOGLE_CLIENT_SECRET,
+    
+    // Optional configuration
+    encryptionKey: TOKEN_ENCRYPTION_KEY,
+    scopes: ['openid', 'email', 'profile'],
+    baseUrl: `http://localhost:${SERVER_PORT}`, // Use HTTP for development (avoid certificate issues)
+    
+    // Automatic features:
+    // ✅ Redirect URI: http://localhost:8082/oauth/callback (auto-configured)
+    // ✅ Discovery endpoints: /.well-known/oauth-authorization-server (auto-configured)  
+    // ✅ Session middleware: Required for OAuth flow (auto-configured)
+    // ✅ Encrypted token storage: Secure AES-256-GCM (auto-configured)
+    // ✅ MCP authentication: OAuth tokens work with MCP (auto-configured)
   },
-  pkce: {
-    required: () => true,
-  },
-  scopes: ['openid', 'mcp', 'offline_access'],
-  claims: {
-    openid: ['sub'],
-    email: ['email', 'email_verified'],
-    profile: ['name', 'picture'],
-  },
-  // Configure oidc-provider to use express-session for cookies
-  cookies: {
-    long: session.Cookie,
-    short: session.Cookie,
-  },
-  interactions: {
-    url(ctx, interaction) {
-      return `/oidc/interactions/${interaction.uid}`;
-    },
-  },
-  ttl: {
-    Interaction: 3600, // 1 hour in seconds
-  },
-};
-
-// --- 5. Instantiate and Mount the OIDC Provider ---
-const oidc = new Provider(ISSUER, oidcConfig);
-
-// Add express-session middleware before oidc.callback()
-app.use(session({
-  secret: 'a-very-secret-key-for-express-session',
-  resave: false,
-  saveUninitialized: false,
-  proxy: true,
-  cookie: { secure: false }
-}));
-
-const interactions = express.Router();
-interactions.get('/:uid', async (req, res, next) => {
-  try {
-    const details = await oidc.interactionDetails(req, res);
-    const { uid, prompt, params } = details;
-
-    if (prompt.name === 'login') {
-      await oidc.interactionFinished(req, res, { login: { accountId: 'user-123', jti: 'mock-jti-' + Date.now() } }, { mergeWithLastSubmission: false });
-    } else if (prompt.name === 'consent') {
-      await oidc.interactionFinished(req, res, { consent: { grantId: details.grantId } }, { mergeWithLastSubmission: true });
-    }
-  } catch (err) {
-    console.error('Error in interaction handler:', err);
-    next(err);
+  
+  // Disable HTTPS for MCP Jam compatibility (Node.js apps struggle with self-signed certs)
+  https: {
+    enabled: false,  // Use HTTP for development to avoid certificate issues
+    keyPath: './certs/key.pem',
+    certPath: './certs/cert.pem'
   }
 });
 
-app.use('/oidc/interactions', interactions);
-app.use('/oidc', oidc.callback());
-
-// --- 6. Main Execution ---
+// --- Start Server ---
 async function main() {
-  await aiServer.start();
-  console.log(`🛡️  OIDC-compliant AI Server running at http://localhost:${SERVER_PORT}`);
-  console.log(`   - OIDC Provider is mounted at ${ISSUER}`);
-  console.log(`   - Root discovery endpoints will redirect to the OIDC provider.`);
-  console.log(`   - The /mcp route is protected and will trigger the auth flow.`);
+  await server.start();
+  
+  console.log('');
+  console.log('🚀 MCP Server with Perfect DX OAuth2 Authentication Ready!');
+  console.log('');
+  console.log('📋 Automatically configured endpoints:');
+  console.log(`   • MCP with OAuth: http://localhost:${SERVER_PORT}/mcp`);
+  console.log(`   • OAuth Discovery: http://localhost:${SERVER_PORT}/.well-known/oauth-authorization-server`);
+  console.log(`   • Protected Resource: http://localhost:${SERVER_PORT}/.well-known/oauth-protected-resource`);
+  console.log(`   • tRPC Playground: http://localhost:${SERVER_PORT}/trpc-playground`);
+  console.log('');
+  console.log('🎯 Perfect DX Features:');
+  console.log('   ✅ HTTP URLs for development compatibility');
+  console.log('   ✅ Session middleware for OAuth flow');
+  console.log('   ✅ Encrypted token storage');
+  console.log('   ✅ Automatic OAuth discovery');
+  console.log('   ✅ MCP authentication');
+  console.log('   ✅ Google OAuth2 integration');
+  console.log('   ✅ Token persistence across restarts');
+  console.log('');
+  console.log('🧪 Test with MCP clients:');
+  console.log('   1. Open MCP Jam at http://localhost:4000');
+  console.log(`   2. Connect to: http://localhost:${SERVER_PORT}/mcp`);
+  console.log('   3. OAuth flow starts automatically!');
+  console.log('');
+  console.log('💡 Perfect DX achieved with just oauth config in createRpcAiServer!');
+  console.log('');
 }
 
 main().catch(error => {
-  console.error('An error occurred:', error);
+  console.error('❌ Server startup failed:', error);
   process.exit(1);
 });

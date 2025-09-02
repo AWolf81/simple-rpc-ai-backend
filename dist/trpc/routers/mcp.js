@@ -84,7 +84,7 @@ export class MCPProtocolHandler {
                     response = await this.handleToolsList(mcpRequest);
                     break;
                 case 'tools/call':
-                    response = await this.handleToolsCall(mcpRequest);
+                    response = await this.handleToolsCall(mcpRequest, req);
                     break;
                 case 'notifications/cancelled':
                     response = this.handleCancellation(mcpRequest);
@@ -171,7 +171,7 @@ export class MCPProtocolHandler {
     /**
      * Handle tools/call method - execute tRPC procedure
      */
-    async handleToolsCall(request) {
+    async handleToolsCall(request, req) {
         try {
             const { name, arguments: args, _meta } = request.params;
             if (!name) {
@@ -182,12 +182,18 @@ export class MCPProtocolHandler {
             if (!tool) {
                 throw new Error(`Tool '${name}' not found`);
             }
-            // Check if tool supports progress reporting
+            // Get metadata for progress reporting and extensions
             const meta = tool.procedure._def?.meta;
             const mcpExtensions = meta?.mcpExtensions;
             const progressToken = _meta?.progressToken;
-            // Execute the tRPC procedure with progress support
-            const result = await this.executeTRPCProcedure(tool, args || {}, progressToken, mcpExtensions);
+            // Execute the tRPC procedure with progress support and user context
+            const userContext = {
+                user: req?.user || null,
+                apiKey: req?.tokenInfo?.apiKey || null,
+                req: req || null,
+                res: null // Not available in this context
+            };
+            const result = await this.executeTRPCProcedure(tool, args || {}, progressToken, mcpExtensions, userContext);
             // Format response based on result type
             let content;
             if (typeof result === 'string') {
@@ -321,7 +327,7 @@ export class MCPProtocolHandler {
     /**
      * Execute a tRPC procedure with given arguments and optional progress tracking
      */
-    async executeTRPCProcedure(tool, args, progressToken, meta) {
+    async executeTRPCProcedure(tool, args, progressToken, meta, userContext) {
         const procedure = tool.procedure;
         console.log(`🔍 Executing tRPC procedure ${tool.name} with raw args:`, JSON.stringify(args, null, 2));
         // Validate input if parser exists
@@ -341,16 +347,25 @@ export class MCPProtocolHandler {
                 console.log(`📊 Progress: ${progress}/${total} - ${message || 'Processing...'}`);
             };
         }
-        // Create a mock context for procedure execution with progress support
+        // Create a context for procedure execution with progress support and user info
         const ctx = {
             type: 'query',
             input: args,
             ctx: {
                 progressToken,
                 progress: progressCallback,
-                // Add authentication/session data here if needed
+                // Pass authenticated user info from MCP auth middleware
+                user: userContext?.user || null,
+                apiKey: userContext?.apiKey || null,
+                req: userContext?.req || null,
+                res: userContext?.res || null
             }
         };
+        console.log(`🔐 Procedure context:`, {
+            hasUser: !!ctx.ctx.user,
+            userEmail: ctx.ctx.user?.email,
+            hasApiKey: !!ctx.ctx.apiKey
+        });
         // Execute the resolver
         return await procedure._def.resolver(ctx);
     }
@@ -704,6 +719,26 @@ export function createMCPRouter() {
                 totalRunning: runningTasks.length,
                 totalCompleted: mockCompletedTasks.length,
                 registrySize: registry.size
+            };
+        }),
+        // Example: Demonstrating flexible middleware usage (auth policies defined in ai-server-example)
+        advancedExample: publicProcedure
+            .meta({
+            mcp: {
+                name: 'advancedExample',
+                description: 'Demonstrate flexible MCP middleware patterns'
+            }
+        })
+            .input(z.object({
+            action: z.enum(['check', 'process']).describe('Action to perform')
+        }))
+            .query(({ input, ctx }) => {
+            const action = input.action ?? 'check'; // Handle missing in code
+            return {
+                action: action,
+                user: ctx.user ? `${ctx.user.email} (${ctx.user.subscriptionTier})` : 'Anonymous',
+                hasApiKey: !!ctx.apiKey,
+                message: `Successfully executed ${action}`
             };
         }),
         // Get progress for a specific task

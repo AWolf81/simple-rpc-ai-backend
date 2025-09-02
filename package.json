@@ -49,6 +49,8 @@
     "postgres:logs": "docker-compose --env-file .env.postgres -f docker-compose.postgres.yml logs -f",
     "demo:storage": "node examples/flexible-storage-examples.js",
     "demo:trpc": "node -e \"import('./dist/server-trpc.js').then(({createTRPCServer}) => { const server = createTRPCServer({port: 8001}); server.start().then(() => console.log('🚀 tRPC demo running on http://localhost:8001\\nTry: curl http://localhost:8001/health')); })\"",
+    "demo:oauth": "pnpm build && node examples/authentication/basic-oauth-example.js",
+    "test:oauth": "node test-oauth-discovery.js",
     "test:trpc": "node -e \"import('./dist/server-trpc.js').then(async ({createTRPCServer}) => { const s = createTRPCServer({port: 8003}); await s.start(); const r = await fetch('http://localhost:8003/health'); console.log('✅ tRPC test:', (await r.json()).status); await s.stop(); })\""
   },
   "keywords": [

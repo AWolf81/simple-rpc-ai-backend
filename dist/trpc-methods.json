@@ -1,5 +1,5 @@
 {
-  "generated": "2025-08-31T19:13:03.981Z",
+  "generated": "2025-09-02T11:35:30.751Z",
   "version": "1.0.0",
   "description": "tRPC procedure documentation extracted from router",
   "procedures": {
@@ -1020,6 +1020,30 @@
         }
       }
     },
+    "mcp.advancedExample": {
+      "path": "mcp.advancedExample",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "action": {
+            "type": "ZodEnum",
+            "description": "Action to perform"
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "advancedExample",
+          "description": "Demonstrate flexible MCP middleware patterns"
+        }
+      }
+    },
     "mcp.getTaskProgress": {
       "path": "mcp.getTaskProgress",
       "type": "query",
@@ -1422,6 +1446,46 @@
           }
         }
       },
+      "mcp.advancedExample": {
+        "title": "advancedExample",
+        "description": "Demonstrate flexible MCP middleware patterns",
+        "category": "general",
+        "type": "query",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "advancedExample",
+                "arguments": {
+                  "action": "example"
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.advancedExample",
+            "method": "GET",
+            "example": "curl -X GET \"http://localhost:8000/trpc/mcp.advancedExample?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22action%22%3A%22example%22%7D%7D%7D\""
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.advancedExample",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.advancedExample",
+              "params": {
+                "action": "example"
+              }
+            }
+          }
+        }
+      },
       "mcp.getTaskProgress": {
         "title": "getTaskProgress",
         "description": "Get real-time progress for a specific task",
@@ -1467,10 +1531,10 @@
     "protocolVersion": "2024-11-05"
   },
   "stats": {
-    "totalProcedures": 36,
-    "queries": 22,
+    "totalProcedures": 37,
+    "queries": 23,
     "mutations": 14,
     "subscriptions": 0,
-    "mcpMethods": 10
+    "mcpMethods": 11
   }
 }
