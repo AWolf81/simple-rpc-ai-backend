@@ -6,15 +6,11 @@
  */
 import 'dotenv/config';
 import express from 'express';
-import { createServer as createHttpServer } from 'http';
-import { createServer as createHttpsServer } from 'https';
-import { readFileSync, existsSync } from 'fs';
+import crypto from 'crypto';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as trpcExpress from '@trpc/server/adapters/express';
-import session from 'express-session';
-import crypto from 'crypto';
 import { createAppRouter } from './trpc/root.js';
 import { createTRPCContext } from './trpc/index.js';
 import { JWTMiddleware } from './auth/jwt-middleware.js';
@@ -24,7 +20,7 @@ import { UsageAnalyticsService } from './services/usage-analytics-service.js';
 import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods.js';
 import { RPC_METHODS } from './constants.js';
 import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge.js';
-import { createOAuthMiddleware, createOAuthRoutes } from './auth/oauth-middleware.js';
+import { createOAuthServer, initializeOAuthServer, closeOAuthServer } from './auth/oauth-middleware.js';
 export class RpcAiServer {
     app;
     server;
@@ -36,8 +32,8 @@ export class RpcAiServer {
     usageAnalyticsService;
     postgresRPCMethods;
     jsonRpcBridge;
-    oauthMiddleware;
-    oauthRoutes;
+    oauthServer;
+    oauthStorage;
     /**
      * Opinionated protocol configuration:
      * - Default: JSON-RPC only (simpler, universal)
@@ -92,18 +88,16 @@ export class RpcAiServer {
             jwt: {
                 ...config.jwt
             },
-            ...(config.oauth && { oauth: config.oauth }),
+            oauth: {
+                enabled: false,
+                ...config.oauth
+            },
             cors: {
                 origin: '*',
                 credentials: false,
                 ...config.cors
             },
-            https: {
-                enabled: false,
-                keyPath: './certs/key.pem',
-                certPath: './certs/cert.pem',
-                ...config.https
-            },
+            trustProxy: config.trustProxy || false,
             rateLimit: {
                 windowMs: 15 * 60 * 1000, // 15 minutes
                 max: 1000, // Conservative but reasonable
@@ -122,9 +116,8 @@ export class RpcAiServer {
                     http: true, // HTTP transport enabled by default
                     stdio: false, // STDIO transport disabled by default
                     sse: false, // SSE transport disabled by default  
-                    ...config.mcp?.transports,
-                    // Ensure sseEndpoint always has a fallback value after merge
-                    sseEndpoint: config.mcp?.transports?.sseEndpoint || '/sse'
+                    sseEndpoint: '/sse',
+                    ...config.mcp?.transports
                 },
                 auth: {
                     requireAuthForToolsList: false, // tools/list is public by default
@@ -176,163 +169,26 @@ export class RpcAiServer {
         if (this.config.protocols.jsonRpc) {
             this.jsonRpcBridge = createTRPCToJSONRPCBridge(this.router);
         }
+        // Initialize OAuth server (if enabled)
+        if (this.config.oauth.enabled) {
+            console.log(`🔐 Setting up OAuth 2.0 server...`);
+            const storageConfig = {
+                type: this.config.oauth.sessionStorage?.type || 'memory',
+                filePath: this.config.oauth.sessionStorage?.filePath,
+                redis: this.config.oauth.sessionStorage?.redis
+            };
+            const { oauth, storage } = createOAuthServer(storageConfig);
+            this.oauthServer = oauth;
+            this.oauthStorage = storage; // Store reference to session storage
+            console.log(`✅ OAuth 2.0 server initialized with ${storageConfig.type} storage`);
+        }
         this.app = express();
-        this.setupOAuth();
+        // Enable trust proxy if configured (for reverse proxies like ngrok, cloudflare, etc.)
+        if (this.config.trustProxy) {
+            this.app.set('trust proxy', 1);
+            console.log(`🔧 Trust proxy enabled for reverse proxy support`);
+        }
         this.setupMiddleware();
-        this.setupRoutes();
-    }
-    /**
-     * Setup OAuth2 authentication (if configured)
-     * Note: Routes are registered later in start() method to avoid catch-all interference
-     */
-    setupOAuth() {
-        if (!this.config.oauth) {
-            return;
-        }
-        console.log(`🔐 Setting up OAuth2 authentication with ${this.config.oauth.provider}...`);
-        // Add session middleware (required for OAuth flow)
-        this.app.use(session({
-            secret: this.config.oauth.encryptionKey || crypto.randomBytes(32).toString('hex'),
-            resave: false,
-            saveUninitialized: true,
-            cookie: {
-                secure: false, // Set to true in production with HTTPS
-                maxAge: 24 * 60 * 60 * 1000, // 24 hours
-                sameSite: 'lax'
-            }
-        }));
-        // Calculate base URL for OAuth (prefer HTTPS for MCP compliance)
-        const baseUrl = this.config.oauth.baseUrl || `https://localhost:${this.config.port}`;
-        // Ensure redirectUri is set if not provided
-        const oauthConfig = {
-            ...this.config.oauth,
-            redirectUri: this.config.oauth.redirectUri || `${baseUrl}/oauth/callback`,
-            baseUrl
-        };
-        // Initialize OAuth middleware and routes (routes will be registered in start())
-        this.oauthMiddleware = createOAuthMiddleware(oauthConfig);
-        this.oauthRoutes = createOAuthRoutes(oauthConfig, baseUrl);
-        // Use the tokenStorage from the OAuth routes (same instance used by OAuth handlers)
-        this.tokenStorage = this.oauthRoutes.tokenStorage;
-        // Note: OAuth middleware for MCP endpoint will be applied in start() after JSON parsing
-        console.log(`✅ OAuth2 middleware configured (routes will be registered during start())`);
-    }
-    /**
-     * Register OAuth routes (called during start() before catch-all handler)
-     */
-    setupOAuthRoutes() {
-        if (!this.config.oauth || !this.oauthRoutes) {
-            return;
-        }
-        const baseUrl = this.config.oauth.baseUrl || `https://localhost:${this.config.port}`;
-        // CORS preflight support for OAuth discovery endpoints
-        const corsHandler = (req, res) => {
-            res.header('Access-Control-Allow-Origin', '*');
-            res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-            res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Accept-Language, Content-Language, Origin');
-            res.status(200).send();
-        };
-        this.app.options('/.well-known/oauth-authorization-server', corsHandler);
-        this.app.options('/.well-known/oauth-authorization-server/mcp', corsHandler);
-        this.app.options('/.well-known/oauth-protected-resource', corsHandler);
-        this.app.options('/.well-known/oauth-protected-resource/mcp', corsHandler);
-        this.app.options('/.well-known/openid-configuration', corsHandler);
-        this.app.options('/.well-known/openid-configuration/mcp', corsHandler);
-        this.app.options('/mcp/.well-known/openid-configuration', corsHandler);
-        this.app.options('/.well-known/jwks.json', corsHandler);
-        this.app.options('/mcp', corsHandler); // MCP endpoint preflight
-        // Setup OAuth discovery and flow routes
-        this.app.get('/.well-known/oauth-authorization-server', this.oauthRoutes.authorizationServerDiscovery);
-        this.app.get('/.well-known/oauth-authorization-server/mcp', this.oauthRoutes.mcpAuthorizationServerDiscovery);
-        this.app.get('/.well-known/oauth-protected-resource', this.oauthRoutes.protectedResourceDiscovery);
-        this.app.get('/.well-known/oauth-protected-resource/mcp', this.oauthRoutes.mcpResourceDiscovery);
-        this.app.get('/.well-known/openid-configuration', this.oauthRoutes.openidConfiguration);
-        this.app.get('/.well-known/openid-configuration/mcp', this.oauthRoutes.openidConfiguration); // MCP-specific alias
-        this.app.get('/mcp/.well-known/openid-configuration', this.oauthRoutes.openidConfiguration); // Alternative MCP path
-        this.app.get('/.well-known/jwks.json', this.oauthRoutes.jwks);
-        // OAuth flow endpoints
-        this.app.post('/oauth/register', express.json(), this.oauthRoutes.register);
-        this.app.get('/oauth/authorize', this.oauthRoutes.authorize);
-        this.app.get('/authorize', this.oauthRoutes.authorize); // Alias for MCP Jam compatibility
-        this.app.get('/oauth/callback', this.oauthRoutes.callback);
-        this.app.post('/oauth/token', express.json(), this.oauthRoutes.token);
-        this.app.post('/token', express.json(), this.oauthRoutes.token); // Alias for MCP Jam compatibility
-        console.log(`✅ OAuth2 routes registered:`);
-        console.log(`   • Provider: ${this.config.oauth.provider}`);
-        console.log(`   • Base URL: ${baseUrl}`);
-        console.log(`   • Discovery: ${baseUrl}/.well-known/oauth-authorization-server`);
-        console.log(`   • Protected Resource: ${baseUrl}/.well-known/oauth-protected-resource`);
-        console.log(`   • Authorization: ${baseUrl}/oauth/authorize (also available at ${baseUrl}/authorize)`);
-        console.log(`   • Token: ${baseUrl}/oauth/token (also available at ${baseUrl}/token)`);
-        console.log(`   • OpenID Config: ${baseUrl}/.well-known/openid-configuration (also at /mcp/.well-known/openid-configuration)`);
-        // Add debug endpoints for token inspection
-        this.app.get('/debug/tokens', (req, res) => {
-            console.log('🐛 DEBUG: Token inspection requested');
-            const storage = this.tokenStorage;
-            if (storage && storage.tokens) {
-                const tokens = Array.from(storage.tokens.entries()).map((entry) => {
-                    const [token, info] = entry;
-                    return {
-                        token: token.substring(0, 20) + '...',
-                        user: info.user?.email,
-                        created: new Date(info.created_at).toISOString(),
-                        expires_in: info.expires_in
-                    };
-                });
-                res.json({ tokens, count: tokens.length });
-            }
-            else {
-                res.json({ error: 'Token storage not accessible', tokens: [] });
-            }
-        });
-        this.app.get('/debug/latest-token', (req, res) => {
-            console.log('🐛 DEBUG: Latest token inspection requested');
-            const storage = this.tokenStorage;
-            console.log('🐛 DEBUG: tokenStorage exists?', !!storage);
-            console.log('🐛 DEBUG: storage.tokens exists?', !!(storage && storage.tokens));
-            console.log('🐛 DEBUG: storage.tokens size:', storage && storage.tokens ? storage.tokens.size : 'N/A');
-            if (storage && storage.tokens) {
-                const entries = Array.from(storage.tokens.entries());
-                console.log('🐛 DEBUG: entries length:', entries.length);
-                if (entries.length > 0) {
-                    const latest = entries[entries.length - 1];
-                    res.json({
-                        token: latest[0].substring(0, 20) + '...',
-                        info: {
-                            user: latest[1].user?.email,
-                            created_at: latest[1].created_at,
-                            expires_in: latest[1].expires_in
-                        },
-                        created: new Date(latest[1].created_at).toISOString()
-                    });
-                }
-                else {
-                    res.json({ error: 'No tokens found' });
-                }
-            }
-            else {
-                res.json({ error: 'Token storage not accessible', debug: {
-                        storageExists: !!storage,
-                        tokensExists: !!(storage && storage.tokens)
-                    } });
-            }
-        });
-        this.app.get('/debug/session', (req, res) => {
-            console.log('🐛 DEBUG: Session inspection requested');
-            const session = req.session;
-            res.json({
-                sessionID: req.sessionID,
-                session: session,
-                cookies: req.headers.cookie
-            });
-        });
-        // Apply OAuth middleware to MCP endpoint (after JSON parsing middleware is set up)
-        this.app.use('/', (req, res, next) => {
-            if (req.method === 'POST' && req.path === '/mcp') {
-                return this.oauthMiddleware.mcpAuthMiddleware(req, res, next);
-            }
-            next();
-        });
     }
     setupMiddleware() {
         // Security - with CORS-friendly settings
@@ -345,20 +201,17 @@ export class RpcAiServer {
         this.app.use(cors({
             origin: this.config.cors.origin,
             credentials: this.config.cors.credentials,
-            methods: ['GET', 'POST', 'OPTIONS', 'HEAD', 'PUT', 'DELETE'],
+            methods: ['GET', 'POST', 'OPTIONS', 'HEAD'],
             allowedHeaders: [
                 'Content-Type',
                 'Authorization',
                 'X-Requested-With',
+                'mcp-protocol-version', // Required for MCP Jam OAuth discovery
                 'Accept',
                 'Accept-Language',
                 'Content-Language',
-                'Origin',
-                'X-Session-Id',
-                'X-Forwarded-For',
-                'X-Real-IP'
+                'Origin'
             ],
-            exposedHeaders: ['WWW-Authenticate'],
             optionsSuccessStatus: 200 // Some legacy browsers choke on 204
         }));
         // Body parsing
@@ -382,7 +235,7 @@ export class RpcAiServer {
             }));
         }
     }
-    setupRoutes() {
+    async setupRoutes() {
         // Health endpoint
         this.app.get(this.config.paths.health, (_req, res) => {
             res.json({
@@ -396,6 +249,237 @@ export class RpcAiServer {
                 }
             });
         });
+        // OAuth2 Discovery endpoints (for MCP Jam compatibility)
+        // These endpoints are required by MCP Jam even if OAuth is not fully implemented
+        const baseUrl = process.env.OAUTH_BASE_URL || `http://localhost:${this.config.port}`;
+        // CORS preflight for OAuth discovery endpoints
+        const oauthCorsHandler = (_req, res) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, mcp-protocol-version, Accept, Accept-Language, Content-Language, Origin');
+            res.status(200).send();
+        };
+        this.app.options('/.well-known/oauth-authorization-server', oauthCorsHandler);
+        this.app.options('/.well-known/oauth-authorization-server/mcp', oauthCorsHandler);
+        this.app.options('/.well-known/oauth-protected-resource', oauthCorsHandler);
+        this.app.options('/.well-known/oauth-protected-resource/mcp', oauthCorsHandler);
+        this.app.options('/.well-known/openid-configuration', oauthCorsHandler);
+        this.app.options('/oauth/register', oauthCorsHandler);
+        this.app.options('/oauth/token', oauthCorsHandler);
+        this.app.options('/oauth/authorize', oauthCorsHandler);
+        // OAuth Authorization Server Discovery
+        this.app.get('/.well-known/oauth-authorization-server', (_req, res) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.json({
+                issuer: baseUrl,
+                authorization_endpoint: `${baseUrl}/oauth/authorize`,
+                token_endpoint: `${baseUrl}/oauth/token`,
+                registration_endpoint: `${baseUrl}/oauth/register`,
+                response_types_supported: ['code'],
+                grant_types_supported: ['authorization_code'],
+                code_challenge_methods_supported: ['S256'],
+                token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
+                // scopes_supported: [
+                //   'mcp', 'mcp:list', 'mcp:call', 'mcp:tools', 'mcp:admin',
+                //   'read', 'write', 'admin', 'user',
+                //   'ai:execute', 'ai:configure', 'ai:read',
+                //   'system:read', 'system:admin', 'system:health',
+                //   'profile:read', 'profile:write',
+                //   'billing:read', 'billing:write'
+                // ],
+                scopes_supported: ['mcp'],
+                resource: `${baseUrl}/`, // Required by OAuth 2025-DRAFT-v2
+                // RFC 7591 Dynamic Client Registration metadata
+                client_registration_types_supported: ['dynamic'],
+                registration_endpoint_auth_methods_supported: ['none'],
+                client_registration_endpoint: `${baseUrl}/oauth/register`,
+                // Additional metadata for OAuth client compatibility
+                application_type: 'web',
+                subject_types_supported: ['public'],
+                client_id_issued_at: Math.floor(Date.now() / 1000)
+            });
+        });
+        // MCP-specific OAuth Authorization Server Discovery
+        this.app.get('/.well-known/oauth-authorization-server/mcp', (_req, res) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.json({
+                issuer: baseUrl,
+                authorization_endpoint: `${baseUrl}/oauth/authorize`,
+                token_endpoint: `${baseUrl}/oauth/token`,
+                registration_endpoint: `${baseUrl}/oauth/register`,
+                response_types_supported: ['code'],
+                grant_types_supported: ['authorization_code'],
+                code_challenge_methods_supported: ['S256'],
+                token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
+                // scopes_supported: [
+                //   'mcp', 'mcp:list', 'mcp:call', 'mcp:tools', 'mcp:admin',
+                //   'read', 'write', 'admin', 'user',
+                //   'ai:execute', 'ai:configure', 'ai:read',
+                //   'system:read', 'system:admin', 'system:health',
+                //   'profile:read', 'profile:write',
+                //   'billing:read', 'billing:write'
+                // ],
+                scopes_supported: ['mcp'],
+                resource: `${baseUrl}/`, // Required by OAuth 2025-DRAFT-v2
+                // RFC 7591 Dynamic Client Registration metadata
+                client_registration_types_supported: ['dynamic'],
+                registration_endpoint_auth_methods_supported: ['none'],
+                client_registration_endpoint: `${baseUrl}/oauth/register`,
+                // Additional metadata for OAuth client compatibility
+                application_type: 'web',
+                subject_types_supported: ['public'],
+                client_id_issued_at: Math.floor(Date.now() / 1000)
+            });
+        });
+        // OAuth Protected Resource Discovery  
+        this.app.get('/.well-known/oauth-protected-resource', (_req, res) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.json({
+                resource: `${baseUrl}/`,
+                authorization_servers: [`${baseUrl}/`],
+                // scopes_supported: [
+                //   'mcp', 'mcp:list', 'mcp:call', 'mcp:tools', 'mcp:admin',
+                //   'read', 'write', 'admin', 'user',
+                //   'ai:execute', 'ai:configure', 'ai:read',
+                //   'system:read', 'system:admin', 'system:health',
+                //   'profile:read', 'profile:write',
+                //   'billing:read', 'billing:write'
+                // ],
+                scopes_supported: ['mcp'],
+                bearer_methods_supported: ['header'],
+                resource_documentation: `${baseUrl}/mcp`
+            });
+        });
+        // MCP-specific OAuth Protected Resource Discovery
+        this.app.get('/.well-known/oauth-protected-resource/mcp', (_req, res) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.json({
+                resource: `${baseUrl}/`,
+                authorization_servers: [`${baseUrl}/`],
+                // scopes_supported: [
+                //   'mcp', 'mcp:list', 'mcp:call', 'mcp:tools', 'mcp:admin',
+                //   'read', 'write', 'admin', 'user',
+                //   'ai:execute', 'ai:configure', 'ai:read',
+                //   'system:read', 'system:admin', 'system:health',
+                //   'profile:read', 'profile:write',
+                //   'billing:read', 'billing:write'
+                // ],
+                scopes_supported: ['mcp'],
+                bearer_methods_supported: ['header'],
+                resource_documentation: `${baseUrl}/mcp`
+            });
+        });
+        // OpenID Configuration (minimal, for compatibility)
+        this.app.get('/.well-known/openid-configuration', (_req, res) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.json({
+                issuer: baseUrl,
+                authorization_endpoint: `${baseUrl}/oauth/authorize`,
+                token_endpoint: `${baseUrl}/oauth/token`,
+                response_types_supported: ['code'],
+                grant_types_supported: ['authorization_code'],
+                code_challenge_methods_supported: ['S256'],
+                scopes_supported: ['openid', 'mcp'],
+                subject_types_supported: ['public'],
+                jwks_uri: `${baseUrl}/.well-known/jwks.json`, // required by OIDC
+                id_token_signing_alg_values_supported: ['RS256']
+            });
+        });
+        // JWKS endpoint (placeholder) --> required by OIDC but empty for now
+        this.app.get('/.well-known/jwks.json', (_req, res) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.json({
+                keys: [] // In a real implementation, this would contain your public keys
+            });
+        });
+        // OAuth 2.0 Functional Endpoints (if OAuth is enabled)
+        if (this.config.oauth.enabled && this.oauthServer) {
+            console.log(`🔗 Setting up OAuth 2.0 functional endpoints...`);
+            // Import OAuth route handlers
+            const { handleProviderLogin, handleProviderCallback, createAuthenticateHandler, handleProviderSelection } = await import('./auth/oauth-middleware.js');
+            // Provider selection page
+            this.app.get('/login', handleProviderSelection);
+            // Identity provider login routes
+            this.app.get('/login/:provider', handleProviderLogin);
+            this.app.get('/callback/:provider', handleProviderCallback);
+            // OAuth Authorization Endpoint with pre-authentication check
+            this.app.get('/oauth/authorize', async (req, res, next) => {
+                // Generate a default state parameter if missing (OAuth 2.0 state is optional)
+                if (!req.query.state) {
+                    console.log(`⚠️ OAuth: No state parameter provided, generating default state`);
+                    req.query.state = 'auto-generated-state-' + crypto.randomBytes(16).toString('hex');
+                }
+                // Pre-check authentication before calling OAuth server
+                const authenticateHandler = createAuthenticateHandler();
+                const user = await authenticateHandler.handle(req);
+                if (!user) {
+                    // No authentication - redirect to login page
+                    const baseUrl = process.env.OAUTH_BASE_URL || `http://localhost:${this.config.port}`;
+                    const loginUrl = new URL('/login', baseUrl);
+                    loginUrl.searchParams.set('redirect_uri', req.originalUrl);
+                    return res.redirect(loginUrl.toString());
+                }
+                // User is authenticated - proceed with OAuth authorization
+                this.oauthServer.authorize({
+                    authenticateHandler: {
+                        handle: async () => user // Return the already authenticated user
+                    }
+                })(req, res, next);
+            });
+            // OAuth Token Endpoint  
+            this.app.post('/oauth/token', (req, res, next) => {
+                // Add CORS headers for token endpoint
+                res.header('Access-Control-Allow-Origin', '*');
+                res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+                res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                next();
+            }, this.oauthServer.token());
+            // OAuth Dynamic Client Registration Endpoint
+            this.app.post('/oauth/register', async (req, res) => {
+                try {
+                    res.header('Access-Control-Allow-Origin', '*');
+                    const { redirect_uris, client_name, grant_types } = req.body;
+                    if (!redirect_uris || !Array.isArray(redirect_uris) || redirect_uris.length === 0) {
+                        res.status(400).json({
+                            error: 'invalid_redirect_uri',
+                            error_description: 'redirect_uris is required and must be an array'
+                        });
+                        return;
+                    }
+                    // Generate a new client with timestamp-based ID (matching expected format)
+                    const clientId = `static_client_${Date.now()}`;
+                    const clientSecret = crypto.randomBytes(32).toString('hex');
+                    // Create client object directly in storage to avoid registerClient generating its own secret
+                    const client = {
+                        id: clientId,
+                        clientSecret,
+                        grants: grant_types || ['authorization_code', 'refresh_token'],
+                        redirectUris: redirect_uris,
+                        accessTokenLifetime: 3600,
+                        refreshTokenLifetime: 86400
+                    };
+                    // Store client directly using the OAuth storage instance
+                    await this.oauthStorage.setClient(clientId, client);
+                    console.log(`✅ OAuth: Registered dynamic client ${clientId}`);
+                    // Return client registration response
+                    res.json({
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        redirect_uris: redirect_uris,
+                        grant_types: client.grants,
+                        token_endpoint_auth_method: 'client_secret_post'
+                    });
+                }
+                catch (error) {
+                    console.error('❌ OAuth client registration failed:', error);
+                    res.status(500).json({
+                        error: 'server_error',
+                        error_description: 'Failed to register client'
+                    });
+                }
+            });
+            console.log(`✅ OAuth 2.0 functional endpoints configured (including registration)`);
+        }
         // tRPC endpoint (if enabled)
         if (this.config.protocols.tRpc) {
             this.app.use(this.config.paths.tRpc, trpcExpress.createExpressMiddleware({
@@ -550,7 +634,7 @@ export class RpcAiServer {
                         console.log(`✅ Processed subscription: ${tokensPurchased} tokens for user ${userId}`);
                     }
                     else {
-                        console.log(`✅ Processed one-time purchase: $${orderValue / 100} for user ${userId}`);
+                        console.log(`✅ Processed one-time purchase: ${orderValue / 100} for user ${userId}`);
                     }
                 }
             }
@@ -569,8 +653,12 @@ export class RpcAiServer {
         // Import MCP server components
         const { createMCPServer } = await import('./mcp-server.js');
         const { MCPProtocolHandler } = await import('./trpc/routers/mcp.js');
-        // Use the corrected transport configuration from constructor (should be defined by now)
-        const transports = this.config.mcp.transports;
+        const transports = this.config.mcp.transports || {
+            http: true,
+            stdio: false,
+            sse: false,
+            sseEndpoint: '/sse'
+        };
         // Create unified MCP server manager
         const mcpServer = createMCPServer({
             name: 'simple-rpc-ai-backend',
@@ -603,7 +691,7 @@ export class RpcAiServer {
             console.log(`   • HTTP: http://localhost:${this.config.port}/mcp`);
         }
         if (transports.sse) {
-            console.log(`   • SSE: http://localhost:${this.config.port}${transports.sseEndpoint || '/sse'}`);
+            console.log(`   • SSE: http://localhost:${this.config.port}${transports.sseEndpoint}`);
         }
         if (transports.stdio) {
             console.log(`   • STDIO: node dist/mcp-stdio-server.js`);
@@ -613,14 +701,18 @@ export class RpcAiServer {
         console.log(`   • Supports: initialize, ping, tools/list, tools/call, notifications/progress`);
     }
     async start(setupRoutes) {
+        // Initialize OAuth server session storage (if enabled)
+        if (this.config.oauth.enabled) {
+            await initializeOAuthServer();
+        }
+        // Setup routes (including OAuth routes)
+        await this.setupRoutes();
         // Setup MCP endpoint (always enabled for SDK integration)
         // Setup new router-based MCP server with HTTP transport
         await this.setupMCPServer();
         if (setupRoutes) {
             setupRoutes(this.app);
         }
-        // Register OAuth routes (must be before catch-all handler)
-        this.setupOAuthRoutes();
         // Catch-all (moved from rpc-ai-server setupRoutes method to run after the custom setup routes - if any)
         // Catch-all 404 middleware — place this LAST
         this.app.use((req, res) => {
@@ -634,46 +726,21 @@ export class RpcAiServer {
                     health: this.config.paths.health,
                     ...(this.config.protocols.jsonRpc && { jsonRpc: this.config.paths.jsonRpc }),
                     ...(this.config.protocols.tRpc && { tRpc: this.config.paths.tRpc }),
-                    ...(this.config.tokenTracking.enabled && { webhooks: this.config.tokenTracking.webhookPath }),
-                    ...(this.config.oauth && {
-                        'oauth-authorize': '/oauth/authorize',
-                        'oauth-token': '/oauth/token',
-                        'oauth-discovery': '/.well-known/oauth-authorization-server',
-                        'mcp': '/mcp'
-                    })
+                    ...(this.config.tokenTracking.enabled && { webhooks: this.config.tokenTracking.webhookPath })
                 }
             });
         });
         return new Promise((resolve, reject) => {
-            // Create HTTPS or HTTP server based on configuration
-            const useHttps = this.config.https?.enabled;
-            const protocol = useHttps ? 'https' : 'http';
-            if (useHttps) {
-                const keyPath = this.config.https?.keyPath || './certs/key.pem';
-                const certPath = this.config.https?.certPath || './certs/cert.pem';
-                if (!existsSync(keyPath) || !existsSync(certPath)) {
-                    reject(new Error(`HTTPS enabled but certificates not found at ${keyPath} and ${certPath}`));
-                    return;
-                }
-                const httpsOptions = {
-                    key: readFileSync(keyPath),
-                    cert: readFileSync(certPath)
-                };
-                this.server = createHttpsServer(httpsOptions, this.app);
-            }
-            else {
-                this.server = createHttpServer(this.app);
-            }
-            this.server.listen(this.config.port, () => {
-                console.log(`🚀 RPC AI Server running on port ${this.config.port} ${useHttps ? '(HTTPS)' : '(HTTP)'}`);
+            this.server = this.app.listen(this.config.port, () => {
+                console.log(`🚀 RPC AI Server running on port ${this.config.port}`);
                 console.log(`📍 Endpoints:`);
-                console.log(`   • Health: GET ${protocol}://localhost:${this.config.port}${this.config.paths.health}`);
+                console.log(`   • Health: GET http://localhost:${this.config.port}${this.config.paths.health}`);
                 if (this.config.protocols.jsonRpc) {
-                    console.log(`   • JSON-RPC: POST ${protocol}://localhost:${this.config.port}${this.config.paths.jsonRpc}`);
-                    console.log(`   • OpenRPC Schema: GET ${protocol}://localhost:${this.config.port}/openrpc.json`);
+                    console.log(`   • JSON-RPC: POST http://localhost:${this.config.port}${this.config.paths.jsonRpc}`);
+                    console.log(`   • OpenRPC Schema: GET http://localhost:${this.config.port}/openrpc.json`);
                 }
                 if (this.config.protocols.tRpc) {
-                    console.log(`   • tRPC: POST ${protocol}://localhost:${this.config.port}${this.config.paths.tRpc}/*`);
+                    console.log(`   • tRPC: POST http://localhost:${this.config.port}${this.config.paths.tRpc}/*`);
                 }
                 console.log(`📋 Configuration:`);
                 console.log(`   • Protocols: ${Object.entries(this.config.protocols).filter(([, enabled]) => enabled).map(([name]) => name).join(', ')}`);
@@ -697,6 +764,10 @@ export class RpcAiServer {
         });
     }
     async stop() {
+        // Close OAuth server if enabled
+        if (this.config.oauth.enabled) {
+            await closeOAuthServer();
+        }
         return new Promise((resolve) => {
             if (this.server) {
                 this.server.close(() => {

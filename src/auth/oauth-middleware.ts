@@ -1,488 +1,764 @@
 /**
- * OAuth2 Middleware for AI Server
+ * OAuth 2.0 Server Implementation using @node-oauth/express-oauth-server
  * 
- * Provides easy OAuth2 integration with Google, GitHub, and custom providers
- * for MCP authentication with minimal configuration.
+ * Provides proper OAuth 2.0 server functionality for MCP Jam integration.
+ * Uses RFC 6749 & RFC 6750 compliant implementation with PKCE support.
  */
 
-import { Request, Response, NextFunction } from 'express';
+import ExpressOAuthServer from '@node-oauth/express-oauth-server';
+import * as OAuth2Server from '@node-oauth/oauth2-server';
+import { randomPKCECodeVerifier, calculatePKCECodeChallenge } from 'openid-client';
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import type { OpenSaaSJWTPayload } from './jwt-middleware.js';
+import { createSessionStorage, SessionStorage } from './session-storage.js';
+import { Request, Response } from 'express';
 
-export interface OAuthConfig {
-  provider: 'google' | 'github' | 'custom';
+// Session storage instance (will be set during initialization)
+let sessionStorage: SessionStorage;
+
+// Identity Provider Configuration
+interface IdentityProviderConfig {
+  type: 'oidc' | 'oauth2';
   clientId: string;
   clientSecret: string;
-  
-  // Optional configuration
-  redirectUri?: string;
-  scopes?: string[];
-  encryptionKey?: string;
-  tokenStoragePath?: string;
-  baseUrl?: string; // Override base URL (useful for HTTPS in development)
-  
-  // Custom provider URLs (required if provider === 'custom')
+  discoveryUrl?: string;
   authUrl?: string;
   tokenUrl?: string;
   userInfoUrl?: string;
+  scopes: string[];
+  redirectUri?: string;
 }
 
-export interface TokenInfo {
-  user: any;
-  created_at: number;
-  expires_in: number;
-  audience?: string;
-  resource?: string;
-  google_tokens?: any; // To store original tokens from Google
-}
-
-/**
- * Built-in OAuth provider configurations
- */
-const OAUTH_PROVIDERS = {
-  google: {
-    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-    tokenUrl: 'https://oauth2.googleapis.com/token',
-    userInfoUrl: 'https://www.googleapis.com/oauth2/v1/userinfo',
-    defaultScopes: ['openid', 'email', 'profile']
-  },
-  github: {
-    authUrl: 'https://github.com/login/oauth/authorize',
-    tokenUrl: 'https://github.com/login/oauth/access_token',
-    userInfoUrl: 'https://api.github.com/user',
-    defaultScopes: ['user:email']
-  }
+// Default identity providers configuration
+const getIdentityProviders = (): Record<string, IdentityProviderConfig> => {
+  const baseUrl = process.env.OAUTH_BASE_URL || `http://localhost:${process.env.PORT || 8000}`;
+  
+  return {
+    google: {
+      type: 'oidc',
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      discoveryUrl: 'https://accounts.google.com/.well-known/openid-configuration',
+      scopes: ['openid', 'email', 'profile'],
+      redirectUri: `${baseUrl}/callback/google`
+    },
+    github: {
+      type: 'oauth2',
+      clientId: process.env.GITHUB_CLIENT_ID || '',
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+      authUrl: 'https://github.com/login/oauth/authorize',
+      tokenUrl: 'https://github.com/login/oauth/access_token',
+      userInfoUrl: 'https://api.github.com/user',
+      scopes: ['read:user', 'user:email'],
+      redirectUri: `${baseUrl}/callback/github`
+    },
+    microsoft: {
+      type: 'oidc',
+      clientId: process.env.MICROSOFT_CLIENT_ID || '',
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET || '',
+      discoveryUrl: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
+      scopes: ['openid', 'email', 'profile'],
+      redirectUri: `${baseUrl}/callback/microsoft`
+    }
+  };
 };
 
+// Default MCP client for testing
+const defaultClient: OAuth2Server.Client = {
+  id: 'mcp-client',
+  clientSecret: 'mcp-secret',
+  grants: ['authorization_code', 'refresh_token'],
+  redirectUris: ['http://localhost:4000/oauth/callback/debug'],
+  accessTokenLifetime: 3600, // 1 hour
+  refreshTokenLifetime: 86400 // 24 hours
+};
+
+// Default user for OAuth flow (Google OAuth integration would replace this)
+const defaultUser: OAuth2Server.User = {
+  id: 'user@example.com',
+  username: 'user@example.com'
+};
+
+// OIDC configuration cache to avoid repeated discovery
+const oidcConfigs: Record<string, any> = {};
+
 /**
- * Encrypted Token Storage for OAuth tokens
+ * Get or create OIDC configuration for a provider
  */
-class EncryptedTokenStorage {
-  private tokens = new Map<string, TokenInfo>();
-  private encryptionKey: string;
-  private storagePath: string;
-
-  constructor(encryptionKey?: string, storagePath?: string) {
-    this.encryptionKey = encryptionKey || crypto.randomBytes(32).toString('hex');
-    this.storagePath = storagePath || path.join(process.cwd(), '.oauth-tokens.encrypted');
-    
-    if (!encryptionKey) {
-      console.log('⚠️ Using generated encryption key for OAuth tokens. Set encryptionKey for production.');
-    }
-    
-    this.loadTokens();
+async function getOidcConfig(providerName: string, config: IdentityProviderConfig): Promise<any> {
+  if (oidcConfigs[providerName]) {
+    return oidcConfigs[providerName];
   }
 
-  private encrypt(data: any): any {
-    // 🚨 DEBUG MODE: Encryption disabled for testing
-    console.log('🐛 DEBUG: Token encryption disabled - storing plaintext');
-    console.log('🐛 DEBUG: Data being stored:', JSON.stringify(data, null, 2));
-    
-    return {
-      plaintext: JSON.stringify(data),
-      debug: true
-    };
+  if (config.type !== 'oidc' || !config.discoveryUrl) {
+    throw new Error(`Provider ${providerName} is not an OIDC provider`);
   }
 
-  private decrypt(encryptedData: any): any {
-    // 🚨 DEBUG MODE: Check if it's plaintext debug data first
-    if (encryptedData.debug && encryptedData.plaintext) {
-      console.log('🐛 DEBUG: Reading plaintext token data');
-      const data = JSON.parse(encryptedData.plaintext);
-      console.log('🐛 DEBUG: Data loaded:', Object.keys(data));
-      return data;
-    }
-    
-    // Otherwise try normal decryption
-    try {
-      const algorithm = 'aes-256-gcm';
-      const key = Buffer.from(this.encryptionKey, 'hex');
-      const iv = Buffer.from(encryptedData.iv, 'hex');
-      
-      const decipher = crypto.createDecipheriv(algorithm, key, iv);
-      decipher.setAuthTag(Buffer.from(encryptedData.authTag, 'hex'));
-      
-      let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
-      
-      return JSON.parse(decrypted);
-    } catch (error) {
-      console.error('❌ OAuth token decryption failed:', (error as Error).message);
-      throw error;
-    }
-  }
-
-  private loadTokens(): void {
-    try {
-      if (fs.existsSync(this.storagePath)) {
-        const encryptedData = JSON.parse(fs.readFileSync(this.storagePath, 'utf8'));
-        if (!encryptedData.iv || !encryptedData.authTag) {
-          console.log('🚨 Old token file format detected. Deleting and starting fresh.');
-          fs.unlinkSync(this.storagePath);
-          this.tokens = new Map();
-          return;
-        }
-
-        const tokenData = this.decrypt(encryptedData);
-        
-        const now = Date.now();
-        let validCount = 0;
-        let expiredCount = 0;
-        
-        for (const [token, info] of Object.entries(tokenData)) {
-          const tokenInfo = info as TokenInfo;
-          const tokenAge = now - tokenInfo.created_at;
-          const isExpired = tokenAge > (tokenInfo.expires_in * 1000);
-          
-          if (!isExpired) {
-            this.tokens.set(token, tokenInfo);
-            validCount++;
-          } else {
-            expiredCount++;
-          }
-        }
-        
-        console.log(`📂 Loaded ${validCount} valid OAuth tokens from encrypted storage`);
-        if (expiredCount > 0) {
-          console.log(`🧹 Filtered out ${expiredCount} expired tokens`);
-          this.saveTokens();
-        }
-      }
-    } catch (error) {
-      console.error('❌ Could not load OAuth tokens:', (error as Error).message);
-      this.tokens = new Map();
-    }
-  }
-
-  private saveTokens(): void {
-    try {
-      const tokenData = Object.fromEntries(this.tokens);
-      const encryptedData = this.encrypt(tokenData);
-      fs.writeFileSync(this.storagePath, JSON.stringify(encryptedData));
-    } catch (error) {
-      console.error('❌ Could not save OAuth tokens:', (error as Error).message);
-    }
-  }
-
-  set(token: string, info: TokenInfo): void { this.tokens.set(token, info); this.saveTokens(); }
-  get(token: string): TokenInfo | undefined { return this.tokens.get(token); }
-  delete(token: string): boolean { const r = this.tokens.delete(token); if (r) { this.saveTokens(); } return r; }
-  cleanupExpired(): void { /* ... */ }
-}
-
-export function createOAuthMiddleware(config: OAuthConfig) {
-  const tokenStorage = new EncryptedTokenStorage(config.encryptionKey, config.tokenStoragePath);
-  const provider = config.provider === 'custom' ? { authUrl: config.authUrl!, tokenUrl: config.tokenUrl!, userInfoUrl: config.userInfoUrl!, defaultScopes: config.scopes || [] } : OAUTH_PROVIDERS[config.provider];
-
-  setInterval(() => tokenStorage.cleanupExpired(), 5 * 60 * 1000);
-
-  const mcpAuthMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-    // Check if this is a JSON-RPC request and what method is being called
-    let mcpMethod: string | undefined;
-    if (req.body && typeof req.body === 'object' && req.body.method) {
-      mcpMethod = req.body.method;
-    }
-
-    // Allow certain MCP methods without authentication for initial handshake
-    const publicMethods = ['initialize', 'ping'];
-    if (mcpMethod && publicMethods.includes(mcpMethod)) {
-      console.log(`🔓 Allowing unauthenticated MCP method: ${mcpMethod}`);
-      return next();
-    }
-
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      // Use configured baseUrl or construct from request (allow HTTP for localhost development)
-      const baseUrl = config.baseUrl || `${req.protocol}://${req.get('host')}`;
-      res.setHeader('WWW-Authenticate', `Bearer resource="${baseUrl}/.well-known/oauth-protected-resource"`);
-      return res.status(401).json({ 
-        error: 'unauthorized', 
-        error_description: 'Authentication required for MCP access',
-        _links: {
-          'oauth-authorization-server': `${baseUrl}/.well-known/oauth-authorization-server`,
-          'oauth-protected-resource': `${baseUrl}/.well-known/oauth-protected-resource`
-        }
-      });
-    }
-    const token = authHeader.substring(7);
-    const tokenInfo = tokenStorage.get(token);
-    if (!tokenInfo) { return res.status(401).json({ error: 'invalid_token', error_description: 'Invalid or expired access token' }); }
-    const tokenAge = Date.now() - tokenInfo.created_at;
-    if (tokenAge > (tokenInfo.expires_in * 1000)) {
-      tokenStorage.delete(token);
-      return res.status(401).json({ error: 'invalid_token', error_description: 'Access token has expired' });
-    }
-    (req as any).user = { userId: tokenInfo.user.id?.toString() || 'oauth-' + Date.now(), email: tokenInfo.user.email || tokenInfo.user.login, subscriptionTier: 'oauth', monthlyTokenQuota: 10000, rpmLimit: 60, tpmLimit: 50000, features: ['oauth_access'], iat: Math.floor(tokenInfo.created_at / 1000), exp: Math.floor((tokenInfo.created_at + tokenInfo.expires_in * 1000) / 1000), iss: 'simple-rpc-ai-backend', aud: 'oauth-users', _originalOAuthUser: tokenInfo.user } as OpenSaaSJWTPayload;
-    next();
-  };
-
-  return { mcpAuthMiddleware, tokenStorage, provider };
-}
-
-export function createOAuthRoutes(config: OAuthConfig, baseUrl?: string) {
-  const { tokenStorage, provider } = createOAuthMiddleware(config);
+  console.log(`🔍 Discovering OIDC configuration for ${providerName}...`);
   
-  // Use configured baseUrl or provided baseUrl (allow HTTP for localhost development)
-  const effectiveBaseUrl = config.baseUrl || baseUrl || 'http://localhost:8000';
+  // Use direct HTTP call to discovery endpoint instead of openid-client discovery
+  const discoveryResponse = await fetch(config.discoveryUrl);
+  if (!discoveryResponse.ok) {
+    throw new Error(`Failed to fetch OIDC configuration: ${discoveryResponse.status}`);
+  }
+  
+  const configuration = await discoveryResponse.json() as any;
 
-  const handleAuthorizationRequest = (req: Request, res: Response) => {
-    const { resource, code_challenge, code_challenge_method, ...query } = req.query;
-    const normalizedResource = resource ? (resource as string).replace(/\/$/, '') : undefined;
-
-    // Allow both HTTP and HTTPS versions for localhost development
-    const isLocalhostDev = effectiveBaseUrl.includes('localhost') || effectiveBaseUrl.includes('127.0.0.1');
-    if (normalizedResource && normalizedResource !== effectiveBaseUrl) {
-      if (isLocalhostDev) {
-        // For localhost, allow both HTTP and HTTPS variants
-        const httpUrl = effectiveBaseUrl.replace('https:', 'http:');
-        const httpsUrl = effectiveBaseUrl.replace('http:', 'https:');
-        if (normalizedResource !== httpUrl && normalizedResource !== httpsUrl) {
-          return res.status(400).json({ error: 'invalid_resource', error_description: `Invalid resource. Expected: ${effectiveBaseUrl} (or HTTP/HTTPS variant)` });
-        }
-      } else {
-        return res.status(400).json({ error: 'invalid_resource', error_description: `Invalid resource. Expected: ${effectiveBaseUrl}` });
-      }
-    }
-
-    // Store the original client's PKCE challenge in the session
-    console.log('🔍 MCP Client Authorization Request:');
-    console.log('   redirect_uri:', query.redirect_uri);
-    console.log('   client_id:', query.client_id);
-    console.log('   resource:', normalizedResource || effectiveBaseUrl);
-    (req as any).session.oauth = { ...query, resource: normalizedResource || effectiveBaseUrl, code_challenge, code_challenge_method };
-    
-    // Parameters for the external OAuth provider (Google)
-    const params = new URLSearchParams({
-      client_id: config.clientId,
-      redirect_uri: config.redirectUri!,
-      response_type: 'code',
-      scope: (config.scopes || provider.defaultScopes).join(' '),
-      state: (query.state as string) || crypto.randomBytes(16).toString('hex'),
-      access_type: 'offline'
-    });
-
-    // Do NOT forward the client's PKCE challenge to the external provider.
-    // The server acts as a confidential client to Google.
-
-    res.redirect(`${provider.authUrl}?${params}`);
+  oidcConfigs[providerName] = {
+    configuration,
+    clientId: config.clientId,
+    clientSecret: config.clientSecret,
+    redirectUri: config.redirectUri
   };
+  
+  console.log(`✅ OIDC configuration cached for ${providerName}: ${configuration.authorization_endpoint}`);
+  
+  return oidcConfigs[providerName];
+}
 
-  const handleCallback = async (req: Request, res: Response) => {
-    console.log('--- OAuth Callback ---');
-    console.log('🐛 DEBUG: Full callback URL:', req.url);
-    console.log('🐛 DEBUG: Query parameters:', req.query);
-    console.log('🐛 DEBUG: Session ID:', (req as any).sessionID);
-    console.log('🐛 DEBUG: Session data:', (req as any).session);
-    
-    const { code, state, error } = req.query;
-    if (error) {
-      console.log('Error from OAuth provider:', error);
-      return res.status(400).json({ error: `OAuth error: ${error}` });
-    }
-    if (!code) {
-      console.log('Error: Missing authorization code from provider');
-      return res.status(400).json({ error: 'Missing authorization code' });
-    }
-    console.log('Received code from provider:', code);
+/**
+ * Normalize user profile from different providers
+ */
+function normalizeUserProfile(provider: string, profile: any): { id: string; email: string; name: string } {
+  switch (provider) {
+    case 'google':
+      return {
+        id: profile.sub || profile.id,
+        email: profile.email,
+        name: profile.name || profile.given_name
+      };
+    case 'github':
+      return {
+        id: profile.id.toString(),
+        email: profile.email,
+        name: profile.name || profile.login
+      };
+    case 'microsoft':
+      return {
+        id: profile.sub || profile.oid,
+        email: profile.email || profile.preferred_username,
+        name: profile.name
+      };
+    default:
+      return {
+        id: profile.sub || profile.id || profile.user_id,
+        email: profile.email || profile.preferred_username,
+        name: profile.name || profile.display_name || profile.username
+      };
+  }
+}
 
-    try {
-      console.log('Exchanging code for token...');
-      const tokenResponse = await fetch(provider.tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, code: code as string, grant_type: 'authorization_code', redirect_uri: config.redirectUri! })
-      });
-      const tokens: any = await tokenResponse.json();
-      console.log('Token exchange response status:', tokenResponse.status);
-      console.log('Token exchange response body:', tokens);
-      if (!tokenResponse.ok) { throw new Error(tokens.error_description || 'Token exchange failed'); }
-
-      console.log('Fetching user info...');
-      const userResponse = await fetch(provider.userInfoUrl, { headers: { 'Authorization': `Bearer ${tokens.access_token}` } });
-      const userInfo = await userResponse.json();
-      console.log('User info received:', userInfo);
-
-      const accessToken = 'mcp_' + crypto.randomBytes(32).toString('hex');
-      const tokenInfo = { user: userInfo, google_tokens: tokens, created_at: Date.now(), expires_in: 3600 };
-      console.log('🐛 DEBUG: About to store token info:', JSON.stringify(tokenInfo, null, 2));
-      tokenStorage.set(accessToken, tokenInfo);
-      console.log('Generated and stored MCP token:', accessToken);
-
-      const oauthParams = (req as any).session.oauth;
-      console.log('🐛 DEBUG: Session OAuth params:', JSON.stringify(oauthParams, null, 2));
-      if (!oauthParams) {
-        console.log('Error: Session expired or missing');
-        return res.status(400).json({ error: 'Session expired' });
-      }
-      console.log('Retrieved OAuth params from session:', oauthParams);
-
-      const callbackParams = new URLSearchParams({ code: accessToken, state: oauthParams.state || (state as string) });
-      console.log('🔄 OAuth Callback Redirect:');
-      console.log('   MCP Client redirect_uri:', oauthParams.redirect_uri);
-      console.log('   Full callback URL:', `${oauthParams.redirect_uri}?${callbackParams}`);
-      res.redirect(`${oauthParams.redirect_uri}?${callbackParams}`);
-    } catch (e: any) {
-      console.error('Error in callback handler:', e);
-      res.status(500).json({ error: 'Internal server error', message: e.message });
-    }
-    console.log('----------------------');
-  };
-
-  const handleToken = (req: Request, res: Response) => {
-    console.log('--- OAuth Token Endpoint ---');
-    console.log('Request Body:', req.body);
-    console.log('Request Headers:', req.headers);
-    console.log('Session Object:', (req as any).session);
-
-    const { grant_type, code, resource, code_verifier } = req.body;
-    if (grant_type !== 'authorization_code') { return res.status(400).json({ error: 'unsupported_grant_type' }); }
-    // Resource parameter is optional in token request (already validated during authorization)
-    // Allow both HTTP and HTTPS versions for localhost development  
-    if (resource) {
-      const normalizedResource = resource.replace(/\/$/, '');
-      const isLocalhostDev = effectiveBaseUrl.includes('localhost') || effectiveBaseUrl.includes('127.0.0.1');
-      if (normalizedResource !== effectiveBaseUrl) {
-        if (isLocalhostDev) {
-          const httpUrl = effectiveBaseUrl.replace('https:', 'http:');
-          const httpsUrl = effectiveBaseUrl.replace('http:', 'https:');
-          if (normalizedResource !== httpUrl && normalizedResource !== httpsUrl) {
-            return res.status(400).json({ error: 'invalid_request', error_description: 'Invalid resource parameter' });
-          }
-        } else {
-          return res.status(400).json({ error: 'invalid_request', error_description: 'Invalid resource parameter' });
-        }
-      }
-    }
-    if (!code || !code.startsWith('mcp_')) { return res.status(400).json({ error: 'invalid_grant' }); }
-
-    // Try to get oauthParams from session first, but allow fallback
-    const oauthParams = (req as any).session.oauth;
-    if (!oauthParams) {
-      console.log('Warning: oauthParams not found in session, but continuing with token validation...');
-      // We can still validate the MCP token without full session state
-    }
-
-    // PKCE Verification (only if oauthParams exists and has code_challenge)
-    if (oauthParams && oauthParams.code_challenge) {
-      console.log('--- PKCE Verification ---');
-      console.log('Received code_verifier:', code_verifier);
-      console.log('Stored code_challenge:', oauthParams.code_challenge);
-
-      if (!code_verifier) {
-        console.log('Error: Missing code_verifier in request body');
-        return res.status(400).json({ error: 'invalid_request', error_description: 'Missing code_verifier' });
+/**
+ * Create OAuth 2.0 Model Implementation with Session Storage
+ * Uses the configured session storage backend for persistence
+ */
+function createOAuthModel(storage: SessionStorage) {
+  return {
+    // Client methods
+    async getClient(clientId: string, clientSecret?: string) {
+      console.log(`🔍 OAuth: Getting client ${clientId}, secret provided: ${clientSecret !== undefined && clientSecret !== ''}`);
+      const client = await storage.getClient(clientId);
+      
+      if (!client) {
+        console.log(`❌ OAuth: Client ${clientId} not found`);
+        return null;
       }
       
-      const expectedChallenge = crypto.createHash('sha256').update(code_verifier).digest('base64url');
-      console.log('Calculated expected_challenge:', expectedChallenge);
-
-      if (oauthParams.code_challenge !== expectedChallenge) {
-        console.log('Error: PKCE challenge mismatch');
-        return res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid PKCE code_verifier' });
+      // Handle different authentication methods:
+      // 1. PKCE flow: clientSecret is undefined or empty - skip secret validation
+      // 2. Client credentials flow: clientSecret must match
+      const isPKCE = !clientSecret || clientSecret === '';
+      
+      if (!isPKCE && client.clientSecret !== clientSecret) {
+        console.log(`❌ OAuth: Invalid client secret for ${clientId}`);
+        console.log(`   Expected: ${client.clientSecret.substring(0, 20)}... (length: ${client.clientSecret.length})`);
+        console.log(`   Received: ${clientSecret?.substring(0, 20)}... (length: ${clientSecret?.length})`);
+        return null;
       }
-      console.log('PKCE Verification Successful');
-      console.log('-------------------------');
-    } else if (code_verifier) {
-      console.log('Warning: code_verifier provided but no stored code_challenge found (session may be missing)');
+      
+      console.log(`✅ OAuth: Client ${clientId} found (PKCE: ${isPKCE})`);
+      return client;
+    },
+
+    // Authorization code methods
+    async saveAuthorizationCode(code: any, client: any, user: any) {
+      console.log(`💾 OAuth: Saving authorization code for client ${client.id}, user ${user.id}`);
+      
+      const authCode = {
+        authorizationCode: code.authorizationCode,
+        expiresAt: code.expiresAt,
+        redirectUri: code.redirectUri,
+        scope: code.scope,
+        client,
+        user,
+        // PKCE support
+        codeChallenge: code.codeChallenge,
+        codeChallengeMethod: code.codeChallengeMethod
+      };
+      
+      await storage.setAuthCode(code.authorizationCode, authCode);
+      console.log(`✅ OAuth: Authorization code saved: ${code.authorizationCode.substring(0, 10)}...`);
+      
+      return authCode;
+    },
+
+    async getAuthorizationCode(authorizationCode: string) {
+      console.log(`🔍 OAuth: Getting authorization code ${authorizationCode.substring(0, 10)}...`);
+      
+      const code = await storage.getAuthCode(authorizationCode);
+      if (!code) {
+        console.log(`❌ OAuth: Authorization code not found`);
+        return null;
+      }
+      
+      // Convert expiresAt string back to Date object (required by OAuth library)
+      if (code.expiresAt && typeof code.expiresAt === 'string') {
+        code.expiresAt = new Date(code.expiresAt);
+      }
+      
+      console.log(`✅ OAuth: Authorization code found`);
+      return code;
+    },
+
+    async revokeAuthorizationCode(authorizationCode: any) {
+      console.log(`🗑️ OAuth: Revoking authorization code ${authorizationCode.authorizationCode.substring(0, 10)}...`);
+      
+      const deleted = await storage.deleteAuthCode(authorizationCode.authorizationCode);
+      console.log(`${deleted ? '✅' : '❌'} OAuth: Authorization code revoked`);
+      
+      return deleted;
+    },
+
+    // Access token methods
+    async saveToken(token: any, client: any, user: any) {
+      console.log(`💾 OAuth: Saving access token for client ${client.id}, user ${user.id}`);
+      
+      const tokenWithMeta = {
+        ...token,
+        client,
+        user
+      };
+      
+      await storage.setToken(token.accessToken, tokenWithMeta);
+      
+      if (token.refreshToken) {
+        await storage.setToken(token.refreshToken, tokenWithMeta);
+      }
+      
+      console.log(`✅ OAuth: Token saved: ${token.accessToken.substring(0, 10)}...`);
+      return tokenWithMeta;
+    },
+
+    async getAccessToken(accessToken: string) {
+      console.log(`🔍 OAuth: Getting access token ${accessToken.substring(0, 10)}...`);
+      
+      const token = await storage.getToken(accessToken);
+      if (!token) {
+        console.log(`❌ OAuth: Access token not found`);
+        return null;
+      }
+      
+      console.log(`✅ OAuth: Access token found`);
+      return token;
+    },
+
+    // Scope validation with configurable scopes
+    async validateScope(user: any, client: any, scope?: any) {
+      console.log(`🔍 OAuth: Validating scope for user ${user.id}, client ${client.id}`, scope, typeof scope);
+      
+      // Parse requested scopes from the OAuth flow - handle different input types
+      let requestedScopes: string[] = [];
+      if (scope) {
+        if (typeof scope === 'string') {
+          requestedScopes = scope.split(' ');
+        } else if (Array.isArray(scope)) {
+          requestedScopes = scope;
+        } else if (scope.split && typeof scope.split === 'function') {
+          requestedScopes = scope.split(' ');
+        } else {
+          console.warn(`⚠️ OAuth: Unexpected scope type:`, typeof scope, scope);
+          requestedScopes = [];
+        }
+      }
+      console.log(`📋 OAuth: Requested scopes:`, requestedScopes);
+      
+      // Default scopes for backward compatibility and MCP access
+      const defaultScopes = ['mcp', 'mcp:list', 'mcp:call'];
+      
+      // If no specific scopes requested, grant default MCP scopes
+      const validatedScope = requestedScopes.length > 0 ? requestedScopes : defaultScopes;
+      
+      // TODO: Add user permission checking here
+      // For now, grant all requested scopes (or defaults)
+      // In production, you'd check user's permissions against requested scopes
+      
+      console.log(`✅ OAuth: Scope validated:`, validatedScope);
+      return validatedScope;
     }
-
-    const tokenInfo = tokenStorage.get(code);
-    console.log('🐛 DEBUG: Looking up token:', code);
-    console.log('🐛 DEBUG: Token info found:', tokenInfo ? 'YES' : 'NO');
-    if (tokenInfo) {
-      console.log('🐛 DEBUG: Token details:', JSON.stringify(tokenInfo, null, 2));
-    }
-    if (!tokenInfo) { return res.status(400).json({ error: 'invalid_grant' }); }
-
-    tokenInfo.audience = resource;
-    tokenInfo.resource = resource;
-
-    const tokenResponse = { access_token: code, token_type: 'Bearer', expires_in: tokenInfo.expires_in, scope: 'mcp', resource: resource };
-    console.log('🐛 DEBUG: Token exchange successful:', tokenResponse);
-    res.json(tokenResponse);
-    console.log('--------------------------');
-  };
-
-  const handleRegistration = (req: Request, res: Response) => {
-    const { redirect_uris, ...body } = req.body;
-    const clientId = 'mcp-client-' + Date.now();
-    const clientSecret = crypto.randomBytes(16).toString('hex');
-    res.status(201).json({
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uris: redirect_uris || [config.redirectUri],
-      ...body
-    });
-  };
-
-  const handleOpenIdConfiguration = (req: Request, res: Response) => {
-    res.json({
-      issuer: effectiveBaseUrl,
-      authorization_endpoint: `${effectiveBaseUrl}/oauth/authorize`,
-      token_endpoint: `${effectiveBaseUrl}/oauth/token`,
-      userinfo_endpoint: `${effectiveBaseUrl}/oauth/userinfo`,
-      jwks_uri: `${effectiveBaseUrl}/.well-known/jwks.json`,
-      registration_endpoint: `${effectiveBaseUrl}/oauth/register`,
-      response_types_supported: ['code'],
-      subject_types_supported: ['public'],
-      id_token_signing_alg_values_supported: ['RS256'],
-      scopes_supported: ['openid', 'email', 'profile', 'mcp'],
-      token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
-      claims_supported: ['sub', 'email', 'name', 'picture'],
-      code_challenge_methods_supported: ['S256'],
-      registration_endpoint_auth_methods_supported: ['none'],
-    });
-  };
-
-  const handleJwks = (req: Request, res: Response) => {
-    res.json({ keys: [] });
-  };
-
-  return {
-    authorizationServerDiscovery: (req: Request, res: Response) => res.json({
-      issuer: effectiveBaseUrl,
-      authorization_endpoint: `${effectiveBaseUrl}/oauth/authorize`,
-      token_endpoint: `${effectiveBaseUrl}/oauth/token`,
-      userinfo_endpoint: `${effectiveBaseUrl}/oauth/userinfo`,
-      registration_endpoint: `${effectiveBaseUrl}/oauth/register`,
-      jwks_uri: `${effectiveBaseUrl}/.well-known/jwks.json`,
-      response_types_supported: ['code'],
-      grant_types_supported: ['authorization_code', 'refresh_token'],
-      scopes_supported: config.scopes || provider.defaultScopes,
-      resource_parameter_supported: true,
-      code_challenge_methods_supported: ['S256'],
-      registration_endpoint_auth_methods_supported: ['none'],
-    }),
-    protectedResourceDiscovery: (req: Request, res: Response) => res.json({ 
-      resource: effectiveBaseUrl, 
-      authorization_servers: [effectiveBaseUrl], 
-      scopes_supported: config.scopes || provider.defaultScopes, 
-      bearer_methods_supported: ['header'],
-      resource_documentation: effectiveBaseUrl + '/docs'
-    }),
-    mcpAuthorizationServerDiscovery: (req: Request, res: Response) => res.json({
-      issuer: effectiveBaseUrl,
-      authorization_endpoint: `${effectiveBaseUrl}/oauth/authorize`,
-      token_endpoint: `${effectiveBaseUrl}/oauth/token`,
-      userinfo_endpoint: `${effectiveBaseUrl}/oauth/userinfo`,
-      registration_endpoint: `${effectiveBaseUrl}/oauth/register`,
-      jwks_uri: `${effectiveBaseUrl}/.well-known/jwks.json`,
-      response_types_supported: ['code'],
-      grant_types_supported: ['authorization_code', 'refresh_token'],
-      scopes_supported: ['openid', 'email', 'profile', 'mcp'],
-      resource_parameter_supported: true,
-      code_challenge_methods_supported: ['S256'],
-      registration_endpoint_auth_methods_supported: ['none'],
-    }),
-    mcpResourceDiscovery: (req: Request, res: Response) => res.json({ resource_server: effectiveBaseUrl, resource: effectiveBaseUrl, authorization_servers: [effectiveBaseUrl], scopes_supported: ['mcp'], bearer_methods_supported: ['header'] }),
-    openidConfiguration: handleOpenIdConfiguration,
-    jwks: handleJwks,
-    authorize: handleAuthorizationRequest,
-    callback: handleCallback,
-    token: handleToken,
-    register: handleRegistration,
-    tokenStorage, // Add tokenStorage to the returned object
   };
 }
+
+/**
+ * Create OAuth 2.0 server instance with configurable session storage
+ */
+export function createOAuthServer(storageConfig: {
+  type: 'memory' | 'file' | 'redis';
+  filePath?: string;
+  redis?: {
+    host?: string;
+    port?: number;
+    password?: string;
+    db?: number;
+    keyPrefix?: string;
+    instance?: any;
+  };
+} = { type: 'memory' }) {
+  console.log(`🚀 Creating OAuth 2.0 server with ${storageConfig.type} session storage...`);
+  
+  // Initialize session storage - ensure it's the same instance used globally
+  if (!sessionStorage) {
+    sessionStorage = createSessionStorage(storageConfig);
+  }
+  
+  // Create OAuth model with session storage
+  const oauthModel = createOAuthModel(sessionStorage);
+  
+  const oauth = new ExpressOAuthServer({
+    model: oauthModel,
+    requireClientAuthentication: {
+      authorization_code: false  // PKCE doesn't require client secret
+    },
+    allowBearerTokensInQueryString: true,
+    allowExtendedTokenAttributes: true,
+    accessTokenLifetime: 3600,      // 1 hour
+    refreshTokenLifetime: 86400,    // 24 hours
+    authorizationCodeLifetime: 600, // 10 minutes
+    useErrorHandler: false,
+    continueMiddleware: false
+  });
+  
+  console.log(`✅ OAuth 2.0 server created with ${storageConfig.type} storage`);
+  return { oauth, storage: sessionStorage };
+}
+
+/**
+ * Register a new OAuth client
+ */
+export async function registerClient(
+  clientData: {
+    id: string;
+    name: string; 
+    redirectUris: string[];
+    grants?: string[];
+  },
+  storage?: SessionStorage
+): Promise<OAuth2Server.Client> {
+  console.log(`📝 Registering OAuth client: ${clientData.id}`);
+  
+  const client: OAuth2Server.Client = {
+    id: clientData.id,
+    clientSecret: crypto.randomBytes(32).toString('hex'),
+    grants: clientData.grants || ['authorization_code', 'refresh_token'],
+    redirectUris: clientData.redirectUris,
+    accessTokenLifetime: 3600,
+    refreshTokenLifetime: 86400
+  };
+  
+  // Use provided storage or fall back to global sessionStorage
+  const storageToUse = storage || sessionStorage;
+  await storageToUse.setClient(client.id, client);
+  console.log(`✅ Client registered: ${client.id}`);
+  
+  return client;
+}
+
+/**
+ * Initialize OAuth server with default client and user
+ */
+export async function initializeOAuthServer() {
+  if (!sessionStorage) {
+    throw new Error('OAuth server not initialized. Call createOAuthServer first.');
+  }
+  
+  await sessionStorage.initialize();
+  
+  // Add default client and user
+  await sessionStorage.setClient(defaultClient.id, defaultClient);
+  await sessionStorage.setUser(defaultUser.id, defaultUser);
+  
+  console.log(`✅ OAuth server initialized with default client and user`);
+}
+
+/**
+ * Get the current session storage instance
+ */
+export function getSessionStorage() {
+  return sessionStorage;
+}
+
+/**
+ * Get OAuth server statistics (for debugging)
+ */
+export function getOAuthStats() {
+  return {
+    storageType: sessionStorage ? sessionStorage.constructor.name : 'none',
+    initialized: !!sessionStorage
+  };
+}
+
+/**
+ * Clear all OAuth data (for testing)
+ */
+export async function clearOAuthData() {
+  if (!sessionStorage) {
+    console.warn(`⚠️ OAuth server not initialized`);
+    return;
+  }
+  
+  console.log(`🧹 Clearing OAuth data...`);
+  await sessionStorage.clear();
+  
+  // Re-add default client and user
+  await sessionStorage.setClient(defaultClient.id, defaultClient);
+  await sessionStorage.setUser(defaultUser.id, defaultUser);
+  
+  console.log(`✅ OAuth data cleared and defaults restored`);
+}
+
+/**
+ * Close OAuth server and clean up resources
+ */
+export async function closeOAuthServer() {
+  if (sessionStorage) {
+    await sessionStorage.close();
+    console.log(`✅ OAuth server closed`);
+  }
+}
+
+/**
+ * Handle identity provider login initiation
+ */
+export async function handleProviderLogin(req: Request, res: Response) {
+  const provider = req.params.provider;
+  const identityProviders = getIdentityProviders();
+  const config = identityProviders[provider];
+
+  if (!config) {
+    return res.status(400).json({ 
+      error: 'invalid_provider',
+      error_description: `Unknown provider: ${provider}`,
+      supported_providers: Object.keys(identityProviders)
+    });
+  }
+
+  if (!config.clientId || !config.clientSecret) {
+    return res.status(500).json({
+      error: 'provider_not_configured',
+      error_description: `Provider ${provider} is not properly configured. Missing client credentials.`
+    });
+  }
+
+  try {
+    // Store OAuth state for security
+    const state = crypto.randomBytes(32).toString('hex');
+    const codeVerifier = randomPKCECodeVerifier();
+    const codeChallenge = await calculatePKCECodeChallenge(codeVerifier);
+    
+    // Extract original OAuth parameters from redirect_uri if provided
+    // When user clicks on a provider from /login page, the original OAuth params are in redirect_uri
+    let originalQuery = {};
+    const redirectUri = req.query.redirect_uri as string;
+    if (redirectUri) {
+      try {
+        // Parse the redirect_uri to extract original OAuth parameters
+        const urlParts = redirectUri.split('?');
+        if (urlParts.length > 1) {
+          const searchParams = new URLSearchParams(urlParts[1]);
+          originalQuery = Object.fromEntries(searchParams.entries());
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to parse redirect_uri: ${redirectUri}`);
+      }
+    } else {
+      // Fallback: if no redirect_uri, use current query params (direct provider access)
+      originalQuery = { ...req.query };
+    }
+
+    // Store state and PKCE data in session/storage for later verification
+    await sessionStorage.setItem(`oauth_state_${state}`, JSON.stringify({
+      provider,
+      codeVerifier,
+      originalQuery // Store original OAuth authorize params
+    }), 600); // 10 minutes
+
+    if (config.type === 'oidc') {
+      const oidcConfig = await getOidcConfig(provider, config);
+      const authUrl = new URL(oidcConfig.configuration.authorization_endpoint);
+      authUrl.searchParams.set('client_id', config.clientId);
+      authUrl.searchParams.set('redirect_uri', config.redirectUri!);
+      authUrl.searchParams.set('scope', config.scopes.join(' '));
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('state', state);
+      authUrl.searchParams.set('code_challenge', codeChallenge);
+      authUrl.searchParams.set('code_challenge_method', 'S256');
+      
+      console.log(`🚀 Redirecting to ${provider} OIDC authorization...`);
+      res.redirect(authUrl.toString());
+      
+    } else {
+      // OAuth2-only flow (GitHub, etc.)
+      const authUrl = new URL(config.authUrl!);
+      authUrl.searchParams.set('client_id', config.clientId);
+      authUrl.searchParams.set('redirect_uri', config.redirectUri!);
+      authUrl.searchParams.set('scope', config.scopes.join(' '));
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('state', state);
+      
+      console.log(`🚀 Redirecting to ${provider} OAuth2 authorization...`);
+      res.redirect(authUrl.toString());
+    }
+    
+  } catch (error) {
+    console.error(`❌ Error initiating ${provider} login:`, error);
+    res.status(500).json({
+      error: 'authorization_error',
+      error_description: `Failed to initiate ${provider} login`
+    });
+  }
+}
+
+/**
+ * Handle identity provider callback
+ */
+export async function handleProviderCallback(req: Request, res: Response) {
+  const provider = req.params.provider;
+  const { code, state, error } = req.query;
+
+  if (error) {
+    console.error(`❌ OAuth error from ${provider}:`, error);
+    return res.status(400).json({
+      error: 'authorization_denied',
+      error_description: `Authorization denied by ${provider}: ${error}`
+    });
+  }
+
+  if (!code || !state) {
+    return res.status(400).json({
+      error: 'invalid_request',
+      error_description: 'Missing authorization code or state parameter'
+    });
+  }
+
+  try {
+    // Retrieve and verify state
+    const stateData = await sessionStorage.getItem(`oauth_state_${state}`);
+    if (!stateData) {
+      return res.status(400).json({
+        error: 'invalid_state',
+        error_description: 'Invalid or expired state parameter'
+      });
+    }
+
+    const { provider: storedProvider, codeVerifier, originalQuery } = JSON.parse(stateData);
+    
+    if (storedProvider !== provider) {
+      return res.status(400).json({
+        error: 'state_mismatch',
+        error_description: 'State parameter provider mismatch'
+      });
+    }
+
+    const identityProviders = getIdentityProviders();
+    const config = identityProviders[provider];
+    
+    let userProfile: Record<string, any>;
+
+    if (config.type === 'oidc') {
+      // OIDC flow - use direct token exchange
+      const oidcConfig = await getOidcConfig(provider, config);
+      const tokenResponse = await fetch(oidcConfig.configuration.token_endpoint, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          code: code as string,
+          redirect_uri: config.redirectUri!,
+          code_verifier: codeVerifier
+        })
+      });
+      
+      const tokens = await tokenResponse.json() as any;
+      
+      if (!tokens.access_token) {
+        throw new Error(`No access token received from ${provider}`);
+      }
+      
+      // Fetch user profile using userinfo endpoint
+      const profileResponse = await fetch(oidcConfig.configuration.userinfo_endpoint, {
+        headers: { Authorization: `Bearer ${tokens.access_token}` }
+      });
+      
+      userProfile = await profileResponse.json() as Record<string, any>;
+      
+    } else {
+      // OAuth2-only flow
+      const tokenResponse = await fetch(config.tokenUrl!, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
+        },
+        body: new URLSearchParams({
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          code: code as string,
+          redirect_uri: config.redirectUri!,
+          grant_type: 'authorization_code'
+        })
+      });
+      
+      const tokens = await tokenResponse.json() as any;
+      
+      if (!tokens.access_token) {
+        throw new Error(`No access token received from ${provider}`);
+      }
+      
+      // Fetch user profile
+      const profileResponse = await fetch(config.userInfoUrl!, {
+        headers: { Authorization: `Bearer ${tokens.access_token}` }
+      });
+      
+      userProfile = await profileResponse.json() as Record<string, any>;
+    }
+
+    // Normalize user profile
+    const user = normalizeUserProfile(provider, userProfile);
+    
+    // Store user in session storage
+    const userId = `${provider}:${user.id}`;
+    await sessionStorage.setUser(userId, {
+      id: userId,
+      username: user.email,
+      email: user.email,
+      name: user.name,
+      provider
+    });
+
+    // Clean up state
+    await sessionStorage.deleteItem(`oauth_state_${state}`);
+
+    console.log(`✅ User authenticated via ${provider}: ${user.email}`);
+
+    // Redirect back to continue OAuth authorize flow
+    const baseUrl = process.env.OAUTH_BASE_URL || `http://localhost:${process.env.PORT || 8000}`;
+    const resumeUrl = new URL('/oauth/authorize', baseUrl);
+    Object.entries(originalQuery).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        resumeUrl.searchParams.set(key, value);
+      }
+    });
+    
+    // Set session marker so OAuth authorize can find authenticated user
+    resumeUrl.searchParams.set('authenticated_user', userId);
+    
+    res.redirect(resumeUrl.toString());
+
+  } catch (error) {
+    console.error(`❌ Error processing ${provider} callback:`, error);
+    res.status(500).json({
+      error: 'callback_error',
+      error_description: `Failed to process ${provider} callback`
+    });
+  }
+}
+
+/**
+ * Create authentication handler for OAuth authorize endpoint
+ */
+export function createAuthenticateHandler() {
+  return {
+    handle: async (req: Request & { query: any; session?: any }) => {
+      // Check if user was just authenticated via federated login
+      const authenticatedUser = req.query.authenticated_user;
+      if (authenticatedUser) {
+        const user = await sessionStorage.getUser(authenticatedUser);
+        if (user) {
+          console.log(`🔐 OAuth: User authenticated via federated login: ${user.email || user.username}`);
+          return user;
+        }
+      }
+
+      // Check session for existing authentication
+      if (req.session?.userId) {
+        const user = await sessionStorage.getUser(req.session.userId);
+        if (user) {
+          console.log(`🔐 OAuth: User authenticated via session: ${user.email || user.username}`);
+          return user;
+        }
+      }
+
+      // No authentication found - return false to trigger OAuth2 error handling
+      console.log(`❌ OAuth: No authenticated user found`);
+      return false;
+    }
+  };
+}
+
+/**
+ * Handle provider selection page (for better UX)
+ */
+export function handleProviderSelection(req: Request, res: Response) {
+  const identityProviders = getIdentityProviders();
+  const availableProviders = Object.keys(identityProviders).filter(provider => {
+    const config = identityProviders[provider];
+    return config.clientId && config.clientSecret;
+  });
+
+  const baseUrl = process.env.OAUTH_BASE_URL || `http://localhost:${process.env.PORT || 8000}`;
+  
+  // Preserve redirect_uri parameter for provider login links
+  const redirectUri = req.query.redirect_uri as string;
+  const redirectParam = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
+  
+  // Simple HTML page for provider selection
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Choose Identity Provider</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+    .provider { display: block; margin: 10px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; text-decoration: none; color: #333; background: #f9f9f9; }
+    .provider:hover { background: #e9e9e9; }
+    h1 { color: #333; }
+    .info { color: #666; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>🔐 Sign In</h1>
+  <p class="info">Choose your identity provider to continue:</p>
+  ${availableProviders.map(provider => 
+    `<a href="${baseUrl}/login/${provider}${redirectParam}" class="provider">
+       <strong>${provider.charAt(0).toUpperCase() + provider.slice(1)}</strong>
+       <br><small>Sign in with ${provider}</small>
+     </a>`
+  ).join('')}
+  
+  ${availableProviders.length === 0 ? 
+    '<p style="color: red;">❌ No identity providers are configured. Please check your environment variables.</p>' : ''
+  }
+</body>
+</html>
+  `;
+  
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+}
+
+export { ExpressOAuthServer, getIdentityProviders };

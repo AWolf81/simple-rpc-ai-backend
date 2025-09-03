@@ -46,7 +46,6 @@ export { MCPAIService } from './services/mcp-ai-service.js';
 export { RefMCPIntegration, VSCodeRefIntegration } from './services/ref-mcp-integration.js';
 // Authentication system exports
 export { UserManager, SimpleKeyManager, AuthManager, PostgreSQLAdapter, AIKeyValidator } from './auth/index.js';
-export { createOAuthMiddleware, createOAuthRoutes } from './auth/oauth-middleware.js';
 // OpenSaaS Monetization exports
 export { createMonetizedAIServer } from './monetization/opensaas-server.js';
 export { createOpenSaaSConfig, mergeOpenSaaSConfig, validateOpenSaaSConfig, EXAMPLE_CUSTOM_TIERS, DEFAULT_OPENSAAS_CONFIG } from './monetization/opensaas-config.js';

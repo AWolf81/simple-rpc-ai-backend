@@ -2,6 +2,9 @@ import { publicProcedure, router } from "../index.js";
 import z from "zod";
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { ErrorCode, LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
+import { ScopeHelpers, ScopeValidator, createMCPTool } from '../../auth/scopes.js';
+import fs from 'fs';
+import path from 'path';
 /**
  * MCP Protocol implementation for tRPC router
  * Provides tools/list and tools/call functionality
@@ -81,7 +84,7 @@ export class MCPProtocolHandler {
                     response = this.handlePing(mcpRequest);
                     break;
                 case 'tools/list':
-                    response = await this.handleToolsList(mcpRequest);
+                    response = await this.handleToolsList(mcpRequest, req);
                     break;
                 case 'tools/call':
                     response = await this.handleToolsCall(mcpRequest, req);
@@ -149,18 +152,31 @@ export class MCPProtocolHandler {
     /**
      * Handle tools/list method - extract tools from tRPC with MCP metadata
      */
-    async handleToolsList(request) {
+    async handleToolsList(request, req) {
         try {
-            const tools = this.extractMCPToolsFromTRPC();
+            const allTools = this.extractMCPToolsFromTRPC();
+            // Extract user scopes from the request (if authenticated)
+            const userScopes = this.extractUserScopes(req);
+            // Filter tools based on user scopes
+            const accessibleTools = ScopeValidator.filterToolsByScope(allTools.map(tool => ({
+                name: tool.name,
+                scopes: tool.scopes
+            })), userScopes);
+            // Build the response with accessible tools
+            const tools = accessibleTools.map(accessibleTool => {
+                const fullTool = allTools.find(t => t.name === accessibleTool.name);
+                return {
+                    name: fullTool.name,
+                    description: fullTool.description,
+                    inputSchema: fullTool.inputSchema
+                };
+            });
+            console.log(`🔍 MCP Tools List: ${allTools.length} total, ${tools.length} accessible for scopes:`, userScopes);
             return {
                 jsonrpc: '2.0',
                 id: request.id,
                 result: {
-                    tools: tools.map(tool => ({
-                        name: tool.name,
-                        description: tool.description,
-                        inputSchema: tool.inputSchema
-                    }))
+                    tools
                 }
             };
         }
@@ -181,6 +197,23 @@ export class MCPProtocolHandler {
             const tool = tools.find(t => t.name === name);
             if (!tool) {
                 throw new Error(`Tool '${name}' not found`);
+            }
+            // Check scope permissions before execution
+            const userScopes = this.extractUserScopes(req);
+            console.log('🔍 Debug - Tool scope check:', {
+                toolName: name,
+                toolScopes: tool.scopes,
+                userScopes: userScopes,
+                expandedUserScopes: userScopes ? ScopeValidator.expandScopes(userScopes) : []
+            });
+            if (tool.scopes && !ScopeValidator.hasScope(userScopes, tool.scopes)) {
+                const missing = ScopeValidator.getMissingScopes(userScopes, tool.scopes);
+                console.log('❌ Debug - Scope validation failed:', {
+                    userScopes,
+                    toolScopes: tool.scopes,
+                    missing: missing
+                });
+                throw new Error(`Insufficient permissions. Missing scopes: ${missing.missing.join(', ')}`);
             }
             // Get metadata for progress reporting and extensions
             const meta = tool.procedure._def?.meta;
@@ -249,6 +282,146 @@ export class MCPProtocolHandler {
         }
     }
     /**
+     * Extract user scopes from request (OAuth token or session)
+     */
+    extractUserScopes(req) {
+        console.log('🔍 Debug - extractUserScopes called:', {
+            hasReq: !!req,
+            authHeader: req?.headers?.authorization ? `Bearer ${req.headers.authorization.substring(7, 17)}...` : 'none'
+        });
+        if (!req) {
+            console.log('❌ Debug - No request object, returning empty scopes');
+            return [];
+        }
+        // Extract from OAuth token
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith('Bearer ')) {
+            const token = authHeader.substring(7);
+            console.log('🔍 Debug - Processing Bearer token:', token.substring(0, 20) + '...');
+            // Validate token against OAuth storage and extract scopes
+            try {
+                const userInfo = this.validateOAuthToken(token);
+                console.log('🔍 Debug - OAuth validation result:', {
+                    hasUserInfo: !!userInfo,
+                    user: userInfo?.user ? `${userInfo.user.name} (${userInfo.user.email})` : null,
+                    scopes: userInfo?.tokenInfo?.scope
+                });
+                if (userInfo) {
+                    // Attach user info to request for later use
+                    req.user = userInfo.user;
+                    req.tokenInfo = userInfo.tokenInfo;
+                    const scopes = userInfo.tokenInfo.scope || [];
+                    console.log('✅ Debug - Extracted scopes:', scopes);
+                    return scopes;
+                }
+            }
+            catch (error) {
+                console.warn('⚠️ Invalid OAuth token:', error);
+                return [];
+            }
+        }
+        // Extract from session or other auth mechanism
+        const user = req.user;
+        if (user?.scopes) {
+            return Array.isArray(user.scopes) ? user.scopes : [user.scopes];
+        }
+        // Default: no authentication = public access only
+        return [];
+    }
+    /**
+     * Validate OAuth token against stored sessions
+     */
+    validateOAuthToken(token) {
+        try {
+            // In production, you'd use proper JWT validation
+            // For now, check if token exists in OAuth sessions
+            import('fs').then(async (fs) => {
+                import('path').then(async (path) => {
+                    const sessionsPath = path.join(process.cwd(), 'data', 'oauth-sessions.json');
+                    if (!fs.existsSync(sessionsPath)) {
+                        return null;
+                    }
+                    const sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf-8'));
+                    const tokenData = sessions.tokens?.[token];
+                    if (!tokenData) {
+                        return null;
+                    }
+                    // Check if token is expired
+                    const now = new Date();
+                    const expiresAt = new Date(tokenData.accessTokenExpiresAt);
+                    if (now > expiresAt) {
+                        console.warn('🕐 OAuth token expired:', token.substring(0, 10) + '...');
+                        return null;
+                    }
+                    return {
+                        user: tokenData.user,
+                        tokenInfo: {
+                            scope: tokenData.scope,
+                            expiresAt: tokenData.accessTokenExpiresAt,
+                            client: tokenData.client
+                        }
+                    };
+                });
+            });
+        }
+        catch (error) {
+            console.error('❌ Error validating OAuth token:', error);
+            return null;
+        }
+        // Fallback for async nature - this needs to be synchronous
+        // Let me use a synchronous approach with proper ES module imports
+        return this.validateOAuthTokenSync(token);
+    }
+    validateOAuthTokenSync(token) {
+        try {
+            const sessionsPath = path.join(process.cwd(), 'data', 'oauth-sessions.json');
+            console.log('🔍 Debug - Checking OAuth sessions file:', {
+                path: sessionsPath,
+                exists: fs.existsSync(sessionsPath)
+            });
+            if (!fs.existsSync(sessionsPath)) {
+                console.log('❌ Debug - OAuth sessions file not found');
+                return null;
+            }
+            const sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf-8'));
+            console.log('🔍 Debug - OAuth sessions loaded:', {
+                hasTokens: !!sessions.tokens,
+                tokenCount: sessions.tokens ? Object.keys(sessions.tokens).length : 0,
+                requestedToken: token.substring(0, 20) + '...'
+            });
+            const tokenData = sessions.tokens?.[token];
+            console.log('🔍 Debug - Token lookup result:', {
+                found: !!tokenData,
+                user: tokenData?.user ? `${tokenData.user.name} (${tokenData.user.email})` : null,
+                scope: tokenData?.scope
+            });
+            if (!tokenData) {
+                console.log('❌ Debug - Token not found in sessions');
+                return null;
+            }
+            // Check if token is expired
+            const now = new Date();
+            const expiresAt = new Date(tokenData.accessTokenExpiresAt);
+            if (now > expiresAt) {
+                console.warn('🕐 OAuth token expired:', token.substring(0, 10) + '...');
+                return null;
+            }
+            console.log('✅ Debug - Token validation successful');
+            return {
+                user: tokenData.user,
+                tokenInfo: {
+                    scope: tokenData.scope,
+                    expiresAt: tokenData.accessTokenExpiresAt,
+                    client: tokenData.client
+                }
+            };
+        }
+        catch (error) {
+            console.error('❌ Error validating OAuth token:', error);
+            return null;
+        }
+    }
+    /**
      * Extract MCP tools from tRPC procedures with MCP metadata
      */
     extractMCPToolsFromTRPC() {
@@ -270,7 +443,8 @@ export class MCPProtocolHandler {
                         name: toolName,
                         description: meta.mcp.description || `Execute ${toolName}`,
                         inputSchema,
-                        procedure: procedureAny
+                        procedure: procedureAny,
+                        scopes: meta.mcp.scopes // Include scope requirements
                     });
                 }
             }
@@ -372,13 +546,15 @@ export class MCPProtocolHandler {
 }
 export function createMCPRouter() {
     return router({
-        // Greeting tool with MCP metadata
+        // Greeting tool with MCP metadata - Public tool (no auth required)
         hello: publicProcedure
             .meta({
-            mcp: {
+            ...createMCPTool({
                 name: 'greeting',
-                description: 'Generate a friendly greeting message for a given name'
-            },
+                description: 'Generate a friendly greeting message for a given name',
+                category: 'utility',
+                public: true // No authentication required
+            }),
             openapi: {
                 method: 'GET',
                 path: '/mcp/hello',
@@ -394,13 +570,15 @@ export function createMCPRouter() {
             .query(({ input }) => {
             return { greeting: `Hello ${input.name}! Welcome to Simple RPC AI Backend.` };
         }),
-        // Echo tool with MCP metadata - returns plain text
+        // Echo tool with MCP metadata - requires basic MCP access
         echo: publicProcedure
             .meta({
-            mcp: {
+            ...createMCPTool({
                 name: 'echo',
-                description: 'Echo back a message with optional transformation'
-            }
+                description: 'Echo back a message with optional transformation',
+                category: 'utility',
+                scopes: ScopeHelpers.mcpCall() // Requires mcp:call scope
+            })
         })
             .input(z.object({
             message: z.string().min(1).optional().default('Hello from MCP!').describe('Message to echo'),
@@ -425,13 +603,15 @@ export function createMCPRouter() {
             }
             return `Echo: ${result}`;
         }),
-        // Status tool - returns structured data 
+        // Status tool - requires system read access
         status: publicProcedure
             .meta({
-            mcp: {
+            ...createMCPTool({
                 name: 'status',
-                description: 'Get server status and information'
-            }
+                description: 'Get server status and information',
+                category: 'system',
+                scopes: ScopeHelpers.system('read') // Requires system:read scope
+            })
         })
             .input(z.object({
             detailed: z.boolean().describe('Include detailed system information?')
@@ -461,13 +641,15 @@ export function createMCPRouter() {
             }
             return baseStatus;
         }),
-        // Math tool - returns a simple calculation result
+        // Math tool - public utility tool
         calculate: publicProcedure
             .meta({
-            mcp: {
+            ...createMCPTool({
                 name: 'calculate',
-                description: 'Perform basic mathematical calculations'
-            }
+                description: 'Perform basic mathematical calculations',
+                category: 'utility',
+                public: true // Public calculation tool
+            })
         })
             .input(z.object({
             expression: z.string().min(1).optional().default('2 + 2').describe('Mathematical expression (e.g., "2 + 3 * 4")'),
@@ -721,13 +903,15 @@ export function createMCPRouter() {
                 registrySize: registry.size
             };
         }),
-        // Example: Demonstrating flexible middleware usage (auth policies defined in ai-server-example)
+        // Example: Demonstrating flexible middleware usage with advanced scoping
         advancedExample: publicProcedure
             .meta({
-            mcp: {
+            ...createMCPTool({
                 name: 'advancedExample',
-                description: 'Demonstrate flexible MCP middleware patterns'
-            }
+                description: 'Demonstrate flexible MCP middleware patterns',
+                category: 'admin',
+                scopes: ScopeHelpers.custom(['admin', 'mcp:admin'], 'Advanced MCP administration features', { anyOf: true, namespace: 'mcp', privileged: true })
+            })
         })
             .input(z.object({
             action: z.enum(['check', 'process']).describe('Action to perform')
@@ -788,6 +972,53 @@ export function createMCPRouter() {
                 },
                 cancelled: taskData.cancelled
             };
+        }),
+        // Get authenticated user information from OAuth session
+        getUserInfo: publicProcedure
+            .meta({
+            ...createMCPTool({
+                name: 'getUserInfo',
+                description: 'Get information about the authenticated user from OAuth session',
+                category: 'auth',
+                scopes: ScopeHelpers.mcpCall() // Requires mcp:call scope
+            })
+        })
+            .input(z.object({
+            includeTokenInfo: z.boolean().default(false).describe('Include token expiration and scopes')
+        }))
+            .query(({ input, ctx }) => {
+            // Extract user information from context (populated by OAuth middleware)
+            const req = ctx?.req;
+            // Try to get user info from various sources
+            // The user is set directly in ctx.user by executeTRPCProcedure
+            const user = ctx?.user || req?.user || null;
+            const tokenInfo = ctx?.tokenInfo || req?.tokenInfo || null;
+            if (!user) {
+                return {
+                    authenticated: false,
+                    message: 'No authenticated user found. Please complete OAuth authentication first.'
+                };
+            }
+            // Build user information response
+            const userInfo = {
+                authenticated: true,
+                user: {
+                    id: user.id,
+                    username: user.username || user.email,
+                    email: user.email,
+                    name: user.name,
+                    provider: user.provider || 'oauth'
+                }
+            };
+            // Add token information if requested
+            if (input.includeTokenInfo && tokenInfo) {
+                userInfo.token = {
+                    scopes: tokenInfo.scope || [],
+                    expiresAt: tokenInfo.accessTokenExpiresAt,
+                    hasRefreshToken: !!tokenInfo.refreshToken
+                };
+            }
+            return userInfo;
         })
     });
 }

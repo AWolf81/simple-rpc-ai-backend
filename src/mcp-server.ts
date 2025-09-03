@@ -377,40 +377,6 @@ export class MCPServerManager {
       }
     });
 
-    // OAuth endpoints that Claude.ai discovers
-    app.get('/.well-known/oauth-authorization-server', (req, res) => {
-      console.log('🔐 OAuth authorization server discovery');
-      res.json({
-        issuer: req.protocol + '://' + req.get('host'),
-        authorization_endpoint: req.protocol + '://' + req.get('host') + '/oauth/authorize',
-        token_endpoint: req.protocol + '://' + req.get('host') + '/oauth/token',
-        response_types_supported: ['code'],
-        grant_types_supported: ['authorization_code'],
-        code_challenge_methods_supported: ['S256']
-      });
-    });
-
-    app.get('/.well-known/oauth-protected-resource/mcp', (req, res) => {
-      console.log('🔐 OAuth protected resource discovery');
-      const baseUrl = req.protocol + '://' + req.get('host');
-      res.json({
-        resource: baseUrl,
-        authorization_servers: [baseUrl],
-        scopes_supported: ['mcp'],
-        bearer_methods_supported: ['header']
-      });
-    });
-
-    // Client registration endpoint
-    app.post('/register', (req, res) => {
-      console.log('📝 Client registration requested:', req.body);
-      res.json({
-        client_id: 'mcp-client-' + Date.now(),
-        client_secret: 'secret-' + Math.random().toString(36).substring(7),
-        registration_access_token: 'token-' + Math.random().toString(36).substring(7)
-      });
-    });
-
     // CORS support
     app.options(['/mcp', '/messages', '/register'], (req, res) => {
       res.header('Access-Control-Allow-Origin', '*');

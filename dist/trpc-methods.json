@@ -1,5 +1,5 @@
 {
-  "generated": "2025-09-02T11:35:30.751Z",
+  "generated": "2025-09-03T19:32:18.668Z",
   "version": "1.0.0",
   "description": "tRPC procedure documentation extracted from router",
   "procedures": {
@@ -762,7 +762,12 @@
       "meta": {
         "mcp": {
           "name": "greeting",
-          "description": "Generate a friendly greeting message for a given name"
+          "description": "Generate a friendly greeting message for a given name",
+          "category": "utility",
+          "public": true,
+          "scopes": {
+            "description": "Public access - no authentication required"
+          }
         },
         "openapi": {
           "method": "GET",
@@ -813,7 +818,17 @@
       "meta": {
         "mcp": {
           "name": "echo",
-          "description": "Echo back a message with optional transformation"
+          "description": "Echo back a message with optional transformation",
+          "category": "utility",
+          "scopes": {
+            "anyOf": [
+              "mcp:call",
+              "mcp:tools",
+              "mcp"
+            ],
+            "description": "Execute MCP tools",
+            "namespace": "mcp"
+          }
         }
       }
     },
@@ -837,7 +852,16 @@
       "meta": {
         "mcp": {
           "name": "status",
-          "description": "Get server status and information"
+          "description": "Get server status and information",
+          "category": "system",
+          "scopes": {
+            "required": [
+              "system:read"
+            ],
+            "description": "System read access",
+            "namespace": "system",
+            "privileged": false
+          }
         }
       }
     },
@@ -877,7 +901,12 @@
       "meta": {
         "mcp": {
           "name": "calculate",
-          "description": "Perform basic mathematical calculations"
+          "description": "Perform basic mathematical calculations",
+          "category": "utility",
+          "public": true,
+          "scopes": {
+            "description": "Public access - no authentication required"
+          }
         }
       }
     },
@@ -1040,7 +1069,17 @@
       "meta": {
         "mcp": {
           "name": "advancedExample",
-          "description": "Demonstrate flexible MCP middleware patterns"
+          "description": "Demonstrate flexible MCP middleware patterns",
+          "category": "admin",
+          "scopes": {
+            "anyOf": [
+              "admin",
+              "mcp:admin"
+            ],
+            "description": "Advanced MCP administration features",
+            "namespace": "mcp",
+            "privileged": true
+          }
         }
       }
     },
@@ -1073,6 +1112,44 @@
         "mcp": {
           "name": "getTaskProgress",
           "description": "Get real-time progress for a specific task"
+        }
+      }
+    },
+    "mcp.getUserInfo": {
+      "path": "mcp.getUserInfo",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodObject",
+        "description": null,
+        "properties": {
+          "includeTokenInfo": {
+            "type": "ZodDefault",
+            "description": "Include token expiration and scopes",
+            "innerType": {
+              "type": "ZodBoolean",
+              "description": null
+            }
+          }
+        }
+      },
+      "output": null,
+      "meta": {
+        "mcp": {
+          "name": "getUserInfo",
+          "description": "Get information about the authenticated user from OAuth session",
+          "category": "auth",
+          "scopes": {
+            "anyOf": [
+              "mcp:call",
+              "mcp:tools",
+              "mcp"
+            ],
+            "description": "Execute MCP tools",
+            "namespace": "mcp"
+          }
         }
       }
     }
@@ -1123,7 +1200,7 @@
       "mcp.hello": {
         "title": "greeting",
         "description": "Generate a friendly greeting message for a given name",
-        "category": "general",
+        "category": "utility",
         "type": "query",
         "calling": {
           "mcp": {
@@ -1163,7 +1240,7 @@
       "mcp.echo": {
         "title": "echo",
         "description": "Echo back a message with optional transformation",
-        "category": "general",
+        "category": "utility",
         "type": "mutation",
         "calling": {
           "mcp": {
@@ -1205,7 +1282,7 @@
       "mcp.status": {
         "title": "status",
         "description": "Get server status and information",
-        "category": "general",
+        "category": "system",
         "type": "query",
         "calling": {
           "mcp": {
@@ -1245,7 +1322,7 @@
       "mcp.calculate": {
         "title": "calculate",
         "description": "Perform basic mathematical calculations",
-        "category": "general",
+        "category": "utility",
         "type": "mutation",
         "calling": {
           "mcp": {
@@ -1449,7 +1526,7 @@
       "mcp.advancedExample": {
         "title": "advancedExample",
         "description": "Demonstrate flexible MCP middleware patterns",
-        "category": "general",
+        "category": "admin",
         "type": "query",
         "calling": {
           "mcp": {
@@ -1525,16 +1602,56 @@
             }
           }
         }
+      },
+      "mcp.getUserInfo": {
+        "title": "getUserInfo",
+        "description": "Get information about the authenticated user from OAuth session",
+        "category": "auth",
+        "type": "query",
+        "calling": {
+          "mcp": {
+            "endpoint": "http://localhost:8000/mcp",
+            "method": "tools/call",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "tools/call",
+              "params": {
+                "name": "getUserInfo",
+                "arguments": {
+                  "includeTokenInfo": false
+                }
+              }
+            }
+          },
+          "trpc": {
+            "endpoint": "http://localhost:8000/trpc/mcp.getUserInfo",
+            "method": "GET",
+            "example": "curl -X GET \"http://localhost:8000/trpc/mcp.getUserInfo?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22includeTokenInfo%22%3Afalse%7D%7D%7D\""
+          },
+          "jsonRpc": {
+            "endpoint": "http://localhost:8000/rpc",
+            "method": "mcp.getUserInfo",
+            "example": {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "mcp.getUserInfo",
+              "params": {
+                "includeTokenInfo": false
+              }
+            }
+          }
+        }
       }
     },
     "endpoint": "http://localhost:8000/mcp",
     "protocolVersion": "2024-11-05"
   },
   "stats": {
-    "totalProcedures": 37,
-    "queries": 23,
+    "totalProcedures": 38,
+    "queries": 24,
     "mutations": 14,
     "subscriptions": 0,
-    "mcpMethods": 11
+    "mcpMethods": 12
   }
 }
