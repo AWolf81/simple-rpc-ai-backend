@@ -177,7 +177,7 @@ export class RpcAiServer {
                 filePath: this.config.oauth.sessionStorage?.filePath,
                 redis: this.config.oauth.sessionStorage?.redis
             };
-            const { oauth, storage } = createOAuthServer(storageConfig);
+            const { oauth, storage } = createOAuthServer(storageConfig, this.config.mcp?.adminUsers || []);
             this.oauthServer = oauth;
             this.oauthStorage = storage; // Store reference to session storage
             console.log(`✅ OAuth 2.0 server initialized with ${storageConfig.type} storage`);
@@ -671,7 +671,29 @@ export class RpcAiServer {
         const enabledTransports = [];
         // HTTP transport (for MCP Jam, testing)
         if (transports.http) {
-            const httpHandler = new MCPProtocolHandler(this.router);
+            // Initialize OpenSaaS JWT middleware for MCP if configured
+            let mcpJwtMiddleware;
+            const opensaasConfig = this.config.mcp?.auth?.opensaas;
+            if (opensaasConfig?.enabled && opensaasConfig.publicKey) {
+                try {
+                    mcpJwtMiddleware = new JWTMiddleware({
+                        opensaasPublicKey: opensaasConfig.publicKey,
+                        audience: opensaasConfig.audience || 'simple-rpc-ai-backend',
+                        issuer: opensaasConfig.issuer || 'opensaas',
+                        clockTolerance: opensaasConfig.clockTolerance || 30,
+                        requireAuthForAllMethods: opensaasConfig.requireAuthForAllMethods || false,
+                        skipAuthForMethods: opensaasConfig.skipAuthForMethods || ['tools/list', 'initialize', 'ping']
+                    });
+                    console.log(`🔐 OpenSaaS JWT authentication enabled for MCP endpoints`);
+                }
+                catch (error) {
+                    console.error(`❌ Failed to initialize OpenSaaS JWT middleware for MCP: ${error.message}`);
+                }
+            }
+            const httpHandler = new MCPProtocolHandler(this.router, {
+                adminUsers: this.config.mcp?.adminUsers,
+                jwtMiddleware: mcpJwtMiddleware
+            });
             httpHandler.setupMCPEndpoint(this.app, '/mcp');
             enabledTransports.push('HTTP');
         }

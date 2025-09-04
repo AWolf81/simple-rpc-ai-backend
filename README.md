@@ -3138,6 +3138,82 @@ export const mcpRouter = router({
 - **Input Validation**: All tool calls validated against tRPC Zod schemas
 - **Corporate Friendly**: Works through corporate proxies, no special network requirements
 
+##### **OAuth2 Scope System**
+
+Our MCP implementation uses a granular OAuth2 scope system for fine-grained access control:
+
+**Available OAuth Scopes:**
+- **MCP Access**: `mcp`, `mcp:list`, `mcp:call`, `mcp:tools`, `mcp:admin`
+- **System Access**: `system:read`, `system:admin`, `system:health`
+- **AI Services**: `ai:execute`, `ai:configure`, `ai:read`
+- **User Data**: `profile:read`, `profile:write`, `billing:read`, `billing:write`
+- **General**: `read`, `write`, `admin`, `user`
+
+**Tool Scope Requirements:**
+Each MCP tool specifies its required scopes in the `meta.mcp.scopes` configuration:
+
+```typescript
+// Public tool - no authentication required
+greeting: publicProcedure
+  .meta({
+    mcp: {
+      name: "greeting",
+      description: "Generate friendly greetings",
+      scopes: { description: "Public access - no authentication required" }
+    }
+  })
+
+// Standard MCP tool - requires basic MCP access
+echo: publicProcedure
+  .meta({
+    mcp: {
+      name: "echo", 
+      description: "Echo messages with transformation",
+      scopes: {
+        anyOf: ["mcp:call", "mcp:tools", "mcp"],
+        description: "Execute MCP tools",
+        namespace: "mcp"
+      }
+    }
+  })
+
+// Admin tool - requires elevated privileges
+getUserInfo: publicProcedure
+  .meta({
+    mcp: {
+      name: "getUserInfo",
+      description: "Get authenticated user information",
+      scopes: {
+        anyOf: ["admin", "mcp:admin"],
+        description: "Admin access required",
+        namespace: "admin",
+        privileged: true,
+        requireAdminUser: true
+      }
+    }
+  })
+```
+
+**Scope Validation:**
+- **anyOf**: User needs ANY of the listed scopes (OR logic)
+- **allOf**: User needs ALL of the listed scopes (AND logic)
+- **privileged**: Tool requires elevated permissions
+- **requireAdminUser**: Tool restricted to configured admin users
+- **namespace**: Logical grouping of related scopes
+
+**Development & Testing:**
+The build process automatically displays scope requirements for each MCP tool:
+
+```bash
+🛠️  Available MCP Tools:
+   📋 hello: greeting
+      🔐 Scopes:  (Public access - no authentication required)
+   📋 echo: echo
+      🔐 Scopes: mcp:call OR mcp:tools OR mcp (Execute MCP tools)
+   📋 getUserInfo: getUserInfo
+      🔐 Scopes: admin OR mcp:admin (Admin access required) [Admin Required] [Privileged]
+```
+
 #### **📊 MCP Protocol Features**
 - **Standard Compliance**: Full MCP HTTP transport implementation
 - **Tool Categories**: Organize tools by category (utility, ai, data, etc.)

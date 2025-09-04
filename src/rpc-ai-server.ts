@@ -144,7 +144,17 @@ export interface RpcAiServerConfig {
       requireAuthForToolsList?: boolean;  // Default: false (tools/list is public)
       requireAuthForToolsCall?: boolean;  // Default: true (tools/call requires auth)
       publicTools?: string[];             // Tools that don't require auth (even if requireAuthForToolsCall = true)
+      opensaas?: {
+        enabled?: boolean;                // Enable OpenSaaS JWT token authentication
+        publicKey?: string;               // OpenSaaS public key for JWT validation
+        audience?: string;                // Expected audience for JWT tokens
+        issuer?: string;                  // Expected issuer for JWT tokens
+        clockTolerance?: number;          // JWT clock tolerance in seconds (default: 30)
+        requireAuthForAllMethods?: boolean; // If true, all MCP methods require auth
+        skipAuthForMethods?: string[];    // MCP methods that don't require auth
+      };
     };
+    adminUsers?: string[];                // Admin users who can access admin-restricted tools (by email/username);
     defaultConfig?: {
       enableWebSearchTool?: boolean;   // build-in websearch tool
       enableRefTools?: boolean;        // Documentation search
@@ -338,7 +348,7 @@ export class RpcAiServer {
         redis: this.config.oauth.sessionStorage?.redis
       };
       
-      const { oauth, storage } = createOAuthServer(storageConfig);
+      const { oauth, storage } = createOAuthServer(storageConfig, this.config.mcp?.adminUsers || []);
       this.oauthServer = oauth;
       this.oauthStorage = storage; // Store reference to session storage
       console.log(`✅ OAuth 2.0 server initialized with ${storageConfig.type} storage`);
@@ -909,7 +919,30 @@ export class RpcAiServer {
 
     // HTTP transport (for MCP Jam, testing)
     if (transports.http) {
-      const httpHandler = new MCPProtocolHandler(this.router);
+      // Initialize OpenSaaS JWT middleware for MCP if configured
+      let mcpJwtMiddleware: JWTMiddleware | undefined;
+      const opensaasConfig = this.config.mcp?.auth?.opensaas;
+      
+      if (opensaasConfig?.enabled && opensaasConfig.publicKey) {
+        try {
+          mcpJwtMiddleware = new JWTMiddleware({
+            opensaasPublicKey: opensaasConfig.publicKey,
+            audience: opensaasConfig.audience || 'simple-rpc-ai-backend',
+            issuer: opensaasConfig.issuer || 'opensaas',
+            clockTolerance: opensaasConfig.clockTolerance || 30,
+            requireAuthForAllMethods: opensaasConfig.requireAuthForAllMethods || false,
+            skipAuthForMethods: opensaasConfig.skipAuthForMethods || ['tools/list', 'initialize', 'ping']
+          });
+          console.log(`🔐 OpenSaaS JWT authentication enabled for MCP endpoints`);
+        } catch (error: any) {
+          console.error(`❌ Failed to initialize OpenSaaS JWT middleware for MCP: ${error.message}`);
+        }
+      }
+
+      const httpHandler = new MCPProtocolHandler(this.router, { 
+        adminUsers: this.config.mcp?.adminUsers,
+        jwtMiddleware: mcpJwtMiddleware
+      });
       httpHandler.setupMCPEndpoint(this.app, '/mcp');
       enabledTransports.push('HTTP');
     }

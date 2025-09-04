@@ -115,6 +115,16 @@ export class ScopeHelpers {
             privileged: options?.privileged
         };
     }
+    /** Admin-only tool - requires admin scope + specific user validation */
+    static adminOnly(adminUsers = 'any', description) {
+        return {
+            anyOf: ['admin', 'mcp:admin'],
+            description: description || 'Admin access required',
+            namespace: 'admin',
+            privileged: true,
+            adminUsers
+        };
+    }
 }
 /**
  * Scope Validation and Checking
@@ -123,10 +133,21 @@ export class ScopeValidator {
     /**
      * Check if user scopes satisfy the requirement
      */
-    static hasScope(userScopes, requirement) {
+    static hasScope(userScopes, requirement, userInfo) {
         // Public access - no scopes required
         if (!requirement.required && !requirement.anyOf) {
             return true;
+        }
+        // Check admin user restrictions if present
+        if (requirement.adminUsers && userInfo) {
+            const adminUsers = requirement.adminUsers;
+            if (adminUsers !== 'any') {
+                const userEmail = userInfo.email || userInfo.id || '';
+                const isAuthorizedAdmin = adminUsers.includes(userEmail);
+                if (!isAuthorizedAdmin) {
+                    return false; // User not in admin list
+                }
+            }
         }
         // Expand user scopes to include hierarchical scopes
         const expandedUserScopes = ScopeValidator.expandScopes(userScopes);
@@ -200,14 +221,14 @@ export class ScopeValidator {
         return { missing: [], type: 'none' };
     }
     /**
-     * Filter tools based on user scopes
+     * Filter tools based on user scopes and admin restrictions
      */
-    static filterToolsByScope(tools, userScopes) {
+    static filterToolsByScope(tools, userScopes, userInfo) {
         return tools.filter(tool => {
             if (!tool.scopes) {
                 return true; // No scope requirement = public access
             }
-            return this.hasScope(userScopes, tool.scopes);
+            return this.hasScope(userScopes, tool.scopes, userInfo);
         });
     }
     /**
@@ -269,6 +290,25 @@ export function createMCPTool(config) {
             ...config,
             // If marked as public, ensure no scope requirements
             ...(config.public && { scopes: DefaultScopes.PUBLIC })
+        }
+    };
+}
+/**
+ * Utility function to create admin-restricted MCP tool
+ */
+export function createAdminMCPTool(config) {
+    const { adminUsers, baseScopes, ...toolConfig } = config;
+    // Create scope requirement with admin user restriction
+    const scopeRequirement = baseScopes || ScopeHelpers.mcpCall();
+    const adminScopeRequirement = {
+        ...scopeRequirement,
+        adminUsers
+    };
+    return {
+        mcp: {
+            ...toolConfig,
+            scopes: adminScopeRequirement,
+            requireAdminUser: true
         }
     };
 }

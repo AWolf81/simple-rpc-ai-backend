@@ -134,7 +134,7 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
          * Simple test procedure with minimal Zod schema
          */
         test: publicProcedure
-            .input(z.object({ message: z.string().optional().default('Hello from test tool!') }))
+            .input(z.object({ message: z.string().min(1).describe('Message to echo back') }))
             .output(z.object({ message: z.string() }))
             .meta({
             mcp: { enabled: true, description: "Just a echo test endpoint" },
@@ -147,7 +147,9 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
             }
         })
             .mutation(async ({ input }) => {
-            return { message: `Hello ${input.message}` };
+            // Handle missing parameter with default
+            const message = input.message || 'Hello from AI test!';
+            return { message: `Echo: ${message}` };
         }),
         /**
          * Health check procedure

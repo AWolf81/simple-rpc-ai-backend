@@ -55,7 +55,11 @@ const server = createRpcAiServer({
     auth: {
       requireAuthForToolsList: false,
       requireAuthForToolsCall: true
-    }
+    },
+    // Admin user configuration - specific users who can access admin-restricted tools
+    adminUsers: [
+      'awolf2904@gmail.com'  // Add more admin emails as needed
+    ]
   },
   
   // CORS configuration for MCP Jam and ngrok compatibility

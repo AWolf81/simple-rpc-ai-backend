@@ -31,6 +31,8 @@ export type ScopeRequirement = {
   description?: string;
   /** Whether this is a privileged scope requiring explicit consent */
   privileged?: boolean;
+  /** Whether admin user validation is required (checked against adminUsers config) */
+  requireAdminUser?: boolean;
 };
 
 /**
@@ -50,6 +52,10 @@ export interface MCPToolScope {
   public?: boolean;
   /** Custom permissions beyond scopes */
   permissions?: string[];
+  /** Admin user restrictions - only these users can access the tool */
+  adminUsers?: string[] | 'any';
+  /** Whether to require admin user validation in addition to scopes */
+  requireAdminUser?: boolean;
 }
 
 /**
@@ -179,6 +185,17 @@ export class ScopeHelpers {
       privileged: options?.privileged
     };
   }
+
+  /** Admin-only tool - requires admin scope + specific user validation */
+  static adminOnly(adminUsers: string[] | 'any' = 'any', description?: string): ScopeRequirement & { adminUsers: string[] | 'any' } {
+    return {
+      anyOf: ['admin', 'mcp:admin'],
+      description: description || 'Admin access required',
+      namespace: 'admin',
+      privileged: true,
+      adminUsers
+    } as ScopeRequirement & { adminUsers: string[] | 'any' };
+  }
 }
 
 /**
@@ -188,10 +205,22 @@ export class ScopeValidator {
   /**
    * Check if user scopes satisfy the requirement
    */
-  static hasScope(userScopes: string[], requirement: ScopeRequirement): boolean {
+  static hasScope(userScopes: string[], requirement: ScopeRequirement, userInfo?: { email?: string; id?: string }): boolean {
     // Public access - no scopes required
     if (!requirement.required && !requirement.anyOf) {
       return true;
+    }
+
+    // Check admin user restrictions if present
+    if ((requirement as any).adminUsers && userInfo) {
+      const adminUsers = (requirement as any).adminUsers;
+      if (adminUsers !== 'any') {
+        const userEmail = userInfo.email || userInfo.id || '';
+        const isAuthorizedAdmin = adminUsers.includes(userEmail);
+        if (!isAuthorizedAdmin) {
+          return false; // User not in admin list
+        }
+      }
     }
 
     // Expand user scopes to include hierarchical scopes
@@ -291,14 +320,18 @@ export class ScopeValidator {
   }
 
   /**
-   * Filter tools based on user scopes
+   * Filter tools based on user scopes and admin restrictions
    */
-  static filterToolsByScope(tools: Array<{ name: string; scopes?: ScopeRequirement }>, userScopes: string[]): Array<{ name: string; scopes?: ScopeRequirement }> {
+  static filterToolsByScope(
+    tools: Array<{ name: string; scopes?: ScopeRequirement }>, 
+    userScopes: string[], 
+    userInfo?: { email?: string; id?: string }
+  ): Array<{ name: string; scopes?: ScopeRequirement }> {
     return tools.filter(tool => {
       if (!tool.scopes) {
         return true; // No scope requirement = public access
       }
-      return this.hasScope(userScopes, tool.scopes);
+      return this.hasScope(userScopes, tool.scopes, userInfo);
     });
   }
 
@@ -367,6 +400,31 @@ export function createMCPTool(config: MCPToolScope): { mcp: MCPToolScope } {
       ...config,
       // If marked as public, ensure no scope requirements
       ...(config.public && { scopes: DefaultScopes.PUBLIC })
+    }
+  };
+}
+
+/**
+ * Utility function to create admin-restricted MCP tool
+ */
+export function createAdminMCPTool(config: Omit<MCPToolScope, 'scopes'> & {
+  adminUsers: string[] | 'any';
+  baseScopes?: ScopeRequirement;
+}): { mcp: MCPToolScope } {
+  const { adminUsers, baseScopes, ...toolConfig } = config;
+  
+  // Create scope requirement with admin user restriction
+  const scopeRequirement = baseScopes || ScopeHelpers.mcpCall();
+  const adminScopeRequirement = {
+    ...scopeRequirement,
+    adminUsers
+  };
+
+  return {
+    mcp: {
+      ...toolConfig,
+      scopes: adminScopeRequirement,
+      requireAdminUser: true
     }
   };
 }

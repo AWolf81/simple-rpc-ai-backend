@@ -11,9 +11,13 @@ import { randomPKCECodeVerifier, calculatePKCECodeChallenge } from 'openid-clien
 import crypto from 'crypto';
 import { createSessionStorage, SessionStorage } from './session-storage.js';
 import { Request, Response } from 'express';
+import { HandlebarsTemplateEngine, HandlebarsTemplateConfig, HandlebarsTemplateData, HANDLEBARS_PROVIDER_ICONS } from './handlebars-template-engine.js';
 
 // Session storage instance (will be set during initialization)
 let sessionStorage: SessionStorage;
+
+// Template engine instance for OAuth pages
+let templateEngine: HandlebarsTemplateEngine;
 
 // Identity Provider Configuration
 interface IdentityProviderConfig {
@@ -151,7 +155,7 @@ function normalizeUserProfile(provider: string, profile: any): { id: string; ema
  * Create OAuth 2.0 Model Implementation with Session Storage
  * Uses the configured session storage backend for persistence
  */
-function createOAuthModel(storage: SessionStorage) {
+function createOAuthModel(storage: SessionStorage, adminUsers: string[] = []) {
   return {
     // Client methods
     async getClient(clientId: string, clientSecret?: string) {
@@ -261,7 +265,7 @@ function createOAuthModel(storage: SessionStorage) {
       return token;
     },
 
-    // Scope validation with configurable scopes
+    // Scope validation with admin user support
     async validateScope(user: any, client: any, scope?: any) {
       console.log(`🔍 OAuth: Validating scope for user ${user.id}, client ${client.id}`, scope, typeof scope);
       
@@ -279,26 +283,65 @@ function createOAuthModel(storage: SessionStorage) {
           requestedScopes = [];
         }
       }
-      console.log(`📋 OAuth: Requested scopes:`, requestedScopes);
       
-      // Default scopes for backward compatibility and MCP access
+      // Check if user is an admin (by email or userId)
+      const userEmail = user?.email;
+      const userId = user?.id || user?.sub;
+      const isAdminUser = adminUsers.includes(userEmail || '') || adminUsers.includes(userId || '');
+      
+      console.log(`🔐 OAuth: Admin user check - Email: ${userEmail}, IsAdmin: ${isAdminUser}`);
+      
+      // Default scopes for MCP access
       const defaultScopes = ['mcp', 'mcp:list', 'mcp:call'];
       
-      // If no specific scopes requested, grant default MCP scopes
-      const validatedScope = requestedScopes.length > 0 ? requestedScopes : defaultScopes;
+      // Admin scopes granted automatically to admin users
+      const adminScopes = ['admin', 'mcp:admin'];
       
-      // TODO: Add user permission checking here
-      // For now, grant all requested scopes (or defaults)
-      // In production, you'd check user's permissions against requested scopes
+      let validatedScopes: string[];
       
-      console.log(`✅ OAuth: Scope validated:`, validatedScope);
-      return validatedScope;
+      if (requestedScopes.length === 0) {
+        // Best Practice: Empty scopes = defaults + admin (if admin user)
+        validatedScopes = [...defaultScopes];
+        if (isAdminUser) {
+          validatedScopes.push(...adminScopes);
+          console.log(`🔐 OAuth: Admin user detected - granting admin scopes automatically`);
+        }
+      } else {
+        // Best Practice: Explicit scopes = validate and filter based on permissions
+        validatedScopes = [...requestedScopes];
+        
+        // Always ensure basic MCP scopes for valid users
+        for (const scope of defaultScopes) {
+          if (!validatedScopes.includes(scope)) {
+            validatedScopes.push(scope);
+          }
+        }
+        
+        // Auto-grant admin scopes to admin users (even if not requested)
+        if (isAdminUser) {
+          for (const scope of adminScopes) {
+            if (!validatedScopes.includes(scope)) {
+              validatedScopes.push(scope);
+            }
+          }
+          console.log(`🔐 OAuth: Admin user - automatically added admin scopes`);
+        } else {
+          // Remove admin scopes from non-admin users
+          validatedScopes = validatedScopes.filter(s => !adminScopes.includes(s));
+          if (requestedScopes.some(s => adminScopes.includes(s))) {
+            console.log(`⚠️  OAuth: Non-admin user requested admin scopes - filtered out`);
+          }
+        }
+      }
+      
+      console.log(`✅ OAuth: Final validated scopes:`, validatedScopes);
+      return validatedScopes;
     }
   };
 }
 
 /**
- * Create OAuth 2.0 server instance with configurable session storage
+ * Create OAuth 2.0 server instance with configurable session storage and templating
  */
 export function createOAuthServer(storageConfig: {
   type: 'memory' | 'file' | 'redis';
@@ -311,7 +354,7 @@ export function createOAuthServer(storageConfig: {
     keyPrefix?: string;
     instance?: any;
   };
-} = { type: 'memory' }) {
+} = { type: 'memory' }, adminUsers: string[] = [], templateConfig?: HandlebarsTemplateConfig) {
   console.log(`🚀 Creating OAuth 2.0 server with ${storageConfig.type} session storage...`);
   
   // Initialize session storage - ensure it's the same instance used globally
@@ -319,8 +362,14 @@ export function createOAuthServer(storageConfig: {
     sessionStorage = createSessionStorage(storageConfig);
   }
   
-  // Create OAuth model with session storage
-  const oauthModel = createOAuthModel(sessionStorage);
+  // Initialize template engine with provided configuration
+  if (!templateEngine) {
+    templateEngine = new HandlebarsTemplateEngine(templateConfig);
+    console.log(`✅ OAuth Handlebars template engine initialized with ${templateConfig ? 'custom' : 'default'} configuration`);
+  }
+  
+  // Create OAuth model with session storage and admin users
+  const oauthModel = createOAuthModel(sessionStorage, adminUsers);
   
   const oauth = new ExpressOAuthServer({
     model: oauthModel,
@@ -709,9 +758,9 @@ export function createAuthenticateHandler() {
 }
 
 /**
- * Handle provider selection page (for better UX)
+ * Handle provider selection page using Handlebars templates
  */
-export function handleProviderSelection(req: Request, res: Response) {
+export async function handleProviderSelection(req: Request, res: Response) {
   const identityProviders = getIdentityProviders();
   const availableProviders = Object.keys(identityProviders).filter(provider => {
     const config = identityProviders[provider];
@@ -724,41 +773,55 @@ export function handleProviderSelection(req: Request, res: Response) {
   const redirectUri = req.query.redirect_uri as string;
   const redirectParam = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
   
-  // Simple HTML page for provider selection
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Choose Identity Provider</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-    .provider { display: block; margin: 10px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; text-decoration: none; color: #333; background: #f9f9f9; }
-    .provider:hover { background: #e9e9e9; }
-    h1 { color: #333; }
-    .info { color: #666; margin-bottom: 20px; }
-  </style>
-</head>
-<body>
-  <h1>🔐 Sign In</h1>
-  <p class="info">Choose your identity provider to continue:</p>
-  ${availableProviders.map(provider => 
-    `<a href="${baseUrl}/login/${provider}${redirectParam}" class="provider">
-       <strong>${provider.charAt(0).toUpperCase() + provider.slice(1)}</strong>
-       <br><small>Sign in with ${provider}</small>
-     </a>`
-  ).join('')}
+  // Prepare template data
+  const templateData: HandlebarsTemplateData = {
+    providers: availableProviders.map(provider => ({
+      name: provider,
+      displayName: provider.charAt(0).toUpperCase() + provider.slice(1),
+      loginUrl: `${baseUrl}/login/${provider}${redirectParam}`,
+      icon: HANDLEBARS_PROVIDER_ICONS[provider] || '🔑'
+    })),
+    context: {
+      redirectUri,
+      scopes: req.query.scope ? (req.query.scope as string).split(' ') : undefined,
+      clientId: req.query.client_id as string
+    }
+  };
   
-  ${availableProviders.length === 0 ? 
-    '<p style="color: red;">❌ No identity providers are configured. Please check your environment variables.</p>' : ''
+  // Use Handlebars template engine to render the page
+  if (!templateEngine) {
+    // Fallback to default template engine if not initialized
+    templateEngine = new HandlebarsTemplateEngine();
   }
-</body>
-</html>
-  `;
   
-  res.setHeader('Content-Type', 'text/html');
-  res.send(html);
+  try {
+    const html = await templateEngine.render('oauth/login', templateData);
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    console.error('❌ Template rendering error:', error);
+    res.status(500).send('Template rendering error');
+  }
 }
 
-export { ExpressOAuthServer, getIdentityProviders };
+/**
+ * Configure OAuth template engine
+ */
+export function configureOAuthTemplates(config: HandlebarsTemplateConfig) {
+  if (!templateEngine) {
+    templateEngine = new HandlebarsTemplateEngine(config);
+  } else {
+    // Update existing configuration
+    templateEngine.updateConfig(config);
+  }
+  console.log(`✅ OAuth Handlebars templates configured with custom branding`);
+}
+
+/**
+ * Get the current template engine instance
+ */
+export function getTemplateEngine() {
+  return templateEngine;
+}
+
+export { ExpressOAuthServer, getIdentityProviders, HandlebarsTemplateConfig, HandlebarsTemplateData };

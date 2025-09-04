@@ -116,6 +116,7 @@ async function extractTRPCMethods() {
         description: mcpMeta.description,
         category: mcpMeta.category || 'general',
         type: method.type,
+        scopes: mcpMeta.scopes || null,
         calling: {
           mcp: {
             endpoint: 'http://localhost:8000/mcp',
@@ -241,6 +242,53 @@ async function extractTRPCMethods() {
   }
 }
 
+function formatScopeInfo(scopes) {
+  if (!scopes) return 'None required';
+  
+  let info = '';
+  
+  // Handle combined required (AND) + anyOf (OR) scopes
+  if (scopes.required && Array.isArray(scopes.required) && 
+      scopes.anyOf && Array.isArray(scopes.anyOf)) {
+    // Both AND and OR conditions - show clearly that BOTH must be satisfied
+    info = `${scopes.required.join(' AND ')} AND (${scopes.anyOf.join(' OR ')})`;
+  }
+  // Handle only required scopes (AND logic)
+  else if (scopes.required && Array.isArray(scopes.required)) {
+    info = `${scopes.required.join(' AND ')}`;
+  }
+  // Handle only anyOf scopes (OR logic)
+  else if (scopes.anyOf && Array.isArray(scopes.anyOf)) {
+    info = `${scopes.anyOf.join(' OR ')}`;
+  }
+  // Handle allOf scopes (AND logic - less common)
+  else if (scopes.allOf && Array.isArray(scopes.allOf)) {
+    info = `${scopes.allOf.join(' AND ')}`;
+  }
+  
+  // Add description if available
+  if (scopes.description) {
+    info += ` (${scopes.description})`;
+  }
+  
+  // Add admin requirement notation
+  if (scopes.requireAdminUser) {
+    info += ' [Admin Required]';
+  }
+  
+  // Add privileged notation
+  if (scopes.privileged) {
+    info += ' [Privileged]';
+  }
+  
+  // Handle public/no scopes case
+  if (!info && scopes.description) {
+    info = scopes.description;
+  }
+  
+  return info || 'Custom scopes';
+}
+
 async function main() {
   const documentation = await extractTRPCMethods();
   
@@ -268,6 +316,13 @@ async function main() {
       for (const [name, tool] of Object.entries(documentation.mcp.methods)) {
         const toolName = name.split('.').pop();
         console.log(`   📋 ${toolName}: ${tool.title}`);
+        
+        // Display scope requirements
+        if (tool.scopes) {
+          const scopesInfo = formatScopeInfo(tool.scopes);
+          console.log(`      🔐 Scopes: ${scopesInfo}`);
+        }
+        
         console.log(`      🔹 MCP: POST ${tool.calling.mcp.endpoint}`);
         console.log(`      🔹 tRPC: ${tool.calling.trpc.method} ${tool.calling.trpc.endpoint}`);
         console.log(`      🔹 JSON-RPC: POST ${tool.calling.jsonRpc.endpoint} (method: ${tool.calling.jsonRpc.method})`);

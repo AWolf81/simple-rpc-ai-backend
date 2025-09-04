@@ -3,7 +3,8 @@ import z from "zod";
 import { Request, Response } from 'express';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { ErrorCode, McpError, LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
-import { ScopeHelpers, ScopeValidator, DefaultScopes, createMCPTool, type MCPToolScope } from '../../auth/scopes.js';
+import { ScopeHelpers, ScopeValidator, DefaultScopes, createMCPTool, createAdminMCPTool, type MCPToolScope } from '../../auth/scopes.js';
+import { JWTMiddleware, type AuthenticatedRequest } from '../../auth/jwt-middleware.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -12,6 +13,8 @@ export interface MCPRouterConfig {
   mcpService?: any;
   refIntegration?: any;
   defaultConfig?: any;
+  adminUsers?: string[];
+  jwtMiddleware?: JWTMiddleware;
 }
 
 /**
@@ -22,9 +25,23 @@ export class MCPProtocolHandler {
   private appRouter: any;
   private progressCallbacks: Map<string, (progress: number, total: number, message?: string) => void> = new Map();
   private runningTasks: Map<string, { cancel: () => void; status: string; taskName: string }> = new Map();
+  private adminUsers: string[];
+  private jwtMiddleware?: JWTMiddleware;
 
-  constructor(appRouter: any) {
+  constructor(appRouter: any, config?: MCPRouterConfig) {
     this.appRouter = appRouter;
+    this.adminUsers = config?.adminUsers || [];
+    this.jwtMiddleware = config?.jwtMiddleware;
+  }
+  
+  /**
+   * Check if a user is an admin user
+   */
+  private isAdminUser(userEmail?: string, userId?: string): boolean {
+    if (!userEmail && !userId) return false;
+    if (this.adminUsers.length === 0) return false; // No admin users configured
+    
+    return this.adminUsers.includes(userEmail || '') || this.adminUsers.includes(userId || '');
   }
 
   /**
@@ -68,9 +85,18 @@ export class MCPProtocolHandler {
    * Setup MCP HTTP endpoint on Express app
    */
   setupMCPEndpoint(app: any, path: string = '/mcp') {
-    app.post(path, (req: Request, res: Response) => {
-      this.handleMCPRequest(req, res);
-    });
+    // Apply JWT middleware if configured
+    if (this.jwtMiddleware) {
+      app.post(path, this.jwtMiddleware.authenticate, (req: AuthenticatedRequest, res: Response) => {
+        this.handleMCPRequest(req, res);
+      });
+      console.log(`✅ MCP endpoint ready at ${path} (with OpenSaaS JWT authentication)`);
+    } else {
+      app.post(path, (req: AuthenticatedRequest, res: Response) => {
+        this.handleMCPRequest(req, res);
+      });
+      console.log(`✅ MCP endpoint ready at ${path}`);
+    }
 
     app.options(path, (req: Request, res: Response) => {
       res.header('Access-Control-Allow-Origin', '*');
@@ -78,14 +104,12 @@ export class MCPProtocolHandler {
       res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       res.status(200).send();
     });
-
-    console.log(`✅ MCP endpoint ready at ${path}`);
   }
 
   /**
    * Handle incoming MCP requests
    */
-  private async handleMCPRequest(req: Request, res: Response) {
+  private async handleMCPRequest(req: AuthenticatedRequest, res: Response) {
     try {
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -190,23 +214,35 @@ export class MCPProtocolHandler {
   /**
    * Handle tools/list method - extract tools from tRPC with MCP metadata
    */
-  private async handleToolsList(request: any, req?: Request) {
+  private async handleToolsList(request: any, req?: AuthenticatedRequest) {
     try {
       const allTools = this.extractMCPToolsFromTRPC();
       
       // Extract user scopes from the request (if authenticated)
       const userScopes = this.extractUserScopes(req);
       
-      // Filter tools based on user scopes
-      const accessibleTools = ScopeValidator.filterToolsByScope(
-        allTools.map(tool => ({
-          name: tool.name,
-          scopes: tool.scopes
-        })),
-        userScopes
-      );
+      // Extract user information for admin validation
+      const userInfo = this.extractUserInfo(req);
       
-      // Build the response with accessible tools
+      // Filter tools based on user scopes and admin restrictions
+      const accessibleTools = allTools.filter(tool => {
+        if (!tool.scopes) {
+          return true; // No scope requirement = public access
+        }
+        
+        // Check if this tool requires admin user validation
+        if (tool.scopes.requireAdminUser && this.adminUsers.length > 0) {
+          const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
+          if (!isAdmin) {
+            return false; // User is not an admin, hide the tool
+          }
+        }
+        
+        // Check scope requirements
+        return ScopeValidator.hasScope(userScopes, tool.scopes, userInfo || undefined);
+      }).map(tool => ({ name: tool.name, scopes: tool.scopes }));
+      
+      // Build the response with accessible tools (scope filtering already applied)
       const tools = accessibleTools.map(accessibleTool => {
         const fullTool = allTools.find(t => t.name === accessibleTool.name)!;
         return {
@@ -238,7 +274,7 @@ export class MCPProtocolHandler {
   /**
    * Handle tools/call method - execute tRPC procedure
    */
-  private async handleToolsCall(request: any, req?: Request) {
+  private async handleToolsCall(request: any, req?: AuthenticatedRequest) {
     try {
       const { name, arguments: args, _meta } = request.params;
       
@@ -253,23 +289,47 @@ export class MCPProtocolHandler {
         throw new Error(`Tool '${name}' not found`);
       }
 
-      // Check scope permissions before execution
+      // Check scope permissions and admin restrictions before execution
       const userScopes = this.extractUserScopes(req);
+      const userInfo = this.extractUserInfo(req);
+      
       console.log('🔍 Debug - Tool scope check:', {
         toolName: name,
         toolScopes: tool.scopes,
         userScopes: userScopes,
-        expandedUserScopes: userScopes ? ScopeValidator.expandScopes(userScopes) : []
+        userInfo: userInfo ? { hasEmail: !!userInfo.email, hasId: !!userInfo.id } : null,
+        expandedUserScopes: userScopes ? ScopeValidator.expandScopes(userScopes) : [],
+        adminUsersConfigured: this.adminUsers.length > 0,
+        isAdmin: this.isAdminUser(userInfo?.email, userInfo?.id)
       });
       
-      if (tool.scopes && !ScopeValidator.hasScope(userScopes, tool.scopes)) {
-        const missing = ScopeValidator.getMissingScopes(userScopes, tool.scopes);
-        console.log('❌ Debug - Scope validation failed:', {
-          userScopes,
-          toolScopes: tool.scopes,
-          missing: missing
-        });
-        throw new Error(`Insufficient permissions. Missing scopes: ${missing.missing.join(', ')}`);
+      if (tool.scopes) {
+        // Check if this tool requires admin user validation
+        const requiresAdminUser = tool.scopes.requireAdminUser;
+        
+        // First check admin user restriction if required
+        if (requiresAdminUser && this.adminUsers.length > 0) {
+          const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
+          if (!isAdmin) {
+            throw new Error(`Access denied. This tool requires administrative privileges.`);
+          }
+        }
+        
+        // Then check scope requirements
+        if (!ScopeValidator.hasScope(userScopes, tool.scopes, userInfo || undefined)) {
+          const missing = ScopeValidator.getMissingScopes(userScopes, tool.scopes);
+          
+          console.log('❌ Debug - Scope validation failed:', {
+            userScopes,
+            toolScopes: tool.scopes,
+            missing: missing,
+            requiresAdminUser,
+            hasUserEmail: !!userInfo?.email,
+            adminUsersConfigured: this.adminUsers.length > 0
+          });
+          
+          throw new Error(`Insufficient permissions. Missing scopes: ${missing.missing.join(', ')}`);
+        }
       }
 
       // Get metadata for progress reporting and extensions
@@ -311,7 +371,7 @@ export class MCPProtocolHandler {
           const entries = Object.entries(result);
           if (entries.length <= 5) { // Only for simple objects
             const textSummary = entries
-              .map(([key, value]) => `${key}: ${value}`)
+              .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
               .join('\n');
             
             content.unshift({
@@ -345,6 +405,37 @@ export class MCPProtocolHandler {
         error instanceof Error ? error.message : String(error)
       );
     }
+  }
+
+  /**
+   * Extract user information from request for admin validation
+   */
+  private extractUserInfo(req?: Request): { email?: string; id?: string; name?: string } | null {
+    if (!req) {
+      return null;
+    }
+
+    // Get user from OAuth validation (set by validateOAuthToken)
+    const user = (req as any).user;
+    if (user) {
+      return {
+        email: user.email,
+        id: user.id,
+        name: user.name
+      };
+    }
+
+    // Get user from session
+    const sessionUser = (req as any).session?.user;
+    if (sessionUser) {
+      return {
+        email: sessionUser.email,
+        id: sessionUser.id,
+        name: sessionUser.name
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -405,49 +496,7 @@ export class MCPProtocolHandler {
    * Validate OAuth token against stored sessions
    */
   private validateOAuthToken(token: string): { user: any; tokenInfo: any } | null {
-    try {
-      // In production, you'd use proper JWT validation
-      // For now, check if token exists in OAuth sessions
-      import('fs').then(async (fs) => {
-        import('path').then(async (path) => {
-          const sessionsPath = path.join(process.cwd(), 'data', 'oauth-sessions.json');
-          if (!fs.existsSync(sessionsPath)) {
-            return null;
-          }
-          
-          const sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf-8'));
-          const tokenData = sessions.tokens?.[token];
-          
-          if (!tokenData) {
-            return null;
-          }
-          
-          // Check if token is expired
-          const now = new Date();
-          const expiresAt = new Date(tokenData.accessTokenExpiresAt);
-          
-          if (now > expiresAt) {
-            console.warn('🕐 OAuth token expired:', token.substring(0, 10) + '...');
-            return null;
-          }
-          
-          return {
-            user: tokenData.user,
-            tokenInfo: {
-              scope: tokenData.scope,
-              expiresAt: tokenData.accessTokenExpiresAt,
-              client: tokenData.client
-            }
-          };
-        });
-      });
-    } catch (error) {
-      console.error('❌ Error validating OAuth token:', error);
-      return null;
-    }
-    
-    // Fallback for async nature - this needs to be synchronous
-    // Let me use a synchronous approach with proper ES module imports
+    // Use synchronous validation since this needs to return immediately
     return this.validateOAuthTokenSync(token);
   }
 
@@ -672,11 +721,12 @@ export function createMCPRouter() {
                 } 
             })
             .input(z.object({ 
-                name: z.string().min(1).optional().default('World').describe('The name to greet')
+                name: z.string().min(1).describe('The name to greet')
             }))
             .output(z.object({ greeting: z.string() }))
             .query(({ input }) => {
-                return { greeting: `Hello ${input.name}! Welcome to Simple RPC AI Backend.` };
+                const name = input.name || 'World'; // Handle missing parameter with default
+                return { greeting: `Hello ${name}! Welcome to Simple RPC AI Backend.` };
             }),
 
         // Echo tool with MCP metadata - requires basic MCP access
@@ -690,13 +740,14 @@ export function createMCPRouter() {
                 })
             })
             .input(z.object({
-                message: z.string().min(1).optional().default('Hello from MCP!').describe('Message to echo'),
-                transform: z.enum(['uppercase', 'lowercase', 'reverse', 'none']).default('none').describe('How to transform the message')
+                message: z.string().min(1).describe('Message to echo'),
+                transform: z.enum(['uppercase', 'lowercase', 'reverse', 'none']).describe('How to transform the message')
             }))
             .mutation(({ input }) => {
-                let result = input.message;
+                let result = input.message || 'Hello from MCP!'; // Handle missing parameter with default
+                const transform = input.transform || 'none'; // Handle missing transform with default
                 
-                switch (input.transform) {
+                switch (transform) {
                     case 'uppercase':
                         result = result.toUpperCase();
                         break;
@@ -767,25 +818,29 @@ export function createMCPRouter() {
                 })
             })
             .input(z.object({
-                expression: z.string().min(1).optional().default('2 + 2').describe('Mathematical expression (e.g., "2 + 3 * 4")'),
-                precision: z.number().min(0).max(10).default(2).describe('Decimal precision for results')
+                expression: z.string().min(1).describe('Mathematical expression (e.g., "2 + 3 * 4")'),
+                precision: z.number().min(0).max(10).describe('Decimal precision for results')
             }))
             .mutation(({ input }) => {
                 try {
+                    // Handle safe defaults in code
+                    const expression = input.expression || '2 + 2';
+                    const precision = input.precision ?? 2;
+                    
                     // Simple expression evaluator (for demo - in production use a proper math parser)
-                    const sanitized = input.expression.replace(/[^0-9+\-*/().\s]/g, '');
+                    const sanitized = expression.replace(/[^0-9+\-*/().\s]/g, '');
                     const result = Function('"use strict"; return (' + sanitized + ')')();
                     
                     if (typeof result !== 'number' || !isFinite(result)) {
                         throw new Error('Invalid mathematical expression');
                     }
 
-                    const rounded = Number(result.toFixed(input.precision));
+                    const rounded = Number(result.toFixed(precision));
                     
                     return {
-                        expression: input.expression,
+                        expression: expression,
                         result: rounded,
-                        formatted: `${input.expression} = ${rounded}`
+                        formatted: `${expression} = ${rounded}`
                     };
                 } catch (error) {
                     throw new Error(`Calculation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -795,10 +850,12 @@ export function createMCPRouter() {
         // Long-running task with progress support
         longRunningTask: publicProcedure
             .meta({
-                mcp: {
+                ...createMCPTool({
                     name: 'longRunningTask',
-                    description: 'Demonstrate a long-running task with progress reporting and cancellation support'
-                },
+                    description: 'Demonstrate a long-running task with progress reporting and cancellation support',
+                    category: 'utility',
+                    scopes: ScopeHelpers.mcpCall() // Requires mcp:call scope
+                }),
                 // Custom MCP extensions - handled by our MCP processor
                 mcpExtensions: {
                     supportsProgress: true,
@@ -912,10 +969,12 @@ export function createMCPRouter() {
         // Tool with cancellation support
         cancellableTask: publicProcedure
             .meta({
-                mcp: {
+                ...createMCPTool({
                     name: 'cancellableTask',
-                    description: 'A task that can be cancelled mid-execution'
-                },
+                    description: 'A task that can be cancelled mid-execution',
+                    category: 'utility',
+                    scopes: ScopeHelpers.mcpCall() // Requires mcp:call scope
+                }),
                 // Custom MCP extensions - handled by our MCP processor
                 mcpExtensions: {
                     supportsCancellation: true
@@ -948,10 +1007,12 @@ export function createMCPRouter() {
         // Cancel running task tool
         cancelTask: publicProcedure
             .meta({
-                mcp: {
+                ...createMCPTool({
                     name: 'cancelTask',
-                    description: 'Cancel a running task by its task ID'
-                }
+                    description: 'Cancel a running task by its task ID',
+                    category: 'utility',
+                    scopes: ScopeHelpers.mcpCall() // Requires mcp:call scope
+                })
             })
             .input(z.object({
                 taskId: z.string().min(1).optional().default('demo-task').describe('ID of the task to cancel')
@@ -990,10 +1051,12 @@ export function createMCPRouter() {
         // List running tasks tool
         listRunningTasks: publicProcedure
             .meta({
-                mcp: {
+                ...createMCPTool({
                     name: 'listRunningTasks',
-                    description: 'List all currently running tasks'
-                }
+                    description: 'List all currently running tasks',
+                    category: 'utility',
+                    scopes: ScopeHelpers.mcpCall() // Requires mcp:call scope
+                })
             })
             .input(z.object({
                 includeCompleted: z.boolean().default(false).describe('Include completed tasks in the list')
@@ -1072,7 +1135,7 @@ export function createMCPRouter() {
                 const action = input.action ?? 'check'; // Handle missing in code
                 return {
                     action: action,
-                    user: ctx.user ? `${ctx.user.email} (${ctx.user.subscriptionTier})` : 'Anonymous',
+                    user: ctx.user ? `${ctx.user.email} (${(ctx.user as any).name || 'user'})` : 'Anonymous',
                     hasApiKey: !!ctx.apiKey,
                     message: `Successfully executed ${action}`
                 };
@@ -1081,10 +1144,12 @@ export function createMCPRouter() {
         // Get progress for a specific task
         getTaskProgress: publicProcedure
             .meta({
-                mcp: {
+                ...createMCPTool({
                     name: 'getTaskProgress',
-                    description: 'Get real-time progress for a specific task'
-                }
+                    description: 'Get real-time progress for a specific task',
+                    category: 'utility',
+                    scopes: ScopeHelpers.mcpCall() // Requires mcp:call scope
+                })
             })
             .input(z.object({
                 taskId: z.string().min(1).optional().default('demo-task').describe('ID of the task to check progress for')
@@ -1130,20 +1195,28 @@ export function createMCPRouter() {
                 };
             }),
 
-        // Get authenticated user information from OAuth session
+        // Get authenticated user information from OAuth session (Admin only)
         getUserInfo: publicProcedure
             .meta({
                 ...createMCPTool({
                     name: 'getUserInfo',
-                    description: 'Get information about the authenticated user from OAuth session',
+                    description: 'Get information about the authenticated user from OAuth session (Admin only)',
                     category: 'auth',
-                    scopes: ScopeHelpers.mcpCall() // Requires mcp:call scope
+                    scopes: {
+                      anyOf: ['admin', 'mcp:admin'],
+                      description: 'Admin access required',
+                      namespace: 'admin',
+                      privileged: true,
+                      requireAdminUser: true  // This will be checked dynamically against adminUsers config
+                    }
                 })
             })
             .input(z.object({
-                includeTokenInfo: z.boolean().default(false).describe('Include token expiration and scopes')
+                includeTokenInfo: z.boolean().describe('Include token expiration and scopes')
             }))
             .query(({ input, ctx }) => {
+                // Handle missing parameter with default
+                const includeTokenInfo = input.includeTokenInfo ?? false;
                 // Extract user information from context (populated by OAuth middleware)
                 const req = (ctx as any)?.req;
                 
@@ -1172,7 +1245,7 @@ export function createMCPRouter() {
                 };
                 
                 // Add token information if requested
-                if (input.includeTokenInfo && tokenInfo) {
+                if (includeTokenInfo && tokenInfo) {
                     userInfo.token = {
                         scopes: tokenInfo.scope || [],
                         expiresAt: tokenInfo.accessTokenExpiresAt,

@@ -1,5 +1,5 @@
 {
-  "generated": "2025-09-03T19:32:18.668Z",
+  "generated": "2025-09-04T21:48:11.581Z",
   "version": "1.0.0",
   "description": "tRPC procedure documentation extracted from router",
   "procedures": {
@@ -17,16 +17,8 @@
         "description": null,
         "properties": {
           "message": {
-            "type": "ZodDefault",
-            "description": null,
-            "innerType": {
-              "type": "ZodOptional",
-              "description": null,
-              "innerType": {
-                "type": "ZodString",
-                "description": null
-              }
-            }
+            "type": "ZodString",
+            "description": "Message to echo back"
           }
         }
       },
@@ -736,16 +728,8 @@
         "description": null,
         "properties": {
           "name": {
-            "type": "ZodDefault",
-            "description": "The name to greet",
-            "innerType": {
-              "type": "ZodOptional",
-              "description": null,
-              "innerType": {
-                "type": "ZodString",
-                "description": null
-              }
-            }
+            "type": "ZodString",
+            "description": "The name to greet"
           }
         }
       },
@@ -793,24 +777,12 @@
         "description": null,
         "properties": {
           "message": {
-            "type": "ZodDefault",
-            "description": "Message to echo",
-            "innerType": {
-              "type": "ZodOptional",
-              "description": null,
-              "innerType": {
-                "type": "ZodString",
-                "description": null
-              }
-            }
+            "type": "ZodString",
+            "description": "Message to echo"
           },
           "transform": {
-            "type": "ZodDefault",
-            "description": "How to transform the message",
-            "innerType": {
-              "type": "ZodEnum",
-              "description": null
-            }
+            "type": "ZodEnum",
+            "description": "How to transform the message"
           }
         }
       },
@@ -876,24 +848,12 @@
         "description": null,
         "properties": {
           "expression": {
-            "type": "ZodDefault",
-            "description": "Mathematical expression (e.g., \"2 + 3 * 4\")",
-            "innerType": {
-              "type": "ZodOptional",
-              "description": null,
-              "innerType": {
-                "type": "ZodString",
-                "description": null
-              }
-            }
+            "type": "ZodString",
+            "description": "Mathematical expression (e.g., \"2 + 3 * 4\")"
           },
           "precision": {
-            "type": "ZodDefault",
-            "description": "Decimal precision for results",
-            "innerType": {
-              "type": "ZodNumber",
-              "description": null
-            }
+            "type": "ZodNumber",
+            "description": "Decimal precision for results"
           }
         }
       },
@@ -950,7 +910,17 @@
       "meta": {
         "mcp": {
           "name": "longRunningTask",
-          "description": "Demonstrate a long-running task with progress reporting and cancellation support"
+          "description": "Demonstrate a long-running task with progress reporting and cancellation support",
+          "category": "utility",
+          "scopes": {
+            "anyOf": [
+              "mcp:call",
+              "mcp:tools",
+              "mcp"
+            ],
+            "description": "Execute MCP tools",
+            "namespace": "mcp"
+          }
         },
         "mcpExtensions": {
           "supportsProgress": true,
@@ -982,7 +952,17 @@
       "meta": {
         "mcp": {
           "name": "cancellableTask",
-          "description": "A task that can be cancelled mid-execution"
+          "description": "A task that can be cancelled mid-execution",
+          "category": "utility",
+          "scopes": {
+            "anyOf": [
+              "mcp:call",
+              "mcp:tools",
+              "mcp"
+            ],
+            "description": "Execute MCP tools",
+            "namespace": "mcp"
+          }
         },
         "mcpExtensions": {
           "supportsCancellation": true
@@ -1017,7 +997,17 @@
       "meta": {
         "mcp": {
           "name": "cancelTask",
-          "description": "Cancel a running task by its task ID"
+          "description": "Cancel a running task by its task ID",
+          "category": "utility",
+          "scopes": {
+            "anyOf": [
+              "mcp:call",
+              "mcp:tools",
+              "mcp"
+            ],
+            "description": "Execute MCP tools",
+            "namespace": "mcp"
+          }
         }
       }
     },
@@ -1045,7 +1035,17 @@
       "meta": {
         "mcp": {
           "name": "listRunningTasks",
-          "description": "List all currently running tasks"
+          "description": "List all currently running tasks",
+          "category": "utility",
+          "scopes": {
+            "anyOf": [
+              "mcp:call",
+              "mcp:tools",
+              "mcp"
+            ],
+            "description": "Execute MCP tools",
+            "namespace": "mcp"
+          }
         }
       }
     },
@@ -1111,7 +1111,17 @@
       "meta": {
         "mcp": {
           "name": "getTaskProgress",
-          "description": "Get real-time progress for a specific task"
+          "description": "Get real-time progress for a specific task",
+          "category": "utility",
+          "scopes": {
+            "anyOf": [
+              "mcp:call",
+              "mcp:tools",
+              "mcp"
+            ],
+            "description": "Execute MCP tools",
+            "namespace": "mcp"
+          }
         }
       }
     },
@@ -1126,12 +1136,8 @@
         "description": null,
         "properties": {
           "includeTokenInfo": {
-            "type": "ZodDefault",
-            "description": "Include token expiration and scopes",
-            "innerType": {
-              "type": "ZodBoolean",
-              "description": null
-            }
+            "type": "ZodBoolean",
+            "description": "Include token expiration and scopes"
           }
         }
       },
@@ -1139,16 +1145,17 @@
       "meta": {
         "mcp": {
           "name": "getUserInfo",
-          "description": "Get information about the authenticated user from OAuth session",
+          "description": "Get information about the authenticated user from OAuth session (Admin only)",
           "category": "auth",
           "scopes": {
             "anyOf": [
-              "mcp:call",
-              "mcp:tools",
-              "mcp"
+              "admin",
+              "mcp:admin"
             ],
-            "description": "Execute MCP tools",
-            "namespace": "mcp"
+            "description": "Admin access required",
+            "namespace": "admin",
+            "privileged": true,
+            "requireAdminUser": true
           }
         }
       }
@@ -1162,6 +1169,7 @@
         "description": "Just a echo test endpoint",
         "category": "general",
         "type": "mutation",
+        "scopes": null,
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1202,6 +1210,9 @@
         "description": "Generate a friendly greeting message for a given name",
         "category": "utility",
         "type": "query",
+        "scopes": {
+          "description": "Public access - no authentication required"
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1242,6 +1253,15 @@
         "description": "Echo back a message with optional transformation",
         "category": "utility",
         "type": "mutation",
+        "scopes": {
+          "anyOf": [
+            "mcp:call",
+            "mcp:tools",
+            "mcp"
+          ],
+          "description": "Execute MCP tools",
+          "namespace": "mcp"
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1284,6 +1304,14 @@
         "description": "Get server status and information",
         "category": "system",
         "type": "query",
+        "scopes": {
+          "required": [
+            "system:read"
+          ],
+          "description": "System read access",
+          "namespace": "system",
+          "privileged": false
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1324,6 +1352,9 @@
         "description": "Perform basic mathematical calculations",
         "category": "utility",
         "type": "mutation",
+        "scopes": {
+          "description": "Public access - no authentication required"
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1364,8 +1395,17 @@
       "mcp.longRunningTask": {
         "title": "longRunningTask",
         "description": "Demonstrate a long-running task with progress reporting and cancellation support",
-        "category": "general",
+        "category": "utility",
         "type": "mutation",
+        "scopes": {
+          "anyOf": [
+            "mcp:call",
+            "mcp:tools",
+            "mcp"
+          ],
+          "description": "Execute MCP tools",
+          "namespace": "mcp"
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1406,8 +1446,17 @@
       "mcp.cancellableTask": {
         "title": "cancellableTask",
         "description": "A task that can be cancelled mid-execution",
-        "category": "general",
+        "category": "utility",
         "type": "mutation",
+        "scopes": {
+          "anyOf": [
+            "mcp:call",
+            "mcp:tools",
+            "mcp"
+          ],
+          "description": "Execute MCP tools",
+          "namespace": "mcp"
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1446,8 +1495,17 @@
       "mcp.cancelTask": {
         "title": "cancelTask",
         "description": "Cancel a running task by its task ID",
-        "category": "general",
+        "category": "utility",
         "type": "mutation",
+        "scopes": {
+          "anyOf": [
+            "mcp:call",
+            "mcp:tools",
+            "mcp"
+          ],
+          "description": "Execute MCP tools",
+          "namespace": "mcp"
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1486,8 +1544,17 @@
       "mcp.listRunningTasks": {
         "title": "listRunningTasks",
         "description": "List all currently running tasks",
-        "category": "general",
+        "category": "utility",
         "type": "query",
+        "scopes": {
+          "anyOf": [
+            "mcp:call",
+            "mcp:tools",
+            "mcp"
+          ],
+          "description": "Execute MCP tools",
+          "namespace": "mcp"
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1528,6 +1595,15 @@
         "description": "Demonstrate flexible MCP middleware patterns",
         "category": "admin",
         "type": "query",
+        "scopes": {
+          "anyOf": [
+            "admin",
+            "mcp:admin"
+          ],
+          "description": "Advanced MCP administration features",
+          "namespace": "mcp",
+          "privileged": true
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1566,8 +1642,17 @@
       "mcp.getTaskProgress": {
         "title": "getTaskProgress",
         "description": "Get real-time progress for a specific task",
-        "category": "general",
+        "category": "utility",
         "type": "query",
+        "scopes": {
+          "anyOf": [
+            "mcp:call",
+            "mcp:tools",
+            "mcp"
+          ],
+          "description": "Execute MCP tools",
+          "namespace": "mcp"
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
@@ -1605,9 +1690,19 @@
       },
       "mcp.getUserInfo": {
         "title": "getUserInfo",
-        "description": "Get information about the authenticated user from OAuth session",
+        "description": "Get information about the authenticated user from OAuth session (Admin only)",
         "category": "auth",
         "type": "query",
+        "scopes": {
+          "anyOf": [
+            "admin",
+            "mcp:admin"
+          ],
+          "description": "Admin access required",
+          "namespace": "admin",
+          "privileged": true,
+          "requireAdminUser": true
+        },
         "calling": {
           "mcp": {
             "endpoint": "http://localhost:8000/mcp",
