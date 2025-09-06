@@ -11,6 +11,7 @@ coverage/
 .nyc_output/
 
 # Environment files
+.env.oauth
 .env
 .env.*
 !.env.example
@@ -96,3 +97,8 @@ oauth-sessions.json
 auth-tokens*
 *.token
 *.tokens
+
+# OAuth tokens (development only)
+.oauth-tokens.json
+.oauth-tokens.encrypted
+.oauth-tokens-debug.json
