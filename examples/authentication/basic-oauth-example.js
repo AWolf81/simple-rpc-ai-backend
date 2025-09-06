@@ -166,7 +166,7 @@ async function main() {
   console.log('⚠️  Important: OAUTH_BASE_URL ensures Google redirects to the correct URL');
   console.log('');
   
-  console.log('💡 Perfect DX achieved with just oauth config in createRpcAiServer!');
+  console.log('💡 Good DX achieved with just oauth config in createRpcAiServer!');
   console.log('');
 }
 

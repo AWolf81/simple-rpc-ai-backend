@@ -5,8 +5,17 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { ErrorCode, McpError, LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { ScopeHelpers, ScopeValidator, DefaultScopes, createMCPTool, createAdminMCPTool, type MCPToolScope } from '../../auth/scopes.js';
 import { JWTMiddleware, type AuthenticatedRequest } from '../../auth/jwt-middleware.js';
+import { MCPRateLimiter, getDefaultRateLimiter, type MCPRateLimitConfig } from '../../security/rate-limiter.js';
+import { SecurityLogger, getDefaultSecurityLogger, type SecurityLoggerConfig } from '../../security/security-logger.js';
+import { AuthEnforcer, getDefaultAuthEnforcer, type AuthEnforcementConfig } from '../../security/auth-enforcer.js';
 import fs from 'fs';
 import path from 'path';
+
+export interface MCPAuthConfig {
+  requireAuthForToolsList?: boolean;
+  requireAuthForToolsCall?: boolean;  
+  publicTools?: string[];
+}
 
 export interface MCPRouterConfig {
   enableMCP?: boolean;
@@ -15,6 +24,22 @@ export interface MCPRouterConfig {
   defaultConfig?: any;
   adminUsers?: string[];
   jwtMiddleware?: JWTMiddleware;
+  rateLimiting?: MCPRateLimitConfig;
+  securityLogging?: SecurityLoggerConfig;
+  authEnforcement?: AuthEnforcementConfig;
+  auth?: MCPAuthConfig;
+  extensions?: {
+    prompts?: {
+      includeDefaults?: boolean;
+      customPrompts?: any[];
+      customTemplates?: Record<string, any>;
+    };
+    resources?: {
+      includeDefaults?: boolean;
+      customResources?: any[];
+      customHandlers?: Record<string, any>;
+    };
+  };
 }
 
 /**
@@ -23,15 +48,63 @@ export interface MCPRouterConfig {
  */
 export class MCPProtocolHandler {
   private appRouter: any;
-  private progressCallbacks: Map<string, (progress: number, total: number, message?: string) => void> = new Map();
-  private runningTasks: Map<string, { cancel: () => void; status: string; taskName: string }> = new Map();
   private adminUsers: string[];
   private jwtMiddleware?: JWTMiddleware;
+  private rateLimiter: MCPRateLimiter;
+  private securityLogger: SecurityLogger;
+  private authEnforcer: AuthEnforcer;
+  private authConfig: MCPAuthConfig;
+  private extensionsConfig?: MCPRouterConfig['extensions'];
 
   constructor(appRouter: any, config?: MCPRouterConfig) {
     this.appRouter = appRouter;
     this.adminUsers = config?.adminUsers || [];
     this.jwtMiddleware = config?.jwtMiddleware;
+    
+    // Initialize auth config with defaults
+    this.authConfig = {
+      requireAuthForToolsList: false,    // tools/list public by default
+      requireAuthForToolsCall: true,     // tools/call requires auth by default  
+      publicTools: ['greeting'],         // greeting is public by default
+      ...config?.auth
+    };
+    
+    // Initialize rate limiter with custom config or defaults
+    this.rateLimiter = config?.rateLimiting 
+      ? new MCPRateLimiter(config.rateLimiting)
+      : getDefaultRateLimiter();
+      
+    // Initialize security logger with custom config or defaults
+    this.securityLogger = config?.securityLogging 
+      ? new SecurityLogger(config.securityLogging)
+      : getDefaultSecurityLogger();
+      
+    // Initialize auth enforcer with custom config or defaults
+    this.authEnforcer = config?.authEnforcement 
+      ? new AuthEnforcer(config.authEnforcement)
+      : getDefaultAuthEnforcer();
+    
+    // Store extensions configuration
+    this.extensionsConfig = config?.extensions;
+    
+    // Debug: log extensions config
+    console.log('🔍 MCP Extensions Config:', {
+      hasExtensions: !!this.extensionsConfig,
+      prompts: this.extensionsConfig?.prompts ? {
+        hasCustomPrompts: !!this.extensionsConfig.prompts.customPrompts,
+        customPromptsCount: this.extensionsConfig.prompts.customPrompts?.length || 0,
+        customPrompts: this.extensionsConfig.prompts.customPrompts?.map(p => p.name) || []
+      } : null,
+      resources: this.extensionsConfig?.resources ? {
+        hasCustomResources: !!this.extensionsConfig.resources.customResources,
+        customResourcesCount: this.extensionsConfig.resources.customResources?.length || 0,
+        customResources: this.extensionsConfig.resources.customResources?.map(r => r.name) || []
+      } : null
+    });
+      
+    console.log('✅ Rate limiting: MCP rate limiter initialized');
+    console.log('✅ Security logging: MCP security logger initialized');
+    console.log('✅ Auth enforcement: MCP auth enforcer initialized');
   }
   
   /**
@@ -85,17 +158,67 @@ export class MCPProtocolHandler {
    * Setup MCP HTTP endpoint on Express app
    */
   setupMCPEndpoint(app: any, path: string = '/mcp') {
+    // Create security middleware only if enabled
+    const networkFilterMiddleware = this.securityLogger.createNetworkFilterMiddleware();
+    const mcpLoggingMiddleware = this.securityLogger.createMCPLoggingMiddleware();
+    const rateLimitMiddleware = this.rateLimiter.createMCPToolMiddleware();
+    const authEnforcementMiddleware = this.authEnforcer.createAuthEnforcementMiddleware();
+    
+    // Check if security features are disabled
+    const isRateLimitingDisabled = (this.rateLimiter as any).config?.enabled === false;
+    const isSecurityLoggingDisabled = (this.securityLogger as any).config?.enabled === false;
+    const isAuthEnforcementDisabled = (this.authEnforcer as any).config?.enabled === false;
+    
+    // Build middleware chain based on what's enabled
+    const middlewareChain: any[] = [];
+    
+    if (!isSecurityLoggingDisabled) {
+      middlewareChain.push(networkFilterMiddleware);
+      middlewareChain.push(mcpLoggingMiddleware);
+    }
+    
+    if (!isRateLimitingDisabled) {
+      middlewareChain.push(rateLimitMiddleware);
+    }
+    
+    if (!isAuthEnforcementDisabled) {
+      middlewareChain.push(authEnforcementMiddleware);
+    }
+    
     // Apply JWT middleware if configured
     if (this.jwtMiddleware) {
-      app.post(path, this.jwtMiddleware.authenticate, (req: AuthenticatedRequest, res: Response) => {
-        this.handleMCPRequest(req, res);
-      });
-      console.log(`✅ MCP endpoint ready at ${path} (with OpenSaaS JWT authentication)`);
+      middlewareChain.push(this.jwtMiddleware.authenticate);
+    }
+    
+    // Add the main handler
+    middlewareChain.push((req: AuthenticatedRequest, res: Response) => {
+      this.handleMCPRequest(req, res);
+    });
+    
+    // Apply all middleware
+    app.post(path, ...middlewareChain);
+    
+    // Log configuration
+    const enabledFeatures: string[] = [];
+    if (!isSecurityLoggingDisabled) enabledFeatures.push('security logging');
+    if (!isRateLimitingDisabled) enabledFeatures.push('rate limiting');
+    if (!isAuthEnforcementDisabled) enabledFeatures.push('auth enforcement');
+    if (this.jwtMiddleware) enabledFeatures.push('JWT auth');
+    
+    if (enabledFeatures.length === 0) {
+      console.log(`🧪 MCP endpoint ready at ${path} (ALL SECURITY DISABLED FOR TESTING)`);
+    } else if (this.jwtMiddleware) {
+      console.log(`✅ MCP endpoint ready at ${path} (with ${enabledFeatures.join(', ')})`);
     } else {
-      app.post(path, (req: AuthenticatedRequest, res: Response) => {
-        this.handleMCPRequest(req, res);
-      });
-      console.log(`✅ MCP endpoint ready at ${path}`);
+      console.log(`⚠️  MCP endpoint ready at ${path} (${enabledFeatures.join(', ')} enabled, NO JWT AUTH)`);
+      if (!isSecurityLoggingDisabled || !isRateLimitingDisabled || !isAuthEnforcementDisabled) {
+        console.log(`🔒 SECURITY WARNING: MCP authentication is disabled!`);
+        console.log(`   This allows unrestricted access to all MCP tools and data.`);
+        console.log(`   For production use, enable authentication by configuring:`);
+        console.log(`   • OpenSaaS JWT: Set opensaas.enabled = true with publicKey`);
+        console.log(`   • Or implement custom JWT middleware`);
+        console.log(`   • See docs: specs/features/mcp-oauth-authentication.md`);
+      }
     }
 
     app.options(path, (req: Request, res: Response) => {
@@ -103,6 +226,154 @@ export class MCPProtocolHandler {
       res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       res.status(200).send();
+    });
+    
+    // Add rate limiting status endpoint for debugging (admin only)
+    app.get(`${path}/rate-limit-status`, (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userInfo = req.user;
+        const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.userId);
+        
+        if (!isAdmin) {
+          return res.status(403).json({
+            error: 'Access denied. Admin privileges required.'
+          });
+        }
+        
+        const status = this.rateLimiter.getStatus();
+        res.json(status);
+      } catch (error) {
+        console.error('❌ Rate limiting: Failed to get status:', error);
+        res.status(500).json({
+          error: 'Internal server error'
+        });
+      }
+    });
+    
+    // Add security statistics endpoint (admin only)
+    app.get(`${path}/security-stats`, (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userInfo = req.user;
+        const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.userId);
+        
+        if (!isAdmin) {
+          return res.status(403).json({
+            error: 'Access denied. Admin privileges required.'
+          });
+        }
+        
+        const stats = this.securityLogger.getSecurityStats();
+        res.json(stats);
+      } catch (error) {
+        console.error('❌ Security logging: Failed to get stats:', error);
+        res.status(500).json({
+          error: 'Internal server error'
+        });
+      }
+    });
+    
+    // Add IP management endpoint (admin only)
+    app.post(`${path}/admin/block-ip`, (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userInfo = req.user;
+        const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.userId);
+        
+        if (!isAdmin) {
+          return res.status(403).json({
+            error: 'Access denied. Admin privileges required.'
+          });
+        }
+        
+        const { ip, reason, durationMinutes } = req.body;
+        if (!ip || !reason) {
+          return res.status(400).json({
+            error: 'IP address and reason are required'
+          });
+        }
+        
+        this.securityLogger.blockIP(ip, reason, durationMinutes || 60);
+        res.json({ success: true, message: `IP ${ip} blocked` });
+      } catch (error) {
+        console.error('❌ Security logging: Failed to block IP:', error);
+        res.status(500).json({
+          error: 'Internal server error'
+        });
+      }
+    });
+    
+    app.post(`${path}/admin/unblock-ip`, (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userInfo = req.user;
+        const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.userId);
+        
+        if (!isAdmin) {
+          return res.status(403).json({
+            error: 'Access denied. Admin privileges required.'
+          });
+        }
+        
+        const { ip } = req.body;
+        if (!ip) {
+          return res.status(400).json({
+            error: 'IP address is required'
+          });
+        }
+        
+        const wasBlocked = this.securityLogger.unblockIP(ip);
+        res.json({ 
+          success: true, 
+          message: wasBlocked ? `IP ${ip} unblocked` : `IP ${ip} was not blocked`
+        });
+      } catch (error) {
+        console.error('❌ Security logging: Failed to unblock IP:', error);
+        res.status(500).json({
+          error: 'Internal server error'
+        });
+      }
+    });
+    
+    // Add auth enforcement statistics endpoint (admin only)
+    app.get(`${path}/auth-stats`, (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userInfo = req.user;
+        const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.userId);
+        
+        if (!isAdmin) {
+          return res.status(403).json({
+            error: 'Access denied. Admin privileges required.'
+          });
+        }
+        
+        const stats = this.authEnforcer.getUsageStatistics();
+        res.json(stats);
+      } catch (error) {
+        console.error('❌ Auth enforcement: Failed to get stats:', error);
+        res.status(500).json({
+          error: 'Internal server error'
+        });
+      }
+    });
+    
+    // Add resource usage endpoint (admin only)
+    app.get(`${path}/resource-usage`, (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userInfo = req.user;
+        const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.userId);
+        
+        if (!isAdmin) {
+          return res.status(403).json({
+            error: 'Access denied. Admin privileges required.'
+          });
+        }
+        
+        const usage = this.authEnforcer.getUsageStatistics();
+        res.json(usage);
+      } catch (error) {
+        console.error('❌ Auth enforcement: Failed to get resource usage:', error);
+        res.status(500).json({
+          error: 'Internal server error'
+        });
+      }
     });
   }
 
@@ -133,6 +404,18 @@ export class MCPProtocolHandler {
           break;
         case 'tools/call':
           response = await this.handleToolsCall(mcpRequest, req);
+          break;
+        case 'prompts/list':
+          response = await this.handlePromptsList(mcpRequest, req);
+          break;
+        case 'prompts/get':
+          response = await this.handlePromptsGet(mcpRequest, req);
+          break;
+        case 'resources/list':
+          response = await this.handleResourcesList(mcpRequest, req);
+          break;
+        case 'resources/read':
+          response = await this.handleResourcesRead(mcpRequest, req);
           break;
         case 'notifications/cancelled':
           response = this.handleCancellation(mcpRequest);
@@ -216,6 +499,25 @@ export class MCPProtocolHandler {
    */
   private async handleToolsList(request: any, req?: AuthenticatedRequest) {
     try {
+      // Check if authentication is required for tools/list
+      if (this.authConfig.requireAuthForToolsList) {
+        // First extract user scopes (this processes OAuth tokens and sets user info)
+        const userScopes = this.extractUserScopes(req);
+        const userInfo = this.extractUserInfo(req);
+        const hasValidToken = userInfo !== null && userInfo !== undefined;
+        const authHeaderPresent = req?.headers?.authorization?.startsWith('Bearer ') || false;
+        
+        // If an auth header is present but token is invalid, fail immediately
+        if (authHeaderPresent && !hasValidToken) {
+          throw new Error('Invalid or expired authentication token');
+        }
+        
+        // If no auth header and authentication is required, fail
+        if (!authHeaderPresent && !hasValidToken) {
+          throw new Error('Authentication required to list tools');
+        }
+      }
+      
       const allTools = this.extractMCPToolsFromTRPC();
       
       // Extract user scopes from the request (if authenticated)
@@ -289,9 +591,31 @@ export class MCPProtocolHandler {
         throw new Error(`Tool '${name}' not found`);
       }
 
-      // Check scope permissions and admin restrictions before execution
-      const userScopes = this.extractUserScopes(req);
-      const userInfo = this.extractUserInfo(req);
+      // Get authentication info - validate OAuth token once and use result for both scopes and user info
+      let userInfo: { email?: string; id?: string; name?: string } | null = null;
+      let userScopes: string[] = [];
+      
+      // Extract OAuth token validation result
+      if (req?.headers?.authorization?.startsWith('Bearer ')) {
+        const token = req.headers.authorization.substring(7);
+        try {
+          const validationResult = this.validateOAuthToken(token);
+          if (validationResult) {
+            userInfo = validationResult.user;
+            userScopes = validationResult.tokenInfo.scope || [];
+          }
+        } catch (error) {
+          console.warn('⚠️ OAuth token validation failed:', error);
+        }
+      }
+      
+      // Fallback to existing methods if OAuth validation didn't work
+      if (!userInfo) {
+        userInfo = this.extractUserInfo(req);
+      }
+      if (userScopes.length === 0) {
+        userScopes = this.extractUserScopes(req);
+      }
       
       console.log('🔍 Debug - Tool scope check:', {
         toolName: name,
@@ -303,7 +627,24 @@ export class MCPProtocolHandler {
         isAdmin: this.isAdminUser(userInfo?.email, userInfo?.id)
       });
       
-      if (tool.scopes) {
+      // Check if tool is public (no authentication required)
+      const isPublicTool = this.authConfig.publicTools?.includes(name);
+      
+      // For protected tools, check authentication BEFORE checking scopes
+      if (tool.scopes && !isPublicTool) {
+        // Security: Check authentication first - don't reveal scope requirements for invalid tokens  
+        const hasValidToken = userInfo !== null && userInfo !== undefined;
+        const authHeaderPresent = req?.headers?.authorization?.startsWith('Bearer ') || false;
+        
+        // If an auth header is present but token is invalid, fail immediately
+        if (authHeaderPresent && !hasValidToken) {
+          throw new Error('Invalid or expired authentication token');
+        }
+        
+        // If no auth header and tool requires authentication, fail with generic message
+        if (!authHeaderPresent && !hasValidToken) {
+          throw new Error('Authentication required to access this tool');
+        }
         // Check if this tool requires admin user validation
         const requiresAdminUser = tool.scopes.requireAdminUser;
         
@@ -315,7 +656,7 @@ export class MCPProtocolHandler {
           }
         }
         
-        // Then check scope requirements
+        // Then check scope requirements (user is already authenticated at this point)
         if (!ScopeValidator.hasScope(userScopes, tool.scopes, userInfo || undefined)) {
           const missing = ScopeValidator.getMissingScopes(userScopes, tool.scopes);
           
@@ -328,6 +669,7 @@ export class MCPProtocolHandler {
             adminUsersConfigured: this.adminUsers.length > 0
           });
           
+          // User is authenticated but lacks required scopes - safe to tell them what's missing
           throw new Error(`Insufficient permissions. Missing scopes: ${missing.missing.join(', ')}`);
         }
       }
@@ -337,6 +679,9 @@ export class MCPProtocolHandler {
       const mcpExtensions = meta?.mcpExtensions;
       const progressToken = _meta?.progressToken;
       
+      // Sanitize input parameters to prevent command injection
+      const sanitizedArgs = this.validateToolInputs(name, args || {});
+      
       // Execute the tRPC procedure with progress support and user context
       const userContext = {
         user: (req as any)?.user || null,
@@ -344,7 +689,7 @@ export class MCPProtocolHandler {
         req: req || null,
         res: null // Not available in this context
       };
-      const result = await this.executeTRPCProcedure(tool, args || {}, progressToken, mcpExtensions, userContext);
+      const result = await this.executeTRPCProcedure(tool, sanitizedArgs, progressToken, mcpExtensions, userContext);
 
       // Format response based on result type
       let content: any[];
@@ -403,6 +748,216 @@ export class MCPProtocolHandler {
         ErrorCode.InternalError,
         'Tool execution failed',
         error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  /**
+   * Handle prompts/list method - list available prompts
+   */
+  private async handlePromptsList(request: any, req?: AuthenticatedRequest) {
+    try {
+      // Check authentication if required
+      if (this.authConfig.requireAuthForToolsList) {
+        const userInfo = this.extractUserInfo(req);
+        const hasValidToken = userInfo !== null && userInfo !== undefined;
+        const authHeaderPresent = req?.headers?.authorization?.startsWith('Bearer ') || false;
+        
+        if (authHeaderPresent && !hasValidToken) {
+          throw new Error('Invalid or expired authentication token');
+        }
+        
+        if (!authHeaderPresent && !hasValidToken) {
+          throw new Error('Authentication required to list prompts');
+        }
+      }
+
+      // Get prompts from extensions config
+      const promptsConfig = this.extensionsConfig?.prompts;
+      const prompts: any[] = [];
+      
+      if (promptsConfig?.customPrompts) {
+        for (const customPrompt of promptsConfig.customPrompts) {
+          prompts.push({
+            name: customPrompt.name,
+            description: customPrompt.description,
+            arguments: customPrompt.arguments || []
+          });
+        }
+      }
+      
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: { prompts }
+      };
+    } catch (error: any) {
+      console.error('❌ MCP prompts/list error:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        `Failed to list prompts: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Handle prompts/get method - get specific prompt template
+   */
+  private async handlePromptsGet(request: any, req?: AuthenticatedRequest) {
+    try {
+      const { name, arguments: args } = request.params;
+      
+      if (!name) {
+        throw new Error('Prompt name is required');
+      }
+
+      // Get prompt template from extensions config
+      const promptsConfig = this.extensionsConfig?.prompts;
+      if (!promptsConfig?.customTemplates) {
+        throw new Error(`Prompt '${name}' not found - no custom templates configured`);
+      }
+
+      const template = promptsConfig.customTemplates[name];
+      if (!template) {
+        throw new Error(`Prompt '${name}' not found in custom templates`);
+      }
+
+      // Replace template variables with provided arguments
+      let processedTemplate = { ...template };
+      if (args && template.messages) {
+        processedTemplate.messages = template.messages.map((message: any) => {
+          if (message.content && typeof message.content.text === 'string') {
+            let text = message.content.text;
+            // Replace {{variable}} placeholders with argument values
+            Object.entries(args).forEach(([key, value]) => {
+              text = text.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value));
+            });
+            return {
+              ...message,
+              content: {
+                ...message.content,
+                text
+              }
+            };
+          }
+          return message;
+        });
+      }
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: processedTemplate
+      };
+      
+    } catch (error: any) {
+      console.error('❌ MCP prompts/get error:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InvalidParams,
+        `Failed to get prompt: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Handle resources/list method - list available resources
+   */
+  private async handleResourcesList(request: any, req?: AuthenticatedRequest) {
+    try {
+      // Check authentication if required (similar to tools/list)
+      if (this.authConfig.requireAuthForToolsList) {
+        const userInfo = this.extractUserInfo(req);
+        const hasValidToken = userInfo !== null && userInfo !== undefined;
+        const authHeaderPresent = req?.headers?.authorization?.startsWith('Bearer ') || false;
+        
+        if (authHeaderPresent && !hasValidToken) {
+          throw new Error('Invalid or expired authentication token');
+        }
+        
+        if (!authHeaderPresent && !hasValidToken) {
+          throw new Error('Authentication required to list resources');
+        }
+      }
+
+      // Get resources from extensions config
+      const resourcesConfig = this.extensionsConfig?.resources;
+      const resources: any[] = [];
+      
+      if (resourcesConfig?.customResources) {
+        for (const customResource of resourcesConfig.customResources) {
+          resources.push({
+            uri: customResource.uri,
+            name: customResource.name,
+            description: customResource.description,
+            mimeType: customResource.mimeType
+          });
+        }
+      }
+      
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: { resources }
+      };
+    } catch (error: any) {
+      console.error('❌ MCP resources/list error:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        `Failed to list resources: ${error.message}`
+      );
+    }
+  }
+
+
+  /**
+   * Handle resources/read method - read specific resource content
+   */
+  private async handleResourcesRead(request: any, req?: AuthenticatedRequest) {
+    try {
+      const { uri } = request.params;
+      
+      if (!uri) {
+        throw new Error('Resource URI is required');
+      }
+
+      // Get resource handler from extensions config
+      const resourcesConfig = this.extensionsConfig?.resources;
+      if (!resourcesConfig?.customHandlers) {
+        throw new Error(`Resource '${uri}' not found - no custom handlers configured`);
+      }
+
+      // Extract resource name from URI (e.g., 'file://company-handbook.json' -> 'company-handbook.json')
+      const resourceName = uri.replace(/^file:\/\//, '').replace(/^https?:\/\/[^\/]+\//, '');
+      
+      const handler = resourcesConfig.customHandlers[resourceName];
+      if (!handler || typeof handler !== 'function') {
+        throw new Error(`Resource handler for '${resourceName}' not found`);
+      }
+
+      // Execute the handler to get resource content
+      const content = await handler();
+      
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          contents: [{
+            uri: uri,
+            mimeType: 'application/json', // Default to JSON, could be dynamic based on resource
+            text: typeof content === 'string' ? content : JSON.stringify(content, null, 2)
+          }]
+        }
+      };
+      
+    } catch (error: any) {
+      console.error('❌ MCP resources/read error:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InvalidParams,
+        `Failed to read resource: ${error.message}`
       );
     }
   }
@@ -558,6 +1113,113 @@ export class MCPProtocolHandler {
   }
 
   /**
+   * Sanitize tool descriptions to prevent prompt injection attacks
+   */
+  private sanitizeDescription(description: string): string {
+    if (!description || typeof description !== 'string') {
+      return description;
+    }
+
+    const maliciousPatterns = [
+      /{{.*?}}/g,                    // Template injection
+      /SYSTEM\s*:/gi,                // System instruction overrides
+      /ignore\s+.*?previous/gi,      // Instruction overrides
+      /execute\s+.*?command/gi,      // Command execution
+      /curl\s+.*?POST/gi,            // Data exfiltration patterns
+      /\$\(.*?\)/g,                  // Command substitution
+      /`.*?`/g,                      // Backtick execution
+      /eval\s*\(/gi,                 // Code evaluation
+      /exec\s*\(/gi,                 // Code execution
+      /<script.*?>/gi,               // Script injection
+      /javascript\s*:/gi,            // JavaScript URLs
+      /data\s*:\s*text\/html/gi,     // Data URLs
+    ];
+    
+    let sanitized = description;
+    maliciousPatterns.forEach(pattern => {
+      sanitized = sanitized.replace(pattern, '[FILTERED_CONTENT]');
+    });
+    
+    // Limit description length
+    if (sanitized.length > 500) {
+      sanitized = sanitized.substring(0, 500) + '...';
+    }
+    
+    return sanitized;
+  }
+
+  /**
+   * Validate and sanitize tool input parameters to prevent command injection
+   */
+  private validateToolInputs(toolName: string, args: any): any {
+    if (!args) return {};
+    
+    // Recursive sanitization of parameters
+    const sanitizeValue = (value: any, depth: number = 0): any => {
+      // Prevent deep recursion attacks
+      if (depth > 10) {
+        return '[MAX_DEPTH_EXCEEDED]';
+      }
+
+      if (typeof value === 'string') {
+        // Remove dangerous command patterns and limit length
+        return value
+          .replace(/[`$();|&<>]/g, '')     // Shell metacharacters
+          .replace(/\.\./g, '')            // Directory traversal
+          .replace(/eval\s*\(/gi, '')      // Code evaluation
+          .replace(/exec\s*\(/gi, '')      // Code execution
+          .replace(/system\s*\(/gi, '')    // System calls
+          .replace(/require\s*\(/gi, '')   // Module loading
+          .replace(/import\s+/gi, '')      // ES6 imports
+          // Dangerous command patterns (remove entire commands)
+          .replace(/rm\s+-rf\s*[\/\*\~\$]/gi, '[FILTERED]')  // rm -rf dangerous paths
+          .replace(/\brm\s+.*[\/\*]/gi, '[FILTERED]')  // rm with wildcards or paths
+          .replace(/\bcat\s+\/etc\/passwd/gi, '[FILTERED]')  // passwd reading
+          .replace(/\bnc\s+\w+\.\w+/gi, '[FILTERED]')  // netcat connections
+          .replace(/\bwget\s+http/gi, '[FILTERED]')     // wget downloads
+          .replace(/\bcurl\s+\S+/gi, '[FILTERED]')      // curl downloads
+          // System instruction injection patterns
+          .replace(/SYSTEM\s*:/gi, '[FILTERED]')  // System overrides
+          .replace(/ignore\s+.*previous/gi, '[FILTERED]')  // Instruction ignoring
+          .replace(/\{\{.*?\}\}/g, '[FILTERED]')  // Template injection
+          .replace(/INSTRUCTION_INJECTION/gi, '[FILTERED]') // Instruction injection
+          .replace(/SYSTEM_OVERRIDE/gi, '[FILTERED]') // System override attempts
+          .substring(0, 2000);             // Limit string length
+      }
+      
+      if (typeof value === 'object' && value !== null) {
+        if (Array.isArray(value)) {
+          // Limit array size and sanitize elements
+          return value.slice(0, 100).map(item => sanitizeValue(item, depth + 1));
+        } else {
+          // Limit object properties and sanitize values
+          const sanitized: any = {};
+          const keys = Object.keys(value).slice(0, 50); // Limit properties
+          keys.forEach(key => {
+            const sanitizedKey = key.replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 100);
+            if (sanitizedKey) {
+              sanitized[sanitizedKey] = sanitizeValue(value[key], depth + 1);
+            }
+          });
+          return sanitized;
+        }
+      }
+      
+      // Numbers, booleans pass through unchanged
+      return value;
+    };
+    
+    const sanitizedArgs = sanitizeValue(args);
+    
+    // Log potential security issues
+    if (JSON.stringify(sanitizedArgs) !== JSON.stringify(args)) {
+      console.warn(`🔒 MCP Security: Sanitized potentially dangerous input for tool '${toolName}'`);
+    }
+    
+    return sanitizedArgs;
+  }
+
+  /**
    * Extract MCP tools from tRPC procedures with MCP metadata
    */
   private extractMCPToolsFromTRPC(): Array<{ name: string; description: string; inputSchema: any; procedure: any; scopes?: any }> {
@@ -578,12 +1240,18 @@ export class MCPProtocolHandler {
         if (meta?.mcp) {
           const inputSchema = this.extractInputSchema(procedureAny);
           
-          // Remove router prefix if present (e.g., 'mcp.hello' -> 'hello')
-          const toolName = fullName.includes('.') ? fullName.split('.').pop()! : fullName;
+          // Use the MCP tool name if specified, otherwise use the procedure name
+          const mcpToolName = meta.mcp.name;
+          const procedureName = fullName.includes('.') ? fullName.split('.').pop()! : fullName;
+          const toolName = mcpToolName || procedureName;
+          
+          // Sanitize tool description to prevent prompt injection
+          const rawDescription = meta.mcp.description || `Execute ${toolName}`;
+          const sanitizedDescription = this.sanitizeDescription(rawDescription);
           
           tools.push({
             name: toolName,
-            description: meta.mcp.description || `Execute ${toolName}`,
+            description: sanitizedDescription,
             inputSchema,
             procedure: procedureAny,
             scopes: meta.mcp.scopes // Include scope requirements
@@ -701,33 +1369,48 @@ export class MCPProtocolHandler {
   }
 }
 
-export function createMCPRouter() {
+export function createMCPRouter(config?: MCPRouterConfig) {
     return router({
         // Greeting tool with MCP metadata - Public tool (no auth required)
-        hello: publicProcedure
-            .meta({ 
-                ...createMCPTool({
-                    name: 'greeting',
-                    description: 'Generate a friendly greeting message for a given name',
-                    category: 'utility',
-                    public: true // No authentication required
-                }),
-                openapi: { 
-                    method: 'GET', 
-                    path: '/mcp/hello', 
-                    tags: ['MCP', 'Greetings'], 
-                    summary: 'Generate greeting',
-                    description: 'Generate a friendly greeting message for a given name'
-                } 
-            })
-            .input(z.object({ 
-                name: z.string().min(1).describe('The name to greet')
-            }))
-            .output(z.object({ greeting: z.string() }))
-            .query(({ input }) => {
-                const name = input.name || 'World'; // Handle missing parameter with default
-                return { greeting: `Hello ${name}! Welcome to Simple RPC AI Backend.` };
+        greeting: publicProcedure
+          .meta({ 
+            ...createMCPTool({
+              name: 'greeting',
+              description: 'Generate a friendly greeting message for a given name in multiple languages',
+              category: 'utility',
+              public: true // No authentication required
             }),
+            openapi: { 
+              method: 'GET', 
+              path: '/mcp/hello', 
+              tags: ['MCP', 'Greetings'], 
+              summary: 'Generate greeting',
+              description: 'Generate a friendly greeting message for a given name'
+            } 
+          })
+          .input(z.object({ 
+            name: z.string().min(1).describe('The name to greet'),
+            language: z.enum(['en', 'de', 'es']).describe('Language code for the greeting (en=English, de=German, es=Spanish)'),
+          }))
+          .output(z.object({ greeting: z.string() }))
+          .query(({ input }) => {
+            const name = input.name || 'World'; 
+            const lang = input.language || 'en';
+
+            let greeting: string;
+            switch (lang) {
+              case 'de':
+                greeting = `Hallo ${name}! Willkommen beim Simple RPC AI Backend.`;
+                break;
+              case 'es':
+                greeting = `¡Hola ${name}! Bienvenido al Simple RPC AI Backend.`;
+                break;
+              default:
+                greeting = `Hello ${name}! Welcome to Simple RPC AI Backend.`;
+            }
+
+            return { greeting };
+          }),
 
         // Echo tool with MCP metadata - requires basic MCP access
         echo: publicProcedure

@@ -507,7 +507,7 @@ describe('error handling and edge cases', () => {
     expect(result.success).toBe(true);
     expect(result.results).toHaveLength(3);
     expect(result.results![0].title).toBe('Result 1');
-    expect(result.results![1].excerpt).toBe('...');
+    expect(result.results![1].excerpt).toBe('No search result...');
   });
 
   it('should determine result types correctly', async () => {

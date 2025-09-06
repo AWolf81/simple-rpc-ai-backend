@@ -106,6 +106,7 @@ const t = initTRPC
  */
 export const router = t.router;
 export const publicProcedure = t.procedure;
+export const mergeRouters = t.mergeRouters;
 /**
  * Protected procedure - requires valid JWT authentication
  */

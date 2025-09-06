@@ -161,6 +161,7 @@ const t = initTRPC
  */
 export const router: typeof t.router = t.router;
 export const publicProcedure: typeof t.procedure = t.procedure;
+export const mergeRouters: typeof t.mergeRouters = t.mergeRouters;
 
 /**
  * Protected procedure - requires valid JWT authentication

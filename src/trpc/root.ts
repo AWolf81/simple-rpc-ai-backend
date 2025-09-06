@@ -29,8 +29,19 @@ export function createAppRouter(
   mcpConfig?: MCPRouterConfig
 ) {
   // Create the MCP router and extract its SDK integration
+  
+  // Debug: log MCP config in createAppRouter
+  console.log('🔍 createAppRouter MCP Config (Call #' + Math.random().toString(36).substr(2, 5) + '):', {
+    hasMcpConfig: !!mcpConfig,
+    extensions: mcpConfig?.extensions ? {
+      hasPrompts: !!mcpConfig.extensions.prompts,
+      hasResources: !!mcpConfig.extensions.resources,
+      promptsConfig: mcpConfig.extensions.prompts,
+      resourcesConfig: mcpConfig.extensions.resources
+    } : null
+  });
 
-  const mcpRouter = createMCPRouter();
+  const mcpRouter = createMCPRouter(mcpConfig);
 
   console.log("MCP enabled?", mcpConfig?.enableMCP); // todo add handling
 

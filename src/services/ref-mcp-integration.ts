@@ -358,7 +358,7 @@ export class RefMCPIntegration {
       title: result.title || result.filename || `Result ${index + 1}`,
       url: result.url,
       filePath: result.file_path,
-      excerpt: result.excerpt || result.content?.substring(0, 200) + '...',
+      excerpt: result.excerpt || (result.content || 'No search result').substring(0, 200) + '...',
       relevanceScore: result.score || (1 - index * 0.1),
       type: this.determineResultType(result),
       source: this.determineResultSource(result, scope),

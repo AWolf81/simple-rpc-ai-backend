@@ -11,8 +11,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as trpcExpress from '@trpc/server/adapters/express';
+import { createTRPCContext, mergeRouters, router } from './trpc/index.js';
 import { createAppRouter } from './trpc/root.js';
-import { createTRPCContext } from './trpc/index.js';
 import { JWTMiddleware } from './auth/jwt-middleware.js';
 import { PostgreSQLAdapter } from './database/postgres-adapter.js';
 import { VirtualTokenService } from './services/virtual-token-service.js';
@@ -21,6 +21,7 @@ import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods.js';
 import { RPC_METHODS } from './constants.js';
 import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge.js';
 import { createOAuthServer, initializeOAuthServer, closeOAuthServer } from './auth/oauth-middleware.js';
+import { getTestSafeConfig } from './security/test-helpers.js';
 export class RpcAiServer {
     app;
     server;
@@ -67,6 +68,8 @@ export class RpcAiServer {
         return { jsonRpc: true, tRpc: false };
     }
     constructor(config = {}) {
+        // Apply test-safe configuration if in test environment
+        config = getTestSafeConfig(config);
         // Opinionated protocol defaults
         const protocols = this.getOpinionatedProtocols(config.protocols);
         // Set smart defaults
@@ -163,8 +166,18 @@ export class RpcAiServer {
                 requireAuthForAllMethods: false
             });
         }
+        // Debug: log MCP config before passing to router
+        console.log('🔍 RPC Server MCP Config:', {
+            hasMcpConfig: !!this.config.mcp,
+            extensions: this.config.mcp?.extensions ? {
+                hasPrompts: !!this.config.mcp.extensions.prompts,
+                hasResources: !!this.config.mcp.extensions.resources,
+                promptsConfig: this.config.mcp.extensions.prompts,
+                resourcesConfig: this.config.mcp.extensions.resources
+            } : null
+        });
         // Create router with AI configuration and token tracking
-        this.router = createAppRouter(this.config.aiLimits, this.config.tokenTracking.enabled || false, this.dbAdapter, this.config.serverProviders, this.config.byokProviders, this.postgresRPCMethods);
+        this.router = createAppRouter(this.config.aiLimits, this.config.tokenTracking.enabled || false, this.dbAdapter, this.config.serverProviders, this.config.byokProviders, this.postgresRPCMethods, this.config.mcp);
         // Initialize tRPC to JSON-RPC bridge (if JSON-RPC is enabled)
         if (this.config.protocols.jsonRpc) {
             this.jsonRpcBridge = createTRPCToJSONRPCBridge(this.router);
@@ -692,7 +705,12 @@ export class RpcAiServer {
             }
             const httpHandler = new MCPProtocolHandler(this.router, {
                 adminUsers: this.config.mcp?.adminUsers,
-                jwtMiddleware: mcpJwtMiddleware
+                jwtMiddleware: mcpJwtMiddleware,
+                auth: this.config.mcp?.auth,
+                rateLimiting: this.config.mcp?.rateLimiting,
+                securityLogging: this.config.mcp?.securityLogging,
+                authEnforcement: this.config.mcp?.authEnforcement,
+                extensions: this.config.mcp?.extensions
             });
             httpHandler.setupMCPEndpoint(this.app, '/mcp');
             enabledTransports.push('HTTP');
@@ -729,9 +747,11 @@ export class RpcAiServer {
         }
         // Setup routes (including OAuth routes)
         await this.setupRoutes();
-        // Setup MCP endpoint (always enabled for SDK integration)
-        // Setup new router-based MCP server with HTTP transport
-        await this.setupMCPServer();
+        // Setup MCP endpoint (only if enabled in config)
+        if (this.config.mcp.enableMCP) {
+            // Setup new router-based MCP server with HTTP transport
+            await this.setupMCPServer();
+        }
         if (setupRoutes) {
             setupRoutes(this.app);
         }
@@ -807,6 +827,92 @@ export class RpcAiServer {
     }
     getRouter() {
         return this.router;
+    }
+    /**
+     * Completely replace the current router with a new one.
+     *
+     * WARNING: This replaces ALL existing routes including AI and MCP routers.
+     * If you need MCP tools to be discoverable, ensure your new router includes
+     * procedures with MCP metadata (using .meta({ mcp: {...} })).
+     *
+     * For adding routes, consider using mergeRouters() instead.
+     *
+     * @param newRouter - The router to replace the current router with
+     *
+     * Example:
+     * const newRouter = router({
+     *   greeting: publicProcedure
+     *     .meta({ mcp: { description: 'Say hello' } })
+     *     .input(z.object({ name: z.string() }))
+     *     .query(({ input }) => `Hello, ${input.name}!`)
+     * });
+     * server.setRouter(newRouter);
+     */
+    setRouter(newRouter) {
+        this.router = newRouter;
+    }
+    /**
+     * Merge routers using tRPC's built-in mergeRouters with optional namespace support.
+     *
+     * @param routerOrNamespace - Either a router to merge, or a namespace string if namespace is provided
+     * @param namespaceOrRouters - If first param is string, this is the routers array. Otherwise, additional routers.
+     *
+     * Examples:
+     * - server.mergeRouters(router1, router2) - Merge to root
+     * - server.mergeRouters(router, 'mcp') - Merge router under 'mcp' namespace
+     * - server.mergeRouters('mcp', router1, router2) - Merge multiple routers under 'mcp' namespace
+     *
+     * tRPC automatically flattens nested router structures, so:
+     * - router({ mcp: { greeting: procedure } }) becomes procedure key "mcp.greeting"
+     * - Multiple routers with different namespaces merge without conflicts
+     */
+    mergeRouters(routerOrNamespace, ...namespaceOrRouters) {
+        if (typeof routerOrNamespace === 'string') {
+            // First param is namespace string - format: mergeRouters('namespace', router1, router2, ...)
+            const namespace = routerOrNamespace;
+            const routersToMerge = namespaceOrRouters;
+            if (routersToMerge.length === 0) {
+                throw new Error('At least one router must be provided when using namespace');
+            }
+            // Create a namespaced router structure
+            const namespacedRouter = router({
+                [namespace]: routersToMerge.length === 1
+                    ? routersToMerge[0]
+                    : mergeRouters(...routersToMerge)
+            });
+            this.router = mergeRouters(this.router, namespacedRouter);
+        }
+        else {
+            // First param is a router - check if second param is namespace string
+            const firstRouter = routerOrNamespace;
+            if (namespaceOrRouters.length === 1 && typeof namespaceOrRouters[0] === 'string') {
+                // Format: mergeRouters(router, 'namespace')
+                const namespace = namespaceOrRouters[0];
+                const namespacedRouter = router({
+                    [namespace]: firstRouter
+                });
+                this.router = mergeRouters(this.router, namespacedRouter);
+            }
+            else {
+                // Format: mergeRouters(router1, router2, ...) - merge to root
+                const allRouters = [firstRouter, ...namespaceOrRouters];
+                this.router = mergeRouters(this.router, ...allRouters);
+            }
+        }
+    }
+    /**
+     * Helper method to extend the existing 'mcp' router with additional procedures.
+     * This merges procedures into the existing mcp router for MCP tool exposure.
+     *
+     * @param mcpRouter - Router containing procedures with MCP metadata to merge into existing mcp router
+     *
+     * Example:
+     * server.mergeMcpRouter(demoRouter) - Extends appRouter.mcp with procedures from demoRouter
+     */
+    mergeMcpRouter(mcpRouter) {
+        // Simple approach: just merge the router directly into the main router
+        // The MCP tool extraction will find procedures from any namespace that have MCP metadata
+        this.router = mergeRouters(this.router, mcpRouter);
     }
     createServiceProvidersConfig(providers) {
         const config = {};

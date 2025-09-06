@@ -1,5 +1,5 @@
 {
-  "generated": "2025-09-04T21:48:11.581Z",
+  "generated": "2025-09-06T15:33:57.598Z",
   "version": "1.0.0",
   "description": "tRPC procedure documentation extracted from router",
   "procedures": {
@@ -714,7 +714,7 @@
       "output": null,
       "meta": null
     },
-    "mcp.hello": {
+    "mcp.greeting": {
       "path": "/mcp/hello",
       "type": "query",
       "description": "Generate a friendly greeting message for a given name",
@@ -730,6 +730,10 @@
           "name": {
             "type": "ZodString",
             "description": "The name to greet"
+          },
+          "language": {
+            "type": "ZodEnum",
+            "description": "Language code for the greeting (en=English, de=German, es=Spanish)"
           }
         }
       },
@@ -746,7 +750,7 @@
       "meta": {
         "mcp": {
           "name": "greeting",
-          "description": "Generate a friendly greeting message for a given name",
+          "description": "Generate a friendly greeting message for a given name in multiple languages",
           "category": "utility",
           "public": true,
           "scopes": {
@@ -1205,9 +1209,9 @@
           }
         }
       },
-      "mcp.hello": {
+      "mcp.greeting": {
         "title": "greeting",
-        "description": "Generate a friendly greeting message for a given name",
+        "description": "Generate a friendly greeting message for a given name in multiple languages",
         "category": "utility",
         "type": "query",
         "scopes": {
@@ -1222,27 +1226,29 @@
               "id": 1,
               "method": "tools/call",
               "params": {
-                "name": "hello",
+                "name": "greeting",
                 "arguments": {
-                  "name": "World"
+                  "name": "World",
+                  "language": "en"
                 }
               }
             }
           },
           "trpc": {
-            "endpoint": "http://localhost:8000/trpc/mcp.hello",
+            "endpoint": "http://localhost:8000/trpc/mcp.greeting",
             "method": "GET",
-            "example": "curl -X GET \"http://localhost:8000/trpc/mcp.hello?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22name%22%3A%22World%22%7D%7D%7D\""
+            "example": "curl -X GET \"http://localhost:8000/trpc/mcp.greeting?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22name%22%3A%22World%22%2C%22language%22%3A%22en%22%7D%7D%7D\""
           },
           "jsonRpc": {
             "endpoint": "http://localhost:8000/rpc",
-            "method": "mcp.hello",
+            "method": "mcp.greeting",
             "example": {
               "jsonrpc": "2.0",
               "id": 1,
-              "method": "mcp.hello",
+              "method": "mcp.greeting",
               "params": {
-                "name": "World"
+                "name": "World",
+                "language": "en"
               }
             }
           }
