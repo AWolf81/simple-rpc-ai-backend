@@ -4,12 +4,18 @@
  * Implements adaptive rate limiting for MCP endpoints with:
  * - Per-user/IP rate limiting
  * - Tool-specific limits
- * - Adaptive throttling based on system load
+ * - Adaptive throttling based on system load using Node.js built-ins
  * - Integration with existing express-rate-limit
+ * 
+ * System Monitoring:
+ * - Uses process.cpuUsage() and process.memoryUsage() (available since Node.js v6.1.0)
+ * - For monitoring external/child processes, consider using 'pidusage' library
+ * - Current implementation monitors this Node.js process only
  */
 
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
+import os from 'os';
 import { AuthenticatedRequest } from '../auth/jwt-middleware.js';
 
 // Rate limit configurations for different scenarios
@@ -134,11 +140,14 @@ export class MCPRateLimiter {
   private adminLimiter: any;
   private burstLimiter: any;
   private toolLimiters: Record<string, any> = {};
+  private toolLimiterConfigs: Record<string, { originalMax: number }> = {}; // Store original max values
   private systemStats = {
     cpu: 0,
     memory: 0,
     lastUpdate: 0
   };
+  private lastCpuUsage: NodeJS.CpuUsage | null = null;
+  private lastCpuMeasurementTime: number = 0;
 
   constructor(config: Partial<MCPRateLimitConfig> = {}) {
     this.config = { ...DEFAULT_MCP_RATE_LIMITS, ...config };
@@ -224,6 +233,9 @@ export class MCPRateLimiter {
 
     // Tool-specific limiters
     for (const [toolName, toolConfig] of Object.entries(this.config.toolLimits)) {
+      // Store original max value for throttling
+      this.toolLimiterConfigs[toolName] = { originalMax: toolConfig.max };
+      
       this.toolLimiters[toolName] = rateLimit({
         ...toolConfig,
         keyGenerator: (req: Request) => {
@@ -262,28 +274,59 @@ export class MCPRateLimiter {
   }
 
   /**
-   * Update system statistics
+   * Update system statistics using Node.js built-in process.cpuUsage() and process.memoryUsage()
    */
   private updateSystemStats() {
     try {
-      // Get CPU usage (simplified - in production use proper monitoring)
-      const loadAvg = process.uptime(); // Placeholder - use proper CPU monitoring
-      this.systemStats.cpu = Math.min(loadAvg * 10, 100); // Simplified calculation
+      // Get CPU usage using Node.js built-in process.cpuUsage()
+      const currentCpuUsage = process.cpuUsage();
+      const currentTime = Date.now();
+      let debugInfo = { totalCpuDiff: 0, timeDiff: 0 };
       
-      // Get memory usage
+      if (this.lastCpuUsage && this.lastCpuMeasurementTime) {
+        // Calculate CPU percentage based on difference since last measurement
+        const userDiff = currentCpuUsage.user - this.lastCpuUsage.user;
+        const systemDiff = currentCpuUsage.system - this.lastCpuUsage.system;
+        const totalCpuDiff = userDiff + systemDiff; // in microseconds
+        
+        // Calculate time difference in milliseconds, then convert to microseconds
+        const timeDiff = (currentTime - this.lastCpuMeasurementTime) * 1000; // μs
+        
+        // Store debug info
+        debugInfo = { totalCpuDiff, timeDiff };
+        
+        // Calculate CPU percentage: (CPU time used / real time elapsed) * 100
+        // process.cpuUsage() returns values in microseconds
+        const cpuPercent = (totalCpuDiff / timeDiff) * 100;
+        this.systemStats.cpu = Math.min(Math.max(cpuPercent, 0), 100);
+      } else {
+        this.systemStats.cpu = 0; // First measurement, no baseline
+      }
+      
+      this.lastCpuUsage = currentCpuUsage;
+      this.lastCpuMeasurementTime = currentTime;
+      
+      // Get memory usage using Node.js built-in process.memoryUsage()
       const memUsage = process.memoryUsage();
-      const totalMem = memUsage.heapTotal + memUsage.external;
-      const usedMem = memUsage.heapUsed;
-      this.systemStats.memory = (usedMem / totalMem) * 100;
+      
+      // Option 1: System-wide memory percentage (recommended for system load monitoring)
+      const totalSystemMemory = os.totalmem();
+      const freeSystemMemory = os.freemem();
+      const usedSystemMemory = totalSystemMemory - freeSystemMemory;
+      this.systemStats.memory = (usedSystemMemory / totalSystemMemory) * 100;
+      
+      // Option 2: Process-specific memory (uncomment if you prefer process-level monitoring)
+      // this.systemStats.memory = (memUsage.heapUsed / memUsage.heapTotal) * 100;
       
       this.systemStats.lastUpdate = Date.now();
       
-      // Log if throttling conditions are met
+      // Log if throttling conditions are met (with proper formatting)
       const cpuThrottle = this.systemStats.cpu > this.config.adaptive.cpuThreshold;
       const memThrottle = this.systemStats.memory > this.config.adaptive.memoryThreshold;
       
       if (cpuThrottle || memThrottle) {
         console.log(`🔄 Rate limiting: Adaptive throttling active (CPU: ${this.systemStats.cpu.toFixed(1)}%, Memory: ${this.systemStats.memory.toFixed(1)}%)`);
+        console.log(`   CPU measurement: ${debugInfo.totalCpuDiff}μs over ${debugInfo.timeDiff}μs = ${this.systemStats.cpu.toFixed(2)}%`);
       }
       
     } catch (error) {
@@ -293,6 +336,19 @@ export class MCPRateLimiter {
 
   /**
    * Check if adaptive throttling should be applied
+   * 
+   * CURRENT BEHAVIOR:
+   * - Reduces rate limits by throttleMultiplier (e.g., 50% reduction)
+   * - Only affects tool-specific rate limits
+   * - Logs throttling action but no other measures
+   * 
+   * BETTER MEASURES FOR LOAD REDUCTION:
+   * 1. Request Prioritization: Process authenticated/premium users first
+   * 2. Response Compression: Enable gzip for large AI responses  
+   * 3. Request Queuing: Queue non-critical requests during high load
+   * 4. Graceful Degradation: Return simpler/cached responses
+   * 5. Circuit Breaking: Temporarily disable expensive operations
+   * 6. Load Shedding: Drop lowest-priority requests
    */
   private shouldThrottle(): boolean {
     if (!this.config.adaptive.enabled) return false;
@@ -301,6 +357,21 @@ export class MCPRateLimiter {
     const memThrottle = this.systemStats.memory > this.config.adaptive.memoryThreshold;
     
     return cpuThrottle || memThrottle;
+  }
+
+  /**
+   * Get load reduction level based on current system stress
+   * Returns 0-3 indicating severity of load reduction needed
+   */
+  private getLoadReductionLevel(): number {
+    const cpuStress = this.systemStats.cpu / this.config.adaptive.cpuThreshold;
+    const memStress = this.systemStats.memory / this.config.adaptive.memoryThreshold;
+    const maxStress = Math.max(cpuStress, memStress);
+    
+    if (maxStress < 1.0) return 0;      // No load reduction needed
+    if (maxStress < 1.2) return 1;      // Light throttling
+    if (maxStress < 1.5) return 2;      // Moderate throttling  
+    return 3;                           // Aggressive throttling
   }
 
   /**
@@ -315,17 +386,58 @@ export class MCPRateLimiter {
     }
 
     // Apply tool-specific limits if specified
-    if (toolName && this.toolLimiters[toolName]) {
+    if (toolName && this.toolLimiters[toolName] && this.toolLimiterConfigs[toolName]) {
       const toolLimiter = this.toolLimiters[toolName];
+      const toolConfig = this.toolLimiterConfigs[toolName];
       
-      // Apply adaptive throttling if needed
-      if (this.shouldThrottle() && toolLimiter.options?.max) {
-        const originalMax = toolLimiter.options.max;
-        toolLimiter.options.max = Math.floor(originalMax * this.config.adaptive.throttleMultiplier);
-        console.log(`🔄 Rate limiting: Throttling tool '${toolName}' from ${originalMax} to ${toolLimiter.options.max} requests`);
+      // Apply graduated throttling based on system load
+      const loadLevel = this.getLoadReductionLevel();
+      if (loadLevel > 0) {
+        const originalMax = toolConfig.originalMax;
+        
+        // Graduated throttling multipliers
+        const multipliers = [1.0, 0.8, 0.6, 0.4]; // Level 0-3
+        const newMax = Math.floor(originalMax * multipliers[loadLevel]);
+        
+        console.log(`🔄 Rate limiting: Load level ${loadLevel} - throttling tool '${toolName}' from ${originalMax} to ${newMax} requests`);
+        
+        // Create a new rate limiter with throttled limits
+        const throttledLimiter = rateLimit({
+          ...this.config.toolLimits[toolName],
+          max: newMax,
+          keyGenerator: (req: Request) => {
+            const authReq = req as AuthenticatedRequest;
+            return `tool:${toolName}:${authReq.user?.userId || authReq.ip}`;
+          },
+          // onLimitReached is deprecated in v7, use handler function instead
+          handler: (req: any, res: any) => {
+            res.set('X-Load-Level', loadLevel.toString());
+            res.set('X-Retry-After', '60'); // Suggest retry after 1 minute
+            res.status(503).json({
+              error: 'Service temporarily throttled due to high system load',
+              loadLevel,
+              retryAfter: 60,
+              suggestion: 'Consider reducing request frequency or using simpler operations'
+            });
+          },
+          message: {
+            jsonrpc: '2.0',
+            error: {
+              code: -32000,
+              message: `Rate limit exceeded for tool '${toolName}' (throttled due to high system load).`,
+              data: { 
+                tool: toolName,
+                loadLevel,
+                retryAfter: this.config.toolLimits[toolName]!.windowMs / 1000 
+              }
+            }
+          }
+        });
+        
+        middlewares.push(throttledLimiter);
+      } else {
+        middlewares.push(toolLimiter);
       }
-      
-      middlewares.push(toolLimiter);
     }
 
     // Apply user-tier appropriate limits
@@ -345,6 +457,32 @@ export class MCPRateLimiter {
     });
 
     return middlewares;
+  }
+
+  /**
+   * Get current system load and recommendations for load reduction
+   */
+  public getLoadStatus() {
+    const loadLevel = this.getLoadReductionLevel();
+    
+    const recommendations = {
+      0: [], // No recommendations needed
+      1: ['Consider batching smaller requests', 'Use caching where possible'],
+      2: ['Reduce request frequency', 'Use simpler AI models if available', 'Implement exponential backoff'],
+      3: ['Pause non-critical operations', 'Implement circuit breaker pattern', 'Consider scaling infrastructure']
+    };
+
+    return {
+      cpu: this.systemStats.cpu,
+      memory: this.systemStats.memory,
+      loadLevel,
+      status: ['normal', 'light_load', 'moderate_load', 'heavy_load'][loadLevel],
+      recommendations: recommendations[loadLevel as keyof typeof recommendations],
+      thresholds: {
+        cpu: this.config.adaptive.cpuThreshold,
+        memory: this.config.adaptive.memoryThreshold
+      }
+    };
   }
 
   /**

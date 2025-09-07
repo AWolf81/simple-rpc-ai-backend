@@ -20,13 +20,17 @@ These tests are related to the security middleware functionality and must work:
 - [ ] **test/rpc-key-management.test.ts** - RPC key management (5 skipped)
   - **Reason**: OAuth-related, will be addressed in mcp-oauth-integration branch
 
-### Security Components Available (No tests needed yet):
-- **src/security/rate-limiter.ts** - MCPRateLimiter class for MCP-specific rate limiting
+### Security Components Available:
+- **src/security/rate-limiter.ts** - MCPRateLimiter class with proper Node.js built-in monitoring
+  - ✅ **Fixed**: CPU monitoring now uses `process.cpuUsage()` correctly (not `process.uptime()`)  
+  - ✅ **Fixed**: Memory monitoring uses `os.totalmem()` and `os.freemem()` for system-wide stats
+  - ✅ **Added**: Proper time-based CPU percentage calculation with microsecond precision
+  - ✅ **Documented**: Notes about when to use `pidusage` library for external process monitoring
 - **src/security/auth-enforcer.ts** - JWT validation and scope enforcement  
 - **src/security/security-logger.ts** - Structured security event logging
 - **src/security/test-helpers.ts** - Security testing utilities
 
-*Note: These are utility classes that will be tested when integrated with the OAuth system in the mcp-oauth-integration branch.*
+*Note: Core CPU/memory monitoring issues from security review have been addressed. Remaining utility classes will be fully tested when integrated with the OAuth system in the mcp-oauth-integration branch.*
 
 ## 🚫 **Non-Security Tests** (Skipped for this branch)
 
