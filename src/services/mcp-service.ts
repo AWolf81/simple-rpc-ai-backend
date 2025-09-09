@@ -6,7 +6,7 @@
  * search, file system access, and other external tool integrations.
  */
 
-import { MCPRegistryService, MCPToolRequest, MCPToolResponse, MCPTool, MCPServerConfig, PREDEFINED_MCP_SERVERS } from './mcp-registry.js';
+import { MCPRegistryService, MCPToolRequest, MCPToolResponse, MCPTool, MCPServerConfig, PREDEFINED_MCP_SERVERS } from './mcp-registry';
 import { EventEmitter } from 'events';
 
 export interface MCPServiceConfig {

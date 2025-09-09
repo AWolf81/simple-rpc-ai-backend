@@ -1,4 +1,4 @@
-import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
+import { PostgreSQLAdapter } from '../database/postgres-adapter';
 import winston from 'winston';
 
 export interface UsageEvent {

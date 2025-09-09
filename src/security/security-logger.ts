@@ -9,7 +9,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../auth/jwt-middleware.js';
+import { AuthenticatedRequest } from '../auth/jwt-middleware';
 import winston from 'winston';
 import fs from 'fs/promises';
 import path from 'path';

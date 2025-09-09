@@ -25,7 +25,7 @@ export interface ExtendedMeta extends McpMeta {
   };
 }
 // OpenAPI removed - using custom tRPC methods extraction instead
-import type { AuthenticatedRequest, OpenSaaSJWTPayload } from '../auth/jwt-middleware.js';
+import type { AuthenticatedRequest, OpenSaaSJWTPayload } from '@auth/jwt-middleware';
 import superjson from 'superjson';
 
 /**

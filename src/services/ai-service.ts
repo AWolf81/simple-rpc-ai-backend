@@ -10,8 +10,8 @@ import { anthropic, Anthropic } from '@ai-sdk/anthropic';
 import { openai, OpenAI } from '@ai-sdk/openai';
 import { google, Google } from '@ai-sdk/google';
 import crypto from 'crypto';
-import { MCPService, MCPServiceConfig } from './mcp-service.js';
-import { ModelRegistryManager, modelRegistry, ModelDefinition, ProviderModelRegistry, ModelCapability } from './model-registry.js';
+import { MCPService, MCPServiceConfig } from './mcp-service';
+import { ModelRegistryManager, modelRegistry, ModelDefinition, ProviderModelRegistry, ModelCapability } from './model-registry';
 
 export interface AIServiceConfig {
   provider?: 'anthropic' | 'openai' | 'google' | 'openrouter'; // selected in constructor & used 

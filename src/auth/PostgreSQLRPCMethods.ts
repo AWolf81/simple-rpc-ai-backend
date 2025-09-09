@@ -5,7 +5,7 @@
  * Maintains compatibility with existing TokenBasedVaultManager interface
  */
 
-import { PostgreSQLSecretManager, PostgreSQLConfig } from '../services/PostgreSQLSecretManager.js';
+import { PostgreSQLSecretManager, PostgreSQLConfig } from '../services/PostgreSQLSecretManager';
 import * as winston from 'winston';
 
 export interface VaultOperationResult {

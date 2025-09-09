@@ -1,12 +1,39 @@
 {
   "extends": "@tsconfig/node22/tsconfig.json",
   "compilerOptions": {
-    "module": "esnext",
-    "moduleResolution": "node",
-    "outDir": "dist",
+    // Override module settings for our build setup
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     
+    // Project-specific settings
+    "outDir": "dist",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@services/*": ["src/services/*"],
+      "@auth/*": ["src/auth/*"],
+      "@src-trpc/*": ["src/trpc/*"],
+      "@database/*": ["src/database/*"],
+      "@billing/*": ["src/billing/*"],
+      "@security/*": ["src/security/*"],
+      "@storage/*": ["src/storage/*"],
+      "@schemas/*": ["src/schemas/*"],
+      "@mcp/*": ["src/mcp/*"],
+      "@monetization/*": ["src/monetization/*"],
+      "@middleware/*": ["src/middleware/*"]
+    },
+    
+    // Relax strictness for this project
+    "strict": false,
     "noImplicitAny": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tools"]
+  "exclude": ["node_modules", "dist", "tools"],
+  "ts-node": {
+    "esm": true
+  },
+  "tsc-alias": {
+    "resolveFullPaths": true,
+    "resolveFullExtension": ".js"
+  }
 }

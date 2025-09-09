@@ -5,8 +5,8 @@
  * enabling AI systems to access documentation, file systems, and other external tools.
  */
 
-import { AIService, AIServiceConfig, ExecuteRequest, ExecuteResult } from './ai-service.js';
-import { MCPService, MCPServiceConfig, AIToolRequest, MCPToolDefinition } from './mcp-service.js';
+import { AIService, AIServiceConfig, ExecuteRequest, ExecuteResult } from './ai-service';
+import { MCPService, MCPServiceConfig, AIToolRequest, MCPToolDefinition } from './mcp-service';
 import { generateText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';

@@ -12,12 +12,12 @@ export {
   VaultStorageConfig,
   FileStorageConfig, 
   ClientManagedStorageConfig 
-} from './StorageAdapter.js';
+} from './StorageAdapter';
 
 // Storage adapters
 // VaultStorageAdapter removed - using simplified storage
-export { FileStorageAdapter } from './FileStorageAdapter.js';
-export { ClientManagedStorageAdapter } from './ClientManagedStorageAdapter.js';
+export { FileStorageAdapter } from './FileStorageAdapter';
+export { ClientManagedStorageAdapter } from './ClientManagedStorageAdapter';
 
 // Factory and utilities
-export { StorageFactory } from './StorageFactory.js';
+export { StorageFactory } from './StorageFactory';

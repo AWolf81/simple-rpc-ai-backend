@@ -6,15 +6,15 @@
  */
 
 // Core components
-export { RPCClient } from './client.js';          // Basic JSON-RPC client (platform-agnostic)
-export { AIClient } from './client.js';           // Enhanced client with BYOK
+export { RPCClient } from './client';          // Basic JSON-RPC client (platform-agnostic)
+export { AIClient } from './client';           // Enhanced client with BYOK
 
 // tRPC Client Support
-export { createTypedAIClient } from './client.js';
-export type { TypedAIClient } from './client.js';
-export { AIService } from './services/ai-service.js';      // Direct AI service usage
-export { generateTRPCMethods, createAppRouter } from './trpc/root.js';
-// export { createTestRouter } from './trpc/test-router.js';
+export { createTypedAIClient } from './client';
+export type { TypedAIClient } from './client';
+export { AIService } from './services/ai-service';      // Direct AI service usage
+export { generateTRPCMethods, createAppRouter } from './trpc/root';
+// export { createTestRouter } from './trpc/test-router';
 // OpenAPI-related exports temporarily disabled
 // export { 
 //   openApiCompatMiddleware, 
@@ -22,7 +22,7 @@ export { generateTRPCMethods, createAppRouter } from './trpc/root.js';
 //   createOpenApiCompatRouter,
 //   patchTrpcToOpenApi,
 //   makeRouterOpenApiCompatible 
-// } from './trpc/openapi-compat-middleware.js';
+// } from './trpc/openapi-compat-middleware';
 
 // getRawInput fix for trpc-to-openapi compatibility (disabled)
 // export {
@@ -33,36 +33,36 @@ export { generateTRPCMethods, createAppRouter } from './trpc/root.js';
 //   createGetRawInputTestRouter,
 //   wrapRouterWithGetRawInputFix,
 //   debugProcedureInputs
-// } from './trpc/getrawinput-fix.js';
+// } from './trpc/getrawinput-fix';
 
 // Recommended server - supports both JSON-RPC and tRPC
-export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
-export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server.js';
+export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server';
+export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server';
 
 // AI Limit Presets for common use cases
-export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
-export type { AIRouterConfig, AIRouterType } from './trpc/routers/ai.js';
+export { AI_LIMIT_PRESETS } from './trpc/routers/ai';
+export type { AIRouterConfig, AIRouterType } from './trpc/routers/ai';
 
 // Provider Registry types
-export type { ProviderConfig, ModelConfig, PricingInfo, RegistryHealthStatus } from './services/provider-registry.js';
+export type { ProviderConfig, ModelConfig, PricingInfo, RegistryHealthStatus } from './services/provider-registry';
 
 // tRPC router types for client type safety
-export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root.js';
+export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root';
 
 // Development tools (separate from main server)
-export { TrpcPanelServer, startTrpcPanel, createLocalPanelServer } from './dev/trpc-panel-server.js';
-export type { PanelServerConfig } from './dev/trpc-panel-server.js';
+export { TrpcPanelServer, startTrpcPanel, createLocalPanelServer } from './dev/trpc-panel-server';
+export type { PanelServerConfig } from './dev/trpc-panel-server';
 
 
 // Custom function system
-export { FunctionRegistry } from './services/function-registry.js';
-export { PromptManager, promptManager } from './services/prompt-manager.js';
+export { FunctionRegistry } from './services/function-registry';
+export { PromptManager, promptManager } from './services/prompt-manager';
 
 // MCP (Model Context Protocol) Integration
-export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService, setDefaultMCPServiceInstance } from './services/mcp-service.js';
-export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp-registry.js';
-export { MCPAIService } from './services/mcp-ai-service.js';
-export { RefMCPIntegration, VSCodeRefIntegration } from './services/ref-mcp-integration.js';
+export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService, setDefaultMCPServiceInstance } from './services/mcp-service';
+export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp-registry';
+export { MCPAIService } from './services/mcp-ai-service';
+export { RefMCPIntegration, VSCodeRefIntegration } from './services/ref-mcp-integration';
 
 // Authentication system exports
 export {
@@ -71,16 +71,16 @@ export {
   AuthManager,
   PostgreSQLAdapter,
   AIKeyValidator
-} from './auth/index.js';
+} from './auth/index';
 
 // Re-export legacy types
 export type {
   ClientOptions
-} from './client.js';
+} from './client';
 
 export type {
   AIServiceConfig
-} from './services/ai-service.js';
+} from './services/ai-service';
 
 // New progressive authentication types
 export type {
@@ -91,20 +91,20 @@ export type {
   AuthSession,
   DeviceInfo,
   AuthUpgradePrompt
-} from './auth/index.js';
+} from './auth/index';
 
 
 // Custom function types
 export type {
   PromptTemplate,
   PromptContext
-} from './services/prompt-manager.js';
+} from './services/prompt-manager';
 
 export type {
   CustomFunctionDefinition,
   CustomFunctionRequest,
   CustomFunctionResult
-} from './services/function-registry.js';
+} from './services/function-registry';
 
 // MCP Types
 export type {
@@ -112,7 +112,7 @@ export type {
   AIToolRequest,
   AIToolResponse,
   MCPToolDefinition
-} from './services/mcp-service.js';
+} from './services/mcp-service';
 
 export type {
   MCPServerConfig,
@@ -120,13 +120,13 @@ export type {
   MCPServerStatus,
   MCPToolRequest,
   MCPToolResponse
-} from './services/mcp-registry.js';
+} from './services/mcp-registry';
 
 export type {
   MCPAIServiceConfig,
   EnhancedExecuteRequest,
   EnhancedExecuteResult
-} from './services/mcp-ai-service.js';
+} from './services/mcp-ai-service';
 
 export type {
   RefMCPConfig,
@@ -134,22 +134,22 @@ export type {
   DocumentationSearchResult,
   URLReadRequest,
   URLReadResult
-} from './services/ref-mcp-integration.js';
+} from './services/ref-mcp-integration';
 
 export type {
   MCPRouterConfig,
   //MCPRouterType
-} from './trpc/routers/mcp.js';
+} from './trpc/routers/mcp';
 
 // OpenSaaS Monetization exports
-export { createMonetizedAIServer } from './monetization/opensaas-server.js';
+export { createMonetizedAIServer } from './monetization/opensaas-server';
 export {
   createOpenSaaSConfig,
   mergeOpenSaaSConfig,
   validateOpenSaaSConfig,
   EXAMPLE_CUSTOM_TIERS,
   DEFAULT_OPENSAAS_CONFIG
-} from './monetization/opensaas-config.js';
+} from './monetization/opensaas-config';
 
 // JWT Authentication middleware
 export {
@@ -157,14 +157,14 @@ export {
   DEFAULT_TIER_CONFIGS,
   getTierConfig,
   mergeWithDefaultTiers
-} from './auth/jwt-middleware.js';
+} from './auth/jwt-middleware';
 
 // Rate limiting
-export { RateLimiter, DEFAULT_TIER_LIMITS } from './middleware/rate-limiter.js';
+export { RateLimiter, DEFAULT_TIER_LIMITS } from './middleware/rate-limiter';
 
 // Usage tracking and billing
-export { UsageTracker, PROVIDER_PRICING } from './billing/usage-tracker.js';
-export { BillingEngine } from './billing/billing-engine.js';
+export { UsageTracker, PROVIDER_PRICING } from './billing/usage-tracker';
+export { BillingEngine } from './billing/billing-engine';
 
 // Export monetization types
 export type {
@@ -172,34 +172,34 @@ export type {
   AuthenticatedRequest,
   SubscriptionTierConfig,
   JWTMiddlewareConfig
-} from './auth/jwt-middleware.js';
+} from './auth/jwt-middleware';
 
 export type {
   RateLimits,
   RateLimitConfig,
   RateLimitResult
-} from './middleware/rate-limiter.js';
+} from './middleware/rate-limiter';
 
 export type {
   UsageEvent,
   UsageSummary,
   QuotaStatus
-} from './billing/usage-tracker.js';
+} from './billing/usage-tracker';
 
 export type {
   BillingEvent,
   BillingConfig,
   SubscriptionInfo
-} from './billing/billing-engine.js';
+} from './billing/billing-engine';
 
 export type {
   OpenSaaSMonetizationConfig,
   MonetizedAIServerConfig
-} from './monetization/opensaas-config.js';
+} from './monetization/opensaas-config';
 
 export type {
   MonetizedServerInstance
-} from './monetization/opensaas-server.js';
+} from './monetization/opensaas-server';
 
 // Default export - unified server for new projects
-export { createRpcAiServer as default } from './rpc-ai-server.js';
+export { createRpcAiServer as default } from './rpc-ai-server';

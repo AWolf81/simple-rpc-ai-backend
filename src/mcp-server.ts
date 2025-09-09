@@ -18,7 +18,7 @@ import {
   LATEST_PROTOCOL_VERSION
 } from '@modelcontextprotocol/sdk/types.js';
 import type { Express } from 'express';
-import { createMCPRouter, MCPProtocolHandler } from './trpc/routers/mcp.js';
+import { createMCPRouter, MCPProtocolHandler } from './trpc/routers/mcp';
 
 export interface MCPServerConfig {
   name?: string;

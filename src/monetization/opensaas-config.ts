@@ -1,6 +1,6 @@
-import type { SubscriptionTierConfig } from '../auth/jwt-middleware.js';
-import type { BillingConfig } from '../billing/billing-engine.js';
-import type { RateLimitConfig } from '../middleware/rate-limiter.js';
+import type { SubscriptionTierConfig } from '../auth/jwt-middleware';
+import type { BillingConfig } from '../billing/billing-engine';
+import type { RateLimitConfig } from '../middleware/rate-limiter';
 
 /**
  * OpenSaaS monetization configuration for the AI server

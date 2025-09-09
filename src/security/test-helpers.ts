@@ -3,9 +3,9 @@
  * Provides simple flags to disable rate limiting and security logging
  */
 
-import { MCPRateLimitConfig } from './rate-limiter.js';
-import { SecurityLoggerConfig } from './security-logger.js';
-import { AuthEnforcementConfig } from './auth-enforcer.js';
+import { MCPRateLimitConfig } from './rate-limiter';
+import { SecurityLoggerConfig } from './security-logger';
+import { AuthEnforcementConfig } from './auth-enforcer';
 
 /**
  * Disabled rate limiting configuration for tests

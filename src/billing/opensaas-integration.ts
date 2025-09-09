@@ -6,7 +6,7 @@
  */
 
 import crypto from 'crypto';
-import { HybridBillingManager, UserBillingPreference, UsageRecord } from './hybrid-billing-manager.js';
+import { HybridBillingManager, UserBillingPreference, UsageRecord } from './hybrid-billing-manager';
 
 export interface SeamlessOpenSaaSConfig {
   // Only these two fields required!

@@ -6,11 +6,11 @@
  */
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure, protectedProcedure } from '../index.js';
-import { AIService } from '../../services/ai-service.js';
-import { VirtualTokenService } from '../../services/virtual-token-service.js';
-import { UsageAnalyticsService } from '../../services/usage-analytics-service.js';
-import { ProviderRegistryService } from '../../services/provider-registry.js';
+import { router, publicProcedure, protectedProcedure } from '../../src/trpc/index.js';
+import { AIService } from '../../src/services/ai-service.js';
+import { VirtualTokenService } from '../../src/services/virtual-token-service.js';
+import { UsageAnalyticsService } from '../../src/services/usage-analytics-service.js';
+import { ProviderRegistryService } from '../../src/services/provider-registry.js';
 // Predefined configurations for common use cases
 // ⚠️ IMPORTANT: These are suggested defaults. Always validate against:
 //   - Your AI provider's token limits (Claude: 200k, GPT-4: 8k-128k, Gemini: 1M)
@@ -836,7 +836,11 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.storeUserKey(input);
+            const result = await postgresRPCMethods.storeUserKey({
+                email: input.email,
+                provider: input.provider,
+                apiKey: input.apiKey
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
@@ -864,7 +868,10 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.getUserKey(input);
+            const result = await postgresRPCMethods.getUserKey({
+                email: input.email,
+                provider: input.provider
+            });
             if (!result.success) {
                 return {
                     hasKey: false,
@@ -894,7 +901,9 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.getUserProviders(input);
+            const result = await postgresRPCMethods.getUserProviders({
+                email: input.email
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
@@ -927,7 +936,10 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.validateUserKey(input);
+            const result = await postgresRPCMethods.validateUserKey({
+                email: input.email,
+                provider: input.provider
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
@@ -955,7 +967,11 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.rotateUserKey(input);
+            const result = await postgresRPCMethods.rotateUserKey({
+                email: input.email,
+                provider: input.provider,
+                newApiKey: input.newApiKey
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
@@ -983,7 +999,10 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.deleteUserKey(input);
+            const result = await postgresRPCMethods.deleteUserKey({
+                email: input.email,
+                provider: input.provider
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',

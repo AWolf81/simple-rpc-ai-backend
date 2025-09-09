@@ -1,6 +1,6 @@
 import { Redis } from 'ioredis';
 import type { Request, Response, NextFunction } from 'express';
-import type { AuthenticatedRequest, SubscriptionTierConfig } from '../auth/jwt-middleware.js';
+import type { AuthenticatedRequest, SubscriptionTierConfig } from '../auth/jwt-middleware';
 
 export interface RateLimits {
   requestsPerMinute: number;

@@ -9,8 +9,8 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { AuthenticatedRequest, OpenSaaSJWTPayload } from '../auth/jwt-middleware.js';
-import { SecurityLogger, SecurityEventType, SecuritySeverity } from './security-logger.js';
+import { AuthenticatedRequest, OpenSaaSJWTPayload } from '../auth/jwt-middleware';
+import { SecurityLogger, SecurityEventType, SecuritySeverity } from './security-logger';
 
 // Resource types for tracking
 export enum ResourceType {
@@ -329,7 +329,7 @@ export class AuthEnforcer {
     
     const endpoint = req.path;
     return !this.config.allowedAnonymousEndpoints.some(allowed => 
-      endpoint.startsWith(allowed)
+      allowed && endpoint.startsWith(allowed)
     );
   }
 
@@ -392,13 +392,16 @@ export class AuthEnforcer {
   }> {
     const userId = user.userId;
     const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-based month
     
     // Get user's current usage for this month
-    const monthlyUsage = this.resourceUsageLog.filter(entry => 
-      entry.userId === userId &&
-      entry.timestamp.toISOString().startsWith(currentMonth)
-    );
+    const monthlyUsage = this.resourceUsageLog.filter(entry => {
+      const entryDate = entry.timestamp;
+      return entry.userId === userId &&
+        entryDate.getFullYear() === currentYear &&
+        entryDate.getMonth() === currentMonth;
+    });
 
     // Calculate total tokens used this month
     const totalTokens = monthlyUsage.reduce((sum, entry) => {
@@ -813,12 +816,15 @@ export class AuthEnforcer {
   public resetUserQuotas(userId: string): boolean {
     // Remove user's usage entries for current month
     const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-based month
     
     const initialCount = this.resourceUsageLog.length;
-    this.resourceUsageLog = this.resourceUsageLog.filter(entry => 
-      !(entry.userId === userId && entry.timestamp.toISOString().startsWith(currentMonth))
-    );
+    this.resourceUsageLog = this.resourceUsageLog.filter(entry => {
+      if (entry.userId !== userId) return true;
+      const entryDate = entry.timestamp;
+      return !(entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth);
+    });
     
     const removed = initialCount - this.resourceUsageLog.length;
     

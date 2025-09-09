@@ -16,7 +16,7 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import os from 'os';
-import { AuthenticatedRequest } from '../auth/jwt-middleware.js';
+import { AuthenticatedRequest } from '../auth/jwt-middleware';
 
 // Rate limit configurations for different scenarios
 export interface RateLimitConfig {

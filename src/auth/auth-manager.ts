@@ -5,8 +5,8 @@
  * Integrates with VS Code authentication API for seamless OAuth
  */
 
-import { UserManager, User, OAuthData } from './user-manager.js';
-import { SimpleKeyManager } from './key-manager.js';
+import { UserManager, User, OAuthData } from './user-manager';
+import { SimpleKeyManager } from './key-manager';
 
 export interface AuthSession {
   userId: string;

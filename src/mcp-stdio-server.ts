@@ -7,7 +7,7 @@
  * Connects via STDIO (stdin/stdout) and provides all tRPC tools as MCP tools.
  */
 
-import { startStdioServer } from './mcp-server.js';
+import { startStdioServer } from './mcp-server';
 
 // Handle process termination gracefully
 process.on('SIGINT', () => {
