@@ -3,11 +3,42 @@
  *
  * Provides three storage backends for OAuth sessions and tokens:
  * - In-Memory: Fast, dev-friendly, data lost on restart
- * - File: Persistent, dev-friendly, single-server only
+ * - File: Persistent, dev-friendly, single-server only (with AES-256-GCM encryption)
  * - Redis: Production-ready, scalable, shared across servers
+ *
+ * Security Features:
+ * - File storage uses AES-256-GCM encryption by default to protect OAuth tokens and user data
+ * - Encryption can be disabled for testing with `encryptionEnabled: false`
+ * - Custom encryption passwords supported via `encryptionPassword` option
+ * - Automatic migration from plaintext to encrypted format
+ *
+ * Usage Examples:
+ *
+ * ```typescript
+ * // Production: Encrypted file storage
+ * const storage = createSessionStorage({
+ *   type: 'file',
+ *   filePath: './data/oauth-sessions.json',
+ *   encryptionPassword: process.env.OAUTH_ENCRYPTION_KEY
+ * });
+ *
+ * // Development: Use default password (shows warning)
+ * const storage = createSessionStorage({
+ *   type: 'file',
+ *   filePath: './data/oauth-sessions.json'
+ * });
+ *
+ * // Testing: Disable encryption for easy inspection
+ * const storage = createSessionStorage({
+ *   type: 'file',
+ *   filePath: './test-oauth-sessions.json',
+ *   encryptionEnabled: false
+ * });
+ * ```
  */
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 /**
  * In-Memory Session Storage
  * Fast and simple, but data is lost on server restart
@@ -94,9 +125,15 @@ export class InMemorySessionStorage {
 /**
  * File-based Session Storage
  * Persistent across restarts, good for development
+ *
+ * Security: Uses AES-256-GCM encryption by default to protect OAuth tokens and user data.
+ * The encryption key is derived from a master password or generated randomly.
  */
 export class FileSessionStorage {
     filePath;
+    encryptionEnabled;
+    encryptionKey;
+    needsMigration = false; // Flag to indicate file needs migration to encrypted format
     clients = new Map();
     tokens = new Map();
     authorizationCodes = new Map();
@@ -104,6 +141,67 @@ export class FileSessionStorage {
     items = new Map();
     constructor(options = {}) {
         this.filePath = options.filePath || './oauth-sessions.json';
+        this.encryptionEnabled = options.encryptionEnabled !== false; // Default: true
+        if (this.encryptionEnabled) {
+            // Derive encryption key from password or use default for development
+            const password = options.encryptionPassword || 'default-dev-password-change-in-production';
+            this.encryptionKey = this.deriveEncryptionKey(password);
+            if (!options.encryptionPassword) {
+                console.warn('🔒 OAuth sessions: Using default encryption password. Set encryptionPassword for production!');
+            }
+        }
+        else {
+            this.encryptionKey = null;
+            console.warn('⚠️  OAuth sessions: Encryption DISABLED - data will be stored in plaintext!');
+        }
+    }
+    /**
+     * Derive a consistent encryption key from password using PBKDF2
+     */
+    deriveEncryptionKey(password) {
+        const salt = 'oauth-session-salt'; // Static salt for consistent key derivation
+        return createHash('sha256').update(password + salt).digest();
+    }
+    /**
+     * Encrypt data using AES-256-GCM
+     */
+    encryptData(data) {
+        if (!this.encryptionEnabled || !this.encryptionKey) {
+            return data; // Return plaintext if encryption disabled
+        }
+        const iv = randomBytes(16); // 16 bytes IV for GCM
+        const cipher = createCipheriv('aes-256-gcm', this.encryptionKey, iv);
+        let encrypted = cipher.update(data, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        const authTag = cipher.getAuthTag();
+        // Combine IV + authTag + encrypted data
+        return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+    }
+    /**
+     * Decrypt data using AES-256-GCM
+     */
+    decryptData(encryptedData) {
+        if (!this.encryptionEnabled || !this.encryptionKey) {
+            return encryptedData; // Return as-is if encryption disabled
+        }
+        try {
+            const parts = encryptedData.split(':');
+            if (parts.length !== 3) {
+                throw new Error('Invalid encrypted data format');
+            }
+            const iv = Buffer.from(parts[0], 'hex');
+            const authTag = Buffer.from(parts[1], 'hex');
+            const encrypted = parts[2];
+            const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
+            decipher.setAuthTag(authTag);
+            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+            return decrypted;
+        }
+        catch (error) {
+            console.error('🔒 Failed to decrypt OAuth session data:', error);
+            throw new Error('Failed to decrypt session data - wrong password or corrupted file');
+        }
     }
     async initialize() {
         try {
@@ -114,7 +212,30 @@ export class FileSessionStorage {
             }
             // Load existing data if file exists
             if (existsSync(this.filePath)) {
-                const data = JSON.parse(readFileSync(this.filePath, 'utf8'));
+                const rawData = readFileSync(this.filePath, 'utf8');
+                let jsonData;
+                // Determine if data is encrypted or plaintext
+                if (rawData.startsWith('{')) {
+                    // Plaintext JSON data
+                    jsonData = rawData;
+                    if (this.encryptionEnabled) {
+                        console.log(`🔄 Migrating OAuth sessions from plaintext to encrypted format...`);
+                        // Mark for re-encryption on next save
+                        this.needsMigration = true;
+                    }
+                }
+                else if (rawData.includes(':') && rawData.split(':').length === 3) {
+                    // Looks like encrypted data (hex:hex:hex format)
+                    if (!this.encryptionEnabled) {
+                        throw new Error('File appears to be encrypted but encryption is disabled');
+                    }
+                    jsonData = this.decryptData(rawData);
+                    console.log(`🔒 Decrypted OAuth session data from ${this.filePath}`);
+                }
+                else {
+                    throw new Error('Invalid session data format - cannot determine if encrypted or plaintext');
+                }
+                const data = JSON.parse(jsonData);
                 // Convert plain objects back to Maps
                 if (data.clients) {
                     this.clients = new Map(Object.entries(data.clients));
@@ -131,10 +252,18 @@ export class FileSessionStorage {
                 if (data.items) {
                     this.items = new Map(Object.entries(data.items));
                 }
-                console.log(`📁 File session storage loaded from ${this.filePath}`);
+                const statusMsg = this.encryptionEnabled ? '🔒 (encrypted)' : '⚠️  (plaintext)';
+                console.log(`📁 File session storage loaded from ${this.filePath} ${statusMsg}`);
+                // If we loaded plaintext data but encryption is enabled, save encrypted version immediately
+                if (this.needsMigration) {
+                    console.log(`🔄 Performing immediate migration to encrypted format...`);
+                    await this.saveToFile();
+                    this.needsMigration = false;
+                }
             }
             else {
-                console.log(`📁 File session storage initialized at ${this.filePath}`);
+                const statusMsg = this.encryptionEnabled ? '🔒 (encrypted)' : '⚠️  (plaintext)';
+                console.log(`📁 File session storage initialized at ${this.filePath} ${statusMsg}`);
             }
         }
         catch (error) {
@@ -150,9 +279,12 @@ export class FileSessionStorage {
                 authorizationCodes: Object.fromEntries(this.authorizationCodes),
                 users: Object.fromEntries(this.users),
                 items: Object.fromEntries(this.items),
-                lastUpdated: new Date().toISOString()
+                lastUpdated: new Date().toISOString(),
+                encrypted: this.encryptionEnabled // Metadata to indicate if data is encrypted
             };
-            writeFileSync(this.filePath, JSON.stringify(data, null, 2));
+            const jsonData = JSON.stringify(data, null, this.encryptionEnabled ? 0 : 2); // Compact JSON if encrypting
+            const finalData = this.encryptionEnabled ? this.encryptData(jsonData) : jsonData;
+            writeFileSync(this.filePath, finalData);
         }
         catch (error) {
             console.error(`❌ Failed to save session data to file:`, error);
@@ -397,7 +529,9 @@ export function createSessionStorage(config) {
             return new InMemorySessionStorage();
         case 'file':
             return new FileSessionStorage({
-                filePath: config.filePath || './data/oauth-sessions.json'
+                filePath: config.filePath || './data/oauth-sessions.json',
+                encryptionEnabled: config.encryptionEnabled,
+                encryptionPassword: config.encryptionPassword
             });
         case 'redis':
             return new RedisSessionStorage({

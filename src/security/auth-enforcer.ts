@@ -328,8 +328,12 @@ export class AuthEnforcer {
     }
     
     const endpoint = req.path;
+    if (!endpoint || !this.config.allowedAnonymousEndpoints) {
+      return true; // Default to requiring auth if configuration is incomplete
+    }
+    
     return !this.config.allowedAnonymousEndpoints.some(allowed => 
-      typeof allowed === 'string' && endpoint.startsWith(allowed)
+      allowed && typeof allowed === 'string' && endpoint.startsWith(allowed)
     );
   }
 
