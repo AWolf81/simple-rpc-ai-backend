@@ -180,7 +180,18 @@ describe('Test Helpers - Security Configuration', () => {
         auth: {
           requireAuthForToolsList: false,
           requireAuthForToolsCall: true,
-          publicTools: ['greeting']
+          publicTools: ['greeting'],
+          authType: 'oauth', // Default to OAuth for backward compatibility
+          oauth: {
+            enabled: true,
+            requireValidSession: true
+          },
+          jwt: {
+            enabled: false,
+            requireValidSignature: true,
+            requiredScopes: ['mcp'],
+            allowExpiredTokens: false
+          }
         },
         rateLimiting: DISABLED_RATE_LIMITING,
         securityLogging: DISABLED_SECURITY_LOGGING,

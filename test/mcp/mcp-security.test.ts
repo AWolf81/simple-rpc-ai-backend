@@ -17,6 +17,7 @@ describe('MCP Security Features', () => {
 
   beforeEach(async () => {
     process.env.JWT_SECRET = testJwtSecret;
+    process.env.NODE_ENV = 'test'; // Ensure test environment
     
     server = createRpcAiServer({
       port: 0, // Use dynamic port for tests
@@ -25,7 +26,12 @@ describe('MCP Security Features', () => {
         jsonRpc: true,
         tRpc: true
       },
-      mcp: createTestMCPConfig()
+      mcp: createTestMCPConfig({
+        // Explicitly override to ensure security is completely disabled
+        rateLimiting: { enabled: false },
+        securityLogging: { enabled: false, networkFilter: { enabled: false } },
+        authEnforcement: { enabled: false }
+      })
     });
     
     // Initialize server (this sets up routes and MCP endpoints)
@@ -37,6 +43,7 @@ describe('MCP Security Features', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     delete process.env.JWT_SECRET;
+    delete process.env.NODE_ENV;
     if (server) {
       await server.stop();
     }

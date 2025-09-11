@@ -129,13 +129,92 @@ export function createTestMCPConfig(overrides) {
         auth: {
             requireAuthForToolsList: false,
             requireAuthForToolsCall: true,
-            publicTools: ['greeting']
+            publicTools: ['greeting'],
+            authType: 'oauth', // Default to OAuth for backward compatibility
+            oauth: {
+                enabled: true,
+                requireValidSession: true
+            },
+            jwt: {
+                enabled: false,
+                requireValidSignature: true,
+                requiredScopes: ['mcp'],
+                allowExpiredTokens: false
+            }
         },
         rateLimiting: DISABLED_RATE_LIMITING,
         securityLogging: DISABLED_SECURITY_LOGGING,
         authEnforcement: DISABLED_AUTH_ENFORCEMENT,
         ...overrides
     };
+}
+/**
+ * Create MCP config for JWT-only authentication
+ */
+export function createJWTMCPConfig(overrides) {
+    return createTestMCPConfig({
+        auth: {
+            requireAuthForToolsList: true,
+            requireAuthForToolsCall: true,
+            publicTools: [],
+            authType: 'jwt',
+            jwt: {
+                enabled: true,
+                requireValidSignature: true,
+                requiredScopes: ['mcp'],
+                allowExpiredTokens: false
+            },
+            oauth: {
+                enabled: false
+            }
+        },
+        ...overrides
+    });
+}
+/**
+ * Create MCP config for OAuth-only authentication
+ */
+export function createOAuthMCPConfig(overrides) {
+    return createTestMCPConfig({
+        auth: {
+            requireAuthForToolsList: true,
+            requireAuthForToolsCall: true,
+            publicTools: [],
+            authType: 'oauth',
+            oauth: {
+                enabled: true,
+                requireValidSession: true
+            },
+            jwt: {
+                enabled: false
+            }
+        },
+        ...overrides
+    });
+}
+/**
+ * Create MCP config for both JWT and OAuth authentication (JWT first, OAuth fallback)
+ */
+export function createBothAuthMCPConfig(overrides) {
+    return createTestMCPConfig({
+        auth: {
+            requireAuthForToolsList: true,
+            requireAuthForToolsCall: true,
+            publicTools: [],
+            authType: 'both',
+            jwt: {
+                enabled: true,
+                requireValidSignature: true,
+                requiredScopes: ['mcp'],
+                allowExpiredTokens: false
+            },
+            oauth: {
+                enabled: true,
+                requireValidSession: true
+            }
+        },
+        ...overrides
+    });
 }
 /**
  * Environment variable to check if we're in test mode

@@ -147,10 +147,15 @@ export class RpcAiServer {
         }
         // Initialize JWT middleware if configured
         if (this.config.jwt.secret) {
+            console.log('🔧 JWT Config:', {
+                secret: this.config.jwt.secret?.slice(0, 10) + '...',
+                audience: this.config.jwt.audience,
+                issuer: this.config.jwt.issuer
+            });
             this.jwtMiddleware = new JWTMiddleware({
                 opensaasPublicKey: this.config.jwt.secret,
-                audience: this.config.jwt.audience || 'rpc-ai-backend',
-                issuer: this.config.jwt.issuer || 'opensaas',
+                audience: this.config.jwt.audience,
+                issuer: this.config.jwt.issuer,
                 skipAuthForMethods: ['health', 'listProviders'],
                 requireAuthForAllMethods: false
             });
@@ -406,7 +411,14 @@ export class RpcAiServer {
         const enabledTransports = [];
         // HTTP transport (for MCP Jam, testing)
         if (transports.http) {
-            const httpHandler = new MCPProtocolHandler(this.router);
+            const httpHandler = new MCPProtocolHandler(this.router, {
+                jwtMiddleware: this.jwtMiddleware,
+                auth: this.config.mcp.auth,
+                // Pass additional config if available (for tests)
+                ...this.config.mcp.rateLimiting && { rateLimiting: this.config.mcp.rateLimiting },
+                ...this.config.mcp.securityLogging && { securityLogging: this.config.mcp.securityLogging },
+                ...this.config.mcp.authEnforcement && { authEnforcement: this.config.mcp.authEnforcement }
+            });
             httpHandler.setupMCPEndpoint(this.app, '/mcp');
             enabledTransports.push('HTTP');
         }

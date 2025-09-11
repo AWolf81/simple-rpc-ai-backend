@@ -1,4 +1,4 @@
-import { publicProcedure, router, withMCPAuth } from "../index";
+import { publicProcedure, router } from "../index";
 import z from "zod";
 import { Request, Response } from 'express';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -11,10 +11,30 @@ import { AuthEnforcer, getDefaultAuthEnforcer, type AuthEnforcementConfig } from
 import fs from 'fs';
 import path from 'path';
 
+export type MCPAuthType = 'oauth' | 'jwt' | 'both' | 'none';
+
 export interface MCPAuthConfig {
   requireAuthForToolsList?: boolean;
   requireAuthForToolsCall?: boolean;  
   publicTools?: string[];
+  
+  // New authentication type configuration
+  authType?: MCPAuthType; // Default: 'oauth' for backward compatibility
+  
+  // OAuth-specific configuration
+  oauth?: {
+    enabled?: boolean; // Default: true when authType includes 'oauth'
+    sessionStorePath?: string; // Path to OAuth session storage
+    requireValidSession?: boolean; // Default: true
+  };
+  
+  // JWT-specific configuration
+  jwt?: {
+    enabled?: boolean; // Default: true when authType includes 'jwt'
+    requireValidSignature?: boolean; // Default: true
+    requiredScopes?: string[]; // Required JWT scopes (e.g., ['mcp', 'mcp:call'])
+    allowExpiredTokens?: boolean; // Default: false
+  };
 }
 
 export interface MCPRouterConfig {
@@ -994,12 +1014,13 @@ export class MCPProtocolHandler {
   }
 
   /**
-   * Extract user scopes from request (OAuth token or session)
+   * Extract user scopes and authentication info from request (JWT, OAuth, or both)
    */
   private extractUserScopes(req?: Request): string[] {
     console.log('🔍 Debug - extractUserScopes called:', {
       hasReq: !!req,
-      authHeader: req?.headers?.authorization ? `Bearer ${req.headers.authorization.substring(7, 17)}...` : 'none'
+      authHeader: req?.headers?.authorization ? `Bearer ${req.headers.authorization.substring(7, 17)}...` : 'none',
+      authType: this.authConfig?.authType || 'oauth'
     });
     
     if (!req) {
@@ -1007,43 +1028,158 @@ export class MCPProtocolHandler {
       return [];
     }
 
-    // Extract from OAuth token
+    const authType = this.authConfig?.authType || 'oauth';
     const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      console.log('🔍 Debug - Processing Bearer token:', token.substring(0, 20) + '...');
-      
-      // Validate token against OAuth storage and extract scopes
-      try {
-        const userInfo = this.validateOAuthToken(token);
-        console.log('🔍 Debug - OAuth validation result:', {
-          hasUserInfo: !!userInfo,
-          user: userInfo?.user ? `${userInfo.user.name} (${userInfo.user.email})` : null,
-          scopes: userInfo?.tokenInfo?.scope
-        });
-        
-        if (userInfo) {
-          // Attach user info to request for later use
-          (req as any).user = userInfo.user;
-          (req as any).tokenInfo = userInfo.tokenInfo;
-          
-          const scopes = userInfo.tokenInfo.scope || [];
-          console.log('✅ Debug - Extracted scopes:', scopes);
-          return scopes;
+    
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.log('❌ Debug - No Bearer token found');
+      return [];
+    }
+
+    const token = authHeader.substring(7);
+    console.log('🔍 Debug - Processing Bearer token:', token.substring(0, 20) + '...', `(authType: ${authType})`);
+
+    // Handle different authentication types
+    switch (authType) {
+      case 'jwt':
+        return this.extractScopesFromJWT(req, token);
+      case 'oauth':
+        return this.extractScopesFromOAuth(req, token);
+      case 'both':
+        // Try JWT first, fallback to OAuth
+        const jwtScopes = this.extractScopesFromJWT(req, token);
+        if (jwtScopes.length > 0) {
+          return jwtScopes;
         }
-      } catch (error) {
-        console.warn('⚠️ Invalid OAuth token:', error);
+        return this.extractScopesFromOAuth(req, token);
+      case 'none':
+        console.log('🔓 Debug - Authentication disabled, returning empty scopes');
         return [];
+      default:
+        console.warn('⚠️ Unknown auth type, falling back to OAuth:', authType);
+        return this.extractScopesFromOAuth(req, token);
+    }
+  }
+
+  /**
+   * Extract scopes from JWT token
+   */
+  private extractScopesFromJWT(req: Request, token: string): string[] {
+    if (!this.jwtMiddleware || this.authConfig?.jwt?.enabled === false) {
+      console.log('❌ Debug - JWT authentication not available or disabled');
+      return [];
+    }
+
+    try {
+      // Validate JWT token using the middleware
+      const payload = this.jwtMiddleware.validateToken(token);
+      console.log('🔍 Debug - JWT validation result:', {
+        userId: payload.userId,
+        email: payload.email,
+        subscriptionTier: payload.subscriptionTier,
+        scope: (payload as any).scope
+      });
+
+      // Check required scopes if configured
+      const requiredScopes = this.authConfig?.jwt?.requiredScopes || [];
+      const userScopes = this.extractScopesFromJWTPayload(payload);
+      
+      if (requiredScopes.length > 0) {
+        const hasRequiredScopes = requiredScopes.every(scope => userScopes.includes(scope));
+        if (!hasRequiredScopes) {
+          console.warn('⚠️ JWT token missing required scopes:', {
+            required: requiredScopes,
+            found: userScopes
+          });
+          return [];
+        }
+      }
+
+      // Attach user info to request
+      (req as any).user = {
+        id: payload.userId,
+        email: payload.email,
+        name: payload.email, // Use email as name if not provided
+        subscriptionTier: payload.subscriptionTier
+      };
+      (req as any).tokenInfo = {
+        scope: userScopes,
+        source: 'jwt',
+        features: payload.features
+      };
+
+      console.log('✅ Debug - JWT scopes extracted:', userScopes);
+      return userScopes;
+
+    } catch (error) {
+      console.warn('⚠️ Invalid JWT token:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Extract scopes from JWT payload
+   */
+  private extractScopesFromJWTPayload(payload: any): string[] {
+    // Check various scope fields that might exist
+    if (payload.scope) {
+      if (Array.isArray(payload.scope)) {
+        return payload.scope;
+      }
+      if (typeof payload.scope === 'string') {
+        return payload.scope.split(' ');
       }
     }
 
-    // Extract from session or other auth mechanism
-    const user = (req as any).user;
-    if (user?.scopes) {
-      return Array.isArray(user.scopes) ? user.scopes : [user.scopes];
+    if (payload.scopes && Array.isArray(payload.scopes)) {
+      return payload.scopes;
     }
 
-    // Default: no authentication = public access only
+    // Default scopes based on subscription tier
+    const defaultScopes = ['mcp'];
+    if (payload.subscriptionTier === 'pro' || payload.subscriptionTier === 'enterprise') {
+      defaultScopes.push('mcp:call', 'mcp:admin');
+    } else {
+      defaultScopes.push('mcp:call');
+    }
+
+    return defaultScopes;
+  }
+
+  /**
+   * Extract scopes from OAuth token
+   */
+  private extractScopesFromOAuth(req: Request, token: string): string[] {
+    if (this.authConfig?.oauth?.enabled === false) {
+      console.log('❌ Debug - OAuth authentication disabled');
+      return [];
+    }
+
+    try {
+      const userInfo = this.validateOAuthToken(token);
+      console.log('🔍 Debug - OAuth validation result:', {
+        hasUserInfo: !!userInfo,
+        user: userInfo?.user ? `${userInfo.user.name} (${userInfo.user.email})` : null,
+        scopes: userInfo?.tokenInfo?.scope
+      });
+      
+      if (userInfo) {
+        // Attach user info to request for later use
+        (req as any).user = userInfo.user;
+        (req as any).tokenInfo = {
+          ...userInfo.tokenInfo,
+          source: 'oauth'
+        };
+        
+        const scopes = userInfo.tokenInfo.scope || [];
+        console.log('✅ Debug - OAuth scopes extracted:', scopes);
+        return scopes;
+      }
+    } catch (error) {
+      console.warn('⚠️ Invalid OAuth token:', error);
+      return [];
+    }
+
     return [];
   }
 

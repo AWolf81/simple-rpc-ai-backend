@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request, { Response } from 'supertest';
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import crypto from 'crypto';
 import { createRpcAiServer } from '../../src/rpc-ai-server';
-import { createTestMCPConfig } from '../../src/security/test-helpers';
+import { createTestMCPConfig, createJWTMCPConfig } from '../../src/security/test-helpers';
 
 describe('MCP Authentication', () => {
   let app: express.Application;
@@ -81,6 +83,8 @@ describe('MCP Authentication', () => {
   }
 
   beforeEach(async () => {
+    process.env.NODE_ENV = 'test'; // Ensure test environment
+    
     // Create OAuth session for testing
     createTestOAuthSession();
     
@@ -96,7 +100,11 @@ describe('MCP Authentication', () => {
           requireAuthForToolsList: false,
           requireAuthForToolsCall: true,
           publicTools: ['greeting']
-        }
+        },
+        // Explicitly disable security features for testing
+        rateLimiting: { enabled: false },
+        securityLogging: { enabled: false, networkFilter: { enabled: false } },
+        authEnforcement: { enabled: false }
       }),    
     });
 
@@ -370,8 +378,32 @@ describe('MCP Authentication', () => {
   describe('Authentication with Strict Configuration', () => {
     let strictServer: any;
     let strictApp: express.Application;
+    let validJWTToken: string;
 
     beforeEach(async () => {
+      // Set up OAuth/JWT environment for strict tests with RSA keys
+      const jwtIssuer = 'test-issuer';
+      const jwtAudience = 'test-audience';
+      
+      // Generate RSA key pair for RS256 JWT signing
+      const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding: {
+          type: 'spki',
+          format: 'pem',
+        },
+        privateKeyEncoding: {
+          type: 'pkcs8',
+          format: 'pem',
+        },
+      });
+      
+      // Store keys for JWT operations
+      const jwtPrivateKey = privateKey;
+      const jwtPublicKey = publicKey;
+      
+      process.env.JWT_SECRET = jwtPublicKey; // Use public key for server verification
+      
       strictServer = createRpcAiServer({
         port: 0, // Use dynamic port for tests
         serverProviders: ['anthropic'],
@@ -379,18 +411,51 @@ describe('MCP Authentication', () => {
           jsonRpc: true,
           tRpc: true
         },
-        mcp: createTestMCPConfig({
-          auth: {
-            requireAuthForToolsList: true, // Require auth even for tools/list
-            requireAuthForToolsCall: true,
-            publicTools: [] // No public tools
-          }
+        // Enable JWT middleware for these tests
+        jwt: {
+          secret: jwtPublicKey,
+          issuer: jwtIssuer,
+          audience: jwtAudience
+        },
+        mcp: createJWTMCPConfig({
+          // Disable rate limiting and logging but keep auth enforcement for JWT tests
+          rateLimiting: { enabled: false },
+          securityLogging: { enabled: false, networkFilter: { enabled: false } },
+          authEnforcement: { enabled: true } // Keep auth enforcement enabled for strict tests
         })
       });
       
       await strictServer.start();
 
-      strictApp = strictServer.app;      
+      strictApp = strictServer.app;
+      
+      // Create a valid JWT token for testing AFTER server is configured using RS256
+      validJWTToken = jwt.sign(
+        { 
+          userId: 'test-user-123', 
+          email: 'test@example.com',
+          subscriptionTier: 'pro',
+          monthlyTokenQuota: 100000,
+          rpmLimit: 100,
+          tpmLimit: 10000,
+          features: ['basic_ai', 'advanced_ai'],
+          scope: 'mcp mcp:call mcp:admin read write admin' // Add the required MCP scopes
+        },
+        jwtPrivateKey, // Use private key for signing
+        { 
+          algorithm: 'RS256', // Use RS256 algorithm
+          expiresIn: '1h',
+          audience: jwtAudience,
+          issuer: jwtIssuer
+        }
+      );
+    });
+
+    afterEach(async () => {
+      if (strictServer) {
+        await strictServer.stop();
+      }
+      delete process.env.JWT_SECRET;
     });
 
     it('should require authentication for tools/list when configured', async () => {
@@ -410,7 +475,7 @@ describe('MCP Authentication', () => {
     it('should allow authenticated tools/list requests', async () => {
       const response = await request(strictApp)
         .post('/mcp')
-        .set('Authorization', `Bearer ${testOAuthToken}`)
+        .set('Authorization', `Bearer ${validJWTToken}`)
         .send({
           jsonrpc: '2.0',
           id: 13,
