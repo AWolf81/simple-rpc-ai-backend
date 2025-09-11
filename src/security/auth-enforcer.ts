@@ -329,7 +329,7 @@ export class AuthEnforcer {
     
     const endpoint = req.path;
     return !this.config.allowedAnonymousEndpoints.some(allowed => 
-      allowed && endpoint.startsWith(allowed)
+      typeof allowed === 'string' && endpoint.startsWith(allowed)
     );
   }
 
