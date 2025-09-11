@@ -5,7 +5,7 @@
  * Perfect for VS Code secure storage integration
  */
 
-import { StorageAdapter } from './StorageAdapter.js';
+import { StorageAdapter } from './StorageAdapter';
 import * as winston from 'winston';
 
 export class ClientManagedStorageAdapter implements StorageAdapter {

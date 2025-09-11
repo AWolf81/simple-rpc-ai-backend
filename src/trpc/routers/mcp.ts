@@ -1,4 +1,4 @@
-import { publicProcedure, router } from "../index.js";
+import { publicProcedure, router } from "@src-trpc/index";
 import z from "zod";
 import { Request, Response } from 'express';
 import { zodToJsonSchema } from 'zod-to-json-schema';

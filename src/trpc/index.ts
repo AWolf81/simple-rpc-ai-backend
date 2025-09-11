@@ -25,7 +25,7 @@ export interface ExtendedMeta extends McpMeta {
   };
 }
 // OpenAPI removed - using custom tRPC methods extraction instead
-import type { AuthenticatedRequest, OpenSaaSJWTPayload } from '../auth/jwt-middleware.js';
+import type { AuthenticatedRequest, OpenSaaSJWTPayload } from '@auth/jwt-middleware';
 import superjson from 'superjson';
 
 /**
@@ -36,11 +36,15 @@ export function createTRPCContext(opts: CreateExpressContextOptions): {
   req: Request;
   res: Response;
   user: OpenSaaSJWTPayload | null;
+  apiKey: string | null;
 } {
   const authReq = opts.req as AuthenticatedRequest;
   
   // Start with JWT middleware user if available
   let user = authReq.user || null;
+  
+  // Extract API key from header for BYOK scenarios
+  const apiKey = opts.req.headers['x-api-key'] as string | null;
   
   // Development mode: Handle OpenSaaS JWT tokens and session tokens
   if (!user && opts.req.headers.authorization?.startsWith('Bearer ')) {
@@ -113,6 +117,7 @@ export function createTRPCContext(opts: CreateExpressContextOptions): {
     req: opts.req,
     res: opts.res,
     user, // Populated by JWT middleware if token is valid, or mock user in dev mode
+    apiKey,
   };
 }
 

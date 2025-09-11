@@ -6,7 +6,7 @@
  * For BYOK users: Used for analytics and display only (no limiting)
  */
 
-import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
+import { PostgreSQLAdapter } from '../database/postgres-adapter';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface UsageRecord {

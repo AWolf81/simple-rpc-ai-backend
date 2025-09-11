@@ -7,13 +7,13 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure, protectedProcedure, tokenProtectedProcedure } from '../index.js';
-import { AIService } from '../../services/ai-service.js';
-import { VirtualTokenService } from '../../services/virtual-token-service.js';
-import { UsageAnalyticsService } from '../../services/usage-analytics-service.js';
-import { PostgreSQLAdapter } from '../../database/postgres-adapter.js';
-import { ProviderRegistryService } from '../../services/provider-registry.js';
-import { PostgreSQLRPCMethods } from '../../auth/PostgreSQLRPCMethods.js';
+import { router, publicProcedure, protectedProcedure, tokenProtectedProcedure } from '@src-trpc/index';
+import { AIService } from '@services/ai-service';
+import { VirtualTokenService } from '@services/virtual-token-service';
+import { UsageAnalyticsService } from '@services/usage-analytics-service';
+import { PostgreSQLAdapter } from '@database/postgres-adapter';
+import { ProviderRegistryService } from '@services/provider-registry';
+import { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
 
 // Configurable limits interface
 export interface AIRouterConfig {
@@ -153,6 +153,7 @@ export function createAIRouter(
     systemPrompt: z.string()
       .min(mergedConfig.systemPrompt.minLength!)
       .max(mergedConfig.systemPrompt.maxLength!),
+    apiKey: z.string().optional(),
     metadata: z.object({
       name: z.string().optional(),
       type: z.string().optional(),
@@ -212,18 +213,12 @@ export function createAIRouter(
    */
   executeAIRequest: publicProcedure
     .input(executeAIRequestSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { content, systemPrompt, metadata, options } = input;
-      // Simplified for OpenAPI testing - no auth/context
-      return {
-        success: true,
-        message: "AI request would be processed here",
-        input: { content: content.substring(0, 50) + "..." }
-      };
-    }),
+      const { user } = ctx;
+      const userId = user?.userId;
+      const apiKey = input.apiKey || ctx.apiKey;
 
-  // TEMPORARILY COMMENTED OUT - OLD IMPLEMENTATION
-  /*
       // Determine user type and execution path
       if (userId && usageAnalyticsService) {
         // Authenticated user - determine if subscription or BYOK
@@ -961,7 +956,11 @@ export function createAIRouter(
         });
       }
 
-      const result = await postgresRPCMethods.storeUserKey(input);
+      const result = await postgresRPCMethods.storeUserKey({
+        email: input.email,
+        provider: input.provider,
+        apiKey: input.apiKey
+      });
       
       if (!result.success) {
         throw new TRPCError({
@@ -993,7 +992,10 @@ export function createAIRouter(
         });
       }
 
-      const result = await postgresRPCMethods.getUserKey(input);
+      const result = await postgresRPCMethods.getUserKey({
+        email: input.email,
+        provider: input.provider
+      });
       
       if (!result.success) {
         return {
@@ -1027,7 +1029,9 @@ export function createAIRouter(
         });
       }
 
-      const result = await postgresRPCMethods.getUserProviders(input);
+      const result = await postgresRPCMethods.getUserProviders({
+        email: input.email
+      });
       
       if (!result.success) {
         throw new TRPCError({
@@ -1064,7 +1068,10 @@ export function createAIRouter(
         });
       }
 
-      const result = await postgresRPCMethods.validateUserKey(input);
+      const result = await postgresRPCMethods.validateUserKey({
+        email: input.email,
+        provider: input.provider
+      });
       
       if (!result.success) {
         throw new TRPCError({
@@ -1096,7 +1103,11 @@ export function createAIRouter(
         });
       }
 
-      const result = await postgresRPCMethods.rotateUserKey(input);
+      const result = await postgresRPCMethods.rotateUserKey({
+        email: input.email,
+        provider: input.provider,
+        newApiKey: input.newApiKey
+      });
       
       if (!result.success) {
         throw new TRPCError({
@@ -1128,7 +1139,10 @@ export function createAIRouter(
         });
       }
 
-      const result = await postgresRPCMethods.deleteUserKey(input);
+      const result = await postgresRPCMethods.deleteUserKey({
+        email: input.email,
+        provider: input.provider
+      });
       
       if (!result.success) {
         throw new TRPCError({

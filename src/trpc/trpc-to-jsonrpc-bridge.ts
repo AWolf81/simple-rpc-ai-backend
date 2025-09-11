@@ -7,7 +7,7 @@
 
 import type { AnyRouter, inferRouterContext, TRPCError } from '@trpc/server';
 import type { Request, Response } from 'express';
-import type { AppRouter } from './root.js';
+import type { AppRouter } from './root';
 
 interface JSONRPCRequest {
   jsonrpc: '2.0';

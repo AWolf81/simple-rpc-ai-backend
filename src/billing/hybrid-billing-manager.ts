@@ -5,7 +5,7 @@
  * Automatically chooses payment method based on user preferences and balance
  */
 
-import { SimpleKeyManager } from '../auth/key-manager.js';
+import { SimpleKeyManager } from '../auth/key-manager';
 
 export interface BillingConfig {
   // Server-wide billing mode

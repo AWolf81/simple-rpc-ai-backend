@@ -3,8 +3,8 @@
  * Allows customization of prompts and resources in Simple RPC AI Backend
  */
 
-import { MCPPrompt, MCPPromptTemplate } from './default-prompts.js';
-import { MCPResource, MCPResourceHandler } from './default-resources.js';
+import { MCPPrompt, MCPPromptTemplate } from './default-prompts';
+import { MCPResource, MCPResourceHandler } from './default-resources';
 
 export interface MCPPromptsConfig {
   /**

@@ -6,11 +6,11 @@
  */
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure, protectedProcedure } from '../index.js';
-import { AIService } from '../../services/ai-service.js';
-import { VirtualTokenService } from '../../services/virtual-token-service.js';
-import { UsageAnalyticsService } from '../../services/usage-analytics-service.js';
-import { ProviderRegistryService } from '../../services/provider-registry.js';
+import { router, publicProcedure, protectedProcedure } from '../../src/trpc/index.js';
+import { AIService } from '../../src/services/ai-service.js';
+import { VirtualTokenService } from '../../src/services/virtual-token-service.js';
+import { UsageAnalyticsService } from '../../src/services/usage-analytics-service.js';
+import { ProviderRegistryService } from '../../src/services/provider-registry.js';
 // Predefined configurations for common use cases
 // ⚠️ IMPORTANT: These are suggested defaults. Always validate against:
 //   - Your AI provider's token limits (Claude: 200k, GPT-4: 8k-128k, Gemini: 1M)
@@ -113,6 +113,7 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
         systemPrompt: z.string()
             .min(mergedConfig.systemPrompt.minLength)
             .max(mergedConfig.systemPrompt.maxLength),
+        apiKey: z.string().optional(),
         metadata: z.object({
             name: z.string().optional(),
             type: z.string().optional(),
@@ -168,173 +169,141 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
          */
         executeAIRequest: publicProcedure
             .input(executeAIRequestSchema)
-            .mutation(async ({ input }) => {
+            .mutation(async ({ input, ctx }) => {
             const { content, systemPrompt, metadata, options } = input;
-            // Simplified for OpenAPI testing - no auth/context
-            return {
-                success: true,
-                message: "AI request would be processed here",
-                input: { content: content.substring(0, 50) + "..." }
-            };
-        }),
-        // TEMPORARILY COMMENTED OUT - OLD IMPLEMENTATION
-        /*
+            const { user } = ctx;
+            const userId = user?.userId;
+            const apiKey = input.apiKey || ctx.apiKey;
             // Determine user type and execution path
             if (userId && usageAnalyticsService) {
-              // Authenticated user - determine if subscription or BYOK
-              const userStatus = await usageAnalyticsService.getUserStatus(userId);
-              
-              // Subscription user with token tracking
-              if (userStatus.userType === 'subscription' && virtualTokenService) {
-                // Ensure user account exists
-                await virtualTokenService.ensureUserAccount(userId, ctx.user?.email);
-      
-                // Estimate tokens (rough estimate: 4 chars per token)
-                const estimatedTokens = Math.ceil(content.length / 4) + Math.ceil(systemPrompt.length / 4);
-                
-                // Check token balance
-                const hasBalance = await virtualTokenService.checkTokenBalance(userId, estimatedTokens);
-                if (!hasBalance) {
-                  throw new TRPCError({
-                    code: 'PAYMENT_REQUIRED',
-                    message: 'Insufficient token balance. Please top up your account to continue.',
-                  });
+                // Authenticated user - determine if subscription or BYOK
+                const userStatus = await usageAnalyticsService.getUserStatus(userId);
+                // Subscription user with token tracking
+                if (userStatus.userType === 'subscription' && virtualTokenService) {
+                    // Ensure user account exists
+                    await virtualTokenService.ensureUserAccount(userId, ctx.user?.email);
+                    // Estimate tokens (rough estimate: 4 chars per token)
+                    const estimatedTokens = Math.ceil(content.length / 4) + Math.ceil(systemPrompt.length / 4);
+                    // Check token balance
+                    const hasBalance = await virtualTokenService.checkTokenBalance(userId, estimatedTokens);
+                    if (!hasBalance) {
+                        throw new TRPCError({
+                            code: 'PAYMENT_REQUIRED',
+                            message: 'Insufficient token balance. Please top up your account to continue.',
+                        });
+                    }
+                    try {
+                        // Execute AI request
+                        const result = await aiService.execute({
+                            content,
+                            systemPrompt,
+                            metadata,
+                            options,
+                        });
+                        // Deduct actual tokens used
+                        if (result.usage?.totalTokens) {
+                            const deductionResult = await virtualTokenService.deductTokens(userId, result.usage.totalTokens, result.provider || 'unknown', result.model, result.requestId, 'executeAIRequest');
+                            return {
+                                success: true,
+                                data: result,
+                                tokenUsage: {
+                                    tokensUsed: result.usage.totalTokens,
+                                    tokensCharged: deductionResult.tokensDeducted,
+                                    platformFee: deductionResult.platformFee,
+                                    remainingBalance: deductionResult.newBalance,
+                                },
+                            };
+                        }
+                        return {
+                            success: true,
+                            data: result,
+                        };
+                    }
+                    catch (error) {
+                        throw new TRPCError({
+                            code: 'INTERNAL_SERVER_ERROR',
+                            message: `AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                        });
+                    }
                 }
-      
-                try {
-                  // Execute AI request
-                  const result = await aiService.execute({
-                    content,
-                    systemPrompt,
-                    metadata,
-                    options,
-                  });
-      
-                  // Deduct actual tokens used
-                  if (result.usage?.totalTokens) {
-                    const deductionResult = await virtualTokenService.deductTokens(
-                      userId,
-                      result.usage.totalTokens,
-                      result.provider || 'unknown',
-                      result.model,
-                      result.requestId,
-                      'executeAIRequest'
-                    );
-      
-                    return {
-                      success: true,
-                      data: result,
-                      tokenUsage: {
-                        tokensUsed: result.usage.totalTokens,
-                        tokensCharged: deductionResult.tokensDeducted,
-                        platformFee: deductionResult.platformFee,
-                        remainingBalance: deductionResult.newBalance,
-                      },
-                    };
-                  }
-      
-                  return {
-                    success: true,
-                    data: result,
-                  };
-                } catch (error) {
-                  throw new TRPCError({
-                    code: 'INTERNAL_SERVER_ERROR',
-                    message: `AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                  });
-                }
-              }
-            } else if (userId && apiKey) {
-              // Authenticated BYOK user - track usage but don't limit
-              try {
-                const result = await aiService.execute({
-                  content,
-                  systemPrompt,
-                  metadata,
-                  options,
-                  apiKey,
-                });
-      
-                // Record usage for analytics (no limiting)
-                if (usageAnalyticsService && result.usage) {
-                  const estimatedCost = UsageAnalyticsService.estimateCost(
-                    result.provider || 'unknown',
-                    result.model,
-                    result.usage.promptTokens,
-                    result.usage.completionTokens
-                  );
-      
-                  await usageAnalyticsService.recordUsage({
-                    userId,
-                    userType: 'byok',
-                    provider: result.provider || 'unknown',
-                    model: result.model,
-                    inputTokens: result.usage.promptTokens,
-                    outputTokens: result.usage.completionTokens,
-                    totalTokens: result.usage.totalTokens,
-                    estimatedCostUsd: estimatedCost,
-                    requestId: result.requestId,
-                    method: 'executeAIRequest',
-                    metadata
-                  });
-                }
-      
-                return {
-                  success: true,
-                  data: result,
-                  usageInfo: result.usage ? {
-                    tokensUsed: result.usage.totalTokens,
-                    estimatedCostUsd: UsageAnalyticsService.estimateCost(
-                      result.provider || 'unknown',
-                      result.model,
-                      result.usage.promptTokens,
-                      result.usage.completionTokens
-                    )
-                  } : undefined
-                };
-              } catch (error) {
-                throw new TRPCError({
-                  code: 'INTERNAL_SERVER_ERROR',
-                  message: `AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                });
-              }
-            } else {
-              // Public/unauthenticated usage with BYOK
-              if (!apiKey) {
-                throw new TRPCError({
-                  code: 'BAD_REQUEST',
-                  message: 'API key required for public usage. Please provide your AI provider API key.',
-                });
-              }
-      
-              try {
-                const result = await aiService.execute({
-                  content,
-                  systemPrompt,
-                  metadata,
-                  options,
-                  apiKey,
-                });
-      
-                return {
-                  success: true,
-                  data: result,
-                };
-              } catch (error) {
-                throw new TRPCError({
-                  code: 'INTERNAL_SERVER_ERROR',
-                  message: `AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                });
-              }
             }
-            
+            else if (userId && apiKey) {
+                // Authenticated BYOK user - track usage but don't limit
+                try {
+                    const result = await aiService.execute({
+                        content,
+                        systemPrompt,
+                        metadata,
+                        options,
+                        apiKey,
+                    });
+                    // Record usage for analytics (no limiting)
+                    if (usageAnalyticsService && result.usage) {
+                        const estimatedCost = UsageAnalyticsService.estimateCost(result.provider || 'unknown', result.model, result.usage.promptTokens, result.usage.completionTokens);
+                        await usageAnalyticsService.recordUsage({
+                            userId,
+                            userType: 'byok',
+                            provider: result.provider || 'unknown',
+                            model: result.model,
+                            inputTokens: result.usage.promptTokens,
+                            outputTokens: result.usage.completionTokens,
+                            totalTokens: result.usage.totalTokens,
+                            estimatedCostUsd: estimatedCost,
+                            requestId: result.requestId,
+                            method: 'executeAIRequest',
+                            metadata
+                        });
+                    }
+                    return {
+                        success: true,
+                        data: result,
+                        usageInfo: result.usage ? {
+                            tokensUsed: result.usage.totalTokens,
+                            estimatedCostUsd: UsageAnalyticsService.estimateCost(result.provider || 'unknown', result.model, result.usage.promptTokens, result.usage.completionTokens)
+                        } : undefined
+                    };
+                }
+                catch (error) {
+                    throw new TRPCError({
+                        code: 'INTERNAL_SERVER_ERROR',
+                        message: `AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    });
+                }
+            }
+            else {
+                // Public/unauthenticated usage with BYOK
+                if (!apiKey) {
+                    throw new TRPCError({
+                        code: 'BAD_REQUEST',
+                        message: 'API key required for public usage. Please provide your AI provider API key.',
+                    });
+                }
+                try {
+                    const result = await aiService.execute({
+                        content,
+                        systemPrompt,
+                        metadata,
+                        options,
+                        apiKey,
+                    });
+                    return {
+                        success: true,
+                        data: result,
+                    };
+                }
+                catch (error) {
+                    throw new TRPCError({
+                        code: 'INTERNAL_SERVER_ERROR',
+                        message: `AI service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    });
+                }
+            }
             // Default fallback - should not reach here normally
             throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Unable to process request - invalid execution path',
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Unable to process request - invalid execution path',
             });
-          }),
-      
+        }),
         /**
          * Get user profile with capabilities and preferences (hybrid users)
          */
@@ -867,7 +836,11 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.storeUserKey(input);
+            const result = await postgresRPCMethods.storeUserKey({
+                email: input.email,
+                provider: input.provider,
+                apiKey: input.apiKey
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
@@ -895,7 +868,10 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.getUserKey(input);
+            const result = await postgresRPCMethods.getUserKey({
+                email: input.email,
+                provider: input.provider
+            });
             if (!result.success) {
                 return {
                     hasKey: false,
@@ -925,7 +901,9 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.getUserProviders(input);
+            const result = await postgresRPCMethods.getUserProviders({
+                email: input.email
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
@@ -958,7 +936,10 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.validateUserKey(input);
+            const result = await postgresRPCMethods.validateUserKey({
+                email: input.email,
+                provider: input.provider
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
@@ -986,7 +967,11 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.rotateUserKey(input);
+            const result = await postgresRPCMethods.rotateUserKey({
+                email: input.email,
+                provider: input.provider,
+                newApiKey: input.newApiKey
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
@@ -1014,7 +999,10 @@ export function createAIRouter(config = {}, tokenTrackingEnabled = false, dbAdap
                     message: 'Secret manager is not configured on this server.',
                 });
             }
-            const result = await postgresRPCMethods.deleteUserKey(input);
+            const result = await postgresRPCMethods.deleteUserKey({
+                email: input.email,
+                provider: input.provider
+            });
             if (!result.success) {
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',

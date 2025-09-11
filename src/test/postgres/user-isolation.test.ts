@@ -7,8 +7,8 @@
  * Validates proper user isolation with database-level separation
  */
 
-import { PostgreSQLRPCMethods } from '../../auth/PostgreSQLRPCMethods.js';
-import { PostgreSQLConfig } from '../../services/PostgreSQLSecretManager.js';
+import { PostgreSQLRPCMethods } from '../../auth/PostgreSQLRPCMethods';
+import { PostgreSQLConfig } from '../../services/PostgreSQLSecretManager';
 import * as winston from 'winston';
 import dotenv from 'dotenv';
 

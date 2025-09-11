@@ -1,4 +1,4 @@
-import { publicProcedure, router } from "../index.js";
+import { publicProcedure, router } from "../../src/trpc/index.js";
 import z from "zod";
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { ErrorCode, LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';

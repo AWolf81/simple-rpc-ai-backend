@@ -8,7 +8,7 @@ export default [
       parser: tsparser,
       parserOptions: {
         ecmaVersion: 2020,
-        sourceType: 'module',
+        sourceType: 'module'
       },
     },
     plugins: {

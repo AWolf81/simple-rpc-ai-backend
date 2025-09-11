@@ -5,13 +5,12 @@
  * This is the single source of truth for all tRPC procedures.
  */
 
-import { router } from './index.js';
-import { createAIRouter, type AIRouterConfig } from './routers/ai.js';
-//import { createMCPRouter, type MCPRouterConfig } from './routers/mcp_old.js';
-import { createMCPRouter, MCPRouterConfig } from './routers/mcp.js'
+import { router } from '@src-trpc/index';
+import { createAIRouter, type AIRouterConfig } from '@src-trpc/routers/ai';
+import { createMCPRouter, MCPRouterConfig } from '@src-trpc/routers/mcp';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
-import type { PostgreSQLAdapter } from '../database/postgres-adapter.js';
-import type { PostgreSQLRPCMethods } from '../auth/PostgreSQLRPCMethods.js';
+import type { PostgreSQLAdapter } from '@database/postgres-adapter';
+import type { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
 // OpenAPI generation removed - using trpc-methods.json instead
 
 

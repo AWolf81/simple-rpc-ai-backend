@@ -9,8 +9,8 @@
  * Handles consumption order preferences and fallback logic
  */
 
-import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
-import { UsageAnalyticsService } from './usage-analytics-service.js';
+import { PostgreSQLAdapter } from '../database/postgres-adapter';
+import { UsageAnalyticsService } from './usage-analytics-service';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface UserProfile {

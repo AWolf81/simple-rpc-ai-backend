@@ -1,23 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { StorageFactory } from '../../src/storage/StorageFactory.js';
-import type { VaultStorageConfig, FileStorageConfig, ClientManagedStorageConfig } from '../../src/storage/StorageAdapter.js';
+import { StorageFactory } from '@storage/StorageFactory';
+import type { VaultStorageConfig, FileStorageConfig, ClientManagedStorageConfig } from '@storage/StorageAdapter';
 
 // Mock the storage adapters
-vi.mock('../../src/storage/VaultStorageAdapter.js', () => ({
+vi.mock('@storage/VaultStorageAdapter', () => ({
   VaultStorageAdapter: vi.fn().mockImplementation(() => ({
     initialize: vi.fn().mockResolvedValue(undefined),
     getType: () => 'vault'
   }))
 }));
 
-vi.mock('../../src/storage/FileStorageAdapter.js', () => ({
+vi.mock('@storage/FileStorageAdapter', () => ({
   FileStorageAdapter: vi.fn().mockImplementation(() => ({
     initialize: vi.fn().mockResolvedValue(undefined),
     getType: () => 'file'
   }))
 }));
 
-vi.mock('../../src/storage/ClientManagedStorageAdapter.js', () => ({
+vi.mock('@storage/ClientManagedStorageAdapter', () => ({
   ClientManagedStorageAdapter: vi.fn().mockImplementation(() => ({
     initialize: vi.fn().mockResolvedValue(undefined),
     getType: () => 'client_managed'
@@ -25,7 +25,7 @@ vi.mock('../../src/storage/ClientManagedStorageAdapter.js', () => ({
 }));
 
 // Mock PostgreSQL service
-vi.mock('../../src/services/PostgreSQLSecretManager.js', () => ({
+vi.mock('@services/PostgreSQLSecretManager', () => ({
   PostgreSQLSecretManager: vi.fn()
 }));
 

@@ -5,20 +5,20 @@ import cors from 'cors';
 import helmet from 'helmet';
 
 // Import OpenSaaS monetization components
-import { JWTMiddleware, type AuthenticatedRequest, mergeWithDefaultTiers } from '../auth/jwt-middleware.js';
-import { RateLimiter } from '../middleware/rate-limiter.js';
-import { UsageTracker } from '../billing/usage-tracker.js';
-import { BillingEngine } from '../billing/billing-engine.js';
-import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
+import { JWTMiddleware, type AuthenticatedRequest, mergeWithDefaultTiers } from '../auth/jwt-middleware';
+import { RateLimiter } from '../middleware/rate-limiter';
+import { UsageTracker } from '../billing/usage-tracker';
+import { BillingEngine } from '../billing/billing-engine';
+import { PostgreSQLAdapter } from '../database/postgres-adapter';
 
 // Import existing server components
-import { AIService } from '../services/ai-service.js';
-import { FunctionRegistry } from '../services/function-registry.js';
-import { PromptManager, promptManager } from '../services/prompt-manager.js';
+import { AIService } from '../services/ai-service';
+import { FunctionRegistry } from '../services/function-registry';
+import { PromptManager, promptManager } from '../services/prompt-manager';
 
 // Import configuration
-import type { MonetizedAIServerConfig, OpenSaaSMonetizationConfig } from './opensaas-config.js';
-import { mergeOpenSaaSConfig, validateOpenSaaSConfig } from './opensaas-config.js';
+import type { MonetizedAIServerConfig, OpenSaaSMonetizationConfig } from './opensaas-config';
+import { mergeOpenSaaSConfig, validateOpenSaaSConfig } from './opensaas-config';
 
 export interface MonetizedServerInstance {
   app: Express;

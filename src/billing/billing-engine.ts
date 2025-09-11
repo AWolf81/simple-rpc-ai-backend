@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { UsageTracker, type UsageEvent } from './usage-tracker.js';
-import { PostgreSQLAdapter } from '../database/postgres-adapter.js';
+import { UsageTracker, type UsageEvent } from './usage-tracker';
+import { PostgreSQLAdapter } from '../database/postgres-adapter';
 import winston from 'winston';
 
 export interface BillingEvent {

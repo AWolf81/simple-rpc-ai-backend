@@ -6,9 +6,9 @@
  */
 
 import { z } from 'zod';
-import { router, publicProcedure } from '../trpc/index.js';
-import { appRouter } from '../trpc/root.js';
-import type { AppRouter } from '../trpc/root.js';
+import { router, publicProcedure } from '../trpc/index';
+import { appRouter } from '../trpc/root';
+import type { AppRouter } from '../trpc/root';
 
 // Re-export tRPC components for compatibility
 export { router as createTRPCRouter, publicProcedure };

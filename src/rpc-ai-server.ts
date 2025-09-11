@@ -15,18 +15,18 @@ import rateLimit from 'express-rate-limit';
 import * as trpcExpress from '@trpc/server/adapters/express';
 import crypto from 'crypto';
 
-import { createAppRouter } from './trpc/root.js';
-import { createTRPCContext } from './trpc/index.js';
-import type { AppRouter } from './trpc/root.js';
-import type { AIRouterConfig } from './trpc/routers/ai.js';
-import { JWTMiddleware } from './auth/jwt-middleware.js';
-import { PostgreSQLAdapter } from './database/postgres-adapter.js';
-import { VirtualTokenService } from './services/virtual-token-service.js';
-import { UsageAnalyticsService } from './services/usage-analytics-service.js';
-import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods.js';
-import { RPC_METHODS } from './constants.js';
-import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge.js';
-import { MCPExtensionConfig } from './mcp/mcp-config.js';
+import { createAppRouter } from './trpc/root';
+import { createTRPCContext } from './trpc/index';
+import type { AppRouter } from './trpc/root';
+import type { AIRouterConfig } from './trpc/routers/ai';
+import { JWTMiddleware } from './auth/jwt-middleware';
+import { PostgreSQLAdapter } from './database/postgres-adapter';
+import { VirtualTokenService } from './services/virtual-token-service';
+import { UsageAnalyticsService } from './services/usage-analytics-service';
+import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods';
+import { RPC_METHODS } from './constants';
+import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge';
+import { MCPExtensionConfig } from './mcp/mcp-config';
 
 // Built-in provider types
 export type BuiltInProvider = 'anthropic' | 'openai' | 'google';

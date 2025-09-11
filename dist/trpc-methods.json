@@ -1,5 +1,5 @@
 {
-  "generated": "2025-08-31T18:51:39.752Z",
+  "generated": "2025-09-09T20:49:31.577Z",
   "version": "1.0.0",
   "description": "tRPC procedure documentation extracted from router",
   "procedures": {
@@ -88,6 +88,14 @@
           "systemPrompt": {
             "type": "ZodString",
             "description": null
+          },
+          "apiKey": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodString",
+              "description": null
+            }
           },
           "metadata": {
             "type": "ZodOptional",
