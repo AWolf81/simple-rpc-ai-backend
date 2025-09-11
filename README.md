@@ -3196,3 +3196,248 @@ const router = createTRPCRouter({
 ```
 
 **Current Status**: ✅ **Production Ready** - MCP integration provides seamless tRPC → MCP tool discovery with decorator pattern, full validation, authentication, and live testing capabilities. Maintains our core focus on system prompt protection and corporate-friendly deployment.
+
+---
+
+## 🔐 **Configurable Scope Management System**
+
+The RPC AI Server includes a powerful, extensible scope management system that allows fine-grained control over tool access and permissions. Scopes determine what actions users can perform and which tools they can access.
+
+### **🎯 Default Scopes**
+
+The system comes with a comprehensive set of default scopes organized hierarchically:
+
+#### **Core MCP Scopes**
+- **`mcp`** - Base MCP access (includes `mcp:list` and `mcp:call`)
+- **`mcp:list`** - List available tools and resources
+- **`mcp:call`** - Execute MCP tools
+- **`mcp:admin`** - Administrative MCP operations
+
+#### **User Access Scopes**
+- **`read`** - Read-only access to resources
+- **`write`** - Write access to resources
+- **`user:read`** - Read user profile information
+- **`user:write`** - Modify user profile information
+
+#### **System Scopes**
+- **`system:read`** - Read system information
+- **`system:admin`** - Administrative system operations
+- **`admin`** - Full administrative access (includes all scopes)
+
+#### **Billing & Profile Scopes**
+- **`billing:read`** - View billing information
+- **`billing:write`** - Modify billing settings
+- **`profile:read`** - Read profile data
+- **`profile:write`** - Update profile data
+
+### **⚙️ Configurable Scope System**
+
+Transform hardcoded scopes into a fully configurable, extensible system:
+
+#### **Basic Configuration**
+```typescript
+import { initializeScopeIntegration, ExampleScopeConfigurations } from './auth/scope-integration';
+
+// Use preset configuration
+const scopeIntegration = initializeScopeIntegration(
+  ExampleScopeConfigurations.production()
+);
+```
+
+#### **Custom Scope Definitions**
+```typescript
+const customScopeIntegration = initializeScopeIntegration({
+  preset: 'standard',
+  custom: {
+    customScopes: [
+      {
+        name: 'company:read',
+        description: 'Company-specific read access',
+        includes: ['read', 'mcp:list']
+      },
+      {
+        name: 'company:admin',
+        description: 'Company admin access',
+        includes: ['company:read', 'admin'],
+        privileged: true
+      }
+    ],
+    toolOverrides: [
+      {
+        toolName: 'sensitive_tool',
+        scopes: { 
+          required: ['company:admin'],
+          requireAdminUser: true,
+          adminUsers: ['admin@company.com']
+        }
+      }
+    ]
+  }
+});
+```
+
+#### **Environment-Specific Configurations**
+
+**Development (Permissive)**
+```typescript
+const devConfig = ExampleScopeConfigurations.development();
+// Allows: ['read', 'write', 'mcp:list', 'mcp:call'] for authenticated users
+```
+
+**Production (Secure)**
+```typescript
+const prodConfig = ExampleScopeConfigurations.production();
+// Restricted scopes with custom validation
+```
+
+**Enterprise (Fine-grained)**
+```typescript
+const enterpriseConfig = ExampleScopeConfigurations.enterprise();
+// Hierarchical scopes with business logic validation
+```
+
+**Multi-tenant**
+```typescript
+const multiTenantConfig = {
+  custom: {
+    customValidator: (userScopes, requiredScopes, context) => {
+      // Tenant isolation logic
+      const userTenant = context?.user?.tenantId;
+      const toolTenant = context?.tool?.tenantId;
+      
+      if (toolTenant && userTenant !== toolTenant) {
+        return false; // Enforce tenant isolation
+      }
+      
+      return requiredScopes.required?.every(scope => 
+        userScopes.includes(scope)
+      ) ?? true;
+    }
+  }
+};
+```
+
+### **🔧 Tool-Specific Scope Configuration**
+
+#### **Before (Hardcoded)**
+```typescript
+// In tRPC router - hardcoded scopes
+.meta({
+  mcp: {
+    name: 'echo',
+    scopes: ScopeHelpers.mcpCall() // ❌ Hardcoded
+  }
+})
+```
+
+#### **After (Configurable)**
+```typescript
+// In tRPC router - configurable scopes
+.meta({
+  mcp: {
+    name: 'echo',
+    scopes: createScopeRequirement('echo', ['mcp:call']) // ✅ Configurable
+  }
+})
+```
+
+### **🚀 Runtime Scope Management**
+
+```typescript
+const scopeIntegration = getScopeIntegration();
+
+// Add custom scope at runtime
+scopeIntegration.addCustomScope({
+  name: 'runtime:analytics',
+  description: 'Analytics access',
+  includes: ['read']
+});
+
+// Override tool scopes at runtime
+scopeIntegration.overrideToolScopes('greeting', {
+  required: [], // Make public
+  description: 'Public greeting tool'
+});
+
+// Get all available scopes
+const allScopes = scopeIntegration.getAllScopes();
+```
+
+### **🎯 Scope Validation Examples**
+
+#### **Basic Validation**
+```typescript
+const userScopes = ['read', 'mcp:list'];
+const requiredScopes = { required: ['mcp:list'] };
+
+const hasAccess = scopeIntegration.validateScopes(userScopes, requiredScopes);
+// Returns: true
+```
+
+#### **Advanced Validation with Context**
+```typescript
+const hasAccess = scopeIntegration.validateScopes(
+  userScopes, 
+  requiredScopes, 
+  {
+    user: { tenantId: 'company-a', role: 'admin' },
+    tool: { tenantId: 'company-a', department: 'engineering' },
+    request: { ip: '192.168.1.100' }
+  }
+);
+```
+
+### **📊 Scope Hierarchy**
+
+Scopes follow a hierarchical structure where higher-level scopes automatically include lower-level ones:
+
+```
+admin
+├── mcp
+│   ├── mcp:list
+│   └── mcp:call
+├── user:read
+├── user:write
+├── system:read
+└── system:admin
+
+mcp:list → includes: mcp
+mcp:call → includes: mcp
+enterprise:admin → includes: enterprise:write, admin
+```
+
+### **🔒 Security Features**
+
+- **Privilege Escalation Protection** - Prevents unauthorized scope elevation
+- **Tenant Isolation** - Multi-tenant scope validation
+- **Time-based Access** - Business hours restrictions
+- **IP-based Restrictions** - Location-based access control
+- **Admin User Validation** - Explicit admin user lists
+- **Graceful Fallbacks** - Falls back to default scopes if custom validation fails
+
+### **📋 Migration Guide**
+
+1. **Phase 1**: Initialize with disabled configuration (no breaking changes)
+2. **Phase 2**: Replace hardcoded scopes with `createScopeRequirement()` calls
+3. **Phase 3**: Add custom scopes and tool-specific overrides
+4. **Phase 4**: Deploy with production-ready configuration
+
+### **🧪 Environment Variables**
+
+```bash
+# Scope system configuration
+SCOPE_PRESET=production          # development|production|enterprise|apiOnly
+SCOPE_ENABLED=true              # Enable/disable configurable scopes
+SCOPE_FALLBACK=true             # Fallback to default scopes on errors
+```
+
+### **✅ Benefits**
+
+- **🔧 Extensible** - Add custom scopes with hierarchical relationships
+- **⚙️ Configurable** - Environment-specific configurations
+- **🔄 Replaceable** - Can disable and use defaults, gradual migration
+- **🚀 Flexible** - Multi-tenant, time-based, IP-based restrictions
+- **🛡️ Secure** - Comprehensive validation with privilege protection
+- **📈 Scalable** - Runtime management and introspection
+
+**The configurable scope system transforms the RPC AI Server into an enterprise-ready platform with fine-grained access control while maintaining full backward compatibility.**
