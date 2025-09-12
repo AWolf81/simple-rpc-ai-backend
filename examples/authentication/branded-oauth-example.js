@@ -159,7 +159,7 @@ const server = createRpcAiServer({
     },
     // Admin user configuration - specific users who can access admin-restricted tools
     adminUsers: [
-      'awolf2904@gmail.com'  // Add more admin emails as needed
+      'admin@gmail.com'  // Add more admin emails as needed
     ]
   },
 });

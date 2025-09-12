@@ -20,7 +20,7 @@ overrides:
   hono: '>=4.9.6'
   postcss: '>=8.4.31'
   '@octokit/request-error': '>=5.1.1'
-  vite: '>=6.3.6'
+  vite: ^6.3.6
   '@octokit/request': '>=8.4.1'
   '@octokit/plugin-paginate-rest': '>=9.2.2'
   prismjs: '>=1.30.0'
@@ -226,7 +226,7 @@ importers:
         version: 3.5.5(typescript@5.9.2)
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.2)(vite@7.1.5(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1))
+        version: 5.1.4(typescript@5.9.2)(vite@6.3.6(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1))
       vitest:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
@@ -7830,24 +7830,24 @@ packages:
   vite-tsconfig-paths@5.1.4:
     resolution: {integrity: sha512-cYj0LRuLV2c2sMqhqhGpaO3LretdtMn/BVX4cPLanIZuwwrkVl+lK84E/miEXkCHWXuq65rhNN4rXsBcOB3S4w==}
     peerDependencies:
-      vite: '>=6.3.6'
+      vite: ^6.3.6
     peerDependenciesMeta:
       vite:
         optional: true
 
-  vite@7.1.5:
-    resolution: {integrity: sha512-4cKBO9wR75r0BeIWWWId9XK9Lj6La5X846Zw9dFfzMRw38IlTk2iCcUt6hsyiDRcPidc55ZParFYDXi0nXOeLQ==}
-    engines: {node: ^20.19.0 || >=22.12.0}
+  vite@6.3.6:
+    resolution: {integrity: sha512-0msEVHJEScQbhkbVTb/4iHZdJ6SXp/AvxL2sjwYQFfBqleHtnCqv1J3sa9zbWz/6kW1m9Tfzn92vW+kZ1WV6QA==}
+    engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
     peerDependencies:
-      '@types/node': ^20.19.0 || >=22.12.0
+      '@types/node': ^18.0.0 || ^20.0.0 || >=22.0.0
       jiti: '>=1.21.0'
-      less: ^4.0.0
+      less: '*'
       lightningcss: ^1.21.0
-      sass: ^1.70.0
-      sass-embedded: ^1.70.0
-      stylus: '>=0.54.8'
-      sugarss: ^5.0.0
+      sass: '*'
+      sass-embedded: '*'
+      stylus: '*'
+      sugarss: '*'
       terser: ^5.16.0
       tsx: ^4.8.1
       yaml: ^2.4.2
@@ -9455,7 +9455,7 @@ snapshots:
       use-dark-mode: 2.3.1(react@19.1.0)
       use-debounce: 3.4.3(react@19.1.0)
       use-persisted-state: 0.3.3(react@19.1.0)
-      vite: 7.1.5(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
+      vite: 6.3.6(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
     transitivePeerDependencies:
       - '@mui/lab'
       - '@types/node'
@@ -11328,7 +11328,7 @@ snapshots:
 
   '@trpc-playground/html@1.0.4(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)':
     dependencies:
-      vite: 7.1.5(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
+      vite: 6.3.6(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
       xss: 1.0.15
     transitivePeerDependencies:
       - '@types/node'
@@ -17261,7 +17261,7 @@ snapshots:
       debug: 4.4.1
       pathe: 1.1.2
       picocolors: 1.1.1
-      vite: 7.1.5(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
+      vite: 6.3.6(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -17276,18 +17276,18 @@ snapshots:
       - tsx
       - yaml
 
-  vite-tsconfig-paths@5.1.4(typescript@5.9.2)(vite@7.1.5(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)):
+  vite-tsconfig-paths@5.1.4(typescript@5.9.2)(vite@6.3.6(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)):
     dependencies:
       debug: 4.4.1
       globrex: 0.1.2
       tsconfck: 3.1.6(typescript@5.9.2)
     optionalDependencies:
-      vite: 7.1.5(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
+      vite: 6.3.6(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
     transitivePeerDependencies:
       - supports-color
       - typescript
 
-  vite@7.1.5(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1):
+  vite@6.3.6(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1):
     dependencies:
       esbuild: 0.25.9
       fdir: 6.5.0(picomatch@4.0.3)
@@ -17320,7 +17320,7 @@ snapshots:
       strip-literal: 2.1.1
       tinybench: 2.9.0
       tinypool: 0.8.4
-      vite: 7.1.5(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
+      vite: 6.3.6(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
       vite-node: 1.6.1(@types/node@20.19.11)(tsx@4.20.5)(yaml@2.8.1)
       why-is-node-running: 2.3.0
     optionalDependencies:

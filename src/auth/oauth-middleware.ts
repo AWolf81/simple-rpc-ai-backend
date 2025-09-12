@@ -12,12 +12,32 @@ import crypto from 'crypto';
 import { createSessionStorage, SessionStorage } from './session-storage.js';
 import { Request, Response } from 'express';
 import { HandlebarsTemplateEngine, HandlebarsTemplateConfig, HandlebarsTemplateData, HANDLEBARS_PROVIDER_ICONS } from './handlebars-template-engine.js';
+import winston from 'winston';
 
 // Session storage instance (will be set during initialization)
 let sessionStorage: SessionStorage;
 
 // Template engine instance for OAuth pages
 let templateEngine: HandlebarsTemplateEngine;
+
+// Logger instance for structured logging
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    })
+  ],
+  defaultMeta: { service: 'oauth-middleware' }
+});
 
 // Identity Provider Configuration
 interface IdentityProviderConfig {
@@ -67,14 +87,16 @@ const getIdentityProviders = (): Record<string, IdentityProviderConfig> => {
 };
 
 // Default MCP client for testing
-const defaultClient: OAuth2Server.Client = {
-  id: 'mcp-client',
-  clientSecret: 'mcp-secret',
+const getDefaultClient = (): OAuth2Server.Client => ({
+  id: process.env.MCP_CLIENT_ID || 'mcp-client',
+  clientSecret: process.env.MCP_CLIENT_SECRET || crypto.randomBytes(32).toString('hex'),
   grants: ['authorization_code', 'refresh_token'],
-  redirectUris: ['http://localhost:4000/oauth/callback/debug'],
+  redirectUris: process.env.MCP_REDIRECT_URIS 
+    ? process.env.MCP_REDIRECT_URIS.split(',').map(uri => uri.trim())
+    : ['http://localhost:4000/oauth/callback/debug'],
   accessTokenLifetime: 3600, // 1 hour
   refreshTokenLifetime: 86400 // 24 hours
-};
+});
 
 // Default user for OAuth flow (Google OAuth integration would replace this)
 const defaultUser: OAuth2Server.User = {
@@ -97,7 +119,7 @@ async function getOidcConfig(providerName: string, config: IdentityProviderConfi
     throw new Error(`Provider ${providerName} is not an OIDC provider`);
   }
 
-  console.log(`🔍 Discovering OIDC configuration for ${providerName}...`);
+  logger.info('Discovering OIDC configuration', { provider: providerName });
   
   // Use direct HTTP call to discovery endpoint instead of openid-client discovery
   const discoveryResponse = await fetch(config.discoveryUrl);
@@ -114,7 +136,10 @@ async function getOidcConfig(providerName: string, config: IdentityProviderConfi
     redirectUri: config.redirectUri
   };
   
-  console.log(`✅ OIDC configuration cached for ${providerName}: ${configuration.authorization_endpoint}`);
+  logger.info('OIDC configuration cached', { 
+    provider: providerName, 
+    authEndpoint: configuration.authorization_endpoint 
+  });
   
   return oidcConfigs[providerName];
 }
@@ -159,11 +184,11 @@ function createOAuthModel(storage: SessionStorage, adminUsers: string[] = []) {
   return {
     // Client methods
     async getClient(clientId: string, clientSecret?: string) {
-      console.log(`🔍 OAuth: Getting client ${clientId}, secret provided: ${clientSecret !== undefined && clientSecret !== ''}`);
+      logger.debug('OAuth client lookup', { clientId, hasSecret: clientSecret !== undefined && clientSecret !== '' });
       const client = await storage.getClient(clientId);
       
       if (!client) {
-        console.log(`❌ OAuth: Client ${clientId} not found`);
+        logger.warn('OAuth client not found', { clientId });
         return null;
       }
       
@@ -173,7 +198,7 @@ function createOAuthModel(storage: SessionStorage, adminUsers: string[] = []) {
       const isPKCE = !clientSecret || clientSecret === '';
       
       if (!isPKCE && client.clientSecret !== clientSecret) {
-        console.log(`❌ OAuth: Invalid client secret for ${clientId}`);
+        logger.warn('OAuth invalid client secret', { clientId });
         console.log(`   Expected: ${client.clientSecret.substring(0, 20)}... (length: ${client.clientSecret.length})`);
         console.log(`   Received: ${clientSecret?.substring(0, 20)}... (length: ${clientSecret?.length})`);
         return null;
@@ -355,7 +380,7 @@ export function createOAuthServer(storageConfig: {
     instance?: any;
   };
 } = { type: 'memory' }, adminUsers: string[] = [], templateConfig?: HandlebarsTemplateConfig) {
-  console.log(`🚀 Creating OAuth 2.0 server with ${storageConfig.type} session storage...`);
+  logger.info('Creating OAuth 2.0 server', { storageType: storageConfig.type });
   
   // Initialize session storage - ensure it's the same instance used globally
   if (!sessionStorage) {
@@ -385,7 +410,7 @@ export function createOAuthServer(storageConfig: {
     continueMiddleware: false
   });
   
-  console.log(`✅ OAuth 2.0 server created with ${storageConfig.type} storage`);
+  logger.info('OAuth 2.0 server created', { storageType: storageConfig.type });
   return { oauth, storage: sessionStorage };
 }
 
@@ -431,6 +456,7 @@ export async function initializeOAuthServer() {
   await sessionStorage.initialize();
   
   // Add default client and user
+  const defaultClient = getDefaultClient();
   await sessionStorage.setClient(defaultClient.id, defaultClient);
   await sessionStorage.setUser(defaultUser.id, defaultUser);
   
@@ -467,6 +493,7 @@ export async function clearOAuthData() {
   await sessionStorage.clear();
   
   // Re-add default client and user
+  const defaultClient = getDefaultClient();
   await sessionStorage.setClient(defaultClient.id, defaultClient);
   await sessionStorage.setUser(defaultUser.id, defaultUser);
   
@@ -567,7 +594,7 @@ export async function handleProviderLogin(req: Request, res: Response) {
     }
     
   } catch (error) {
-    console.error(`❌ Error initiating ${provider} login:`, error);
+    logger.error('Error initiating provider login', { provider, error: error.message, stack: error.stack });
     res.status(500).json({
       error: 'authorization_error',
       error_description: `Failed to initiate ${provider} login`
@@ -583,7 +610,7 @@ export async function handleProviderCallback(req: Request, res: Response) {
   const { code, state, error } = req.query;
 
   if (error) {
-    console.error(`❌ OAuth error from ${provider}:`, error);
+    logger.error('OAuth error from provider', { provider, error });
     return res.status(400).json({
       error: 'authorization_denied',
       error_description: `Authorization denied by ${provider}: ${error}`
@@ -717,7 +744,7 @@ export async function handleProviderCallback(req: Request, res: Response) {
     res.redirect(resumeUrl.toString());
 
   } catch (error) {
-    console.error(`❌ Error processing ${provider} callback:`, error);
+    logger.error('Error processing provider callback', { provider, error: error.message, stack: error.stack });
     res.status(500).json({
       error: 'callback_error',
       error_description: `Failed to process ${provider} callback`
@@ -799,7 +826,7 @@ export async function handleProviderSelection(req: Request, res: Response) {
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } catch (error) {
-    console.error('❌ Template rendering error:', error);
+    logger.error('Template rendering error', { error: error.message, stack: error.stack });
     res.status(500).send('Template rendering error');
   }
 }

@@ -39,6 +39,7 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
+import Redis from 'ioredis';
 /**
  * In-Memory Session Storage
  * Fast and simple, but data is lost on server restart
@@ -143,11 +144,22 @@ export class FileSessionStorage {
         this.filePath = options.filePath || './oauth-sessions.json';
         this.encryptionEnabled = options.encryptionEnabled !== false; // Default: true
         if (this.encryptionEnabled) {
-            // Derive encryption key from password or use default for development
-            const password = options.encryptionPassword || 'default-dev-password-change-in-production';
-            this.encryptionKey = this.deriveEncryptionKey(password);
-            if (!options.encryptionPassword) {
-                console.warn('🔒 OAuth sessions: Using default encryption password. Set encryptionPassword for production!');
+            // Get encryption password from environment or options
+            const password = options.encryptionPassword || process.env.OAUTH_SESSION_ENCRYPTION_KEY;
+            if (!password) {
+                // In production, require explicit encryption key
+                if (process.env.NODE_ENV === 'production') {
+                    throw new Error('OAuth session encryption key required in production. ' +
+                        'Set OAUTH_SESSION_ENCRYPTION_KEY environment variable or pass encryptionPassword option.');
+                }
+                // Development fallback with strong warning
+                const fallbackPassword = 'default-dev-password-change-in-production';
+                this.encryptionKey = this.deriveEncryptionKey(fallbackPassword);
+                console.warn('🔒 OAuth sessions: Using default encryption password. ' +
+                    'Set OAUTH_SESSION_ENCRYPTION_KEY environment variable for production!');
+            }
+            else {
+                this.encryptionKey = this.deriveEncryptionKey(password);
             }
         }
         else {
@@ -403,13 +415,11 @@ export class RedisSessionStorage {
         else {
             // Try to create Redis instance (requires redis package)
             try {
-                const Redis = require('ioredis');
                 this.redis = new Redis({
                     host: options.host || 'localhost',
                     port: options.port || 6379,
                     password: options.password,
                     db: options.db || 0,
-                    retryDelayOnFailover: 100,
                     maxRetriesPerRequest: 3,
                     lazyConnect: true
                 });
@@ -422,7 +432,7 @@ export class RedisSessionStorage {
     async initialize() {
         try {
             await this.redis.ping();
-            console.log(`🔴 Redis session storage connected`);
+            console.log(`✅ Redis session storage connected`);
         }
         catch (error) {
             console.error(`❌ Failed to connect to Redis:`, error);
@@ -432,7 +442,7 @@ export class RedisSessionStorage {
     async close() {
         if (this.redis) {
             await this.redis.quit();
-            console.log(`🔴 Redis session storage disconnected`);
+            console.log(`✅ Redis session storage disconnected`);
         }
     }
     async clear() {

@@ -213,12 +213,26 @@ export class FileSessionStorage implements SessionStorage {
     this.encryptionEnabled = options.encryptionEnabled !== false; // Default: true
     
     if (this.encryptionEnabled) {
-      // Derive encryption key from password or use default for development
-      const password = options.encryptionPassword || 'default-dev-password-change-in-production';
-      this.encryptionKey = this.deriveEncryptionKey(password);
+      // Get encryption password from environment or options
+      const password = options.encryptionPassword || process.env.OAUTH_SESSION_ENCRYPTION_KEY;
       
-      if (!options.encryptionPassword) {
-        console.warn('🔒 OAuth sessions: Using default encryption password. Set encryptionPassword for production!');
+      if (!password) {
+        // In production, require explicit encryption key
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error(
+            'OAuth session encryption key required in production. ' +
+            'Set OAUTH_SESSION_ENCRYPTION_KEY environment variable or pass encryptionPassword option.'
+          );
+        }
+        // Development fallback with strong warning
+        const fallbackPassword = 'default-dev-password-change-in-production';
+        this.encryptionKey = this.deriveEncryptionKey(fallbackPassword);
+        console.warn(
+          '🔒 OAuth sessions: Using default encryption password. ' +
+          'Set OAUTH_SESSION_ENCRYPTION_KEY environment variable for production!'
+        );
+      } else {
+        this.encryptionKey = this.deriveEncryptionKey(password);
       }
     } else {
       this.encryptionKey = null;

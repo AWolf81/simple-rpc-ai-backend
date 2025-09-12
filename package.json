@@ -172,7 +172,7 @@
       "hono": ">=4.9.6",
       "postcss": ">=8.4.31",
       "@octokit/request-error": ">=5.1.1",
-      "vite": ">=6.3.6",
+      "vite": "^6.3.6",
       "@octokit/request": ">=8.4.1",
       "@octokit/plugin-paginate-rest": ">=9.2.2",
       "prismjs": ">=1.30.0",
