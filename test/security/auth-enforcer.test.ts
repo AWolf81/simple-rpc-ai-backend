@@ -324,7 +324,8 @@ describe('AuthEnforcer', () => {
     it('should handle middleware errors gracefully', async () => {
       // Mock an error in the middleware
       const errorEnforcer = new AuthEnforcer({
-        strictMode: true
+        strictMode: true,
+        allowedAnonymousEndpoints: ['/health']
       }, mockSecurityLogger as any);
       
       // Corrupt the request to force an error

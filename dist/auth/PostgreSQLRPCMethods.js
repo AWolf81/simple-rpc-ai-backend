@@ -4,7 +4,7 @@
  * Simple, reliable multi-tenant API key management using PostgreSQL
  * Maintains compatibility with existing TokenBasedVaultManager interface
  */
-import { PostgreSQLSecretManager } from '../services/PostgreSQLSecretManager.js';
+import { PostgreSQLSecretManager } from '../src/services/PostgreSQLSecretManager.js';
 import * as winston from 'winston';
 /**
  * JSON-RPC Methods for PostgreSQL Secret Management

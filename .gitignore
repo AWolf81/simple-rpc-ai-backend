@@ -12,6 +12,9 @@ coverage/
 
 # Environment files
 .env
+.env.*
+!.env.example
+!.env.*.example
 .env.local
 .env.development.local
 .env.test.local
@@ -75,3 +78,21 @@ temp/
 
 # Session logs
 last-session-*.txt
+
+# Security-sensitive files
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+certs/
+keys/
+secrets/
+
+# OAuth and authentication tokens
+.oauth-tokens*
+oauth-sessions.json
+auth-tokens*
+*.token
+*.tokens

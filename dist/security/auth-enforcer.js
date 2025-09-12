@@ -207,7 +207,10 @@ export class AuthEnforcer {
             return false; // Rely on individual endpoint auth requirements
         }
         const endpoint = req.path;
-        return !this.config.allowedAnonymousEndpoints.some(allowed => allowed && endpoint.startsWith(allowed));
+        if (!endpoint || !this.config.allowedAnonymousEndpoints) {
+            return true; // Default to requiring auth if configuration is incomplete
+        }
+        return !this.config.allowedAnonymousEndpoints.some(allowed => allowed && typeof allowed === 'string' && endpoint.startsWith(allowed));
     }
     /**
      * Enforce authentication requirements

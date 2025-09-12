@@ -43,12 +43,12 @@ export type {
 } from './oauth-auth-manager';
 
 // Database and validation
-export { PostgreSQLAdapter } from '../database/postgres-adapter';
-export { AIKeyValidator } from '../services/ai-validator';
+export { PostgreSQLAdapter } from '@database/postgres-adapter';
+export { AIKeyValidator } from '@services/ai-validator';
 
 // Client (now in main client.ts)
 export type { 
   AIClientOptions,
   DeviceInfo,
   AuthUpgradePrompt 
-} from '../client';
+} from '@/client';
