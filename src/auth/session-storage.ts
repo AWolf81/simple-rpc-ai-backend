@@ -41,6 +41,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 import * as OAuth2Server from '@node-oauth/oauth2-server';
+import Redis from 'ioredis';
 
 // Common interfaces
 export interface SessionData {
@@ -515,13 +516,11 @@ export class RedisSessionStorage implements SessionStorage {
     } else {
       // Try to create Redis instance (requires redis package)
       try {
-        const Redis = require('ioredis');
         this.redis = new Redis({
           host: options.host || 'localhost',
           port: options.port || 6379,
           password: options.password,
           db: options.db || 0,
-          retryDelayOnFailover: 100,
           maxRetriesPerRequest: 3,
           lazyConnect: true
         });
@@ -534,7 +533,7 @@ export class RedisSessionStorage implements SessionStorage {
   async initialize(): Promise<void> {
     try {
       await this.redis.ping();
-      console.log(`🔴 Redis session storage connected`);
+      console.log(`✅ Redis session storage connected`);
     } catch (error) {
       console.error(`❌ Failed to connect to Redis:`, error);
       throw error;
@@ -544,7 +543,7 @@ export class RedisSessionStorage implements SessionStorage {
   async close(): Promise<void> {
     if (this.redis) {
       await this.redis.quit();
-      console.log(`🔴 Redis session storage disconnected`);
+      console.log(`✅ Redis session storage disconnected`);
     }
   }
 

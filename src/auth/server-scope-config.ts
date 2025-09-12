@@ -84,8 +84,7 @@ export const ExampleScopeConfigurations = {
           toolName: 'system_info',
           scopes: { 
             required: ['enterprise:admin'],
-            requireAdminUser: true,
-            adminUsers: 'any'
+            requireAdminUser: true
           },
           replace: true
         }

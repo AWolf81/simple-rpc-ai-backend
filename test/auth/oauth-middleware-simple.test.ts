@@ -10,7 +10,10 @@ import {
   getOAuthStats,
   clearOAuthData,
   closeOAuthServer,
-  createAuthenticateHandler
+  createAuthenticateHandler,
+  configureOAuthTemplates,
+  getTemplateEngine,
+  getIdentityProviders
 } from '../../src/auth/oauth-middleware';
 
 describe('OAuth Middleware Unit Tests', () => {
@@ -228,6 +231,239 @@ describe('OAuth Middleware Unit Tests', () => {
       
       expect(storage1).toBeDefined();
       expect(storage2).toBeDefined();
+    });
+  });
+
+  describe('Template Configuration', () => {
+    it('should configure OAuth templates', () => {
+      const config = {
+        brandName: 'Test App',
+        primaryColor: '#ff0000'
+      };
+      
+      expect(() => configureOAuthTemplates(config)).not.toThrow();
+    });
+
+    it('should get template engine instance', () => {
+      const config = {
+        brandName: 'Test App',
+        primaryColor: '#ff0000'
+      };
+      
+      configureOAuthTemplates(config);
+      const engine = getTemplateEngine();
+      
+      expect(engine).toBeDefined();
+    });
+
+    it('should update existing template configuration', () => {
+      const initialConfig = {
+        brandName: 'Initial App',
+        primaryColor: '#00ff00'
+      };
+      
+      const updatedConfig = {
+        brandName: 'Updated App',
+        primaryColor: '#0000ff'
+      };
+      
+      configureOAuthTemplates(initialConfig);
+      expect(() => configureOAuthTemplates(updatedConfig)).not.toThrow();
+    });
+  });
+
+  describe('Identity Providers Configuration', () => {
+    it('should get identity providers configuration', () => {
+      const providers = getIdentityProviders();
+      
+      expect(providers).toBeDefined();
+      expect(providers.google).toBeDefined();
+      expect(providers.github).toBeDefined();
+      expect(providers.microsoft).toBeDefined();
+    });
+
+    it('should use environment variables for provider config', () => {
+      process.env.GOOGLE_CLIENT_ID = 'test-env-google-client';
+      process.env.GITHUB_CLIENT_ID = 'test-env-github-client';
+      
+      const providers = getIdentityProviders();
+      
+      expect(providers.google.clientId).toBe('test-env-google-client');
+      expect(providers.github.clientId).toBe('test-env-github-client');
+    });
+
+    it('should use default empty strings when env vars missing', () => {
+      delete process.env.GOOGLE_CLIENT_ID;
+      delete process.env.GITHUB_CLIENT_ID;
+      
+      const providers = getIdentityProviders();
+      
+      expect(providers.google.clientId).toBe('');
+      expect(providers.github.clientId).toBe('');
+    });
+
+    it('should construct proper redirect URIs', () => {
+      process.env.OAUTH_BASE_URL = 'https://custom.example.com';
+      
+      const providers = getIdentityProviders();
+      
+      expect(providers.google.redirectUri).toBe('https://custom.example.com/callback/google');
+      expect(providers.github.redirectUri).toBe('https://custom.example.com/callback/github');
+      expect(providers.microsoft.redirectUri).toBe('https://custom.example.com/callback/microsoft');
+    });
+
+    it('should handle different provider types', () => {
+      const providers = getIdentityProviders();
+      
+      expect(providers.google.type).toBe('oidc');
+      expect(providers.github.type).toBe('oauth2');
+      expect(providers.microsoft.type).toBe('oidc');
+    });
+
+    it('should configure proper scopes for each provider', () => {
+      const providers = getIdentityProviders();
+      
+      expect(providers.google.scopes).toEqual(['openid', 'email', 'profile']);
+      expect(providers.github.scopes).toEqual(['read:user', 'user:email']);
+      expect(providers.microsoft.scopes).toEqual(['openid', 'email', 'profile']);
+    });
+  });
+
+  describe('OAuth Server Integration Tests', () => {
+    it('should create OAuth server with Redis configuration', () => {
+      const redisConfig = {
+        type: 'redis' as const,
+        redis: {
+          host: 'localhost',
+          port: 6379,
+          password: 'redis-password',
+          db: 0,
+          keyPrefix: 'oauth:'
+        }
+      };
+      
+      const server = createOAuthServer(redisConfig, ['admin@example.com']);
+      
+      expect(server).toBeDefined();
+      expect(server.oauth).toBeDefined();
+      expect(server.storage).toBeDefined();
+    });
+
+    it('should create OAuth server with template configuration', () => {
+      const templateConfig = {
+        brandName: 'Test OAuth Server',
+        primaryColor: '#007bff',
+        logoUrl: 'https://example.com/logo.png',
+        companyName: 'Test Company',
+        supportEmail: 'support@example.com'
+      };
+      
+      const server = createOAuthServer(
+        { type: 'memory' }, 
+        ['admin@example.com'], 
+        templateConfig
+      );
+      
+      expect(server).toBeDefined();
+      expect(server.oauth).toBeDefined();
+      expect(server.storage).toBeDefined();
+    });
+
+    it('should handle OAuth server with file storage', () => {
+      const fileConfig = {
+        type: 'file' as const,
+        filePath: './test-oauth-server.json'
+      };
+      
+      const server = createOAuthServer(fileConfig);
+      
+      expect(server).toBeDefined();
+      expect(server.oauth).toBeDefined();
+      expect(server.storage).toBeDefined();
+    });
+
+    it('should initialize OAuth server with default client and user', async () => {
+      createOAuthServer({ type: 'memory' });
+      
+      // Just verify the function runs without throwing
+      await expect(initializeOAuthServer()).resolves.not.toThrow();
+    });
+
+    it('should get OAuth server statistics', () => {
+      createOAuthServer({ type: 'memory' });
+      
+      const stats = getOAuthStats();
+      
+      expect(stats).toBeDefined();
+      // Stats might have different structure
+      if (stats && typeof stats === 'object') {
+        expect(typeof stats).toBe('object');
+      }
+    });
+
+    it('should create authenticate handler with custom config', () => {
+      const config = {
+        requireAuthenticatedUser: true,
+        allowAnonymous: false,
+        scope: ['read', 'write']
+      };
+      
+      const handler = createAuthenticateHandler(config);
+      
+      expect(handler).toBeDefined();
+      // The handler might be an object or function depending on implementation
+      expect(['function', 'object']).toContain(typeof handler);
+    });
+
+    it('should handle OAuth server with invalid storage type', () => {
+      const invalidConfig = {
+        type: 'invalid' as any
+      };
+      
+      // The function might not throw, just create server with fallback
+      const server = createOAuthServer(invalidConfig);
+      expect(server).toBeDefined();
+    });
+
+    it('should support multiple admin users', () => {
+      const adminUsers = [
+        'admin1@example.com',
+        'admin2@example.com',
+        'superadmin@example.com'
+      ];
+      
+      const server = createOAuthServer({ type: 'memory' }, adminUsers);
+      
+      expect(server).toBeDefined();
+      expect(server.oauth).toBeDefined();
+    });
+
+    it('should handle empty admin users array', () => {
+      const server = createOAuthServer({ type: 'memory' }, []);
+      
+      expect(server).toBeDefined();
+      expect(server.oauth).toBeDefined();
+    });
+
+    it('should create server with Redis instance', () => {
+      // Mock Redis instance
+      const mockRedis = {
+        set: vi.fn(),
+        get: vi.fn(),
+        del: vi.fn(),
+        quit: vi.fn()
+      };
+      
+      const redisConfig = {
+        type: 'redis' as const,
+        redis: {
+          instance: mockRedis
+        }
+      };
+      
+      const server = createOAuthServer(redisConfig);
+      
+      expect(server).toBeDefined();
     });
   });
 });

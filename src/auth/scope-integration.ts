@@ -261,7 +261,7 @@ export class ConfigurableScopeHelpers {
   /**
    * Create system scope (configurable)
    */
-  system(action: string, toolName?: string): ScopeRequirement {
+  system(action: 'read' | 'admin', toolName?: string): ScopeRequirement {
     const defaultScope = ScopeHelpers.system(action);
     return toolName 
       ? this.integrationManager.getToolScopes(toolName, defaultScope) || defaultScope
