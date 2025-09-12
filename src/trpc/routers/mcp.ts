@@ -400,7 +400,7 @@ export class MCPProtocolHandler {
   /**
    * Handle incoming MCP requests
    */
-  private async handleMCPRequest(req: AuthenticatedRequest, res: Response) {
+  public async handleMCPRequest(req: AuthenticatedRequest, res: Response) {
     try {
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');

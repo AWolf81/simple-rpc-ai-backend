@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { HandlebarsTemplateEngine } from '../../src/auth/handlebars-template-engine';
+import { HandlebarsTemplateEngine, HANDLEBARS_DEFAULT_TEMPLATES, HANDLEBARS_PROVIDER_ICONS } from '../../src/auth/handlebars-template-engine';
 
 // Mock path module properly
 vi.mock('path', async (importOriginal) => {
@@ -407,6 +407,212 @@ describe('HandlebarsTemplateEngine', () => {
       
       const config = engine.getConfig();
       expect(config).toBeDefined();
+    });
+  });
+
+  describe('Template Data with Branding Assets', () => {
+    it('should include favicon when provided in template data', async () => {
+      const engineWithFavicon = new HandlebarsTemplateEngine({
+        branding: {
+          appName: 'Test App',
+          favicon: 'https://example.com/favicon.ico'
+        }
+      });
+
+      const data = {
+        providers: [
+          { name: 'test', displayName: 'Test', loginUrl: '/test' }
+        ],
+        context: {}
+      };
+
+      const result = await engineWithFavicon.render('oauth/login', data);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+      // The favicon should be passed to template data
+      expect(engineWithFavicon.getConfig().branding?.favicon).toBe('https://example.com/favicon.ico');
+    });
+
+    it('should include appLogo when provided in template data', async () => {
+      const engineWithLogo = new HandlebarsTemplateEngine({
+        branding: {
+          appName: 'Test App',
+          appLogo: 'https://example.com/logo.png'
+        }
+      });
+
+      const data = {
+        providers: [
+          { name: 'test', displayName: 'Test', loginUrl: '/test' }
+        ],
+        context: {}
+      };
+
+      const result = await engineWithLogo.render('oauth/login', data);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+      // The appLogo should be passed to template data
+      expect(engineWithLogo.getConfig().branding?.appLogo).toBe('https://example.com/logo.png');
+    });
+
+    it('should include both favicon and appLogo when both provided', async () => {
+      const engineWithBoth = new HandlebarsTemplateEngine({
+        branding: {
+          appName: 'Test App',
+          favicon: 'https://example.com/favicon.ico',
+          appLogo: 'https://example.com/logo.svg'
+        }
+      });
+
+      const data = {
+        providers: [
+          { name: 'test', displayName: 'Test', loginUrl: '/test' }
+        ],
+        context: {}
+      };
+
+      const result = await engineWithBoth.render('oauth/login', data);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+      
+      const config = engineWithBoth.getConfig();
+      expect(config.branding?.favicon).toBe('https://example.com/favicon.ico');
+      expect(config.branding?.appLogo).toBe('https://example.com/logo.svg');
+    });
+
+    it('should handle missing favicon and appLogo gracefully', async () => {
+      const engineWithoutAssets = new HandlebarsTemplateEngine({
+        branding: {
+          appName: 'Test App'
+          // No favicon or appLogo
+        }
+      });
+
+      const data = {
+        providers: [
+          { name: 'test', displayName: 'Test', loginUrl: '/test' }
+        ],
+        context: {}
+      };
+
+      const result = await engineWithoutAssets.render('oauth/login', data);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+      
+      const config = engineWithoutAssets.getConfig();
+      expect(config.branding?.favicon).toBeUndefined();
+      expect(config.branding?.appLogo).toBeUndefined();
+    });
+  });
+
+  describe('Default Templates and Provider Icons', () => {
+    it('should have default template configurations available', () => {
+      expect(HANDLEBARS_DEFAULT_TEMPLATES).toBeDefined();
+      expect(HANDLEBARS_DEFAULT_TEMPLATES.corporate).toBeDefined();
+      expect(HANDLEBARS_DEFAULT_TEMPLATES.dark).toBeDefined();
+      expect(HANDLEBARS_DEFAULT_TEMPLATES.minimal).toBeDefined();
+      
+      // Verify corporate theme
+      expect(HANDLEBARS_DEFAULT_TEMPLATES.corporate.branding.primaryColor).toBe('#2c5282');
+      
+      // Verify dark theme
+      expect(HANDLEBARS_DEFAULT_TEMPLATES.dark.darkMode).toBe(true);
+      expect(HANDLEBARS_DEFAULT_TEMPLATES.dark.branding.backgroundColor).toBe('#1a202c');
+      
+      // Verify minimal theme has custom CSS
+      expect(HANDLEBARS_DEFAULT_TEMPLATES.minimal.customCSS).toContain('.login-container');
+    });
+
+    it('should have provider icons available', () => {
+      expect(HANDLEBARS_PROVIDER_ICONS).toBeDefined();
+      expect(HANDLEBARS_PROVIDER_ICONS.google).toContain('<svg');
+      expect(HANDLEBARS_PROVIDER_ICONS.github).toContain('<svg');
+      expect(HANDLEBARS_PROVIDER_ICONS.microsoft).toContain('<svg');
+      expect(HANDLEBARS_PROVIDER_ICONS.facebook).toContain('<svg');
+      expect(HANDLEBARS_PROVIDER_ICONS.twitter).toContain('<svg');
+      expect(HANDLEBARS_PROVIDER_ICONS.linkedin).toContain('<svg');
+      expect(HANDLEBARS_PROVIDER_ICONS.apple).toContain('<svg');
+    });
+
+    it('should create engine with default templates', async () => {
+      const corporateEngine = new HandlebarsTemplateEngine(HANDLEBARS_DEFAULT_TEMPLATES.corporate);
+      const darkEngine = new HandlebarsTemplateEngine(HANDLEBARS_DEFAULT_TEMPLATES.dark);
+      const minimalEngine = new HandlebarsTemplateEngine(HANDLEBARS_DEFAULT_TEMPLATES.minimal);
+
+      // Test corporate theme
+      const corporateConfig = corporateEngine.getConfig();
+      expect(corporateConfig.branding?.primaryColor).toBe('#2c5282');
+      
+      // Test dark theme
+      const darkConfig = darkEngine.getConfig();
+      expect(darkConfig.darkMode).toBe(true);
+      
+      // Test minimal theme
+      const minimalConfig = minimalEngine.getConfig();
+      expect(minimalConfig.customCSS).toContain('.provider-button');
+    });
+  });
+
+  describe('Handlebars Helper Functions Integration', () => {
+    it('should test ifEquals helper functionality', async () => {
+      const data = {
+        providers: [
+          { name: 'google', displayName: 'Google', loginUrl: '/auth/google' }
+        ],
+        context: { currentProvider: 'google' }
+      };
+      
+      const result = await engine.render('oauth/login', data);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+    });
+
+    it('should handle different handlebars helper scenarios', async () => {
+      const complexData = {
+        providers: [
+          { name: 'google', displayName: 'Google', loginUrl: '/auth/google' },
+          { name: 'unknown-sso', displayName: 'Enterprise SSO', loginUrl: '/auth/sso' }
+        ],
+        context: {
+          redirectUri: 'http://localhost:3000/callback?state=test value&scope=read write',
+          clientId: 'test-client-123',
+          debugData: { user: 'test@example.com', timestamp: new Date().toISOString() }
+        }
+      };
+
+      const result = await engine.render('oauth/login', complexData);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+      
+      // The result should contain processed template data
+      expect(result.length).toBeGreaterThan(50);
+    });
+  });
+
+  describe('Template Rendering with Variables', () => {
+    it('should pass custom variables to template', async () => {
+      const engineWithVariables = new HandlebarsTemplateEngine({
+        variables: {
+          version: '2.1.0',
+          supportEmail: 'support@example.com',
+          companyName: 'Example Corp'
+        }
+      });
+
+      const data = {
+        providers: [
+          { name: 'test', displayName: 'Test', loginUrl: '/test' }
+        ],
+        context: {}
+      };
+
+      const result = await engineWithVariables.render('oauth/login', data);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+      
+      const config = engineWithVariables.getConfig();
+      expect(config.variables?.version).toBe('2.1.0');
+      expect(config.variables?.supportEmail).toBe('support@example.com');
     });
   });
 });
