@@ -3196,3 +3196,139 @@ const router = createTRPCRouter({
 ```
 
 **Current Status**: ✅ **Production Ready** - MCP integration provides seamless tRPC → MCP tool discovery with decorator pattern, full validation, authentication, and live testing capabilities. Maintains our core focus on system prompt protection and corporate-friendly deployment.
+
+### **🛡️ MCP Function Signature Monitoring**
+
+**Real-time security monitoring for MCP tool schema changes - protect against tampering and unauthorized modifications.**
+
+Our advanced monitoring system detects schema changes in MCP tools and responds according to configurable security policies, with differentiated handling for internal vs external servers.
+
+#### **🚨 Key Security Features**
+- **Real-time Schema Detection** - SHA-256 hash-based change monitoring
+- **Risk-based Assessment** - Automatic severity scoring (0-10 scale) 
+- **Auto-disable Protection** - Suspicious tools automatically disabled
+- **Credential Sanitization** - API keys, passwords, PII automatically redacted from logs
+- **Differentiated Policies** - Strict external monitoring, loose internal development
+
+#### **📊 Change Detection Capabilities**
+
+| Change Type | Risk Assessment | Example |
+|-------------|-----------------|---------|
+| **Parameter Added** | Low-Critical | New optional parameter (Low) vs new `exec` parameter (Critical) |
+| **Parameter Removed** | Medium-Critical | Optional parameter (Medium) vs required security parameter (Critical) |
+| **Type Changed** | High | `string` → `number` parameter conversion |
+| **Required Changed** | Medium-High | Optional → Required (High), Required → Optional (Medium) |
+
+#### **⚙️ Configurable Sensitivity Levels**
+
+```typescript
+import { MCPFunctionMonitor } from 'simple-rpc-ai-backend';
+
+// Development: Loose monitoring
+const devMonitor = new MCPFunctionMonitor(securityLogger, {
+  changeDetectionLevel: 'loose',     // Alert if >60% of schema changes
+  autoDisableOnChange: false,
+  serverPolicies: {
+    internal: { changeDetectionLevel: 'loose' },
+    external: { changeDetectionLevel: 'moderate' }
+  }
+});
+
+// Production: Strict monitoring
+const prodMonitor = new MCPFunctionMonitor(securityLogger, {
+  changeDetectionLevel: 'strict',      // Alert on any change (0%)
+  autoDisableOnChange: true,
+  serverPolicies: {
+    internal: { changeDetectionLevel: 'moderate' },
+    external: { changeDetectionLevel: 'strict' }  // Zero tolerance
+  }
+});
+
+// Start monitoring your MCP router
+monitor.startMonitoring(mcpRouter);
+```
+
+#### **🏢 Internal vs External Server Policies**
+
+The system automatically classifies servers and applies appropriate policies:
+
+**Internal Servers** (Development-Friendly):
+- `localhost`, `.internal.`, trusted domains
+- **Loose monitoring** - Focus on critical changes only
+- **Team notifications** - Alert developers, not security
+- **Auto-approval** - Common dev changes pre-approved
+
+**External Servers** (Security-First):  
+- All non-internal domains and third-party servers
+- **Strict monitoring** - Every change is monitored
+- **Security escalation** - Critical alerts go to security team
+- **Zero trust** - No changes without explicit approval
+
+#### **🔐 Security-First Logging**
+
+All monitoring events automatically sanitize sensitive information:
+
+```typescript
+// Automatically detects and redacts:
+✅ API Keys: api_key=abc123 → api_key=[REDACTED]
+✅ Passwords: password=secret → password=[REDACTED]  
+✅ Tokens: jwt=eyJ... → jwt=[REDACTED]
+✅ PII: john@company.com → [REDACTED]
+✅ Environment Variables: SECRET_KEY=xyz → SECRET_KEY=[REDACTED]
+✅ Database URLs: postgres://user:pass@host → postgres://[REDACTED]@host
+```
+
+#### **📈 Enterprise Monitoring Dashboard**
+
+Monitor schema changes across your entire MCP ecosystem:
+
+```bash
+# Quick status check
+curl http://localhost:8000/api/mcp/monitor/stats
+
+# Response includes:
+{
+  "monitoredTools": 47,
+  "disabledTools": 0, 
+  "recentChanges": 3,
+  "riskDistribution": {
+    "low": 2,
+    "medium": 1, 
+    "high": 0,
+    "critical": 0
+  },
+  "serverTypes": {
+    "internal": { "tools": 32, "changes": 3 },
+    "external": { "tools": 15, "changes": 0 }
+  }
+}
+```
+
+#### **⚡ Quick Integration**
+
+Enable monitoring in your existing MCP server:
+
+```typescript
+import { createRpcAiServer, MCPFunctionMonitor } from 'simple-rpc-ai-backend';
+
+const server = createRpcAiServer({
+  // Enable MCP with monitoring
+  mcp: { 
+    enableMCP: true,
+    monitoring: {
+      enabled: true,
+      changeDetectionLevel: 'moderate'
+    }
+  }
+});
+
+// Monitoring starts automatically and logs to ./logs/security.log
+```
+
+**Why This Matters**: MCP tools can access files, execute commands, and process sensitive data. Schema changes could indicate:
+- 🚨 **Security breaches** - Malicious tool modifications
+- ⚠️ **Supply chain attacks** - Compromised external tools  
+- 🔧 **Breaking changes** - Updates that break existing integrations
+- 📊 **Compliance violations** - Unauthorized system access additions
+
+**Full Documentation**: See [MCP Function Signature Monitoring Specification](specs/features/mcp-function-signature-monitoring.md) for complete implementation details, policy configuration, and compliance features.

@@ -29,7 +29,13 @@ export enum SecurityEventType {
   MALICIOUS_PAYLOAD = 'malicious_payload',
   COMMAND_INJECTION_ATTEMPT = 'command_injection_attempt',
   TEMPLATE_INJECTION_ATTEMPT = 'template_injection_attempt',
-  SYSTEM_OVERRIDE_ATTEMPT = 'system_override_attempt'
+  SYSTEM_OVERRIDE_ATTEMPT = 'system_override_attempt',
+  // MCP-specific events
+  MCP_TOOL_SCHEMA_CHANGED = 'mcp_tool_schema_changed',
+  MCP_TOOL_AUTO_DISABLED = 'mcp_tool_auto_disabled',
+  MCP_SUSPICIOUS_TOOL_CALL = 'mcp_suspicious_tool_call',
+  MCP_TOOL_EXECUTION_TIMEOUT = 'mcp_tool_execution_timeout',
+  MCP_RESOURCE_ACCESS_VIOLATION = 'mcp_resource_access_violation'
 }
 
 // Security event severity levels
