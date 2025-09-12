@@ -3197,138 +3197,247 @@ const router = createTRPCRouter({
 
 **Current Status**: ✅ **Production Ready** - MCP integration provides seamless tRPC → MCP tool discovery with decorator pattern, full validation, authentication, and live testing capabilities. Maintains our core focus on system prompt protection and corporate-friendly deployment.
 
-### **🛡️ MCP Function Signature Monitoring**
+---
 
-**Real-time security monitoring for MCP tool schema changes - protect against tampering and unauthorized modifications.**
+## 🔐 **Configurable Scope Management System**
 
-Our advanced monitoring system detects schema changes in MCP tools and responds according to configurable security policies, with differentiated handling for internal vs external servers.
+The RPC AI Server includes a powerful, extensible scope management system that allows fine-grained control over tool access and permissions. Scopes determine what actions users can perform and which tools they can access.
 
-#### **🚨 Key Security Features**
-- **Real-time Schema Detection** - SHA-256 hash-based change monitoring
-- **Risk-based Assessment** - Automatic severity scoring (0-10 scale) 
-- **Auto-disable Protection** - Suspicious tools automatically disabled
-- **Credential Sanitization** - API keys, passwords, PII automatically redacted from logs
-- **Differentiated Policies** - Strict external monitoring, loose internal development
+### **🎯 Default Scopes**
 
-#### **📊 Change Detection Capabilities**
+The system comes with a comprehensive set of default scopes organized hierarchically:
 
-| Change Type | Risk Assessment | Example |
-|-------------|-----------------|---------|
-| **Parameter Added** | Low-Critical | New optional parameter (Low) vs new `exec` parameter (Critical) |
-| **Parameter Removed** | Medium-Critical | Optional parameter (Medium) vs required security parameter (Critical) |
-| **Type Changed** | High | `string` → `number` parameter conversion |
-| **Required Changed** | Medium-High | Optional → Required (High), Required → Optional (Medium) |
+#### **Core MCP Scopes**
+- **`mcp`** - Base MCP access (includes `mcp:list` and `mcp:call`)
+- **`mcp:list`** - List available tools and resources
+- **`mcp:call`** - Execute MCP tools
+- **`mcp:admin`** - Administrative MCP operations
 
-#### **⚙️ Configurable Sensitivity Levels**
+#### **User Access Scopes**
+- **`read`** - Read-only access to resources
+- **`write`** - Write access to resources
+- **`user:read`** - Read user profile information
+- **`user:write`** - Modify user profile information
 
+#### **System Scopes**
+- **`system:read`** - Read system information
+- **`system:admin`** - Administrative system operations
+- **`admin`** - Full administrative access (includes all scopes)
+
+#### **Billing & Profile Scopes**
+- **`billing:read`** - View billing information
+- **`billing:write`** - Modify billing settings
+- **`profile:read`** - Read profile data
+- **`profile:write`** - Update profile data
+
+### **⚙️ Configurable Scope System**
+
+Transform hardcoded scopes into a fully configurable, extensible system:
+
+#### **Basic Configuration**
 ```typescript
-import { MCPFunctionMonitor } from 'simple-rpc-ai-backend';
+import { initializeScopeIntegration, ExampleScopeConfigurations } from './auth/scope-integration';
 
-// Development: Loose monitoring
-const devMonitor = new MCPFunctionMonitor(securityLogger, {
-  changeDetectionLevel: 'loose',     // Alert if >60% of schema changes
-  autoDisableOnChange: false,
-  serverPolicies: {
-    internal: { changeDetectionLevel: 'loose' },
-    external: { changeDetectionLevel: 'moderate' }
+// Use preset configuration
+const scopeIntegration = initializeScopeIntegration(
+  ExampleScopeConfigurations.production()
+);
+```
+
+#### **Custom Scope Definitions**
+```typescript
+const customScopeIntegration = initializeScopeIntegration({
+  preset: 'standard',
+  custom: {
+    customScopes: [
+      {
+        name: 'company:read',
+        description: 'Company-specific read access',
+        includes: ['read', 'mcp:list']
+      },
+      {
+        name: 'company:admin',
+        description: 'Company admin access',
+        includes: ['company:read', 'admin'],
+        privileged: true
+      }
+    ],
+    toolOverrides: [
+      {
+        toolName: 'sensitive_tool',
+        scopes: { 
+          required: ['company:admin'],
+          requireAdminUser: true,
+          adminUsers: ['admin@company.com']
+        }
+      }
+    ]
   }
 });
-
-// Production: Strict monitoring
-const prodMonitor = new MCPFunctionMonitor(securityLogger, {
-  changeDetectionLevel: 'strict',      // Alert on any change (0%)
-  autoDisableOnChange: true,
-  serverPolicies: {
-    internal: { changeDetectionLevel: 'moderate' },
-    external: { changeDetectionLevel: 'strict' }  // Zero tolerance
-  }
-});
-
-// Start monitoring your MCP router
-monitor.startMonitoring(mcpRouter);
 ```
 
-#### **🏢 Internal vs External Server Policies**
+#### **Environment-Specific Configurations**
 
-The system automatically classifies servers and applies appropriate policies:
-
-**Internal Servers** (Development-Friendly):
-- `localhost`, `.internal.`, trusted domains
-- **Loose monitoring** - Focus on critical changes only
-- **Team notifications** - Alert developers, not security
-- **Auto-approval** - Common dev changes pre-approved
-
-**External Servers** (Security-First):  
-- All non-internal domains and third-party servers
-- **Strict monitoring** - Every change is monitored
-- **Security escalation** - Critical alerts go to security team
-- **Zero trust** - No changes without explicit approval
-
-#### **🔐 Security-First Logging**
-
-All monitoring events automatically sanitize sensitive information:
-
+**Development (Permissive)**
 ```typescript
-// Automatically detects and redacts:
-✅ API Keys: api_key=abc123 → api_key=[REDACTED]
-✅ Passwords: password=secret → password=[REDACTED]  
-✅ Tokens: jwt=eyJ... → jwt=[REDACTED]
-✅ PII: john@company.com → [REDACTED]
-✅ Environment Variables: SECRET_KEY=xyz → SECRET_KEY=[REDACTED]
-✅ Database URLs: postgres://user:pass@host → postgres://[REDACTED]@host
+const devConfig = ExampleScopeConfigurations.development();
+// Allows: ['read', 'write', 'mcp:list', 'mcp:call'] for authenticated users
 ```
 
-#### **📈 Enterprise Monitoring Dashboard**
-
-Monitor schema changes across your entire MCP ecosystem:
-
-```bash
-# Quick status check
-curl http://localhost:8000/api/mcp/monitor/stats
-
-# Response includes:
-{
-  "monitoredTools": 47,
-  "disabledTools": 0, 
-  "recentChanges": 3,
-  "riskDistribution": {
-    "low": 2,
-    "medium": 1, 
-    "high": 0,
-    "critical": 0
-  },
-  "serverTypes": {
-    "internal": { "tools": 32, "changes": 3 },
-    "external": { "tools": 15, "changes": 0 }
-  }
-}
-```
-
-#### **⚡ Quick Integration**
-
-Enable monitoring in your existing MCP server:
-
+**Production (Secure)**
 ```typescript
-import { createRpcAiServer, MCPFunctionMonitor } from 'simple-rpc-ai-backend';
+const prodConfig = ExampleScopeConfigurations.production();
+// Restricted scopes with custom validation
+```
 
-const server = createRpcAiServer({
-  // Enable MCP with monitoring
-  mcp: { 
-    enableMCP: true,
-    monitoring: {
-      enabled: true,
-      changeDetectionLevel: 'moderate'
+**Enterprise (Fine-grained)**
+```typescript
+const enterpriseConfig = ExampleScopeConfigurations.enterprise();
+// Hierarchical scopes with business logic validation
+```
+
+**Multi-tenant**
+```typescript
+const multiTenantConfig = {
+  custom: {
+    customValidator: (userScopes, requiredScopes, context) => {
+      // Tenant isolation logic
+      const userTenant = context?.user?.tenantId;
+      const toolTenant = context?.tool?.tenantId;
+      
+      if (toolTenant && userTenant !== toolTenant) {
+        return false; // Enforce tenant isolation
+      }
+      
+      return requiredScopes.required?.every(scope => 
+        userScopes.includes(scope)
+      ) ?? true;
     }
   }
-});
-
-// Monitoring starts automatically and logs to ./logs/security.log
+};
 ```
 
-**Why This Matters**: MCP tools can access files, execute commands, and process sensitive data. Schema changes could indicate:
-- 🚨 **Security breaches** - Malicious tool modifications
-- ⚠️ **Supply chain attacks** - Compromised external tools  
-- 🔧 **Breaking changes** - Updates that break existing integrations
-- 📊 **Compliance violations** - Unauthorized system access additions
+### **🔧 Tool-Specific Scope Configuration**
 
-**Full Documentation**: See [MCP Function Signature Monitoring Specification](specs/features/mcp-function-signature-monitoring.md) for complete implementation details, policy configuration, and compliance features.
+#### **Before (Hardcoded)**
+```typescript
+// In tRPC router - hardcoded scopes
+.meta({
+  mcp: {
+    name: 'echo',
+    scopes: ScopeHelpers.mcpCall() // ❌ Hardcoded
+  }
+})
+```
+
+#### **After (Configurable)**
+```typescript
+// In tRPC router - configurable scopes
+.meta({
+  mcp: {
+    name: 'echo',
+    scopes: createScopeRequirement('echo', ['mcp:call']) // ✅ Configurable
+  }
+})
+```
+
+### **🚀 Runtime Scope Management**
+
+```typescript
+const scopeIntegration = getScopeIntegration();
+
+// Add custom scope at runtime
+scopeIntegration.addCustomScope({
+  name: 'runtime:analytics',
+  description: 'Analytics access',
+  includes: ['read']
+});
+
+// Override tool scopes at runtime
+scopeIntegration.overrideToolScopes('greeting', {
+  required: [], // Make public
+  description: 'Public greeting tool'
+});
+
+// Get all available scopes
+const allScopes = scopeIntegration.getAllScopes();
+```
+
+### **🎯 Scope Validation Examples**
+
+#### **Basic Validation**
+```typescript
+const userScopes = ['read', 'mcp:list'];
+const requiredScopes = { required: ['mcp:list'] };
+
+const hasAccess = scopeIntegration.validateScopes(userScopes, requiredScopes);
+// Returns: true
+```
+
+#### **Advanced Validation with Context**
+```typescript
+const hasAccess = scopeIntegration.validateScopes(
+  userScopes, 
+  requiredScopes, 
+  {
+    user: { tenantId: 'company-a', role: 'admin' },
+    tool: { tenantId: 'company-a', department: 'engineering' },
+    request: { ip: '192.168.1.100' }
+  }
+);
+```
+
+### **📊 Scope Hierarchy**
+
+Scopes follow a hierarchical structure where higher-level scopes automatically include lower-level ones:
+
+```
+admin
+├── mcp
+│   ├── mcp:list
+│   └── mcp:call
+├── user:read
+├── user:write
+├── system:read
+└── system:admin
+
+mcp:list → includes: mcp
+mcp:call → includes: mcp
+enterprise:admin → includes: enterprise:write, admin
+```
+
+### **🔒 Security Features**
+
+- **Privilege Escalation Protection** - Prevents unauthorized scope elevation
+- **Tenant Isolation** - Multi-tenant scope validation
+- **Time-based Access** - Business hours restrictions
+- **IP-based Restrictions** - Location-based access control
+- **Admin User Validation** - Explicit admin user lists
+- **Graceful Fallbacks** - Falls back to default scopes if custom validation fails
+
+### **📋 Migration Guide**
+
+1. **Phase 1**: Initialize with disabled configuration (no breaking changes)
+2. **Phase 2**: Replace hardcoded scopes with `createScopeRequirement()` calls
+3. **Phase 3**: Add custom scopes and tool-specific overrides
+4. **Phase 4**: Deploy with production-ready configuration
+
+### **🧪 Environment Variables**
+
+```bash
+# Scope system configuration
+SCOPE_PRESET=production          # development|production|enterprise|apiOnly
+SCOPE_ENABLED=true              # Enable/disable configurable scopes
+SCOPE_FALLBACK=true             # Fallback to default scopes on errors
+```
+
+### **✅ Benefits**
+
+- **🔧 Extensible** - Add custom scopes with hierarchical relationships
+- **⚙️ Configurable** - Environment-specific configurations
+- **🔄 Replaceable** - Can disable and use defaults, gradual migration
+- **🚀 Flexible** - Multi-tenant, time-based, IP-based restrictions
+- **🛡️ Secure** - Comprehensive validation with privilege protection
+- **📈 Scalable** - Runtime management and introspection
+
+**The configurable scope system transforms the RPC AI Server into an enterprise-ready platform with fine-grained access control while maintaining full backward compatibility.**

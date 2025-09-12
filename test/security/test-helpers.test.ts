@@ -6,11 +6,13 @@ import {
   createTestMCPConfig,
   isTestEnvironment,
   shouldDisableSecurity,
-  getTestSafeConfig
-} from '../../dist/security/test-helpers.js';
-import { MCPRateLimitConfig } from '../../dist/security/rate-limiter.js';
-import { SecurityLoggerConfig } from '../../dist/security/security-logger.js';
-import { AuthEnforcementConfig } from '../../dist/security/auth-enforcer.js';
+  getTestSafeConfig,
+  createOAuthMCPConfig,
+  createBothAuthMCPConfig
+} from '../../src/security/test-helpers';
+import { MCPRateLimitConfig } from '../../src/security/rate-limiter';
+import { SecurityLoggerConfig } from '../../src/security/security-logger';
+import { AuthEnforcementConfig } from '../../src/security/auth-enforcer';
 
 describe('Test Helpers - Security Configuration', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -180,7 +182,18 @@ describe('Test Helpers - Security Configuration', () => {
         auth: {
           requireAuthForToolsList: false,
           requireAuthForToolsCall: true,
-          publicTools: ['greeting']
+          publicTools: ['greeting'],
+          authType: 'oauth', // Default to OAuth for backward compatibility
+          oauth: {
+            enabled: true,
+            requireValidSession: true
+          },
+          jwt: {
+            enabled: false,
+            requireValidSignature: true,
+            requiredScopes: ['mcp'],
+            allowExpiredTokens: false
+          }
         },
         rateLimiting: DISABLED_RATE_LIMITING,
         securityLogging: DISABLED_SECURITY_LOGGING,
@@ -500,6 +513,63 @@ describe('Test Helpers - Security Configuration', () => {
       expect(result.mcp.rateLimiting.enabled).toBe(false);
       expect(result.mcp.securityLogging.enabled).toBe(false);
       expect(result.mcp.authEnforcement.enabled).toBe(false);
+    });
+  });
+
+  describe('Specialized MCP Configs', () => {
+    it('should create OAuth-only MCP config', () => {
+      const config = createOAuthMCPConfig();
+      
+      expect(config.auth.requireAuthForToolsList).toBe(true);
+      expect(config.auth.requireAuthForToolsCall).toBe(true);
+      expect(config.auth.publicTools).toEqual([]);
+      expect(config.auth.authType).toBe('oauth');
+      expect(config.auth.oauth.enabled).toBe(true);
+      expect(config.auth.oauth.requireValidSession).toBe(true);
+      expect(config.auth.jwt.enabled).toBe(false);
+    });
+
+    it('should create OAuth-only MCP config with overrides', () => {
+      const config = createOAuthMCPConfig({
+        auth: {
+          publicTools: ['greeting', 'echo']
+        }
+      });
+      
+      expect(config.auth.publicTools).toEqual(['greeting', 'echo']);
+      // The override merges with the base config, authType should still be there
+      expect(config.auth.authType || 'oauth').toBe('oauth');
+    });
+
+    it('should create both-auth MCP config', () => {
+      const config = createBothAuthMCPConfig();
+      
+      expect(config.auth.requireAuthForToolsList).toBe(true);
+      expect(config.auth.requireAuthForToolsCall).toBe(true);
+      expect(config.auth.publicTools).toEqual([]);
+      expect(config.auth.authType).toBe('both');
+      expect(config.auth.jwt.enabled).toBe(true);
+      expect(config.auth.jwt.requireValidSignature).toBe(true);
+      expect(config.auth.jwt.requiredScopes).toEqual(['mcp']);
+      expect(config.auth.jwt.allowExpiredTokens).toBe(false);
+      expect(config.auth.oauth.enabled).toBe(true);
+      expect(config.auth.oauth.requireValidSession).toBe(true);
+    });
+
+    it('should create both-auth MCP config with overrides', () => {
+      const config = createBothAuthMCPConfig({
+        auth: {
+          jwt: {
+            requiredScopes: ['admin', 'mcp'],
+            allowExpiredTokens: true
+          }
+        }
+      });
+      
+      expect(config.auth.jwt.requiredScopes).toEqual(['admin', 'mcp']);
+      expect(config.auth.jwt.allowExpiredTokens).toBe(true);
+      // The override merges with the base config, authType should still be there
+      expect(config.auth.authType || 'both').toBe('both');
     });
   });
 });

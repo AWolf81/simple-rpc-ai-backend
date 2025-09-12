@@ -10,5 +10,5 @@ export { AuthManager } from './auth-manager.js';
 // OAuth authentication (recommended secure approach)
 export { OAuthAuthManager } from './oauth-auth-manager.js';
 // Database and validation
-export { PostgreSQLAdapter } from '../database/postgres-adapter.js';
-export { AIKeyValidator } from '../services/ai-validator.js';
+export { PostgreSQLAdapter } from '../src/database/postgres-adapter.js';
+export { AIKeyValidator } from '../src/services/ai-validator.js';

@@ -1,0 +1,24 @@
+{
+  "clients": {},
+  "tokens": {},
+  "authorizationCodes": {
+    "test-code-123": {
+      "authorizationCode": "test-code-123",
+      "expiresAt": "2025-09-11T20:59:21.021Z",
+      "redirectUri": "http://localhost:3000/callback",
+      "scope": [
+        "read"
+      ],
+      "client": {
+        "id": "test-client"
+      },
+      "user": {
+        "id": "test-user"
+      }
+    }
+  },
+  "users": {},
+  "items": {},
+  "lastUpdated": "2025-09-11T20:54:21.021Z",
+  "encrypted": false
+}
