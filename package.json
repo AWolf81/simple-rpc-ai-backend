@@ -15,7 +15,7 @@
     "build": "tsc && tsc-alias && npm run copy-assets && npm run build:trpc-methods",
     "build:prod": "npm run build",
     "build:trpc-methods": "node tools/generate-trpc-methods.js",
-    "copy-assets": "mkdir -p dist/docker dist/database/migrations && cp -r docker/* dist/docker/ && cp docker-compose.postgres.yml dist/ && cp .env.postgres.example dist/ && cp src/database/migrations/*.sql dist/database/migrations/",
+    "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views && cp -r docker/* dist/docker/ && cp docker-compose.postgres.yml dist/ && cp .env.postgres.example dist/ && cp src/database/migrations/*.sql dist/database/migrations/ && cp -r src/views/* dist/views/",
     "registry:health": "node tools/registry-health-check.js",
     "registry:check-updates": "node tools/registry-update-checker.js",
     "dev": "tsc --watch",
@@ -52,6 +52,10 @@
     "postgres:logs": "docker-compose --env-file .env.postgres -f docker-compose.postgres.yml logs -f",
     "demo:storage": "node examples/flexible-storage-examples.js",
     "demo:trpc": "node -e \"import('./dist/server-trpc.js').then(({createTRPCServer}) => { const server = createTRPCServer({port: 8001}); server.start().then(() => console.log('🚀 tRPC demo running on http://localhost:8001\\nTry: curl http://localhost:8001/health')); })\"",
+    "demo:oauth": "pnpm build && node examples/authentication/basic-oauth-example.js",
+    "demo:oauth:branded": "pnpm build && node examples/authentication/branded-oauth-example.js",
+    "demo:mcp:opensaas": "pnpm build && node examples/authentication/opensaas-mcp-auth-example.js",
+    "test:oauth": "node test-oauth-discovery.js",
     "test:trpc": "node -e \"import('./dist/server-trpc.js').then(async ({createTRPCServer}) => { const s = createTRPCServer({port: 8003}); await s.start(); const r = await fetch('http://localhost:8003/health'); console.log('✅ tRPC test:', (await r.json()).status); await s.stop(); })\""
   },
   "keywords": [
@@ -87,6 +91,7 @@
     "express": "^4.18.2",
     "express-handlebars": "^8.0.3",
     "express-rate-limit": "^7.1.5",
+    "express-session": "^1.18.2",
     "fast-xml-parser": "^4.3.2",
     "helmet": "^7.1.0",
     "ioredis": "^5.7.0",
