@@ -14,7 +14,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as trpcExpress from '@trpc/server/adapters/express';
-import { createTRPCContext, mergeRouters, router } from './trpc/index.js';
+import { createTRPCContext, router } from './trpc/index.js';
 import { createAppRouter } from './trpc/root.js';
 import type { AnyRouter } from '@trpc/server';
 import type { AppRouter } from './trpc/root.js';
@@ -1119,7 +1119,7 @@ export class RpcAiServer {
    * If you need MCP tools to be discoverable, ensure your new router includes
    * procedures with MCP metadata (using .meta({ mcp: {...} })).
    * 
-   * For adding routes, consider using mergeRouters() instead.
+   * For adding routes, create a new router with the desired procedures.
    * 
    * @param newRouter - The router to replace the current router with
    * 
@@ -1136,73 +1136,6 @@ export class RpcAiServer {
     this.router = newRouter as AppRouter;
   }
 
-  /**
-   * Merge routers using tRPC's built-in mergeRouters with optional namespace support.
-   * 
-   * @param routerOrNamespace - Either a router to merge, or a namespace string if namespace is provided
-   * @param namespaceOrRouters - If first param is string, this is the routers array. Otherwise, additional routers.
-   * 
-   * Examples:
-   * - server.mergeRouters(router1, router2) - Merge to root
-   * - server.mergeRouters(router, 'mcp') - Merge router under 'mcp' namespace
-   * - server.mergeRouters('mcp', router1, router2) - Merge multiple routers under 'mcp' namespace
-   * 
-   * tRPC automatically flattens nested router structures, so:
-   * - router({ mcp: { greeting: procedure } }) becomes procedure key "mcp.greeting"
-   * - Multiple routers with different namespaces merge without conflicts
-   */
-  public mergeRouters(routerOrNamespace: AnyRouter | string, ...namespaceOrRouters: (AnyRouter | string)[]): void {
-    if (typeof routerOrNamespace === 'string') {
-      // First param is namespace string - format: mergeRouters('namespace', router1, router2, ...)
-      const namespace = routerOrNamespace;
-      const routersToMerge = namespaceOrRouters as AnyRouter[];
-      
-      if (routersToMerge.length === 0) {
-        throw new Error('At least one router must be provided when using namespace');
-      }
-      
-      // Create a namespaced router structure
-      const namespacedRouter = router({
-        [namespace]: routersToMerge.length === 1 
-          ? routersToMerge[0] 
-          : mergeRouters(...routersToMerge)
-      });
-      
-      this.router = mergeRouters(this.router, namespacedRouter);
-    } else {
-      // First param is a router - check if second param is namespace string
-      const firstRouter = routerOrNamespace;
-      
-      if (namespaceOrRouters.length === 1 && typeof namespaceOrRouters[0] === 'string') {
-        // Format: mergeRouters(router, 'namespace')
-        const namespace = namespaceOrRouters[0] as string;
-        const namespacedRouter = router({
-          [namespace]: firstRouter
-        });
-        
-        this.router = mergeRouters(this.router, namespacedRouter);
-      } else {
-        // Format: mergeRouters(router1, router2, ...) - merge to root
-        const allRouters = [firstRouter, ...(namespaceOrRouters as AnyRouter[])];
-        this.router = mergeRouters(this.router, ...allRouters);
-      }
-    }
-  }
-
-  /**
-   * Helper method to extend the existing 'mcp' router with additional procedures.
-   * This merges procedures into the existing mcp router for MCP tool exposure.
-   * 
-   * @param mcpRouter - Router containing procedures with MCP metadata to merge into existing mcp router
-   * 
-   * Example:
-   * server.mergeMcpRouter(demoRouter) - Extends appRouter.mcp with procedures from demoRouter
-   */
-  public mergeMcpRouter(mcpRouter: AnyRouter): void {
-    // Simple approach: just merge the router directly into the main router
-    // The MCP tool extraction will find procedures from any namespace that have MCP metadata
-    this.router = mergeRouters(this.router, mcpRouter);
-  }
 
   private createServiceProvidersConfig(providers: (BuiltInProvider | string)[]): Record<string, unknown> {
     const config: Record<string, unknown> = {};
