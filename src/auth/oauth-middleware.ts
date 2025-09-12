@@ -851,4 +851,4 @@ export function getTemplateEngine() {
   return templateEngine;
 }
 
-export { ExpressOAuthServer, getIdentityProviders, HandlebarsTemplateConfig, HandlebarsTemplateData };
+export { ExpressOAuthServer, getIdentityProviders, HandlebarsTemplateConfig, HandlebarsTemplateData, createOAuthModel, normalizeUserProfile };

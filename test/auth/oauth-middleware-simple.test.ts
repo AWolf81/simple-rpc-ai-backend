@@ -13,7 +13,10 @@ import {
   createAuthenticateHandler,
   configureOAuthTemplates,
   getTemplateEngine,
-  getIdentityProviders
+  getIdentityProviders,
+  registerClient,
+  createOAuthModel,
+  normalizeUserProfile
 } from '../../src/auth/oauth-middleware';
 
 describe('OAuth Middleware Unit Tests', () => {
@@ -464,6 +467,297 @@ describe('OAuth Middleware Unit Tests', () => {
       const server = createOAuthServer(redisConfig);
       
       expect(server).toBeDefined();
+    });
+  });
+
+  describe('Client Registration', () => {
+    it('should register a new client', async () => {
+      // Create server first to initialize storage
+      createOAuthServer({ type: 'memory' });
+      await initializeOAuthServer();
+      
+      const clientData = {
+        id: 'test-client',
+        name: 'Test Client',
+        redirectUris: ['http://localhost:3000/callback']
+      };
+      
+      const client = await registerClient(clientData);
+      
+      expect(client).toBeDefined();
+      expect(client.id).toBe('test-client');
+      expect(client.clientSecret).toBeDefined();
+      expect(client.clientSecret.length).toBeGreaterThan(20);
+      expect(client.grants).toEqual(['authorization_code', 'refresh_token']);
+      expect(client.redirectUris).toEqual(['http://localhost:3000/callback']);
+    });
+
+    it('should register a client with custom grants', async () => {
+      createOAuthServer({ type: 'memory' });
+      await initializeOAuthServer();
+      
+      const clientData = {
+        id: 'custom-client',
+        name: 'Custom Client',
+        redirectUris: ['http://localhost:3000/callback'],
+        grants: ['client_credentials']
+      };
+      
+      const client = await registerClient(clientData);
+      
+      expect(client.grants).toEqual(['client_credentials']);
+    });
+
+    it('should register a client with multiple redirect URIs', async () => {
+      createOAuthServer({ type: 'memory' });
+      await initializeOAuthServer();
+      
+      const clientData = {
+        id: 'multi-redirect-client',
+        name: 'Multi Redirect Client',
+        redirectUris: [
+          'http://localhost:3000/callback',
+          'http://localhost:4000/callback',
+          'https://example.com/oauth/callback'
+        ]
+      };
+      
+      const client = await registerClient(clientData);
+      
+      expect(client.redirectUris).toHaveLength(3);
+      expect(client.redirectUris).toContain('http://localhost:3000/callback');
+      expect(client.redirectUris).toContain('https://example.com/oauth/callback');
+    });
+
+    it('should generate unique client secrets', async () => {
+      createOAuthServer({ type: 'memory' });
+      await initializeOAuthServer();
+      
+      const client1 = await registerClient({
+        id: 'client1',
+        name: 'Client 1',
+        redirectUris: ['http://localhost:3000/callback']
+      });
+      
+      const client2 = await registerClient({
+        id: 'client2', 
+        name: 'Client 2',
+        redirectUris: ['http://localhost:3000/callback']
+      });
+      
+      expect(client1.clientSecret).not.toBe(client2.clientSecret);
+    });
+  });
+
+  describe('OAuth Model Creation', () => {
+    it('should create OAuth model with session storage', async () => {
+      const { storage } = createOAuthServer({ type: 'memory' });
+      await storage.initialize();
+      
+      const model = createOAuthModel(storage);
+      
+      expect(model).toBeDefined();
+      expect(typeof model.getClient).toBe('function');
+      expect(typeof model.saveAuthorizationCode).toBe('function');
+      expect(typeof model.getAuthorizationCode).toBe('function');
+      expect(typeof model.revokeAuthorizationCode).toBe('function');
+      expect(typeof model.saveToken).toBe('function');
+      expect(typeof model.getAccessToken).toBe('function');
+      expect(typeof model.validateScope).toBe('function');
+    });
+
+    it('should create OAuth model with admin users', async () => {
+      const { storage } = createOAuthServer({ type: 'memory' });
+      await storage.initialize();
+      
+      const adminUsers = ['admin@example.com', 'super@example.com'];
+      const model = createOAuthModel(storage, adminUsers);
+      
+      expect(model).toBeDefined();
+      expect(typeof model.validateScope).toBe('function');
+    });
+
+    it('should validate scopes for regular users', async () => {
+      const { storage } = createOAuthServer({ type: 'memory' });
+      await storage.initialize();
+      
+      const model = createOAuthModel(storage, ['admin@example.com']);
+      
+      const user = { id: 'user@example.com', email: 'user@example.com' };
+      const client = { id: 'test-client' };
+      
+      const scopes = await model.validateScope(user, client, 'mcp mcp:list');
+      
+      expect(scopes).toBeDefined();
+      expect(scopes).toContain('mcp');
+      expect(scopes).toContain('mcp:list');
+      expect(scopes).not.toContain('admin');
+    });
+
+    it('should validate scopes for admin users', async () => {
+      const { storage } = createOAuthServer({ type: 'memory' });
+      await storage.initialize();
+      
+      const model = createOAuthModel(storage, ['admin@example.com']);
+      
+      const user = { id: 'admin@example.com', email: 'admin@example.com' };
+      const client = { id: 'test-client' };
+      
+      const scopes = await model.validateScope(user, client, 'mcp admin');
+      
+      expect(scopes).toBeDefined();
+      expect(scopes).toContain('mcp');
+      expect(scopes).toContain('admin');
+      expect(scopes).toContain('mcp:admin');
+    });
+
+    it('should handle empty scope requests', async () => {
+      const { storage } = createOAuthServer({ type: 'memory' });
+      await storage.initialize();
+      
+      const model = createOAuthModel(storage);
+      
+      const user = { id: 'user@example.com' };
+      const client = { id: 'test-client' };
+      
+      const scopes = await model.validateScope(user, client, '');
+      
+      expect(scopes).toBeDefined();
+      expect(scopes).toContain('mcp');
+      expect(scopes).toContain('mcp:list');
+      expect(scopes).toContain('mcp:call');
+    });
+
+    it('should handle array scope input', async () => {
+      const { storage } = createOAuthServer({ type: 'memory' });
+      await storage.initialize();
+      
+      const model = createOAuthModel(storage);
+      
+      const user = { id: 'user@example.com' };
+      const client = { id: 'test-client' };
+      
+      const scopes = await model.validateScope(user, client, ['mcp', 'custom']);
+      
+      expect(scopes).toBeDefined();
+      expect(scopes).toContain('mcp');
+      expect(scopes).toContain('custom');
+    });
+
+    it('should filter admin scopes from non-admin users', async () => {
+      const { storage } = createOAuthServer({ type: 'memory' });
+      await storage.initialize();
+      
+      const model = createOAuthModel(storage, ['admin@example.com']);
+      
+      const user = { id: 'regular@example.com', email: 'regular@example.com' };
+      const client = { id: 'test-client' };
+      
+      const scopes = await model.validateScope(user, client, 'mcp admin mcp:admin');
+      
+      expect(scopes).toBeDefined();
+      expect(scopes).toContain('mcp');
+      expect(scopes).not.toContain('admin');
+      expect(scopes).not.toContain('mcp:admin');
+    });
+  });
+
+  describe('User Profile Normalization', () => {
+    it('should normalize Google user profile', () => {
+      const googleProfile = {
+        sub: 'google-user-123',
+        email: 'user@gmail.com',
+        name: 'John Doe',
+        given_name: 'John'
+      };
+      
+      const normalized = normalizeUserProfile('google', googleProfile);
+      
+      expect(normalized).toEqual({
+        id: 'google-user-123',
+        email: 'user@gmail.com',
+        name: 'John Doe'
+      });
+    });
+
+    it('should normalize GitHub user profile', () => {
+      const githubProfile = {
+        id: 12345,
+        email: 'user@example.com',
+        name: 'Jane Doe',
+        login: 'janedoe'
+      };
+      
+      const normalized = normalizeUserProfile('github', githubProfile);
+      
+      expect(normalized).toEqual({
+        id: '12345',
+        email: 'user@example.com',
+        name: 'Jane Doe'
+      });
+    });
+
+    it('should normalize Microsoft user profile', () => {
+      const microsoftProfile = {
+        sub: 'microsoft-user-456',
+        email: 'user@outlook.com',
+        name: 'Bob Smith'
+      };
+      
+      const normalized = normalizeUserProfile('microsoft', microsoftProfile);
+      
+      expect(normalized).toEqual({
+        id: 'microsoft-user-456',
+        email: 'user@outlook.com',
+        name: 'Bob Smith'
+      });
+    });
+
+    it('should normalize unknown provider profile using default case', () => {
+      const unknownProfile = {
+        sub: 'unknown-user-789',
+        email: 'user@unknown.com',
+        name: 'Unknown User'
+      };
+      
+      const normalized = normalizeUserProfile('unknown-provider', unknownProfile);
+      
+      expect(normalized).toEqual({
+        id: 'unknown-user-789',
+        email: 'user@unknown.com',
+        name: 'Unknown User'
+      });
+    });
+
+    it('should handle fallback fields for unknown provider', () => {
+      const unknownProfile = {
+        user_id: 'fallback-id',
+        preferred_username: 'fallback@email.com',
+        display_name: 'Fallback Name'
+      };
+      
+      const normalized = normalizeUserProfile('custom-sso', unknownProfile);
+      
+      expect(normalized).toEqual({
+        id: 'fallback-id',
+        email: 'fallback@email.com',
+        name: 'Fallback Name'
+      });
+    });
+
+    it('should handle missing fields gracefully', () => {
+      const incompleteProfile = {
+        id: 'incomplete-user'
+        // Missing email and name
+      };
+      
+      const normalized = normalizeUserProfile('incomplete-provider', incompleteProfile);
+      
+      expect(normalized).toEqual({
+        id: 'incomplete-user',
+        email: undefined,
+        name: undefined
+      });
     });
   });
 });

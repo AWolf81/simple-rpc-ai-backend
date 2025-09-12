@@ -700,4 +700,4 @@ export function configureOAuthTemplates(config) {
 export function getTemplateEngine() {
     return templateEngine;
 }
-export { ExpressOAuthServer, getIdentityProviders };
+export { ExpressOAuthServer, getIdentityProviders, createOAuthModel, normalizeUserProfile };
