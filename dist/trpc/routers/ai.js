@@ -6,11 +6,11 @@
  */
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure, protectedProcedure } from '../../src/trpc/index.js';
-import { AIService } from '../../src/services/ai-service.js';
-import { VirtualTokenService } from '../../src/services/virtual-token-service.js';
-import { UsageAnalyticsService } from '../../src/services/usage-analytics-service.js';
-import { ProviderRegistryService } from '../../src/services/provider-registry.js';
+import { router, publicProcedure, protectedProcedure } from '../index.js';
+import { AIService } from '../../services/ai-service.js';
+import { VirtualTokenService } from '../../services/virtual-token-service.js';
+import { UsageAnalyticsService } from '../../services/usage-analytics-service.js';
+import { ProviderRegistryService } from '../../services/provider-registry.js';
 // Predefined configurations for common use cases
 // ⚠️ IMPORTANT: These are suggested defaults. Always validate against:
 //   - Your AI provider's token limits (Claude: 200k, GPT-4: 8k-128k, Gemini: 1M)

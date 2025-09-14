@@ -8,7 +8,7 @@
 import { 
   StorageAdapter, 
   StorageConfig, 
-  VaultStorageConfig, 
+  PostgreSQLStorageConfig, 
   FileStorageConfig, 
   ClientManagedStorageConfig 
 } from './StorageAdapter';
@@ -43,8 +43,8 @@ export class StorageFactory {
     let adapter: StorageAdapter;
 
     switch (config.type) {
-      case 'vault':
-        adapter = this.createVaultStorage(config as VaultStorageConfig, log);
+      case 'postgres':
+        adapter = this.createPostgreSQLStorage(config as PostgreSQLStorageConfig, log);
         break;
       
       case 'file':
@@ -70,14 +70,15 @@ export class StorageFactory {
   }
 
   /**
-   * Create Vault storage adapter
+   * Create PostgreSQL storage adapter
    */
-  private static createVaultStorage(
-    config: VaultStorageConfig, 
+  private static createPostgreSQLStorage(
+    config: PostgreSQLStorageConfig, 
     logger: winston.Logger
   ): any {
-    // VaultStorageAdapter removed - use FileStorageAdapter or ClientManagedStorageAdapter instead
-    throw new Error('VaultStorageAdapter has been removed. Use "file" or "client-managed" storage types instead.');
+    // PostgreSQL storage adapter implementation would go here
+    // For now, throw an error as this needs to be implemented
+    throw new Error('PostgreSQL storage adapter not yet implemented. Use "file" or "client-managed" storage types instead.');
   }
 
   /**
@@ -123,7 +124,7 @@ export class StorageFactory {
       log.info('Detected PostgreSQL Vault configuration in environment');
       
       return this.createStorage({
-        type: 'vault'
+        type: 'postgres'
       }, log);
     }
     
@@ -154,14 +155,14 @@ export class StorageFactory {
     const errors: string[] = [];
     
     switch (config.type) {
-      case 'vault':
-        const vaultConfig = config as VaultStorageConfig;
-        if (vaultConfig.config) {
-          if (!vaultConfig.config.host) errors.push('Vault storage host is required');
-          if (!vaultConfig.config.database) errors.push('Vault storage database is required');
-          if (!vaultConfig.config.user) errors.push('Vault storage user is required');
-          if (!vaultConfig.config.password) errors.push('Vault storage password is required');
-          if (!vaultConfig.config.encryptionKey) errors.push('Vault storage encryptionKey is required');
+      case 'postgres':
+        const postgresConfig = config as PostgreSQLStorageConfig;
+        if (postgresConfig.config) {
+          if (!postgresConfig.config.host) errors.push('PostgreSQL storage host is required');
+          if (!postgresConfig.config.database) errors.push('PostgreSQL storage database is required');
+          if (!postgresConfig.config.user) errors.push('PostgreSQL storage user is required');
+          if (!postgresConfig.config.password) errors.push('PostgreSQL storage password is required');
+          if (!postgresConfig.config.encryptionKey) errors.push('PostgreSQL storage encryptionKey is required');
         }
         break;
       

@@ -2,7 +2,7 @@
  * API Token Manager
  *
  * Manages API tokens for external client access to user keys
- * Stores tokens securely in Vaultwarden with scoped permissions
+ * Stores tokens securely in PostgreSQL with scoped permissions
  */
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -68,8 +68,8 @@ export class APITokenManager {
                 undefined,
             isActive: true,
         };
-        // Store in Vaultwarden
-        await this.storeTokenInVault(tokenData);
+        // Store in PostgreSQL
+        await this.storeTokenInDatabase(tokenData);
         this.logger.info('API token created', {
             tokenId,
             userId: request.userId,
@@ -84,9 +84,9 @@ export class APITokenManager {
         };
     }
     /**
-     * Store token data in Vault
+     * Store token data in PostgreSQL database
      */
-    async storeTokenInVault(token) {
+    async storeTokenInDatabase(token) {
         const secretName = `api-token-${token.tokenId}`;
         const secretValue = JSON.stringify({
             userId: token.userId,
@@ -102,8 +102,7 @@ export class APITokenManager {
             },
         });
         // Store in token project (separate from API keys)
-        await this.pgsqlSecretManager.storeUserKey(// this was this.vaultwarden.storeApiKey <----  we need to update!!
-        'api-tokens', // Special "provider" for API tokens
+        await this.pgsqlSecretManager.storeUserKey('api-tokens', // Special "provider" for API tokens
         secretValue, token.tokenId);
     }
     /**
@@ -153,7 +152,7 @@ export class APITokenManager {
         }
     }
     /**
-     * Get all token secrets from Vaultwarden
+     * Get all token secrets from PostgreSQL database
      */
     async getAllTokenSecrets() {
         // This is a simplified implementation
@@ -209,14 +208,14 @@ export class APITokenManager {
      * Update last used timestamp
      */
     async updateLastUsed(tokenId) {
-        // In production, batch these updates to avoid excessive Vaultwarden calls
+        // In production, batch these updates to avoid excessive database calls
         this.logger.debug('Token used', { tokenId, timestamp: new Date().toISOString() });
     }
     /**
      * List user's API tokens
      */
     async listUserTokens(userId) {
-        // Implementation would query Vaultwarden for user's tokens
+        // Implementation would query PostgreSQL database for user's tokens
         this.logger.warn('listUserTokens not fully implemented');
         return [];
     }
@@ -225,12 +224,12 @@ export class APITokenManager {
      */
     async revokeToken(tokenId, userId) {
         try {
-            // Delete from Vaultwarden --> needs to be improved, no need to pass User info as the APITokenManager needs to check it based on provided JWT token
-            const deleted = await this.pgsqlSecretManager.deleteUserKey('api-tokens', tokenId); // <<<<<<<<<< was this.vaultwarden.deleteApiKey
+            // Delete from PostgreSQL database
+            const deleted = await this.pgsqlSecretManager.deleteUserKey('api-tokens', tokenId);
             // Remove from usage tracking
             this.tokenUsage.delete(tokenId);
             this.logger.info('API token revoked', { tokenId, userId });
-            return deleted.success; // <<<<<<<<<<<<< better error handling TBD
+            return deleted.success;
         }
         catch (error) {
             if (error instanceof Error) {

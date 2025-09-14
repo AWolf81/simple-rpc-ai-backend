@@ -538,11 +538,7 @@ When generating specs, always ask:
 project/
 ├── src/                   # Main source code
 ├── docker/                # Docker infrastructure and scripts
-│   ├── setup-vaultwarden.sh     # Vaultwarden setup script
-│   ├── backup-vaultwarden.sh    # Backup script
-│   ├── restore-vaultwarden.sh   # Restore script
-│   ├── wait-for-postgres.sh     # PostgreSQL wait script
-│   ├── pg-healthcheck.sh        # PostgreSQL health check
+│   ├── setup-postgres.sh        # PostgreSQL setup script
 │   └── init-db.sql              # Database initialization
 ├── examples/
 │   ├── servers/           # Server implementation examples
@@ -551,8 +547,6 @@ project/
 ├── test/                 # Test suites
 ├── dev-panel.js          # Custom API explorer for development
 ├── local-openrpc-tools.js # Local OpenRPC inspector and playground servers
-├── docker-compose.vaultwarden.yml  # Vaultwarden infrastructure
-├── .env.vaultwarden.example        # Environment template
 ├── CLAUDE.md             # This file
 └── README.md             # User-facing documentation
 ```

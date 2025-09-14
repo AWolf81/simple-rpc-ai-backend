@@ -34,8 +34,7 @@ export { generateTRPCMethods, createAppRouter } from './trpc/root.js';
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
 // AI Limit Presets for common use cases
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
-// Development tools (separate from main server)
-export { TrpcPanelServer, startTrpcPanel, createLocalPanelServer } from './dev/trpc-panel-server.js';
+// Development tools are available in tools/ directory as standalone scripts
 // Custom function system
 export { FunctionRegistry } from './services/function-registry.js';
 export { PromptManager, promptManager } from './services/prompt-manager.js';

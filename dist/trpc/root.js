@@ -4,9 +4,9 @@
  * Combines all sub-routers into the main application router.
  * This is the single source of truth for all tRPC procedures.
  */
-import { router } from '../src/trpc/index.js';
-import { createAIRouter } from '../src/trpc/routers/ai.js';
-import { createMCPRouter } from '../src/trpc/routers/mcp.js';
+import { router } from './index.js';
+import { createAIRouter } from './routers/ai.js';
+import { createMCPRouter } from './routers/mcp.js';
 // OpenAPI generation removed - using trpc-methods.json instead
 /**
  * Create app router with configurable AI limits and optional token tracking

@@ -365,8 +365,8 @@ export class MCPFunctionMonitor {
         }
         
         // Required field changes
-        const wasRequired = previous.jsonSchema.required?.includes(prop) || false;
-        const isRequired = current.jsonSchema.required?.includes(prop) || false;
+        const wasRequired = Array.isArray(previous.jsonSchema.required) && previous.jsonSchema.required.includes(prop) || false;
+        const isRequired = Array.isArray(current.jsonSchema.required) && current.jsonSchema.required.includes(prop) || false;
         
         if (wasRequired !== isRequired) {
           changes.push({

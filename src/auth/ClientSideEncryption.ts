@@ -91,7 +91,7 @@ export class ClientSideEncryption {
 
   /**
    * Encrypt API key with master key (client-side)
-   * Returns encrypted data that can be safely stored in Vaultwarden
+   * Returns encrypted data that can be safely stored in the database
    */
   static encryptApiKey(apiKey: string, masterKey: Buffer): EncryptionResult {
     // Generate random IV and salt for this encryption
@@ -121,7 +121,7 @@ export class ClientSideEncryption {
 
   /**
    * Decrypt API key with master key (client-side)
-   * Decrypts data retrieved from Vaultwarden
+   * Decrypts data retrieved from the database
    */
   static decryptApiKey(encryptedData: DecryptionParams, masterKey: Buffer): string {
     const { ciphertext, iv, salt, tag, algorithm, keyDerivation } = encryptedData;
@@ -218,24 +218,24 @@ const password = ClientSideEncryption.generateSecurePassword();
 const { hash, salt } = ClientSideEncryption.createMasterPasswordHash(password);
 
 // Send hash to server for account setup (never send password)
-await rpcClient.request('vaultwarden.completeSetup', {
+await rpcClient.request('auth.completeSetup', {
   setupToken: setupToken,
   masterPasswordHash: hash,
   // optionally include additional encrypted private key
 });
 
 // Store password securely in VS Code SecretStorage
-await context.secrets.store('vaultwarden.masterPassword', password);
+await context.secrets.store('auth.masterPassword', password);
       `,
       encryptFlow: `
 // Encrypt API key before storing
-const password = await context.secrets.get('vaultwarden.masterPassword');
+const password = await context.secrets.get('auth.masterPassword');
 const { masterKey } = ClientSideEncryption.deriveMasterKey(password);
 const encrypted = ClientSideEncryption.encryptApiKey(apiKey, masterKey);
 
-// Store encrypted data in Vaultwarden
-await rpcClient.request('vaultwarden.storeEncryptedKey', {
-  opensaasJWT: jwt,
+// Store encrypted data in database
+await rpcClient.request('keys.storeEncryptedKey', {
+  authToken: jwt,
   encryptedApiKey: encrypted.ciphertext,
   provider: 'anthropic',
   keyMetadata: {
@@ -250,14 +250,14 @@ ClientSideEncryption.clearSensitiveData(masterKey);
       `,
       decryptFlow: `
 // Retrieve and decrypt API key
-const shortLivedToken = await getVaultwardenToken();
-const { encryptedApiKey, keyMetadata } = await rpcClient.request('vaultwarden.retrieveEncryptedKey', {
-  shortLivedToken,
+const authToken = await getAuthToken();
+const { encryptedApiKey, keyMetadata } = await rpcClient.request('keys.retrieveEncryptedKey', {
+  authToken,
   provider: 'anthropic'
 });
 
 // Decrypt locally
-const password = await context.secrets.get('vaultwarden.masterPassword');
+const password = await context.secrets.get('auth.masterPassword');
 const { masterKey } = ClientSideEncryption.deriveMasterKey(password);
 const apiKey = ClientSideEncryption.decryptApiKey({
   ciphertext: encryptedApiKey,

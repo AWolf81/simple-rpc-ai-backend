@@ -27,6 +27,12 @@ export var SecurityEventType;
     SecurityEventType["COMMAND_INJECTION_ATTEMPT"] = "command_injection_attempt";
     SecurityEventType["TEMPLATE_INJECTION_ATTEMPT"] = "template_injection_attempt";
     SecurityEventType["SYSTEM_OVERRIDE_ATTEMPT"] = "system_override_attempt";
+    // MCP-specific events
+    SecurityEventType["MCP_TOOL_SCHEMA_CHANGED"] = "mcp_tool_schema_changed";
+    SecurityEventType["MCP_TOOL_AUTO_DISABLED"] = "mcp_tool_auto_disabled";
+    SecurityEventType["MCP_SUSPICIOUS_TOOL_CALL"] = "mcp_suspicious_tool_call";
+    SecurityEventType["MCP_TOOL_EXECUTION_TIMEOUT"] = "mcp_tool_execution_timeout";
+    SecurityEventType["MCP_RESOURCE_ACCESS_VIOLATION"] = "mcp_resource_access_violation";
 })(SecurityEventType || (SecurityEventType = {}));
 // Security event severity levels
 export var SecuritySeverity;

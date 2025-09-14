@@ -49,9 +49,7 @@ export type { ProviderConfig, ModelConfig, PricingInfo, RegistryHealthStatus } f
 // tRPC router types for client type safety
 export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root';
 
-// Development tools (separate from main server)
-export { TrpcPanelServer, startTrpcPanel, createLocalPanelServer } from './dev/trpc-panel-server';
-export type { PanelServerConfig } from './dev/trpc-panel-server';
+// Development tools are available in tools/ directory as standalone scripts
 
 
 // Custom function system

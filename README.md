@@ -2485,6 +2485,28 @@ console.log(result.consumption);
 
 This authentication model ensures enterprise-grade security while maintaining developer-friendly experience across all payment methods.
 
+## 📚 **Additional Documentation**
+
+For detailed guides and advanced features, see our documentation in the `docs/` directory:
+
+- **[OAuth Setup Guide](docs/OAUTH_SETUP.md)** - Google OAuth2 + MCP authentication setup
+- **[Provider Registry](docs/PROVIDER-REGISTRY.md)** - Enhanced provider handling with up-to-date model information  
+- **[Registry Integration](docs/REGISTRY_INTEGRATION.md)** - How to extend and customize the AI model registry
+- **[Tool Usage Guide](docs/TOOL_USAGE.md)** - MCP tools and provider-native capabilities
+
+For implementation specifications and feature documentation:
+
+- **[Architecture Specs](specs/architecture.md)** - System architecture and design decisions
+- **[Coding Standards](specs/coding-standards.md)** - Development guidelines and best practices
+- **[Feature Specifications](specs/features/)** - Detailed feature implementations:
+  - [Authentication & Security](specs/features/authentication-security.md)
+  - [Configurable Scopes](specs/features/configurable-scopes.md) 
+  - [Hybrid User System](specs/features/hybrid-user-system.md)
+  - [Logging Features](specs/features/logging.md)
+  - [MCP Function Monitoring](specs/features/mcp-function-signature-monitoring.md)
+  - [Pricing Approval Workflow](specs/features/pricing-approval-workflow.md)
+  - [Virtual Token Tracking](specs/features/virtual-token-tracking.md)
+
 ## 📖 **OpenRPC Documentation & Playground**
 
 This package provides a complete **OpenRPC** specification - the JSON-RPC equivalent of OpenAPI for REST APIs.
@@ -2725,7 +2747,7 @@ The authentication flow has multiple layers that should be tested independently 
 
 ### **Phase 1: Test PostgreSQL Directly (Infrastructure)**
 
-Test the PostgreSQL server and Bitwarden SDK integration directly without RPC:
+Test the PostgreSQL server directly without RPC:
 
 ```bash
 # 1. Start PostgreSQL infrastructure
@@ -2749,7 +2771,7 @@ pnpm test -- --grep="encrypted key storage"
 - ✅ Service account authentication
 - ✅ Organization permissions
 - ✅ Secret storage/retrieval operations
-- ✅ Bitwarden SDK integration
+- ✅ PostgreSQL database integration
 
 ### **Phase 2: Test RPC Methods (Business Logic)**
 
@@ -2842,34 +2864,34 @@ curl -X GET http://localhost:8081/api/organizations/ORG_ID/secrets \
 
 Create these environment files for testing:
 
-**`.env.vaultwarden.test`:**
+**`.env.test`:**
 ```bash
-VW_DOMAIN=http://localhost:8081
-VW_SERVICE_EMAIL=service@simple-rpc-ai.local
-VW_SERVICE_PASSWORD=secure-service-password-123
-VW_SERVICE_CLIENT_ID=web
-VW_ADMIN_TOKEN=your-admin-token
-SIMPLE_RPC_ORG_ID=your-org-uuid
+# PostgreSQL Configuration
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your-postgres-password
+POSTGRES_DB=simple_rpc_ai_test
 
-# For testing with tokens
-VW_ACCESS_TOKEN=your-access-token
-VW_REFRESH_TOKEN=your-refresh-token
+# Encryption Key for API Keys
+ENCRYPTION_KEY=your-32-byte-hex-encryption-key
+
+# OpenSaaS JWT for testing
+TEST_OPENSAAS_JWT=your-test-jwt-token
 ```
 
 ### **Recommended Test Sequence**
 
 ```bash
 # 1. Infrastructure setup
-pnpm run vaultwarden:setup
-pnpm run vaultwarden:start
-pnpm run vaultwarden:logs  # Check for errors
+docker-compose -f docker-compose.postgres.yml up -d
 
 # 2. Phase 1: Direct PostgreSQL testing
-npx ts-node test-vaultwarden-auth.ts     # Get access token
-npx ts-node test-vaultwarden-direct.ts   # Test secret operations
+pnpm test -- --grep="postgresql connection"
+pnpm test -- --grep="encrypted key storage"
 
 # 3. Phase 2: RPC methods testing  
-npx ts-node test-vaultwarden-session.ts  # Test RPC integration
+pnpm test -- --grep="RPC integration"
 
 # 4. Phase 3: End-to-end testing
 pnpm test:auth-flow                       # Complete auth flow
@@ -2882,19 +2904,19 @@ pnpm test:integration                     # Full integration suite
 
 | Issue | Solution |
 |-------|----------|
-| **Connection refused** | Check `pnpm run vaultwarden:logs`, ensure PostgreSQL is running |
-| **Authentication failed** | Verify service account exists, check password in `.env.vaultwarden` |
-| **Organization not found** | Create organization in admin panel, set `SIMPLE_RPC_ORG_ID` |
-| **Token expired** | Re-run `test-vaultwarden-auth.ts` to get fresh token |
+| **Connection refused** | Ensure PostgreSQL is running: `docker-compose -f docker-compose.postgres.yml up -d` |
+| **Authentication failed** | Verify JWT token is valid and not expired |
+| **Database not found** | Check PostgreSQL database exists and migrations have run |
+| **Encryption errors** | Verify `ENCRYPTION_KEY` is set and is 32 bytes hex-encoded |
 | **Permission denied** | Ensure service account has organization access |
 
 ### **What Each Test Validates**
 
 | Test File | Purpose | Validates |
 |-----------|---------|-----------|
-| `test-vaultwarden-auth.ts` | Get access tokens | Service account, basic auth |
-| `test-vaultwarden-direct.ts` | Direct PostgreSQL operations | Secret CRUD, organization permissions |
-| `test-secure-vault-manager.ts` | Secure RPC integration | Server-side crypto, JWT validation |
+| PostgreSQL connection tests | Database connectivity | Connection, schema, migrations |
+| Encrypted key storage tests | Direct database operations | Key CRUD, encryption/decryption |
+| RPC integration tests | Secure RPC integration | Server-side crypto, JWT validation |
 | Complete E2E test | Simplified full flow | OpenSaaS→Server→PostgreSQL→AI integration |
 
 ### **Simplified Testing Benefits**
@@ -2930,12 +2952,8 @@ pnpm test:coverage
 pnpm run dev:docs  # OpenRPC Inspector at localhost:3002
 
 # Test PostgreSQL integration
-pnpm run vaultwarden:setup
-pnpm run vaultwarden:start
-
-# Backup and restore
-pnpm run vaultwarden:backup
-pnpm run vaultwarden:restore
+docker-compose -f docker-compose.postgres.yml up -d
+pnpm test -- --grep="postgresql"
 ```
 
 ## 📄 **License** 

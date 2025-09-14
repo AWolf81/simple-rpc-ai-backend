@@ -1,7 +1,7 @@
 /**
  * Short-Lived Token Manager
  * 
- * Manages secure, short-lived tokens for Vaultwarden access
+ * Manages secure, short-lived tokens for secure API access
  * Implements token-based auth with automatic expiration and cleanup
  */
 
@@ -11,7 +11,7 @@ import * as winston from 'winston';
 export interface TokenData {
   token: string;
   opensaasUserId: string;
-  vaultwardenUserId: string;
+  serviceUserId: string;
   expiresAt: Date;
   createdAt: Date;
   tokenType: 'setup' | 'access';
@@ -29,7 +29,7 @@ export interface TokenValidationResult {
 }
 
 /**
- * Manages short-lived tokens for secure Vaultwarden access
+ * Manages short-lived tokens for secure API access
  * Tokens are cryptographically secure and automatically expire
  */
 export class ShortLivedTokenManager {
@@ -79,7 +79,7 @@ export class ShortLivedTokenManager {
    */
   generateSetupToken(
     opensaasUserId: string,
-    vaultwardenUserId: string,
+    serviceUserId: string,
     metadata?: {
       email?: string;
       subscriptionTier?: string;
@@ -87,7 +87,7 @@ export class ShortLivedTokenManager {
   ): TokenData {
     const tokenBytes = randomBytes(this.TOKEN_LENGTH);
     const timestamp = Date.now().toString();
-    const payload = `${opensaasUserId}:${vaultwardenUserId}:setup:${timestamp}`;
+    const payload = `${opensaasUserId}:${serviceUserId}:setup:${timestamp}`;
     
     // Create HMAC signature for integrity
     const signature = createHmac('sha256', this.hmacSecret)
@@ -100,7 +100,7 @@ export class ShortLivedTokenManager {
     const tokenData: TokenData = {
       token,
       opensaasUserId,
-      vaultwardenUserId,
+      serviceUserId,
       expiresAt,
       createdAt: new Date(),
       tokenType: 'setup',
@@ -112,7 +112,7 @@ export class ShortLivedTokenManager {
     
     this.logger.info('Generated setup token', {
       opensaasUserId,
-      vaultwardenUserId,
+      serviceUserId,
       token: token.substring(0, 20) + '...',
       expiresAt: expiresAt.toISOString()
     });
@@ -126,7 +126,7 @@ export class ShortLivedTokenManager {
    */
   generateAccessToken(
     opensaasUserId: string,
-    vaultwardenUserId: string,
+    serviceUserId: string,
     metadata?: {
       email?: string;
       subscriptionTier?: string;
@@ -135,20 +135,20 @@ export class ShortLivedTokenManager {
   ): TokenData {
     const tokenBytes = randomBytes(this.TOKEN_LENGTH);
     const timestamp = Date.now().toString();
-    const payload = `${opensaasUserId}:${vaultwardenUserId}:access:${timestamp}`;
+    const payload = `${opensaasUserId}:${serviceUserId}:access:${timestamp}`;
     
     // Create HMAC signature for integrity
     const signature = createHmac('sha256', this.hmacSecret)
       .update(payload)
       .digest('hex');
     
-    const token = `vw_${tokenBytes.toString('hex')}_${signature.substring(0, 16)}`;
+    const token = `api_${tokenBytes.toString('hex')}_${signature.substring(0, 16)}`;
     const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_LIFETIME);
     
     const tokenData: TokenData = {
       token,
       opensaasUserId,
-      vaultwardenUserId,
+      serviceUserId,
       expiresAt,
       createdAt: new Date(),
       tokenType: 'access',
@@ -160,7 +160,7 @@ export class ShortLivedTokenManager {
     
     this.logger.info('Generated access token', {
       opensaasUserId,
-      vaultwardenUserId,
+      serviceUserId,
       token: token.substring(0, 20) + '...',
       expiresAt: expiresAt.toISOString(),
       scope: metadata?.scope
@@ -339,7 +339,7 @@ export class ShortLivedTokenManager {
       
       const signature = parts[parts.length - 1];
       const timestamp = tokenData.createdAt.getTime().toString();
-      const payload = `${tokenData.opensaasUserId}:${tokenData.vaultwardenUserId}:${tokenData.tokenType}:${timestamp}`;
+      const payload = `${tokenData.opensaasUserId}:${tokenData.serviceUserId}:${tokenData.tokenType}:${timestamp}`;
       
       // Recreate signature
       const expectedSignature = createHmac('sha256', this.hmacSecret)

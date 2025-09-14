@@ -9,7 +9,7 @@ export {
   StorageAdapter, 
   StorageType, 
   StorageConfig,
-  VaultStorageConfig,
+  PostgreSQLStorageConfig,
   FileStorageConfig, 
   ClientManagedStorageConfig 
 } from './StorageAdapter';

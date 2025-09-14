@@ -1,13 +1,13 @@
 /**
  * Short-Lived Token Manager
  *
- * Manages secure, short-lived tokens for Vaultwarden access
+ * Manages secure, short-lived tokens for secure API access
  * Implements token-based auth with automatic expiration and cleanup
  */
 import { randomBytes, createHmac } from 'crypto';
 import * as winston from 'winston';
 /**
- * Manages short-lived tokens for secure Vaultwarden access
+ * Manages short-lived tokens for secure API access
  * Tokens are cryptographically secure and automatically expire
  */
 export class ShortLivedTokenManager {
@@ -43,10 +43,10 @@ export class ShortLivedTokenManager {
      * Generate setup token (Step 3 from sequence diagram)
      * Short-lived, single-use token for account setup
      */
-    generateSetupToken(opensaasUserId, vaultwardenUserId, metadata) {
+    generateSetupToken(opensaasUserId, serviceUserId, metadata) {
         const tokenBytes = randomBytes(this.TOKEN_LENGTH);
         const timestamp = Date.now().toString();
-        const payload = `${opensaasUserId}:${vaultwardenUserId}:setup:${timestamp}`;
+        const payload = `${opensaasUserId}:${serviceUserId}:setup:${timestamp}`;
         // Create HMAC signature for integrity
         const signature = createHmac('sha256', this.hmacSecret)
             .update(payload)
@@ -56,7 +56,7 @@ export class ShortLivedTokenManager {
         const tokenData = {
             token,
             opensaasUserId,
-            vaultwardenUserId,
+            serviceUserId,
             expiresAt,
             createdAt: new Date(),
             tokenType: 'setup',
@@ -66,7 +66,7 @@ export class ShortLivedTokenManager {
         this.tokens.set(token, tokenData);
         this.logger.info('Generated setup token', {
             opensaasUserId,
-            vaultwardenUserId,
+            serviceUserId,
             token: token.substring(0, 20) + '...',
             expiresAt: expiresAt.toISOString()
         });
@@ -76,20 +76,20 @@ export class ShortLivedTokenManager {
      * Generate access token for normal operations
      * Short-lived token for API access
      */
-    generateAccessToken(opensaasUserId, vaultwardenUserId, metadata) {
+    generateAccessToken(opensaasUserId, serviceUserId, metadata) {
         const tokenBytes = randomBytes(this.TOKEN_LENGTH);
         const timestamp = Date.now().toString();
-        const payload = `${opensaasUserId}:${vaultwardenUserId}:access:${timestamp}`;
+        const payload = `${opensaasUserId}:${serviceUserId}:access:${timestamp}`;
         // Create HMAC signature for integrity
         const signature = createHmac('sha256', this.hmacSecret)
             .update(payload)
             .digest('hex');
-        const token = `vw_${tokenBytes.toString('hex')}_${signature.substring(0, 16)}`;
+        const token = `api_${tokenBytes.toString('hex')}_${signature.substring(0, 16)}`;
         const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_LIFETIME);
         const tokenData = {
             token,
             opensaasUserId,
-            vaultwardenUserId,
+            serviceUserId,
             expiresAt,
             createdAt: new Date(),
             tokenType: 'access',
@@ -99,7 +99,7 @@ export class ShortLivedTokenManager {
         this.tokens.set(token, tokenData);
         this.logger.info('Generated access token', {
             opensaasUserId,
-            vaultwardenUserId,
+            serviceUserId,
             token: token.substring(0, 20) + '...',
             expiresAt: expiresAt.toISOString(),
             scope: metadata?.scope
@@ -243,7 +243,7 @@ export class ShortLivedTokenManager {
                 return false;
             const signature = parts[parts.length - 1];
             const timestamp = tokenData.createdAt.getTime().toString();
-            const payload = `${tokenData.opensaasUserId}:${tokenData.vaultwardenUserId}:${tokenData.tokenType}:${timestamp}`;
+            const payload = `${tokenData.opensaasUserId}:${tokenData.serviceUserId}:${tokenData.tokenType}:${timestamp}`;
             // Recreate signature
             const expectedSignature = createHmac('sha256', this.hmacSecret)
                 .update(payload)
