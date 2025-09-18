@@ -279,7 +279,7 @@ describe.skip('OpenSaaS Email/Password Authentication (REMOVED FEATURE - OpenSaa
         message: 'Free tier: Using your provided API key'
       });
 
-      const result = await mockRPCClient.request('executeAIRequest', {
+      const result = await mockRPCClient.request('generateText', {
         jwt: freeUserJWT,
         content: 'Test content',
         systemPrompt: 'assistant',
@@ -309,7 +309,7 @@ describe.skip('OpenSaaS Email/Password Authentication (REMOVED FEATURE - OpenSaa
         usage: { prompt_tokens: 10, completion_tokens: 20 }
       });
 
-      const result = await mockRPCClient.request('executeAIRequest', {
+      const result = await mockRPCClient.request('generateText', {
         jwt: proUserJWT,
         content: 'Test content',
         systemPrompt: 'assistant',

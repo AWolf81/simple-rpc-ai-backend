@@ -47,6 +47,7 @@ if (trpcMethods) {
   setupTRPCPlayground();
 }
 
+app.use(express.json());
 app.use(express.static('public'));
 
 // Generate playground URL with pre-filled data
@@ -141,10 +142,10 @@ function generateSampleInput(inputSchema) {
   return JSON.stringify(sample, null, 2);
 }
 
-// Setup tRPC Playground
+// Setup tRPC Playground with proxy to actual server
 async function setupTRPCPlayground() {
   try {
-    // Load the actual router - this is a bit tricky since we need to import the built version
+    // Load the actual router for playground schema discovery only
     const routerPath = path.join(process.cwd(), 'dist/trpc/root.js');
     
     if (!existsSync(routerPath)) {
@@ -155,24 +156,57 @@ async function setupTRPCPlayground() {
     // Dynamic import the router
     const { createAppRouter } = await import(routerPath);
     
-    // Create a simple router instance without dependencies for playground
-    const router = createAppRouter();
+    // Create a minimal router instance for schema discovery only
+    const schemaRouter = createAppRouter();
     
-    console.log('🔍 Router created, testing procedures...');
+    console.log('🔍 Router loaded for schema discovery...');
     
-    // Set up tRPC API endpoint for playground
-    app.use(
-      trpcApiEndpoint,
-      trpcExpress.createExpressMiddleware({
-        router,
-        createContext: () => ({}), // Provide empty context
-        onError: ({ error, path }) => {
-          console.error(`❌ tRPC Error on ${path}:`, error.message);
-        },
-      })
-    );
+    // Proxy tRPC requests to the actual server instead of handling them locally
+    app.use(trpcApiEndpoint, async (req, res, next) => {
+      try {
+        const { default: fetch } = await import('node-fetch');
+        
+        // Forward the request to the actual tRPC server
+        const targetUrl = `${aiServerEndpoint}/trpc${req.url}`;
+        
+        // Prepare request body
+        let body = undefined;
+        if (req.method !== 'GET' && req.body) {
+          body = JSON.stringify(req.body);
+        }
+        
+        const response = await fetch(targetUrl, {
+          method: req.method,
+          headers: {
+            'Content-Type': req.headers['content-type'] || 'application/json',
+            'Accept': req.headers.accept || 'application/json',
+          },
+          body,
+        });
+        
+        // Forward the response
+        res.status(response.status);
+        
+        // Copy relevant headers
+        const contentType = response.headers.get('content-type');
+        if (contentType) {
+          res.setHeader('content-type', contentType);
+        }
+        
+        const responseText = await response.text();
+        res.send(responseText);
+        
+      } catch (error) {
+        console.error(`❌ tRPC Proxy Error:`, error.message);
+        res.status(500).json({ 
+          error: 'tRPC proxy failed', 
+          message: `Could not connect to server at ${aiServerEndpoint}. Make sure the AI server is running.`,
+          details: error.message 
+        });
+      }
+    });
     
-    // Set up playground endpoint
+    // Set up playground endpoint with schema router for discovery
     app.use(
       playgroundEndpoint,
       await expressHandler({
@@ -181,7 +215,7 @@ async function setupTRPCPlayground() {
         // zodResolveTypes fix - only need because trpc-playground is not supporting trpc v11 yet.
         // Can be removed once PR #61 is merged https://github.com/sachinraja/trpc-playground/pull/61
         resolveTypes: zodResolveTypes, 
-        router: router,
+        router: schemaRouter, // Used for schema discovery only
         request: {
           superjson: true, // Adjust based on your setup
           globalHeaders: {},
@@ -194,6 +228,7 @@ async function setupTRPCPlayground() {
     );
     
     console.log(`🎮 tRPC Playground available at http://localhost:${port}${playgroundEndpoint}`);
+    console.log(`🔄 tRPC requests proxied to ${aiServerEndpoint}/trpc`);
   } catch (error) {
     console.log('⚠️  Failed to setup tRPC Playground:', error.message);
     console.log('💡 Error details:', error.stack);

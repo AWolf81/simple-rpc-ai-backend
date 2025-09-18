@@ -137,7 +137,7 @@ describe('RPCClient', () => {
   });
 
   describe('AI request simulation', () => {
-    it.skip('should handle executeAIRequest method (NEEDS SERVER SETUP)', async () => {
+    it.skip('should handle generateText method (NEEDS SERVER SETUP)', async () => {
       // Test requires running server on localhost:8000
       // Mock AI response
       mockAxios.post.mockResolvedValueOnce({
@@ -152,7 +152,7 @@ describe('RPCClient', () => {
         }
       });
 
-      const result = await client.request('executeAIRequest', {
+      const result = await client.request('generateText', {
         content: 'Test user input',
         systemPrompt: 'You are a helpful assistant'
       });

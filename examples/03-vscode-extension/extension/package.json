@@ -1,0 +1,101 @@
+{
+  "name": "ai-assistant-mcp",
+  "displayName": "AI Assistant with MCP",
+  "description": "AI-powered coding assistant using Model Context Protocol",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["AI", "Programming Languages", "Other"],
+  "activationEvents": [
+    "onCommand:aiAssistant.askQuestion",
+    "onCommand:aiAssistant.explainSelection",
+    "onCommand:aiAssistant.refactorSelection",
+    "onCommand:aiAssistant.generateTests",
+    "onCommand:aiAssistant.login",
+    "onCommand:aiAssistant.checkUsage"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiAssistant.askQuestion",
+        "title": "AI: Ask Question"
+      },
+      {
+        "command": "aiAssistant.explainSelection",
+        "title": "AI: Explain Selection"
+      },
+      {
+        "command": "aiAssistant.refactorSelection",
+        "title": "AI: Refactor Selection"
+      },
+      {
+        "command": "aiAssistant.generateTests",
+        "title": "AI: Generate Tests"
+      },
+      {
+        "command": "aiAssistant.login",
+        "title": "AI: Login"
+      },
+      {
+        "command": "aiAssistant.checkUsage",
+        "title": "AI: Check Token Usage"
+      }
+    ],
+    "configuration": {
+      "title": "AI Assistant",
+      "properties": {
+        "aiAssistant.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "URL of the AI backend server"
+        },
+        "aiAssistant.defaultProvider": {
+          "type": "string",
+          "enum": ["anthropic", "openai", "google"],
+          "default": "anthropic",
+          "description": "Default AI provider"
+        },
+        "aiAssistant.showTokenUsage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show token usage after each request"
+        },
+        "aiAssistant.maxTokens": {
+          "type": "number",
+          "default": 4096,
+          "description": "Maximum tokens per request"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "aiAssistant.askQuestion",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      },
+      {
+        "command": "aiAssistant.explainSelection",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "editorHasSelection"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "18.x",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@trpc/client": "^11.5.0",
+    "simple-rpc-ai-backend": "file:../../.."
+  }
+}

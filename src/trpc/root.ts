@@ -25,17 +25,25 @@ export function createAppRouter(
   serverProviders?: string[],
   byokProviders?: string[],
   postgresRPCMethods?: PostgreSQLRPCMethods,
-  mcpConfig?: MCPRouterConfig
+  mcpConfig?: MCPRouterConfig,
+  modelRestrictions?: Record<string, {
+    allowedModels?: string[];
+    allowedPatterns?: string[];
+    blockedModels?: string[];
+  }>
 ) {
   // Create the MCP router and extract its SDK integration
 
   const mcpRouter = createMCPRouter();
 
-  console.log("MCP enabled?", mcpConfig?.enableMCP); // todo add handling
+  // Only log MCP config if MCP is enabled
+  if (mcpConfig?.enableMCP) {
+    console.log("MCP enabled:", mcpConfig.enableMCP);
+  }
 
   // Create the main app router
   const appRouter = router({
-    ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders, postgresRPCMethods),
+    ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders, postgresRPCMethods, modelRestrictions),
     mcp: mcpRouter
   });
 

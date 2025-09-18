@@ -35,7 +35,7 @@ describe('Simplified tRPC Router', () => {
     expect(schema.openrpc).toBe('1.2.6');
     expect(schema.info.title).toBe('Test API');
     expect(schema.info.description).toBe('Test RPC API');
-    expect(schema.methods).toHaveLength(3); // ai.health, ai.executeAIRequest, ai.listProviders
+    expect(schema.methods).toHaveLength(3); // ai.health, ai.generateText, ai.listProviders
     expect(schema.methods[0].name).toBe('ai.health');
   });
 

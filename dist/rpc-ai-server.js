@@ -67,6 +67,7 @@ export class RpcAiServer {
         // Fallback to default
         return { jsonRpc: true, tRpc: false };
     }
+    providerApiKeys = {};
     constructor(config = {}) {
         // Apply test-safe configuration if in test environment
         config = getTestSafeConfig(config);
@@ -136,6 +137,7 @@ export class RpcAiServer {
                 },
                 extensions: config.mcp?.extensions
             },
+            modelRestrictions: config.modelRestrictions || {}, // Default: no model restrictions
             ...config
         };
         // Initialize database adapter if token tracking is enabled
@@ -166,21 +168,40 @@ export class RpcAiServer {
                 requireAuthForAllMethods: false
             });
         }
-        // Debug: log MCP config before passing to router
-        console.log('🔍 RPC Server MCP Config:', {
-            hasMcpConfig: !!this.config.mcp,
-            extensions: this.config.mcp?.extensions ? {
-                hasPrompts: !!this.config.mcp.extensions.prompts,
-                hasResources: !!this.config.mcp.extensions.resources,
-                promptsConfig: this.config.mcp.extensions.prompts,
-                resourcesConfig: this.config.mcp.extensions.resources
-            } : null
-        });
+        // Debug: log MCP config only if MCP is enabled
+        if (this.config.mcp?.enableMCP) {
+            console.log('🔍 RPC Server MCP Config:', {
+                hasMcpConfig: !!this.config.mcp,
+                extensions: this.config.mcp?.extensions ? {
+                    hasPrompts: !!this.config.mcp.extensions.prompts,
+                    hasResources: !!this.config.mcp.extensions.resources,
+                    promptsConfig: this.config.mcp.extensions.prompts,
+                    resourcesConfig: this.config.mcp.extensions.resources
+                } : null
+            });
+        }
+        if (config.providers) {
+            const providersObj = config.providers;
+            for (const providerName in providersObj) {
+                if (providersObj[providerName].apiKey) {
+                    this.providerApiKeys[providerName] = providersObj[providerName].apiKey;
+                }
+            }
+        }
+        else if (this.config.serverProviders) {
+            for (const provider of this.config.serverProviders) {
+                if (typeof provider === 'string') {
+                    const envKey = `${provider.toUpperCase()}_API_KEY`;
+                    const apiKey = process.env[envKey];
+                    this.providerApiKeys[provider] = apiKey;
+                }
+            }
+        }
         // Create router with AI configuration and token tracking
-        this.router = createAppRouter(this.config.aiLimits, this.config.tokenTracking.enabled || false, this.dbAdapter, this.config.serverProviders, this.config.byokProviders, this.postgresRPCMethods, this.config.mcp);
+        this.router = createAppRouter(this.config.aiLimits, this.config.tokenTracking.enabled || false, this.dbAdapter, this.config.serverProviders, this.config.byokProviders, this.postgresRPCMethods, this.config.mcp, this.config.modelRestrictions);
         // Initialize tRPC to JSON-RPC bridge (if JSON-RPC is enabled)
         if (this.config.protocols.jsonRpc) {
-            this.jsonRpcBridge = createTRPCToJSONRPCBridge(this.router);
+            this.jsonRpcBridge = createTRPCToJSONRPCBridge(this.router, this.createContext(this.providerApiKeys));
         }
         // Initialize OAuth server (if enabled)
         if (this.config.oauth.enabled) {
@@ -202,6 +223,29 @@ export class RpcAiServer {
             console.log(`🔧 Trust proxy enabled for reverse proxy support`);
         }
         this.setupMiddleware();
+    }
+    createContext(providerApiKeys) {
+        return (opts) => {
+            const baseCtx = createTRPCContext(opts);
+            // Get provider from request, or use first configured provider as default
+            // For JSON-RPC requests, provider is in req.body.params.provider
+            // For tRPC requests, provider might be in different locations
+            const jsonRpcParams = baseCtx.req.body?.params;
+            const requestedProvider = jsonRpcParams?.provider || baseCtx.req.body?.params?.provider;
+            const defaultProvider = this.config.serverProviders?.[0];
+            const providerToUse = requestedProvider || defaultProvider;
+            // Get API key for the provider, or fall back to any available API key
+            let apiKey = baseCtx.apiKey || providerApiKeys[providerToUse];
+            // If no specific provider API key found, try to use any available API key as fallback
+            if (!apiKey && !requestedProvider) {
+                // Use the first available API key if no specific provider was requested
+                apiKey = Object.values(providerApiKeys).find(key => key) || null;
+            }
+            return {
+                ...baseCtx,
+                apiKey: apiKey || null,
+            };
+        };
     }
     setupMiddleware() {
         // Security - with CORS-friendly settings
@@ -497,7 +541,7 @@ export class RpcAiServer {
         if (this.config.protocols.tRpc) {
             this.app.use(this.config.paths.tRpc, trpcExpress.createExpressMiddleware({
                 router: this.router,
-                createContext: createTRPCContext,
+                createContext: this.createContext(this.providerApiKeys),
                 onError: ({ path, error }) => {
                     console.error(`❌ tRPC failed on ${path ?? "<no-path>"}:`, error);
                 },

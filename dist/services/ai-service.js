@@ -10,13 +10,29 @@ import { openai, OpenAI } from '@ai-sdk/openai';
 import { google, Google } from '@ai-sdk/google';
 import crypto from 'crypto';
 import { MCPService } from './mcp-service.js';
-import { ModelRegistryManager } from './model-registry.js';
+import { ModelRegistry } from './model-registry.js';
 // ModelType removed - no longer needed
 function normalizeServiceProviders(spConfig) {
     if (!spConfig)
         return [];
     if (Array.isArray(spConfig)) {
-        return spConfig;
+        // Convert string array to ServiceProvider array
+        return spConfig.map((provider, index) => {
+            if (typeof provider === 'string') {
+                return {
+                    name: provider,
+                    apiKey: '',
+                    priority: index,
+                    model: undefined,
+                    maxTokens: undefined,
+                    temperature: undefined,
+                };
+            }
+            else {
+                // Already a ServiceProvider object
+                return provider;
+            }
+        });
     }
     const providers = [];
     if (spConfig.anthropic) {
@@ -71,10 +87,13 @@ export class AIService {
     systemPrompts;
     providers = [];
     mcpService; // MCP service for web search tools
-    modelRegistry;
+    modelRegistry; // Unified registry with safety features
+    modelRestrictions;
     constructor(config) {
         // Initialize system prompts from config or use defaults
         this.systemPrompts = config.systemPrompts || this.getDefaultSystemPrompts();
+        // Initialize model restrictions
+        this.modelRestrictions = config.modelRestrictions;
         if (config.serviceProviders) {
             this.providers = normalizeServiceProviders(config.serviceProviders);
             if (this.providers.length === 0) {
@@ -84,7 +103,9 @@ export class AIService {
             if (Array.isArray(config.serviceProviders)) {
                 const serviceProvidersArray = config.serviceProviders;
                 this.providers.forEach((p) => {
-                    p.priority = serviceProvidersArray.findIndex(sp => sp.name === p.name);
+                    // Handle both string arrays and ServiceProvider arrays
+                    const priority = serviceProvidersArray.findIndex(sp => typeof sp === 'string' ? sp === p.name : sp.name === p.name);
+                    p.priority = priority >= 0 ? priority : 999; // Default low priority if not found
                 });
             }
             // Sort by priority descending (higher first)
@@ -106,7 +127,8 @@ export class AIService {
             this.mcpService = new MCPService({ enableWebSearch: true });
         }
         // Initialize model registry
-        this.modelRegistry = this.initializeModelRegistry(config.modelRegistry);
+        // Initialize unified model registry
+        this.modelRegistry = new ModelRegistry(config.modelRegistry?.registryConfig);
     }
     /**
      * Execute AI request with system prompt using Vercel AI SDK
@@ -142,12 +164,22 @@ export class AIService {
         console.log('🔍 AI Execute Debug:');
         console.log(`   System Prompt: ${systemPrompt ? `"${systemPrompt.substring(0, 100)}..."` : 'MISSING'}`);
         console.log(`   User Content: ${content ? `"${content.substring(0, 100)}..."` : 'MISSING'}`);
+        console.log(`   Raw metadata:`, metadata);
+        console.log(`   Raw options.model:`, options.model);
+        console.log(`   Raw this.config.provider:`, this.config.provider);
+        console.log(`   Provider calculation: metadata.provider='${metadata.provider}' || this.config.provider='${this.config.provider}'`);
         console.log(`   Provider: ${executionConfig.provider} ${metadata.provider ? '(from metadata)' : '(default)'}`);
+        console.log(`   executionConfig.model raw value:`, executionConfig.model);
         console.log(`   Model: ${executionConfig.model || 'default'}`);
-        console.log(`   Using BYOK: ${apiKey ? 'YES' : 'NO'}`);
+        console.log(`   API Key: ${apiKey ? 'Provided' : 'None'}`);
         console.log(`   Web Search: ${executionConfig.useWebSearch ? executionConfig.webSearchPreference : 'DISABLED'}`);
+        // Debug model creation
+        console.log(`🔧 Model Debug: Creating model for provider=${executionConfig.provider}, model=${executionConfig.model || 'default'}`);
         // Get the AI model provider (with user's API key if provided)
-        const model = this.getModel(executionConfig.model, apiKey, executionConfig.provider, executionConfig.useWebSearch);
+        const modelResult = await this.getModel(executionConfig.model, apiKey, executionConfig.provider, executionConfig.useWebSearch);
+        const model = modelResult;
+        // Track the resolved model name for error reporting
+        const resolvedModelName = model.modelId || model.model || 'unknown';
         // Prepare tools and enhanced system prompt
         const { enhancedSystemPrompt, availableTools } = await this.prepareAIExecution(systemPrompt, executionConfig);
         // Create the user prompt from content
@@ -175,6 +207,11 @@ export class AIService {
                     generateOptions.toolChoice = 'auto'; // Let AI decide when to use tools
                 }
             }
+            console.log('🚀 About to call generateText with:');
+            console.log(`   Model type: ${typeof model}`);
+            console.log(`   Model constructor: ${model.constructor?.name}`);
+            console.log(`   Generate options keys: ${Object.keys(generateOptions)}`);
+            console.log(`   Max tokens: ${generateOptions.maxTokens}`);
             const result = await generateText(generateOptions);
             // Handle tool calls if present (only for MCP tools, not provider-native)
             if (result.toolCalls && result.toolCalls.length > 0 && executionConfig.webSearchPreference !== 'ai-web-search') {
@@ -199,12 +236,70 @@ export class AIService {
             };
         }
         catch (error) {
-            throw new Error(`AI execution failed: ${error.message}`);
+            // Simplified unified error handling for all providers
+            const provider = executionConfig.provider;
+            const modelForError = resolvedModelName || executionConfig.model || 'default';
+            const statusCode = error.statusCode || error.status;
+            // Log detailed error for debugging
+            console.error(`🚨 ${provider.toUpperCase()} API Error:`, {
+                provider,
+                model: modelForError,
+                originalModel: executionConfig.model,
+                resolvedModel: resolvedModelName,
+                message: error.message,
+                statusCode,
+                apiKeyLength: apiKey ? apiKey.length : 0,
+                apiKeyPrefix: apiKey ? apiKey.substring(0, 8) + '...' : 'none'
+            });
+            // Generate user-friendly error message
+            let errorMessage = `${provider} API error`;
+            if (statusCode === 401) {
+                errorMessage += `: Invalid API key (401)`;
+            }
+            else if (statusCode === 403) {
+                errorMessage += `: Access forbidden - API key may not support model "${modelForError}" (403)`;
+            }
+            else if (statusCode === 404 || error.message === 'Not Found') {
+                errorMessage += `: Model "${modelForError}" not found or API key invalid (404)`;
+            }
+            else {
+                errorMessage += `: ${error.message}`;
+            }
+            throw new Error(errorMessage);
         }
     }
-    getModel(modelOverride, apiKey, providerOverride, enableWebSearch) {
+    async getModel(modelOverride, apiKey, providerOverride, enableWebSearch) {
         const provider = providerOverride || this.config.provider;
-        let modelName = modelOverride || this.config.model || this.getDefaultModel(provider);
+        // Debug logging to see what we receive
+        console.log(`🔧 getModel() called with: modelOverride='${modelOverride}', provider='${provider}'`);
+        console.log(`🔧 apiKey parameter:`, apiKey ? `provided (${apiKey.length} chars)` : 'none');
+        console.log(`🔧 Available providers:`, this.providers.map(p => ({ name: p.name, hasKey: !!p.apiKey })));
+        // Handle 'auto' and 'default' as special cases that should trigger default model selection
+        let modelName;
+        if (!modelOverride || modelOverride === 'auto' || modelOverride === 'default') {
+            console.log(`🔧 Triggering default model selection (modelOverride was '${modelOverride}')`);
+            modelName = this.config.model || await this.getDefaultModel(provider);
+            console.log(`🔧 Resolved to default model: ${modelName}`);
+        }
+        else {
+            console.log(`🔧 Using explicit model: ${modelOverride}`);
+            modelName = modelOverride;
+        }
+        // Validate model restrictions
+        const validation = this.validateModelRestrictions(provider, modelName);
+        if (!validation.allowed) {
+            const errorMessage = validation.error || `Model ${modelName} not allowed for provider ${provider}`;
+            const suggestionText = validation.suggestions?.length
+                ? ` Allowed models: ${validation.suggestions.join(', ')}`
+                : '';
+            throw new Error(`${errorMessage}.${suggestionText}`);
+        }
+        // Fix Google model names that come from the registry
+        // Registry has "gemini-1-5-flash" but Google SDK expects "gemini-1.5-flash"
+        if (provider === 'google') {
+            modelName = this.normalizeGoogleModelName(modelName);
+            console.log(`🔧 Normalized Google model name: ${modelName}`);
+        }
         // For OpenRouter, modify model name to enable web search if requested
         if (provider === 'openrouter' && enableWebSearch) {
             modelName = this.getOpenRouterWebSearchModel(modelName, true);
@@ -228,11 +323,40 @@ export class AIService {
             return getModelFn(modelName, apiKey);
         }
         // Use default server-side configuration
+        // For ALL providers, check if we have API keys from provider config first
+        const currentProvider = this.providers.find(p => p.name === provider);
+        const providerApiKey = currentProvider?.apiKey;
+        if (providerApiKey) {
+            console.log(`🔧 [FIXED VERSION] Using ${provider} API key from provider configuration (key length: ${providerApiKey.length})`);
+            // Create provider instances with explicit API keys
+            const modelsWithApiKey = {
+                anthropic: (name) => new Anthropic({ apiKey: providerApiKey }).messages(name),
+                openai: (name) => new OpenAI({ apiKey: providerApiKey }).chat(name),
+                google: (name) => new Google({ apiKey: providerApiKey }).generativeAI(name),
+                openrouter: (name) => new OpenAI({
+                    apiKey: providerApiKey,
+                    baseUrl: 'https://openrouter.ai/api/v1'
+                }).chat(name)
+            };
+            const getModelFn = modelsWithApiKey[provider];
+            if (getModelFn) {
+                return getModelFn(modelName);
+            }
+        }
+        // Fallback to environment variables for helper functions
+        // Ensure Google environment variable mapping
+        if (provider === 'google') {
+            if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GOOGLE_API_KEY) {
+                process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_API_KEY;
+                console.log('🔧 Mapped GOOGLE_API_KEY to GOOGLE_GENERATIVE_AI_API_KEY for Vercel AI SDK');
+            }
+        }
+        console.log(`🔧 Using ${provider} helper function with environment variables`);
         const models = {
-            anthropic: (name) => anthropic.messages(name),
-            openai: (name) => openai.chat(name),
-            google: (name) => google.generativeAI(name),
-            openrouter: (name) => openai.chat(name) // OpenRouter uses OpenAI-compatible interface
+            anthropic: (name) => anthropic.messages(name), // Uses ANTHROPIC_API_KEY
+            openai: (name) => openai.chat(name), // Uses OPENAI_API_KEY
+            google: (name) => google.generativeAI(name), // Uses GOOGLE_GENERATIVE_AI_API_KEY
+            openrouter: (name) => openai.chat(name) // Uses OPENAI_API_KEY
         };
         const getModelFn = models[provider];
         if (getModelFn === undefined) {
@@ -240,12 +364,11 @@ export class AIService {
         }
         return getModelFn(modelName);
     }
-    getDefaultModel(provider) {
+    async getDefaultModel(provider) {
         const targetProvider = provider || this.config.provider;
         if (!targetProvider)
             return 'unknown-model';
-        const defaultModel = this.modelRegistry.getDefaultModel(targetProvider);
-        return defaultModel || 'unknown-model';
+        return await this.modelRegistry.getDefaultModel(targetProvider);
     }
     /**
      * Perform MCP web search using open-webSearch server
@@ -663,42 +786,12 @@ The tools will be available during our conversation. Call them when needed to ga
             return {
                 connected: false,
                 provider: this.config.provider ?? 'unknown',
-                model: this.getDefaultModel(),
+                model: await this.getDefaultModel(),
                 error: error.message
             };
         }
     }
-    /**
-     * Initialize model registry based on configuration
-     */
-    initializeModelRegistry(config) {
-        // If custom registry provided, use it directly
-        if (config?.customModelRegistry) {
-            return config.customModelRegistry;
-        }
-        // Create registry based on configuration
-        const useDefaults = !config?.useCustomRegistry;
-        const registry = new ModelRegistryManager(useDefaults);
-        // Add additional providers
-        if (config?.additionalProviders) {
-            for (const provider of config.additionalProviders) {
-                registry.addProviderRegistry(provider);
-            }
-        }
-        // Extend existing providers
-        if (config?.extendProviders) {
-            for (const [provider, extension] of Object.entries(config.extendProviders)) {
-                registry.extendProvider(provider, extension.models, extension.newDefaultModel);
-            }
-        }
-        // Replace provider models
-        if (config?.replaceProviders) {
-            for (const [provider, replacement] of Object.entries(config.replaceProviders)) {
-                registry.replaceProviderModels(provider, replacement.models, replacement.newDefaultModel);
-            }
-        }
-        return registry;
-    }
+    // Old initializeModelRegistry method removed - now using SafeModelRegistry directly
     /**
      * Check if a specific OpenRouter model supports web search
      */
@@ -733,6 +826,58 @@ The tools will be available during our conversation. Call them when needed to ga
             return model;
         // Add :online suffix to enable web search via Exa.ai
         return `${model}:online`;
+    }
+    /**
+     * Normalize Google model names from registry format to SDK format
+     * Registry has "gemini-1-5-flash" but Google SDK expects "models/gemini-1.5-flash"
+     * All Google models require the "models/" prefix for Vercel AI SDK
+     */
+    normalizeGoogleModelName(modelName) {
+        // Common Google model mappings - all values include required "models/" prefix
+        const modelMappings = {
+            // Gemini 2.5 models (latest cost-efficient)
+            'gemini-2-5-flash': 'models/gemini-2.5-flash',
+            'gemini-2-5-pro': 'models/gemini-2.5-pro',
+            // Gemini 2.0 models
+            'gemini-2-0-flash': 'models/gemini-2.0-flash',
+            'gemini-2-0-flash-exp': 'models/gemini-2.0-flash',
+            'gemini-2-0-pro': 'models/gemini-2.0-pro',
+            // Gemini 1.5 models (stable and widely supported)
+            'gemini-1-5-flash': 'models/gemini-1.5-flash',
+            'gemini-1-5-flash-8b': 'models/gemini-1.5-flash-8b',
+            'gemini-1-5-pro': 'models/gemini-1.5-pro',
+            'gemini-1-0-pro': 'models/gemini-1.0-pro',
+            'gemini-pro': 'models/gemini-pro',
+            'gemini-pro-vision': 'models/gemini-pro-vision',
+            // Default fallback for weird registry names (use stable model)
+            '123-versions': 'models/gemini-2.0-flash',
+            'calendar-month-deprecation-date': 'models/gemini-2.0-flash',
+            'calendar-month-latest-update': 'models/gemini-2.0-flash',
+            'cognition-2-knowledge-cutoff': 'models/gemini-2.0-flash'
+        };
+        // Check if we have a direct mapping
+        if (modelMappings[modelName]) {
+            return modelMappings[modelName];
+        }
+        // Try to convert pattern: gemini-X-Y-name to gemini-X.Y-name
+        if (modelName.startsWith('gemini-')) {
+            const normalized = modelName.replace(/gemini-(\d)-(\d)/, 'gemini-$1.$2');
+            if (normalized !== modelName) {
+                return normalized;
+            }
+        }
+        // If no mapping found and it doesn't look like a valid model, use default
+        if (!modelName.includes('gemini') && !modelName.includes('palm')) {
+            console.warn(`⚠️ Unknown Google model '${modelName}', using default 'models/gemini-2.0-flash'`);
+            return 'models/gemini-2.0-flash';
+        }
+        // Ensure Google models have the required "models/" prefix for Vercel AI SDK
+        const finalModel = modelName;
+        if (!finalModel.startsWith('models/')) {
+            console.log(`🔧 Adding required "models/" prefix for Google model: ${finalModel} → models/${finalModel}`);
+            return `models/${finalModel}`;
+        }
+        return finalModel;
     }
     /**
      * Check if provider supports native web search
@@ -783,50 +928,53 @@ The tools will be available during our conversation. Call them when needed to ga
         };
     }
     /**
-     * Get available models for current provider
+     * Get available models for specified or current provider
      */
-    getAvailableModels() {
-        if (!this.config.provider)
+    async getAvailableModels(provider) {
+        const targetProvider = provider || this.config.provider;
+        if (!targetProvider)
             return [];
-        const models = this.modelRegistry.getModelsForProvider(this.config.provider);
+        const models = await this.modelRegistry.getModelsForProvider(targetProvider);
         return models.map(model => model.id);
     }
     /**
-     * Get detailed model information for current provider
+     * Get detailed model information for specified or current provider
      */
-    getAvailableModelsDetailed() {
-        if (!this.config.provider)
+    async getAvailableModelsDetailed(provider) {
+        const targetProvider = provider || this.config.provider;
+        if (!targetProvider)
             return [];
-        return this.modelRegistry.getModelsForProvider(this.config.provider);
+        return await this.modelRegistry.getModelsForProvider(targetProvider);
     }
     /**
      * Get models by capability
      */
-    getModelsByCapability(capability, provider) {
-        return this.modelRegistry.findModelsByCapability(capability, provider || this.config.provider);
+    async getModelsByCapability(capability, provider) {
+        return await this.modelRegistry.findModelsByCapability(capability, provider || this.config.provider);
     }
     /**
      * Get deprecated models with warnings
      */
-    getDeprecatedModels(provider) {
-        return this.modelRegistry.getDeprecatedModels(provider || this.config.provider);
+    async getDeprecatedModels(provider) {
+        const deprecatedModels = this.modelRegistry.getDeprecatedModels(provider || this.config.provider);
+        return deprecatedModels.map(model => ({ ...model, warning: 'This model is deprecated' }));
     }
     /**
      * Get current configuration (without API key)
      */
-    getConfig() {
+    async getConfig() {
         return {
             provider: this.config.provider,
-            model: this.config.model || this.getDefaultModel(),
+            model: this.config.model || await this.getDefaultModel(),
             maxTokens: this.config.maxTokens,
             temperature: this.config.temperature,
-            availableModels: this.getAvailableModels(),
-            availableModelsDetailed: this.getAvailableModelsDetailed(),
+            availableModels: await this.getAvailableModels(),
+            availableModelsDetailed: await this.getAvailableModelsDetailed(),
             webSearchCapabilities: this.getWebSearchCapabilities(),
-            deprecatedModels: this.getDeprecatedModels(),
+            deprecatedModels: await this.getDeprecatedModels(),
             modelRegistry: {
-                totalModels: this.modelRegistry.getAllActiveModels().length,
-                webSearchModels: this.getModelsByCapability('web-search').length
+                totalModels: (await this.modelRegistry.getAllActiveModels()).length,
+                webSearchModels: (await this.getModelsByCapability('web-search')).length
             }
         };
     }
@@ -835,6 +983,123 @@ The tools will be available during our conversation. Call them when needed to ga
      */
     getModelRegistry() {
         return this.modelRegistry;
+    }
+    /**
+     * Get configured AI service providers
+     */
+    getProviders() {
+        return this.providers.map(p => ({ name: p.name, priority: p.priority }));
+    }
+    /**
+     * Get allowed models for a provider, respecting model restrictions
+     */
+    async getAllowedModels(provider) {
+        // Get all available models first
+        const allModels = await this.getAvailableModels(provider);
+        if (!provider) {
+            // If no provider specified, return all allowed models from all providers
+            const allowedModels = [];
+            for (const p of this.providers) {
+                const providerModels = await this.getAvailableModels(p.name);
+                const filtered = this.filterModelsByRestrictions(p.name, providerModels);
+                allowedModels.push(...filtered);
+            }
+            return allowedModels;
+        }
+        // Filter models by restrictions for the specific provider
+        return this.filterModelsByRestrictions(provider, allModels);
+    }
+    /**
+     * Filter models based on provider restrictions
+     */
+    filterModelsByRestrictions(provider, models) {
+        const restrictions = this.modelRestrictions?.[provider];
+        // No restrictions = all models allowed
+        if (!restrictions) {
+            return models;
+        }
+        return models.filter(model => {
+            // Check if blocked
+            if (restrictions.blockedModels?.includes(model)) {
+                return false;
+            }
+            // If we have allowed models or patterns, model must match one
+            if (restrictions.allowedModels?.length || restrictions.allowedPatterns?.length) {
+                // Check exact matches
+                if (restrictions.allowedModels?.includes(model)) {
+                    return true;
+                }
+                // Check pattern matches
+                if (restrictions.allowedPatterns?.some(pattern => this.matchesPattern(model, pattern))) {
+                    return true;
+                }
+                // No match found
+                return false;
+            }
+            // No specific restrictions, allow by default
+            return true;
+        });
+    }
+    /**
+     * Validate if a model is allowed for the given provider
+     */
+    validateModelRestrictions(provider, model) {
+        const restrictions = this.modelRestrictions?.[provider];
+        // No restrictions = all models allowed
+        if (!restrictions) {
+            return { allowed: true };
+        }
+        // Check blocked models first
+        if (restrictions.blockedModels?.includes(model)) {
+            return {
+                allowed: false,
+                error: `Model '${model}' is blocked for provider '${provider}'`,
+                suggestions: restrictions.allowedModels?.slice(0, 3) || []
+            };
+        }
+        // Check allowed models (exact match)
+        if (restrictions.allowedModels?.length && restrictions.allowedModels.includes(model)) {
+            return { allowed: true };
+        }
+        // Check allowed patterns (glob-style matching)
+        if (restrictions.allowedPatterns?.length) {
+            for (const pattern of restrictions.allowedPatterns) {
+                if (this.matchesPattern(model, pattern)) {
+                    return { allowed: true };
+                }
+            }
+        }
+        // If we have restrictions but model doesn't match any, it's blocked
+        if (restrictions.allowedModels?.length || restrictions.allowedPatterns?.length) {
+            return {
+                allowed: false,
+                error: `Model '${model}' not allowed for provider '${provider}'`,
+                suggestions: restrictions.allowedModels?.slice(0, 3) || this.getPatternSuggestions(restrictions.allowedPatterns || [])
+            };
+        }
+        // No specific restrictions, allow by default
+        return { allowed: true };
+    }
+    /**
+     * Simple glob pattern matching for model names
+     */
+    matchesPattern(model, pattern) {
+        // Convert glob pattern to regex
+        const regexPattern = pattern
+            .replace(/\./g, '\\.') // Escape dots
+            .replace(/\*/g, '.*') // Convert * to .*
+            .replace(/\?/g, '.'); // Convert ? to .
+        const regex = new RegExp(`^${regexPattern}$`);
+        return regex.test(model);
+    }
+    /**
+     * Generate suggestions from patterns
+     */
+    getPatternSuggestions(patterns) {
+        return patterns.map(pattern => {
+            // Convert patterns to example model names
+            return pattern.replace(/\*/g, 'example');
+        }).slice(0, 3);
     }
 }
 export default AIService;

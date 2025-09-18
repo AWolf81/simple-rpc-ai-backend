@@ -282,7 +282,7 @@ pnpm registry:check-updates # Check for new models and pricing
 
 ### Coverage Requirements
 - **Minimum 80% coverage** across branches, functions, lines, statements
-- **Cross-platform testing** on Node.js 18, 20, 22
+- **Cross-platform testing** on Node.js 22+
 - **Security-focused tests** for authentication and key management
 - **Integration tests** for complete AI request workflows
 

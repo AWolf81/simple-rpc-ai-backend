@@ -43,8 +43,13 @@ export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-a
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai';
 export type { AIRouterConfig, AIRouterType } from './trpc/routers/ai';
 
-// Provider Registry types
-export type { ProviderConfig, ModelConfig, PricingInfo, RegistryHealthStatus } from './services/provider-registry';
+// Model Registry (new unified registry with @anolilab/ai-model-registry integration)
+export { ModelRegistry } from './services/model-registry';
+export type { ModelInfo } from './services/model-registry';
+
+// Hybrid Model Registry (production-safe versioned model registry)
+export { HybridModelRegistry, hybridRegistry } from './services/hybrid-model-registry';
+export type { HybridModel } from './services/hybrid-model-registry';
 
 // tRPC router types for client type safety
 export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root';

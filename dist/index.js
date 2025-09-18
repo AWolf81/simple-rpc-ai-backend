@@ -34,6 +34,10 @@ export { generateTRPCMethods, createAppRouter } from './trpc/root.js';
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
 // AI Limit Presets for common use cases
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
+// Model Registry (new unified registry with @anolilab/ai-model-registry integration)
+export { ModelRegistry } from './services/model-registry.js';
+// Hybrid Model Registry (production-safe versioned model registry)
+export { HybridModelRegistry, hybridRegistry } from './services/hybrid-model-registry.js';
 // Development tools are available in tools/ directory as standalone scripts
 // Custom function system
 export { FunctionRegistry } from './services/function-registry.js';

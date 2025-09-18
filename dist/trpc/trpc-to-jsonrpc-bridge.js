@@ -4,6 +4,7 @@
  * Automatically generates JSON-RPC handlers from tRPC routers to eliminate code duplication.
  * This allows us to maintain a single source of truth in tRPC while supporting JSON-RPC protocol.
  */
+import { createTRPCContext } from './index.js';
 /**
  * Maps tRPC error codes to JSON-RPC error codes
  */
@@ -30,8 +31,10 @@ function mapTRPCErrorToJSONRPC(error) {
  */
 export class TRPCToJSONRPCBridge {
     router;
-    constructor(router) {
+    contextCreator;
+    constructor(router, contextCreator) {
         this.router = router;
+        this.contextCreator = contextCreator;
     }
     /**
      * Create Express middleware that handles JSON-RPC requests using tRPC procedures
@@ -58,7 +61,8 @@ export class TRPCToJSONRPCBridge {
                 // Handle legacy method names by mapping them to new ones
                 const legacyMethodMapping = {
                     'health': ['ai', 'health'],
-                    'executeAIRequest': ['ai', 'executeAIRequest'],
+                    'generateText': ['ai', 'generateText'],
+                    'listAllowedModels': ['ai', 'listAllowedModels'],
                     'listProviders': ['ai', 'listProviders'],
                     'storeUserKey': ['ai', 'storeUserKey'],
                     'getUserKey': ['ai', 'getUserKey'],
@@ -68,12 +72,10 @@ export class TRPCToJSONRPCBridge {
                     'deleteUserKey': ['ai', 'deleteUserKey'],
                 };
                 const actualPath = legacyMethodMapping[method] || procedurePath;
-                // Create tRPC context (similar to what we do in the express adapter)
-                const ctx = {
-                    req,
-                    res,
-                    user: req.user || null, // JWT middleware adds this
-                };
+                // Create tRPC context using the enhanced context creation function if provided
+                const ctx = this.contextCreator
+                    ? this.contextCreator({ req, res, info: {} })
+                    : createTRPCContext({ req, res, info: {} });
                 try {
                     // Use tRPC's createCaller API for clean procedure calling
                     const caller = this.router.createCaller(ctx);
@@ -188,8 +190,8 @@ export class TRPCToJSONRPCBridge {
                     }
                 },
                 {
-                    name: "ai.executeAIRequest",
-                    description: "Execute AI request (auto-generated from tRPC)",
+                    name: "ai.generateText",
+                    description: "Generate text using AI (auto-generated from tRPC)",
                     params: [
                         { name: "content", required: true, schema: { type: "string" } },
                         { name: "promptId", required: true, schema: { type: "string" } },
@@ -200,6 +202,17 @@ export class TRPCToJSONRPCBridge {
                         schema: { type: "object" }
                     }
                 },
+                {
+                    name: "ai.listAllowedModels",
+                    description: "List allowed AI models with optional provider filtering (auto-generated from tRPC)",
+                    params: [
+                        { name: "provider", required: false, schema: { type: "string" } }
+                    ],
+                    result: {
+                        name: "modelsResult",
+                        schema: { type: "array", items: { type: "object" } }
+                    }
+                },
                 // Add more methods as needed - these should be auto-generated from tRPC schema
             ]
         };
@@ -208,6 +221,6 @@ export class TRPCToJSONRPCBridge {
 /**
  * Factory function to create the bridge
  */
-export function createTRPCToJSONRPCBridge(router) {
-    return new TRPCToJSONRPCBridge(router);
+export function createTRPCToJSONRPCBridge(router, contextCreator) {
+    return new TRPCToJSONRPCBridge(router, contextCreator);
 }

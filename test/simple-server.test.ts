@@ -46,9 +46,9 @@ describe('Simple AI Server', () => {
   });
 
   describe('AI Request Handling', () => {
-    it('should handle executeAIRequest method (will fail without API keys)', async () => {
+    it('should handle generateText method (will fail without API keys)', async () => {
       try {
-        await client.request('executeAIRequest', {
+        await client.request('generateText', {
           content: 'Hello',
           systemPrompt: 'You are a helpful assistant'
         });
@@ -60,9 +60,9 @@ describe('Simple AI Server', () => {
       }
     });
 
-    it('should validate required parameters for executeAIRequest', async () => {
+    it('should validate required parameters for generateText', async () => {
       try {
-        await client.request('executeAIRequest', {
+        await client.request('generateText', {
           content: 'Hello'
           // Missing systemPrompt
         });

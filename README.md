@@ -1248,6 +1248,10 @@ async function analyzeCode() {
 
 ### Installation
 
+#### Prerequisites
+- **Node.js 22.18.0+** (required by tRPC v11)
+
+#### Install Package
 ```bash
 # Install from GitHub (current)
 npm install git+https://github.com/AWolf81/simple-rpc-ai-backend.git
@@ -1258,20 +1262,43 @@ pnpm add git+https://github.com/AWolf81/simple-rpc-ai-backend.git
 
 ### 📡 **Provider Registry Setup (Recommended)**
 
-The backend now integrates with [`@anolilab/ai-model-registry`](https://www.npmjs.com/package/@anolilab/ai-model-registry) for up-to-date provider and model information. 
+The backend integrates with [`@anolilab/ai-model-registry`](https://www.npmjs.com/package/@anolilab/ai-model-registry) for up-to-date provider and model information, enhanced with **intelligent curation** to handle missing models and deprecated information.
 
-#### **Zero-Setup Registry System**
+#### **Zero-Setup Registry System with Smart Curation**
 
-The AI provider registry **works immediately** after installation:
+The AI provider registry **works immediately** after installation with automatic curation:
 
 - ✅ **Zero Configuration** - Uses `@anolilab/ai-model-registry` automatically
 - ✅ **Live Data** - 1,700+ models from 33+ providers  
 - ✅ **Automatic Updates** - Always current models and pricing
 - ✅ **Intelligent Fallbacks** - Works offline with built-in model data
+- ✅ **Smart Curation** - Extends registry with missing stable models
+- ✅ **Deprecation Handling** - Auto-filters outdated models, prioritizes stable versions
+
+#### **How Registry Curation Works**
+
+**Problem Solved**: External registries may lag behind provider changes or lack stable model variants.
+
+```typescript
+// Example: Google Provider Curation
+// Registry may only have: gemini-2-0-flash-exp (experimental)  
+// Curation automatically adds: gemini-2.0-flash (stable equivalent)
+// Default selection: gemini-2.0-flash (stable prioritized)
+
+// User choice is always preserved:
+// User requests: gemini-2-0-flash-exp → gets experimental version  
+// User requests: "default" → gets curated stable version
+```
+
+**Curation Benefits**:
+- 🎯 **Production-Ready Defaults** - Stable models selected automatically
+- 🔄 **Missing Model Extension** - Adds stable versions when registry lacks them
+- ⚖️ **Balanced Selection** - Prioritizes stability while preserving user choice
+- 🚫 **Deprecated Model Handling** - Filters offline models from defaults
 
 #### **Optional Registry Tools**
 ```bash  
-# Check current registry status
+# Check current registry status and curation results
 pnpm run registry:health
 
 # Check for new models and pricing changes
@@ -1281,11 +1308,12 @@ pnpm run registry:check-updates
 #### **What This Provides**
 - ✅ **Live Provider Data** - Real-time models and pricing from registry
 - ✅ **33+ Providers** - Anthropic (10), OpenAI (20), Google (50), OpenRouter (333+)
-- ✅ **1,700+ Models** - Comprehensive model database
+- ✅ **1,700+ Models** - Comprehensive model database with curation
 - ✅ **Sub-100ms Performance** - Fast registry responses  
 - ✅ **Graceful Fallbacks** - Works even when registry is unavailable
+- ✅ **Production Stability** - Curated defaults avoid experimental/deprecated models
 
-> **Note**: No setup required! The registry integrates automatically and falls back to built-in data if unavailable.
+> **Note**: No setup required! The registry integrates automatically with intelligent curation and falls back to built-in data if unavailable. Curation only affects default model selection - user-specified models are always preserved exactly as requested.
 
 ### Option A: Secure Enterprise Setup with PostgreSQL
 
@@ -2941,7 +2969,7 @@ We welcome contributions that maintain the **simple, flexible** philosophy:
 
 ### 🔧 **Development Setup**
 ```bash
-git clone https://github.com/your-org/simple-rpc-ai-backend
+git clone https://github.com/AWolf81/simple-rpc-ai-backend
 cd simple-rpc-ai-backend
 pnpm install
 

@@ -1,5 +1,5 @@
 {
-  "generated": "2025-09-14T10:29:13.775Z",
+  "generated": "2025-09-18T05:56:46.096Z",
   "version": "1.0.0",
   "description": "tRPC procedure documentation extracted from router",
   "procedures": {
@@ -71,8 +71,8 @@
       "output": null,
       "meta": null
     },
-    "ai.executeAIRequest": {
-      "path": "ai.executeAIRequest",
+    "ai.generateText": {
+      "path": "ai.generateText",
       "type": "mutation",
       "description": null,
       "summary": null,
@@ -88,6 +88,14 @@
           "systemPrompt": {
             "type": "ZodString",
             "description": null
+          },
+          "provider": {
+            "type": "ZodOptional",
+            "description": null,
+            "innerType": {
+              "type": "ZodEnum",
+              "description": null
+            }
           },
           "apiKey": {
             "type": "ZodOptional",
@@ -540,6 +548,33 @@
       "input": {
         "type": "ZodVoid",
         "description": null
+      },
+      "output": null,
+      "meta": null
+    },
+    "ai.listAllowedModels": {
+      "path": "ai.listAllowedModels",
+      "type": "query",
+      "description": null,
+      "summary": null,
+      "tags": [],
+      "input": {
+        "type": "ZodOptional",
+        "description": null,
+        "innerType": {
+          "type": "ZodObject",
+          "description": null,
+          "properties": {
+            "provider": {
+              "type": "ZodOptional",
+              "description": null,
+              "innerType": {
+                "type": "ZodEnum",
+                "description": null
+              }
+            }
+          }
+        }
       },
       "output": null,
       "meta": null
@@ -1669,8 +1704,8 @@
     "protocolVersion": "2024-11-05"
   },
   "stats": {
-    "totalProcedures": 38,
-    "queries": 24,
+    "totalProcedures": 39,
+    "queries": 25,
     "mutations": 14,
     "subscriptions": 0,
     "mcpMethods": 12

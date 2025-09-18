@@ -12,13 +12,16 @@ import { createMCPRouter } from './routers/mcp.js';
  * Create app router with configurable AI limits and optional token tracking
  * NESTED VERSION with proper namespaces for better organization
  */
-export function createAppRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders, postgresRPCMethods, mcpConfig) {
+export function createAppRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders, postgresRPCMethods, mcpConfig, modelRestrictions) {
     // Create the MCP router and extract its SDK integration
     const mcpRouter = createMCPRouter();
-    console.log("MCP enabled?", mcpConfig?.enableMCP); // todo add handling
+    // Only log MCP config if MCP is enabled
+    if (mcpConfig?.enableMCP) {
+        console.log("MCP enabled:", mcpConfig.enableMCP);
+    }
     // Create the main app router
     const appRouter = router({
-        ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders, postgresRPCMethods),
+        ai: createAIRouter(aiConfig, tokenTrackingEnabled, dbAdapter, serverProviders, byokProviders, postgresRPCMethods, modelRestrictions),
         mcp: mcpRouter
     });
     //const mcpServer = createMcpServer(implementation, appRouter);

@@ -29,7 +29,7 @@ Our **core mission** is building a **secure, platform-agnostic JSON-RPC backend*
 ### **Development Setup**
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/simple-rpc-ai-backend.git
+git clone https://github.com/AWolf81/simple-rpc-ai-backend.git
 cd simple-rpc-ai-backend
 
 # Install dependencies

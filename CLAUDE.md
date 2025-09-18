@@ -236,24 +236,67 @@ pnpm docs:playground      # Start local OpenRPC playground (port 3000)
 
 ### How It Works
 
-The system uses `@anolilab/ai-model-registry` for **live model data** with intelligent fallbacks:
+The system uses `@anolilab/ai-model-registry` for **live model data** with intelligent provider-specific curation:
 
 - ✅ **Zero Configuration** - Works immediately after install
 - ✅ **Live Data** - 1,700+ models from 33+ providers  
 - ✅ **Automatic Updates** - Always current models and pricing
 - ✅ **Intelligent Fallbacks** - Works offline with built-in model data
 - ✅ **Corporate Friendly** - No network requirements for basic functionality
+- ✅ **Smart Curation** - Extends registry with missing stable models and deprecated model handling
+
+### Registry Curation & Extension
+
+The system intelligently extends external registry data to ensure production-ready model selection:
+
+#### **Google Provider Curation**
+
+```typescript
+// Automatic curation handles missing stable models
+const registry = new ModelRegistry({
+  serviceProviders: ['google'],
+  byokProviders: ['google']
+});
+
+// Registry may only have: gemini-2-0-flash-exp (experimental)
+// Curation automatically adds: gemini-2.0-flash (stable equivalent)
+// Default selection: gemini-2.0-flash (stable prioritized over experimental)
+```
+
+**How Google curation works:**
+1. **Extends Missing Models**: Adds stable `gemini-2.0-flash` when registry only has experimental `gemini-2-0-flash-exp`
+2. **Prioritizes Stability**: Stable models get higher priority than experimental ones
+3. **Preserves User Choice**: User-specified models (including experimental) pass through unchanged
+4. **Handles Deprecation**: Legacy models like `gemini-1.5-flash` are deprioritized but still available
+
+#### **Anthropic Provider Extension**
+
+```typescript
+// Anthropic requires ID format conversion from registry to SDK format
+// Registry: "claude-sonnet-3-5" + "2024-10-22" 
+// SDK: "claude-3-5-sonnet-20241022"
+```
+
+#### **OpenAI Provider Curation**
+
+```typescript
+// OpenAI uses external curation file to exclude deprecated models
+// Registry: All OpenAI models including deprecated ones
+// Curated: Only chat-compatible, supported models
+```
 
 ### Provider Extension
 
 ```typescript
-import { ProviderRegistryService } from 'simple-rpc-ai-backend';
+import { ModelRegistry } from 'simple-rpc-ai-backend';
 
-// Add custom providers
-const registry = new ProviderRegistryService(
-  ['anthropic', 'openai', 'custom-ai'], // service providers
-  ['anthropic', 'openai', 'custom-ai']  // BYOK providers
-);
+// Add custom providers with automatic curation
+const registry = new ModelRegistry({
+  serviceProviders: ['anthropic', 'openai', 'google', 'custom-ai'],
+  byokProviders: ['anthropic', 'openai', 'google', 'custom-ai'],
+  enablePriceUpdates: true,
+  validationMode: 'warn'
+});
 
 // Override pricing for contract rates
 registry.addPricingOverride({
@@ -262,6 +305,41 @@ registry.addPricingOverride({
   pricing: { input: 1.0, output: 5.0 },
   reason: 'Enterprise contract pricing'
 });
+```
+
+### Handling Outdated Registry Information
+
+**Problem**: External registries may lag behind provider changes or lack stable model variants.
+
+**Solution**: Provider-specific curation that extends and corrects registry data:
+
+#### **Missing Stable Models**
+```typescript
+// Registry only has: gemini-2-0-flash-exp
+// System adds: gemini-2.0-flash (stable equivalent)
+// Default becomes: gemini-2.0-flash (works with APIs)
+```
+
+#### **Deprecated Models**
+```typescript
+// Registry includes: gemini-1.5-flash (deprecated/offline)
+// System: Deprioritizes in default selection but preserves for user choice
+// Fallback: Uses gemini-2.0-flash instead of deprecated models
+```
+
+#### **Format Incompatibilities**  
+```typescript
+// Registry: "claude-sonnet-3-5" (simplified format)
+// SDK needs: "claude-3-5-sonnet-20241022" (full format with date)
+// System: Auto-converts using release date from registry
+```
+
+#### **User Choice Preservation**
+```typescript
+// User requests: gemini-2-0-flash-exp (experimental)
+// System: Preserves user choice exactly - no automatic conversion
+// User requests: "default" or undefined
+// System: Uses curated stable model selection
 ```
 
 ### Available Registry Tools
@@ -281,7 +359,7 @@ pnpm registry:check-updates # Check for new models and pricing
 
 ### Coverage Requirements
 - **Minimum 80% coverage** across branches, functions, lines, statements
-- **Cross-platform testing** on Node.js 18, 20, 22
+- **Cross-platform testing** on Node.js 22+
 - **Security-focused tests** for authentication and key management
 - **Integration tests** for complete AI request workflows
 

@@ -1,0 +1,16 @@
+{
+  "name": "mcp-server-example",
+  "version": "1.0.0",
+  "description": "Production MCP server with OAuth2, tRPC, and token tracking",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "setup": "cp .env.example .env && echo 'Edit .env with your credentials'"
+  },
+  "dependencies": {
+    "simple-rpc-ai-backend": "file:../../",
+    "dotenv": "^16.0.0"
+  }
+}

@@ -1,607 +1,695 @@
 /**
- * Centralized Model Registry for AI Providers
+ * Model Registry Service
  * 
- * Manages model definitions, deprecation warnings, capabilities,
- * and allows for extension by consuming applications.
+ * Integrates @anolilab/ai-model-registry with validation,
+ * caching, and fallback mechanisms for production safety.
  */
 
-export interface ModelDefinition {
+import { getModelSafetyConfig, ModelValidator, type ModelSafetyConfig } from '../config/model-safety.js';
+import openaiModelsData from '../data/openai-models.json' with { type: 'json' };
+
+export interface ModelInfo {
   id: string;
   name: string;
-  provider: 'anthropic' | 'openai' | 'google' | 'openrouter';
-  description: string;
-  contextWindow: number;
-  capabilities: ModelCapability[];
-  status: 'active' | 'deprecated' | 'beta' | 'preview';
-  deprecationDate?: string;
-  replacementModel?: string;
-  trainingDataCutoff?: string;
-  pricing?: {
-    input: number;  // per 1M tokens
-    output: number; // per 1M tokens
-  };
-  webSearchSupport?: boolean;
-  nativeWebSearch?: boolean;
-}
-
-export type ModelCapability = 
-  | 'text'
-  | 'vision' 
-  | 'code'
-  | 'reasoning'
-  | 'multimodal'
-  | 'function-calling'
-  | 'web-search'
-  | 'computer-use';
-
-export interface ProviderModelRegistry {
   provider: string;
-  models: ModelDefinition[];
-  defaultModel: string;
-  webSearchCapabilities?: {
-    supportsNative: boolean;
-    recommendedPreference: 'ai-web-search' | 'mcp' | 'never';
-    description: string;
+  pricing?: {
+    input: number;
+    output: number;
   };
+  contextWindow?: number;
+  capabilities?: string[];
+  source: 'registry' | 'fallback' | 'cache';
 }
 
-/**
- * Default model registries for all supported providers
- */
-export const DEFAULT_MODEL_REGISTRIES: Record<string, ProviderModelRegistry> = {
-  anthropic: {
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-4-1-20250805',
-    webSearchCapabilities: {
-      supportsNative: true,
-      recommendedPreference: 'ai-web-search',
-      description: 'Claude has excellent native web search with domain filtering and location targeting'
-    },
-    models: [
-      // Current Active Models
-      {
-        id: 'claude-opus-4-1-20250805',
-        name: 'Claude Opus 4.1',
-        provider: 'anthropic',
-        description: 'Our most capable and intelligent model yet',
-        contextWindow: 200000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'function-calling', 'web-search', 'computer-use'],
-        status: 'active',
-        trainingDataCutoff: 'March 2025',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
-        id: 'claude-opus-4-20250514',
-        name: 'Claude Opus 4',
-        provider: 'anthropic', 
-        description: 'Previous flagship model with excellent reasoning',
-        contextWindow: 200000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'function-calling', 'web-search'],
-        status: 'active',
-        trainingDataCutoff: 'March 2025',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
-        id: 'claude-sonnet-4-20250514',
-        name: 'Claude Sonnet 4',
-        provider: 'anthropic',
-        description: 'High-performance model with 1M context beta available',
-        contextWindow: 200000, // 1M context available in beta
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'function-calling', 'web-search'],
-        status: 'active',
-        trainingDataCutoff: 'March 2025',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
-        id: 'claude-sonnet-3-7-20241125',
-        name: 'Claude Sonnet 3.7',
-        provider: 'anthropic',
-        description: 'High-performance model with early extended thinking',
-        contextWindow: 200000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'function-calling'],
-        status: 'active',
-        trainingDataCutoff: 'November 2024',
-        webSearchSupport: false,
-        nativeWebSearch: false
-      },
-      {
-        id: 'claude-haiku-3-5-20241022',
-        name: 'Claude Haiku 3.5',
-        provider: 'anthropic',
-        description: 'Fastest model with excellent performance',
-        contextWindow: 200000,
-        capabilities: ['text', 'vision', 'code', 'multimodal'],
-        status: 'active',
-        trainingDataCutoff: 'July 2024',
-        webSearchSupport: false,
-        nativeWebSearch: false
-      },
-      {
-        id: 'claude-haiku-3-20240307',
-        name: 'Claude Haiku 3',
-        provider: 'anthropic',
-        description: 'Fast and compact model',
-        contextWindow: 200000,
-        capabilities: ['text', 'code'],
-        status: 'active',
-        trainingDataCutoff: 'August 2023',
-        webSearchSupport: false,
-        nativeWebSearch: false
-      },
-      
-      // Deprecated Models
-      {
-        id: 'claude-3-5-sonnet-20241022',
-        name: 'Claude 3.5 Sonnet',
-        provider: 'anthropic',
-        description: 'Legacy model - use Claude Sonnet 4 instead',
-        contextWindow: 200000,
-        capabilities: ['text', 'vision', 'code', 'multimodal'],
-        status: 'deprecated',
-        deprecationDate: '2025-03-01',
-        replacementModel: 'claude-sonnet-4-20250514',
-        trainingDataCutoff: 'April 2024',
-        webSearchSupport: false,
-        nativeWebSearch: false
-      },
-      {
-        id: 'claude-3-opus-20240229',
-        name: 'Claude 3 Opus',
-        provider: 'anthropic',
-        description: 'Legacy flagship model - use Claude Opus 4.1 instead',
-        contextWindow: 200000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal'],
-        status: 'deprecated',
-        deprecationDate: '2025-03-01',
-        replacementModel: 'claude-opus-4-1-20250805',
-        trainingDataCutoff: 'August 2023',
-        webSearchSupport: false,
-        nativeWebSearch: false
+export class ModelRegistry {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private config: ModelSafetyConfig;
+  private lastRegistryCheck = 0;
+  
+  constructor(registryConfig?: Partial<ModelSafetyConfig>) {
+    this.config = registryConfig ? { ...getModelSafetyConfig(), ...registryConfig } : getModelSafetyConfig();
+    this.logConfiguration();
+  }
+  
+  private logConfiguration() {
+    const env = process.env.NODE_ENV || 'development';
+    const mode = this.config.useRegistry ? '📡 Live Registry' : '🔒 Cached Models';
+    
+    console.log(`
+🤖 AI Model Registry Configuration:
+   Mode: ${mode}
+   Environment: ${env}
+   Price Updates: ${this.config.allowPriceUpdates ? '✅ Enabled' : '🔒 Disabled'}
+   Validation: ${this.config.validationMode}
+   
+${this.config.useRegistry ? `
+   💡 Using live models from @anolilab/ai-model-registry
+   ${env === 'development' ? '🔒 For production, set: MODEL_REGISTRY_MODE=production' : ''}
+` : `
+   🔒 Using cached/validated models for safety
+   🔄 Run: pnpm models:check to update
+`}
+    `.trim());
+  }
+  
+  async getDefaultModel(provider: string): Promise<string> {
+    try {
+      if (this.config.useRegistry) {
+        return await this.getLiveDefaultModel(provider);
+      } else {
+        return await this.getCachedDefaultModel(provider);
       }
-    ]
-  },
-
-  openai: {
-    provider: 'openai',
-    defaultModel: 'gpt-4o',
-    webSearchCapabilities: {
-      supportsNative: true,
-      recommendedPreference: 'ai-web-search',
-      description: 'GPT-4 has native web browsing capabilities'
-    },
-    models: [
-      {
+    } catch (error) {
+      console.warn('Failed to get default model for ' + provider + ':', error instanceof Error ? error.message : String(error));
+      return this.getFallbackDefaultModel(provider);
+    }
+  }
+  
+  async getModelsByProvider(provider: string): Promise<ModelInfo[]> {
+    try {
+      if (this.config.useRegistry) {
+        return await this.getLiveModels(provider);
+      } else {
+        return await this.getCachedModels(provider);
+      }
+    } catch (error) {
+      console.warn('Failed to get models for ' + provider + ':', error instanceof Error ? error.message : String(error));
+      return this.getFallbackModels(provider);
+    }
+  }
+  
+  private async getLiveDefaultModel(provider: string): Promise<string> {
+    try {
+      const registry = await import('@anolilab/ai-model-registry' as any);
+      const providerName = this.mapProviderName(provider);
+      const models = registry.getModelsByProvider?.(providerName) || [];
+      
+      if (models.length > 0) {
+        const validation = ModelValidator.validateModelData(models);
+        
+        if (!validation.valid && this.config.validationMode === 'strict') {
+          throw new Error('Model validation failed: ' + validation.errors.join(', '));
+        }
+        
+        if (!validation.valid && this.config.validationMode === 'warn') {
+          console.warn('⚠️ Model validation warnings for ' + provider + ':', validation.errors);
+        }
+        
+        // Special handling for Google - curated models with stable versions added
+        if (provider === 'google') {
+          // Google models are curated to include stable versions missing from registry
+          const curatedModels = await this.getCuratedGoogleModels(models);
+          if (curatedModels.length > 0) {
+            const selectedModel = curatedModels[0]; // Already sorted by priority
+            console.log('📡 Using curated Google model from registry: google/' + selectedModel);
+            return selectedModel;
+          }
+          
+          // If no curated models found, use fallback
+          console.log('📡 No curated Google models found, using fallback: google/gemini-2.0-flash');
+          return 'gemini-2.0-flash';
+        }
+        
+        // Special handling for Anthropic - convert simplified IDs to proper format
+        if (provider === 'anthropic') {
+          // Registry returns simplified IDs like "claude-haiku-3" instead of full model names
+          // Use the release date to construct the proper model ID
+          const properModelId = await this.convertAnthropicModelId(models);
+          if (properModelId) {
+            console.log('📡 Converted Anthropic model ID using release date:', properModelId);
+            return properModelId;
+          } else {
+            throw new Error('Could not convert Anthropic model ID from registry - no fallback available');
+          }
+        }
+        
+        // Special handling for OpenAI - curated chat-compatible models
+        if (provider === 'openai') {
+          // OpenAI models are stable, but we curate to exclude deprecated/incompatible models
+          const curatedModels = await this.getCuratedOpenAIModels(models);
+          if (curatedModels.length > 0) {
+            const selectedModel = curatedModels[0]; // Already sorted by priority
+            console.log('📡 Using curated OpenAI model from registry: openai/' + selectedModel);
+            return selectedModel;
+          }
+          
+          // If no curated models found, use fallback
+          console.log('📡 No curated OpenAI models found, using fallback: openai/gpt-4o');
+          return 'gpt-4o';
+        }
+        
+        // Special handling for OpenRouter - prefer Claude 3.7 Sonnet for best cost/performance
+        if (provider === 'openrouter') {
+          // Look for Claude 3.7 Sonnet models first
+          const preferredModels = [
+            'anthropic/claude-3.7-sonnet',
+            'anthropic/claude-3-7-sonnet-20250115',
+            'claude-3.7-sonnet',
+            'claude-3-7-sonnet'
+          ];
+          
+          for (const preferred of preferredModels) {
+            const found = models.find(m => (m.id || m.name) === preferred);
+            if (found) {
+              const selectedModel = found.id || found.name;
+              console.log('📡 Using preferred OpenRouter model: openrouter/' + selectedModel);
+              return selectedModel;
+            }
+          }
+          
+          // If no Claude 3.7 Sonnet found, use first available model
+          const defaultModel = models[0]?.id || models[0]?.name;
+          console.log('📡 Using first available OpenRouter model: openrouter/' + defaultModel);
+          return defaultModel;
+        }
+        
+        // For other providers, use the first model
+        const defaultModel = models[0]?.id || models[0]?.name;
+        console.log('📡 Using live model from registry: ' + provider + '/' + defaultModel);
+        return defaultModel;
+      }
+    } catch (error) {
+      console.warn('Registry unavailable for ' + provider + ', using fallback:', error instanceof Error ? error.message : String(error));
+    }
+    
+    return this.getFallbackDefaultModel(provider);
+  }
+  
+  private async getCachedDefaultModel(provider: string): Promise<string> {
+    const cacheKey = 'default-' + provider;
+    const cached = this.cache.get(cacheKey);
+    
+    if (cached && this.isCacheValid(cached.timestamp)) {
+      return cached.data;
+    }
+    
+    return this.getFallbackDefaultModel(provider);
+  }
+  
+  private getFallbackDefaultModel(provider: string): string {
+    // Simple built-in fallbacks without external dependency
+    // Note: Anthropic no longer uses fallbacks - uses registry conversion instead
+    const fallbacks: Record<string, string> = {
+      'openai': 'gpt-4o',
+      'google': 'gemini-1.5-flash',
+      'openrouter': 'anthropic/claude-3.7-sonnet'
+    };
+    
+    // Anthropic should not reach this point - it uses registry-based conversion
+    if (provider === 'anthropic') {
+      throw new Error('Anthropic models should use registry-based conversion, not fallbacks');
+    }
+    
+    const fallback = fallbacks[provider] || 'unknown-model';
+    console.log('🔄 Using built-in fallback model: ' + provider + '/' + fallback);
+    return fallback;
+  }
+  
+  private async getLiveModels(provider: string): Promise<ModelInfo[]> {
+    try {
+      const registry = await import('@anolilab/ai-model-registry' as any);
+      const providerName = this.mapProviderName(provider);
+      
+      console.log('🔍 Fetching live models for provider:', providerName);
+      const models = registry.getModelsByProvider?.(providerName) || [];
+      console.log('📊 Found', models.length, 'models for', providerName);
+      
+      if (models.length === 0) {
+        console.warn('⚠️ No models found for', providerName, '- falling back to built-in models');
+        return this.getFallbackModels(provider);
+      }
+      
+      const mappedModels = models
+        .filter((model: any) => {
+          const id = model.id || model.name;
+          if (typeof id !== 'string') return false;
+          
+          // Use positive filtering: only include actual model IDs based on provider patterns
+          if (provider === 'google') {
+            // Google models start with gemini- or are specific Google model names
+            return id.startsWith('gemini-') || id.startsWith('google/') || 
+                   id.includes('flash') || id.includes('pro') || id.includes('ultra');
+          }
+          
+          if (provider === 'anthropic') {
+            // Anthropic models start with claude-
+            return id.startsWith('claude-') || id.startsWith('anthropic/');
+          }
+          
+          if (provider === 'openai') {
+            // OpenAI models: gpt-, text-, davinci-, etc.
+            return id.startsWith('gpt-') || id.startsWith('text-') || 
+                   id.startsWith('davinci-') || id.startsWith('openai/') ||
+                   id.includes('turbo') || id.includes('instruct');
+          }
+          
+          if (provider === 'openrouter') {
+            // OpenRouter uses provider/model format or known model patterns
+            return id.includes('/') || id.startsWith('claude-') || 
+                   id.startsWith('gpt-') || id.startsWith('llama-') ||
+                   id.startsWith('mistral-') || id.startsWith('gemini-');
+          }
+          
+          // For other providers, exclude obvious metadata patterns
+          const isMetadata = id.includes('-versions') ||
+            id.includes('-deprecation-date') ||
+            id.includes('-latest-update') ||
+            id.includes('-knowledge-cutoff') ||
+            id.includes('capabilities') ||
+            id.includes('calendar-month') ||
+            id.includes('handyman-') ||
+            id.includes('[*]');
+          
+          return !isMetadata;
+        })
+        .map((model: any) => ({
+          id: model.id || model.name,
+          name: model.name || model.id,
+          provider,
+          pricing: model.pricing ? {
+            input: model.pricing.input || 0,
+            output: model.pricing.output || 0
+          } : undefined,
+          contextWindow: model.contextLength,
+          capabilities: model.capabilities,
+          source: 'registry' as const
+        }));
+      
+      console.log('📡 Using live models from registry for', provider);
+      return mappedModels;
+    } catch (error) {
+      console.warn('❌ Error fetching live models for', provider + ':', error instanceof Error ? error.message : String(error));
+      return this.getFallbackModels(provider);
+    }
+  }
+  
+  private async getCachedModels(provider: string): Promise<ModelInfo[]> {
+    return this.getFallbackModels(provider);
+  }
+  
+  private getFallbackModels(provider: string): ModelInfo[] {
+    // Simple built-in fallback models
+    // Note: Anthropic no longer uses fallbacks - uses registry conversion instead
+    
+    // Anthropic should not reach this point - it uses registry-based conversion
+    if (provider === 'anthropic') {
+      throw new Error('Anthropic models should use registry-based conversion, not fallbacks');
+    }
+    
+    const fallbacks: Record<string, ModelInfo[]> = {
+      'openai': [{
         id: 'gpt-4o',
         name: 'GPT-4o',
         provider: 'openai',
-        description: 'Most capable GPT-4 model with vision and reasoning',
         contextWindow: 128000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'function-calling', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
-        id: 'gpt-4o-mini',
-        name: 'GPT-4o Mini', 
-        provider: 'openai',
-        description: 'Smaller, faster version of GPT-4o',
-        contextWindow: 128000,
-        capabilities: ['text', 'vision', 'code', 'multimodal', 'function-calling'],
-        status: 'active',
-        webSearchSupport: false,
-        nativeWebSearch: false
-      },
-      {
-        id: 'gpt-4-turbo',
-        name: 'GPT-4 Turbo',
-        provider: 'openai',
-        description: 'Fast GPT-4 with large context window',
-        contextWindow: 128000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'function-calling'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
-        id: 'gpt-3.5-turbo',
-        name: 'GPT-3.5 Turbo',
-        provider: 'openai',
-        description: 'Legacy model - consider upgrading to GPT-4o Mini',
-        contextWindow: 16384,
-        capabilities: ['text', 'code', 'function-calling'],
-        status: 'deprecated',
-        deprecationDate: '2024-12-31',
-        replacementModel: 'gpt-4o-mini',
-        webSearchSupport: false,
-        nativeWebSearch: false
-      }
-    ]
-  },
-
-  google: {
-    provider: 'google',
-    defaultModel: 'gemini-2.5-flash',
-    webSearchCapabilities: {
-      supportsNative: true,
-      recommendedPreference: 'ai-web-search',
-      description: 'Gemini has Google Search grounding for real-time web information'
-    },
-    models: [
-      {
-        id: 'gemini-2.5-flash',
-        name: 'Gemini 2.5 Flash',
-        provider: 'google',
-        description: 'Latest fast Gemini model with enhanced capabilities',
-        contextWindow: 1000000,
-        capabilities: ['text', 'vision', 'code', 'reasoning', 'multimodal', 'function-calling', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
-        id: 'gemini-1.5-pro',
-        name: 'Gemini 1.5 Pro',
-        provider: 'google',
-        description: 'High-performance model with large context',
-        contextWindow: 2000000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'function-calling', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
+        capabilities: ['text', 'vision', 'reasoning'],
+        source: 'fallback' as const
+      }],
+      'google': [{
         id: 'gemini-1.5-flash',
         name: 'Gemini 1.5 Flash',
         provider: 'google',
-        description: 'Fast model with good performance',
         contextWindow: 1000000,
-        capabilities: ['text', 'vision', 'code', 'multimodal', 'function-calling'],
-        status: 'active',
-        webSearchSupport: false,
-        nativeWebSearch: false
-      },
-      {
-        id: 'gemini-1.0-pro',
-        name: 'Gemini 1.0 Pro',
-        provider: 'google',
-        description: 'Legacy model - use Gemini 1.5 Pro instead',
-        contextWindow: 32768,
-        capabilities: ['text', 'reasoning'],
-        status: 'deprecated',
-        deprecationDate: '2024-12-31',
-        replacementModel: 'gemini-1.5-pro',
-        webSearchSupport: false,
-        nativeWebSearch: false
-      }
-    ]
-  },
-
-  openrouter: {
-    provider: 'openrouter',
-    defaultModel: 'anthropic/claude-3.5-sonnet',
-    webSearchCapabilities: {
-      supportsNative: true,
-      recommendedPreference: 'ai-web-search',
-      description: 'OpenRouter has universal web search via Exa.ai across 400+ models ($4 per 1000 results)'
-    },
-    models: [
-      // Top Anthropic models via OpenRouter
-      {
-        id: 'anthropic/claude-3.5-sonnet',
-        name: 'Claude 3.5 Sonnet (OpenRouter)',
-        provider: 'openrouter',
-        description: 'Anthropic Claude 3.5 Sonnet via OpenRouter',
-        contextWindow: 200000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
-        id: 'anthropic/claude-3-opus',
-        name: 'Claude 3 Opus (OpenRouter)',
-        provider: 'openrouter',
-        description: 'Anthropic Claude 3 Opus via OpenRouter',
-        contextWindow: 200000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-
-      // Top OpenAI models via OpenRouter  
-      {
-        id: 'openai/gpt-4o',
-        name: 'GPT-4o (OpenRouter)',
-        provider: 'openrouter',
-        description: 'OpenAI GPT-4o via OpenRouter',
-        contextWindow: 128000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
-        id: 'openai/gpt-4-turbo',
-        name: 'GPT-4 Turbo (OpenRouter)',
-        provider: 'openrouter',
-        description: 'OpenAI GPT-4 Turbo via OpenRouter',
-        contextWindow: 128000,
-        capabilities: ['text', 'vision', 'reasoning', 'multimodal', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-
-      // Google models via OpenRouter
-      {
-        id: 'google/gemini-pro',
-        name: 'Gemini Pro (OpenRouter)',
-        provider: 'openrouter',
-        description: 'Google Gemini Pro via OpenRouter',
-        contextWindow: 128000,
-        capabilities: ['text', 'reasoning', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-
-      // Perplexity models with built-in online search
-      {
-        id: 'perplexity/llama-3.1-sonar-large-128k-online',
-        name: 'Perplexity Sonar Large Online',
-        provider: 'openrouter',
-        description: 'Perplexity model with built-in web search capabilities',
-        contextWindow: 128000,
-        capabilities: ['text', 'reasoning', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-      {
-        id: 'perplexity/llama-3.1-sonar-small-128k-online',
-        name: 'Perplexity Sonar Small Online',
-        provider: 'openrouter',
-        description: 'Smaller Perplexity model with built-in web search',
-        contextWindow: 128000,
-        capabilities: ['text', 'reasoning', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-
-      // Meta Llama models
-      {
-        id: 'meta-llama/llama-3.1-405b',
-        name: 'Llama 3.1 405B',
-        provider: 'openrouter',
-        description: 'Meta\'s largest Llama model',
-        contextWindow: 128000,
-        capabilities: ['text', 'reasoning', 'web-search'],
-        status: 'active',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      },
-
-      // Other notable models
-      {
-        id: 'qwen/qwq-32b-preview',
-        name: 'QwQ 32B Preview',
-        provider: 'openrouter',
-        description: 'Qwen QwQ reasoning model',
-        contextWindow: 32768,
-        capabilities: ['text', 'reasoning', 'web-search'],
-        status: 'preview',
-        webSearchSupport: true,
-        nativeWebSearch: true
-      }
-    ]
-  }
-};
-
-/**
- * Model Registry Manager - handles model operations and extensions
- */
-export class ModelRegistryManager {
-  private registries: Record<string, ProviderModelRegistry>;
-
-  constructor(useDefaults: boolean = true) {
-    this.registries = useDefaults ? { ...DEFAULT_MODEL_REGISTRIES } : {};
-  }
-
-  /**
-   * Get all models for a provider
-   */
-  getModelsForProvider(provider: string): ModelDefinition[] {
-    return this.registries[provider]?.models || [];
-  }
-
-  /**
-   * Get a specific model by ID and provider
-   */
-  getModel(provider: string, modelId: string): ModelDefinition | undefined {
-    return this.registries[provider]?.models.find(model => model.id === modelId);
-  }
-
-  /**
-   * Get default model for a provider
-   */
-  getDefaultModel(provider: string): string | undefined {
-    return this.registries[provider]?.defaultModel;
-  }
-
-  /**
-   * Get web search capabilities for a provider
-   */
-  getWebSearchCapabilities(provider: string) {
-    return this.registries[provider]?.webSearchCapabilities;
-  }
-
-  /**
-   * Add or update a provider registry
-   */
-  addProviderRegistry(registry: ProviderModelRegistry): void {
-    this.registries[registry.provider] = registry;
-  }
-
-  /**
-   * Extend existing provider with additional models
-   */
-  extendProvider(provider: string, models: ModelDefinition[], newDefaultModel?: string): void {
-    if (!this.registries[provider]) {
-      throw new Error(`Provider ${provider} not found`);
-    }
-
-    // Add new models, avoiding duplicates
-    const existingIds = new Set(this.registries[provider].models.map(m => m.id));
-    const newModels = models.filter(model => !existingIds.has(model.id));
+        capabilities: ['text', 'vision', 'reasoning'],
+        source: 'fallback' as const
+      }]
+    };
     
-    this.registries[provider].models.push(...newModels);
-
-    // Update default model if provided
-    if (newDefaultModel) {
-      this.registries[provider].defaultModel = newDefaultModel;
-    }
+    console.log('🔄 Using built-in fallback models for ' + provider);
+    return fallbacks[provider] || [];
   }
-
-  /**
-   * Replace models for a provider (preserves other provider settings)
-   */
-  replaceProviderModels(provider: string, models: ModelDefinition[], newDefaultModel?: string): void {
-    if (!this.registries[provider]) {
-      throw new Error(`Provider ${provider} not found`);
-    }
-
-    this.registries[provider].models = models;
+  
+  private mapProviderName(provider: string): string {
+    const providerNameMap: Record<string, string> = {
+      'anthropic': 'Anthropic',
+      'openai': 'OpenAI',
+      'google': 'Google',
+      'openrouter': 'OpenRouter',
+      'meta': 'Meta',
+      'groq': 'Groq'
+    };
     
-    if (newDefaultModel) {
-      this.registries[provider].defaultModel = newDefaultModel;
+    return providerNameMap[provider] || 
+      provider.charAt(0).toUpperCase() + provider.slice(1);
+  }
+  
+  private isCacheValid(timestamp: number): boolean {
+    return (Date.now() - timestamp) < this.config.validationInterval;
+  }
+  
+  /**
+   * Select the best Anthropic model using hybrid registry
+   * Returns production-safe versioned model ID for consistent behavior
+   */
+  private async convertAnthropicModelId(models: any[]): Promise<string | null> {
+    console.log('🔄 Using hybrid registry for production-safe model selection');
+    
+    try {
+      // Use hybrid registry for production-safe model selection
+      const { HybridModelRegistry } = await import('./hybrid-model-registry.js');
+      const hybridRegistry = new HybridModelRegistry({
+        productionMode: process.env.NODE_ENV === 'production',
+        fallbackToAliases: false  // Never fallback to aliases - only use models with production mappings
+      });
+      
+      const productionModel = await hybridRegistry.getProductionModel('anthropic', 'balanced');
+      
+      console.log(`📡 Selected hybrid model: "${productionModel.id}" → "${productionModel.productionId}"`);
+      console.log(`📅 Release: ${productionModel.production.releaseDate}, Status: ${productionModel.production.status}`);
+      
+      return productionModel.productionId;
+      
+    } catch (error) {
+      console.warn('⚠️ Hybrid registry fallback failed, using legacy selection:', error.message);
+      
+      // Fallback to legacy logic - only look for models we have production mappings for
+      const preferredModel = models.find(m => 
+        m.id === 'claude-opus-4-1' && !m.id.includes('deprecated')
+      ) || models.find(m => 
+        m.id === 'claude-sonnet-4' && !m.id.includes('deprecated')
+      ) || models.find(m => 
+        m.id === 'claude-sonnet-3-7' && !m.id.includes('deprecated')
+      ) || models.find(m => 
+        m.id === 'claude-haiku-3-5' && !m.id.includes('deprecated')
+      ) || models.find(m => 
+        m.id === 'claude-haiku-3' && !m.id.includes('deprecated')
+      ) || models.find(m => 
+        m.id === 'claude-sonnet-3-5' && !m.id.includes('deprecated')  // Add as last resort (deprecated)
+      ) || models[0];
+      
+      if (!preferredModel) {
+        throw new Error('No Anthropic models found in registry');
+      }
+      
+      const cleanId = preferredModel.id.replace('-(deprecated)', '');
+      console.log(`📡 Legacy fallback: "${cleanId}"`);
+      return cleanId;
     }
+    
+    // TODO: Remove override when registry is updated with current models
+    // Original logic (kept for reference):
+    /*
+    // Look for the best current model (Claude 3.5 Sonnet non-deprecated)
+    const preferredModel = models.find(m => 
+      m.id === 'claude-sonnet-3-5' && !m.id.includes('deprecated')
+    );
+    
+    if (preferredModel && preferredModel.releaseDate) {
+      const modelId = this.formatAnthropicModelId(preferredModel.id, preferredModel.releaseDate);
+      if (modelId) return modelId;
+    }
+    
+    // Fallback: try any Claude 3.5 Sonnet
+    const sonnetModel = models.find(m => 
+      m.id && m.id.includes('sonnet') && m.releaseDate
+    );
+    
+    if (sonnetModel) {
+      const modelId = this.formatAnthropicModelId(sonnetModel.id, sonnetModel.releaseDate);
+      if (modelId) return modelId;
+    }
+    
+    // Last resort: try any model with a release date
+    const modelWithDate = models.find(m => m.releaseDate);
+    
+    if (modelWithDate) {
+      return this.formatAnthropicModelId(modelWithDate.id, modelWithDate.releaseDate);
+    }
+    
+    return null;
+    */
   }
 
   /**
-   * Update a specific model
+   * Get curated OpenAI models sorted by priority
+   * Filters out deprecated/incompatible models and sorts by preference
    */
-  updateModel(provider: string, modelId: string, updates: Partial<ModelDefinition>): void {
-    const providerRegistry = this.registries[provider];
-    if (!providerRegistry) {
-      throw new Error(`Provider ${provider} not found`);
+  private async getCuratedOpenAIModels(models: any[]): Promise<string[]> {
+    const openaiConfig = openaiModelsData;
+    
+    if (!openaiConfig) {
+      console.warn('⚠️ No OpenAI curation config found, using fallback logic');
+      return models
+        .filter(m => {
+          const id = m.id || m.name || '';
+          return ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'].includes(id);
+        })
+        .map(m => m.id || m.name);
     }
 
-    const modelIndex = providerRegistry.models.findIndex(m => m.id === modelId);
-    if (modelIndex === -1) {
-      throw new Error(`Model ${modelId} not found for provider ${provider}`);
+    // Filter registry models to only include curated ones
+    const curatedModels: Array<{id: string, priority: number}> = [];
+    
+    for (const registryModel of models) {
+      const modelId = registryModel.id || registryModel.name;
+      const curatedModel = openaiConfig.models[modelId];
+      
+      if (curatedModel) {
+        curatedModels.push({
+          id: modelId,
+          priority: curatedModel.priority || 999
+        });
+      } else {
+        // Check if it's in excluded models
+        const isExcluded = openaiConfig.excludedModels?.[modelId];
+        if (isExcluded) {
+          console.warn(`🚫 Excluding OpenAI model "${modelId}": ${isExcluded.reason}`);
+        }
+      }
     }
 
-    providerRegistry.models[modelIndex] = { ...providerRegistry.models[modelIndex], ...updates };
+    // Sort by priority (lower number = higher priority)
+    const sortedModels = curatedModels
+      .sort((a, b) => a.priority - b.priority)
+      .map(m => m.id);
+
+    console.log(`📋 Curated OpenAI models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
+    return sortedModels;
   }
 
   /**
-   * Get deprecated models with warnings
+   * Get curated Google models with stable versions added where missing
+   * Extends registry models by adding stable equivalents of experimental models
    */
-  getDeprecatedModels(provider?: string): Array<ModelDefinition & { warning: string }> {
-    const providers = provider ? [provider] : Object.keys(this.registries);
-    const deprecatedModels: Array<ModelDefinition & { warning: string }> = [];
+  private async getCuratedGoogleModels(models: any[]): Promise<string[]> {
+    // Google curated models - prioritize stable over experimental
+    const curatedGoogleModels = {
+      'gemini-2.0-flash': { priority: 1, source: 'stable' },
+      'gemini-2-0-flash': { priority: 2, source: 'stable' },
+      'gemini-2.0-pro': { priority: 3, source: 'stable' },
+      'gemini-2-0-pro': { priority: 4, source: 'stable' },
+      'gemini-2-0-flash-exp': { priority: 10, source: 'experimental', stableEquivalent: 'gemini-2.0-flash' },
+      'gemini-1-5-flash': { priority: 20, source: 'legacy' },
+      'gemini-1-5-pro': { priority: 21, source: 'legacy' }
+    };
 
-    for (const providerName of providers) {
-      const registry = this.registries[providerName];
-      if (!registry) continue;
+    const curatedModels: Array<{id: string, priority: number}> = [];
+    
+    // First, add models that exist in registry
+    for (const registryModel of models) {
+      const modelId = registryModel.id || registryModel.name;
+      const curatedInfo = curatedGoogleModels[modelId as keyof typeof curatedGoogleModels];
+      
+      if (curatedInfo) {
+        // If it's experimental and has a stable equivalent, add the stable one instead
+        if (curatedInfo.source === 'experimental' && 'stableEquivalent' in curatedInfo && curatedInfo.stableEquivalent) {
+          console.log(`🔄 Adding stable equivalent for experimental model: ${modelId} → ${curatedInfo.stableEquivalent}`);
+          curatedModels.push({
+            id: curatedInfo.stableEquivalent,
+            priority: curatedInfo.priority - 5 // Give stable version higher priority
+          });
+        } else {
+          curatedModels.push({
+            id: modelId,
+            priority: curatedInfo.priority
+          });
+        }
+      }
+    }
+    
+    // Add any missing stable models that aren't in the registry
+    const missingStableModels = ['gemini-2.0-flash', 'gemini-2-0-flash'];
+    for (const stableModel of missingStableModels) {
+      const exists = curatedModels.some(m => m.id === stableModel);
+      if (!exists) {
+        const curatedInfo = curatedGoogleModels[stableModel as keyof typeof curatedGoogleModels];
+        if (curatedInfo) {
+          console.log(`➕ Adding missing stable Google model: ${stableModel}`);
+          curatedModels.push({
+            id: stableModel,
+            priority: curatedInfo.priority
+          });
+        }
+      }
+    }
 
-      const deprecated = registry.models
-        .filter(model => model.status === 'deprecated')
-        .map(model => ({
-          ...model,
-          warning: this.createDeprecationWarning(model)
+    // Sort by priority (lower number = higher priority)
+    const sortedModels = curatedModels
+      .sort((a, b) => a.priority - b.priority)
+      .map(m => m.id);
+
+    console.log(`📋 Curated Google models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
+    return sortedModels;
+  }
+  
+  /**
+   * Format Anthropic model ID from registry format to SDK format
+   * "claude-sonnet-3-5" + "2024-03-04" -> "claude-3-5-sonnet-20240304"
+   */
+  private formatAnthropicModelId(registryId: string, releaseDate: string | Date): string | null {
+    try {
+      // Parse the release date
+      const date = new Date(releaseDate);
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid release date for Anthropic model:', releaseDate);
+        return null;
+      }
+      
+      // Format date as YYYYMMDD (no hyphens)
+      const formattedDate = date.toISOString().slice(0, 10).replace(/-/g, '');
+      
+      // Convert registry format to SDK format
+      // Only includes models we have production mappings for
+      // "claude-sonnet-3-5" -> "claude-3-5-sonnet"
+      // "claude-haiku-3" -> "claude-3-haiku"
+      // "claude-opus-4-1" -> "claude-4-1-opus"
+      
+      const idMappings: Record<string, string> = {
+        'claude-sonnet-3-5': 'claude-3-5-sonnet',
+        'claude-sonnet-3-7': 'claude-3-7-sonnet',
+        'claude-sonnet-4': 'claude-4-sonnet',
+        'claude-haiku-3': 'claude-3-haiku',
+        'claude-haiku-3-5': 'claude-3-5-haiku',
+        'claude-opus-4-1': 'claude-4-1-opus'
+      };
+      
+      // Remove deprecated suffix if present
+      const cleanId = registryId.replace('-(deprecated)', '');
+      const sdkFormat = idMappings[cleanId];
+      
+      if (sdkFormat) {
+        return `${sdkFormat}-${formattedDate}`;
+      } else {
+        console.warn('Unknown Anthropic model format:', registryId);
+        return null;
+      }
+      
+    } catch (error) {
+      console.warn('Error formatting Anthropic model ID:', error);
+      return null;
+    }
+  }
+  
+  async checkForUpdates(): Promise<{ hasUpdates: boolean; changes: any[] }> {
+    try {
+      const registry = await import('@anolilab/ai-model-registry' as any);
+      const providers = ['anthropic', 'openai', 'google', 'openrouter'];
+      const changes: any[] = [];
+      
+      for (const provider of providers) {
+        // Get current models that the system would return
+        const currentModels = await this.getModelsByProvider(provider);
+        
+        // Get fresh models from registry
+        const registryProviderName = this.mapProviderName(provider);
+        const liveModels = registry.getModelsByProvider?.(registryProviderName) || [];
+        
+        // Convert registry models to our format for comparison
+        const liveModelInfos = liveModels.map((model: any) => ({
+          id: model.id || model.name,
+          name: model.name || model.id,
+          provider,
+          pricing: model.pricing,
+          contextWindow: model.contextLength,
+          capabilities: model.capabilities,
+          source: 'registry' as const
         }));
-
-      deprecatedModels.push(...deprecated);
-    }
-
-    return deprecatedModels;
-  }
-
-  /**
-   * Check if a model is deprecated and return warning
-   */
-  checkModelDeprecation(provider: string, modelId: string): { deprecated: boolean; warning?: string } {
-    const model = this.getModel(provider, modelId);
-    if (!model) {
-      return { deprecated: false };
-    }
-
-    if (model.status === 'deprecated') {
+        
+        // Compare counts and detect changes
+        if (liveModelInfos.length !== currentModels.length) {
+          changes.push({
+            provider: provider.charAt(0).toUpperCase() + provider.slice(1),
+            type: 'model_count',
+            old: currentModels.length,
+            new: liveModelInfos.length
+          });
+        }
+        
+        // TODO: Add pricing change detection here
+      }
+      
       return {
-        deprecated: true,
-        warning: this.createDeprecationWarning(model)
+        hasUpdates: changes.length > 0,
+        changes
+      };
+    } catch (error) {
+      console.error('Failed to check for updates:', error);
+      return { hasUpdates: false, changes: [] };
+    }
+  }
+  
+  async getHealthStatus() {
+    try {
+      const registry = await import('@anolilab/ai-model-registry' as any);
+      const providers = registry.getProviders?.() || [];
+      const models = registry.getAllModels?.() || [];
+      
+      return {
+        status: 'healthy',
+        providers: providers.length,
+        models: models.length,
+        config: this.config,
+        lastCheck: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        error: error instanceof Error ? error.message : String(error),
+        config: this.config,
+        lastCheck: new Date().toISOString()
       };
     }
-
+  }
+  
+  // Legacy method compatibility
+  checkModelDeprecation(provider: string, model: string): { deprecated: boolean; warning?: string } {
+    // TODO: Implement deprecation checking from registry
     return { deprecated: false };
   }
-
-  /**
-   * Get all active models across all providers
-   */
-  getAllActiveModels(): ModelDefinition[] {
-    const allModels: ModelDefinition[] = [];
+  
+  getWebSearchCapabilities(provider: string) {
+    // Return basic web search capabilities - this will be enhanced later
+    return {
+      supportsNative: true,
+      recommendedPreference: 'ai-web-search' as const,
+      description: 'Web search support'
+    };
+  }
+  
+  // Alias for compatibility
+  async getModelsForProvider(provider: string): Promise<ModelInfo[]> {
+    return await this.getModelsByProvider(provider);
+  }
+  
+  async findModelsByCapability(capability: string, provider?: string): Promise<ModelInfo[]> {
+    const models = await this.getModelsByProvider(provider || 'anthropic');
+    return models.filter(m => m.capabilities?.includes(capability));
+  }
+  
+  getDeprecatedModels(provider: string): ModelInfo[] {
+    // TODO: Implement deprecated models tracking
+    return [];
+  }
+  
+  async getAllActiveModels(): Promise<ModelInfo[]> {
+    const providers = ['anthropic', 'openai', 'google'];
+    const allModels: ModelInfo[] = [];
     
-    for (const registry of Object.values(this.registries)) {
-      allModels.push(...registry.models.filter(model => model.status === 'active'));
+    for (const provider of providers) {
+      const models = await this.getModelsByProvider(provider);
+      allModels.push(...models);
     }
-
+    
     return allModels;
   }
-
-  /**
-   * Search models by capability
-   */
-  findModelsByCapability(capability: ModelCapability, provider?: string): ModelDefinition[] {
-    const providers = provider ? [provider] : Object.keys(this.registries);
-    const matchingModels: ModelDefinition[] = [];
-
-    for (const providerName of providers) {
-      const registry = this.registries[providerName];
-      if (!registry) continue;
-
-      const models = registry.models.filter(model => 
-        model.capabilities.includes(capability) && model.status === 'active'
-      );
-      matchingModels.push(...models);
-    }
-
-    return matchingModels;
-  }
-
-  /**
-   * Get registry snapshot for debugging/inspection
-   */
-  getRegistrySnapshot(): Record<string, ProviderModelRegistry> {
-    return JSON.parse(JSON.stringify(this.registries));
-  }
-
-  /**
-   * Create deprecation warning message
-   */
-  private createDeprecationWarning(model: ModelDefinition): string {
-    let warning = `⚠️  Model ${model.name} (${model.id}) is deprecated`;
-    
-    if (model.deprecationDate) {
-      warning += ` as of ${model.deprecationDate}`;
-    }
-    
-    if (model.replacementModel) {
-      warning += `. Use ${model.replacementModel} instead`;
-    }
-    
-    warning += '.';
-    
-    return warning;
-  }
 }
-
-// Export singleton instance
-export const modelRegistry = new ModelRegistryManager();

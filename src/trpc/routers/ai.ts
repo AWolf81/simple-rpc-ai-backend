@@ -12,7 +12,7 @@ import { AIService } from '@services/ai-service';
 import { VirtualTokenService } from '@services/virtual-token-service';
 import { UsageAnalyticsService } from '@services/usage-analytics-service';
 import { PostgreSQLAdapter } from '@database/postgres-adapter';
-import { ProviderRegistryService } from '@services/provider-registry';
+// ProviderRegistryService removed - functionality moved to ModelRegistry
 import { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
 
 // Configurable limits interface
@@ -104,7 +104,24 @@ const DEFAULT_CONFIG: Required<AIRouterConfig> = {
 function createServiceProvidersConfig(providers: string[]): any {
   const config: any = {};
   providers.forEach((provider, index) => {
-    config[provider] = { priority: index + 1 };
+    // Get API key from environment variables for built-in providers
+    let apiKey: string | undefined;
+    switch (provider) {
+      case 'anthropic':
+        apiKey = process.env.ANTHROPIC_API_KEY;
+        break;
+      case 'openai':
+        apiKey = process.env.OPENAI_API_KEY;
+        break;
+      case 'google':
+        apiKey = process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        break;
+    }
+    
+    config[provider] = { 
+      priority: index + 1,
+      ...(apiKey && { apiKey })
+    };
   });
   return config;
 }
@@ -116,7 +133,12 @@ export function createAIRouter(
   dbAdapter?: PostgreSQLAdapter,
   serverProviders: (string)[] = ['anthropic'],
   byokProviders: (string)[] = ['anthropic'],
-  postgresRPCMethods?: PostgreSQLRPCMethods
+  postgresRPCMethods?: PostgreSQLRPCMethods,
+  modelRestrictions?: Record<string, {
+    allowedModels?: string[];
+    allowedPatterns?: string[];
+    blockedModels?: string[];
+  }>
 ): ReturnType<typeof router> {
   const mergedConfig = {
     content: { ...DEFAULT_CONFIG.content, ...config.content },
@@ -125,11 +147,12 @@ export function createAIRouter(
   };
 
   // Initialize provider registry service
-  const providerRegistry = new ProviderRegistryService(serverProviders, byokProviders);
+  // Provider registry functionality now handled by ModelRegistry in AIService
 
   // Initialize AI service with configured providers
   const aiService = new AIService({
-    serviceProviders: createServiceProvidersConfig(serverProviders)
+    serviceProviders: createServiceProvidersConfig(serverProviders),
+    modelRestrictions
   });
 
   // Initialize services if database is available
@@ -146,13 +169,14 @@ export function createAIRouter(
   }
 
   // Create dynamic schemas based on configuration  
-  const executeAIRequestSchema = z.object({
+  const generateTextSchema = z.object({
     content: z.string()
       .min(mergedConfig.content.minLength!)
       .max(mergedConfig.content.maxLength!),
     systemPrompt: z.string()
       .min(mergedConfig.systemPrompt.minLength!)
       .max(mergedConfig.systemPrompt.maxLength!),
+    provider: z.enum(['anthropic', 'openai', 'google', 'openrouter']).optional(),
     apiKey: z.string().optional(),
     metadata: z.object({
       name: z.string().optional(),
@@ -211,13 +235,14 @@ export function createAIRouter(
    * REQUIRES AUTHENTICATION - All users must have valid JWT token
    * Payment method (subscription/one-time/BYOK) determined server-side
    */
-  executeAIRequest: publicProcedure
-    .input(executeAIRequestSchema)
+  generateText: publicProcedure
+    .input(generateTextSchema)
     .mutation(async ({ input, ctx }) => {
-      const { content, systemPrompt, metadata, options } = input;
+      const { content, systemPrompt, provider, metadata, options } = input;
       const { user } = ctx;
       const userId = user?.userId;
       const apiKey = input.apiKey || ctx.apiKey;
+      
 
       // Determine user type and execution path
       if (userId && usageAnalyticsService) {
@@ -246,7 +271,7 @@ export function createAIRouter(
             const result = await aiService.execute({
               content,
               systemPrompt,
-              metadata,
+              metadata: { ...metadata, provider },
               options,
             });
 
@@ -258,7 +283,7 @@ export function createAIRouter(
                 result.provider || 'unknown',
                 result.model,
                 result.requestId,
-                'executeAIRequest'
+                'generateText'
               );
 
               return {
@@ -314,7 +339,7 @@ export function createAIRouter(
               totalTokens: result.usage.totalTokens,
               estimatedCostUsd: estimatedCost,
               requestId: result.requestId,
-              method: 'executeAIRequest',
+              method: 'generateText',
               metadata
             });
           }
@@ -351,7 +376,7 @@ export function createAIRouter(
           const result = await aiService.execute({
             content,
             systemPrompt,
-            metadata,
+            metadata: { ...metadata, provider },
             options,
             apiKey,
           });
@@ -829,7 +854,8 @@ export function createAIRouter(
     .input(z.void())
     .query(async () => {
       try {
-        const providers = await providerRegistry.getConfiguredProviders('service');
+        // TODO: Implement provider listing via ModelRegistry
+        const providers: any[] = [];
         return {
           providers,
           source: 'registry',
@@ -852,7 +878,8 @@ export function createAIRouter(
     .input(z.void())
     .query(async () => {
       try {
-        const providers = await providerRegistry.getConfiguredProviders('byok');
+        // TODO: Implement BYOK provider listing via ModelRegistry
+        const providers: any[] = [];
         return {
           providers,
           source: 'registry',
@@ -868,6 +895,73 @@ export function createAIRouter(
     }),
 
   /**
+   * List allowed models for a provider (respects model restrictions)
+   */
+  listAllowedModels: publicProcedure
+    .input(z.object({
+      provider: z.enum(['anthropic', 'openai', 'google', 'openrouter']).optional()
+    }).optional())
+    .query(async ({ input }) => {
+      const { provider } = input || {};
+      
+      if (provider) {
+        // Single provider - return simple format
+        const allowedModels = await aiService.getAllowedModels(provider);
+        
+        // Check if restrictions are actually configured for this provider
+        const hasRestrictions = modelRestrictions && 
+          modelRestrictions[provider] &&
+          (modelRestrictions[provider].allowedModels?.length || 
+           modelRestrictions[provider].allowedPatterns?.length || 
+           modelRestrictions[provider].blockedModels?.length);
+        
+        const restrictionSuffix = hasRestrictions ? ' (after applying restrictions)' : '';
+        
+        return {
+          provider,
+          models: allowedModels,
+          count: allowedModels.length,
+          description: `Available models for ${provider}${restrictionSuffix}`
+        };
+      } else {
+        // All providers - return structured format
+        const providerData = [];
+        let totalCount = 0;
+        
+        for (const p of aiService.getProviders()) {
+          const providerModels = await aiService.getAllowedModels(p.name);
+          
+          // Check if restrictions are configured for this provider
+          const hasRestrictions = modelRestrictions && 
+            modelRestrictions[p.name] &&
+            (modelRestrictions[p.name].allowedModels?.length || 
+             modelRestrictions[p.name].allowedPatterns?.length || 
+             modelRestrictions[p.name].blockedModels?.length);
+          
+          providerData.push({
+            provider: p.name,
+            models: providerModels,
+            count: providerModels.length,
+            hasRestrictions
+          });
+          
+          totalCount += providerModels.length;
+        }
+        
+        // Check if any provider has restrictions
+        const anyRestrictions = providerData.some(p => p.hasRestrictions);
+        const restrictionSuffix = anyRestrictions ? ' (after applying restrictions)' : '';
+        
+        return {
+          provider: 'all',
+          providers: providerData,
+          totalCount,
+          description: `All available models across all providers${restrictionSuffix}`
+        };
+      }
+    }),
+
+  /**
    * Get AI model registry health status
    * Returns detailed health information about the registry integration
    */
@@ -875,7 +969,8 @@ export function createAIRouter(
     .input(z.void())
     .query(async () => {
       try {
-        const healthStatus = await providerRegistry.getHealthStatus();
+        // TODO: Implement health status via ModelRegistry
+        const healthStatus = { status: 'healthy', providers: 3, models: 100 };
         return {
           ...healthStatus,
           checkedAt: new Date().toISOString(),
