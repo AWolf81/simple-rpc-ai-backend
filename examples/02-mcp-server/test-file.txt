@@ -1,0 +1,5 @@
+This is a test file for demonstrating the file-reader resource template.
+
+It contains some sample content that can be read by the MCP resource handler.
+
+Last updated: 2025-01-21

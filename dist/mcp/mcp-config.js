@@ -21,6 +21,8 @@ export class MCPExtensionManager {
             includeDefaults: true,
             customResources: [],
             customHandlers: {},
+            customTemplates: [],
+            templateHandlers: {},
             excludeDefaults: [],
             ...config.resources
         };
@@ -91,6 +93,40 @@ export class MCPExtensionManager {
         // Add custom handlers
         if (this.resourcesConfig.customHandlers) {
             handlers = { ...handlers, ...this.resourcesConfig.customHandlers };
+        }
+        return handlers;
+    }
+    /**
+     * Get merged resource templates list
+     */
+    getResourceTemplates(defaultTemplates = []) {
+        let templates = [];
+        // Add defaults if enabled
+        if (this.resourcesConfig.includeDefaults) {
+            templates = defaultTemplates.filter(t => !this.resourcesConfig.excludeDefaults?.includes(t.name));
+        }
+        // Add custom templates
+        if (this.resourcesConfig.customTemplates) {
+            templates = [...templates, ...this.resourcesConfig.customTemplates];
+        }
+        return templates;
+    }
+    /**
+     * Get merged resource template handlers
+     */
+    getResourceTemplateHandlers(defaultHandlers = {}) {
+        let handlers = {};
+        // Add defaults if enabled
+        if (this.resourcesConfig.includeDefaults) {
+            handlers = { ...defaultHandlers };
+            // Remove excluded defaults
+            this.resourcesConfig.excludeDefaults?.forEach(name => {
+                delete handlers[name];
+            });
+        }
+        // Add custom template handlers
+        if (this.resourcesConfig.templateHandlers) {
+            handlers = { ...handlers, ...this.resourcesConfig.templateHandlers };
         }
         return handlers;
     }

@@ -32,8 +32,10 @@ export { generateTRPCMethods, createAppRouter } from './trpc/root.js';
 // } from './trpc/getrawinput-fix';
 // Recommended server - supports both JSON-RPC and tRPC
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server.js';
+// Note: Simplified server creation has been integrated into the main rpc-ai-server
+// Use createRpcAiServer() with the simplified rootFolders configuration instead
 // AI Limit Presets for common use cases
-export { AI_LIMIT_PRESETS } from './trpc/routers/ai.js';
+export { AI_LIMIT_PRESETS } from './trpc/routers/ai/types.js';
 // Model Registry (new unified registry with @anolilab/ai-model-registry integration)
 export { ModelRegistry } from './services/model-registry.js';
 // Hybrid Model Registry (production-safe versioned model registry)
@@ -42,6 +44,8 @@ export { HybridModelRegistry, hybridRegistry } from './services/hybrid-model-reg
 // Custom function system
 export { FunctionRegistry } from './services/function-registry.js';
 export { PromptManager, promptManager } from './services/prompt-manager.js';
+// Root folder management
+export { RootManager, defaultRootManager, createRootManager } from './services/root-manager.js';
 // MCP (Model Context Protocol) Integration
 export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService, setDefaultMCPServiceInstance } from './services/mcp-service.js';
 export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp-registry.js';
@@ -59,5 +63,9 @@ export { RateLimiter, DEFAULT_TIER_LIMITS } from './middleware/rate-limiter.js';
 // Usage tracking and billing
 export { UsageTracker, PROVIDER_PRICING } from './billing/usage-tracker.js';
 export { BillingEngine } from './billing/billing-engine.js';
+// Development tools
+export { startDevPanel, createServerWithDevPanel, checkDevPanelRunning } from './dev-panel.js';
+// MCP Helper Functions (simplified imports for common use)
+export { createMCPTool, createAdminMCPTool, ScopeHelpers, ScopeValidator, DefaultScopes } from './auth/scopes.js';
 // Default export - unified server for new projects
 export { createRpcAiServer as default } from './rpc-ai-server.js';
