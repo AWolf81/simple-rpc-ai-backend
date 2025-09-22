@@ -14,6 +14,8 @@
   "scripts": {
     "build": "tsc && tsc-alias && npm run copy-assets && npm run build:trpc-methods",
     "build:prod": "npm run build",
+    "postinstall": "npm run build",
+    "prepare": "npm run build",
     "build:trpc-methods": "node tools/generate-trpc-methods.js",
     "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views && cp -r docker/* dist/docker/ && cp docker-compose.postgres.yml dist/ && cp .env.postgres.example dist/ && cp src/database/migrations/*.sql dist/database/migrations/ && cp -r src/views/* dist/views/",
     "registry:health": "node tools/registry-health-check.js",

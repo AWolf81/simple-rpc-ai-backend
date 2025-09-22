@@ -2,8 +2,8 @@
 node_modules/
 
 # Build outputs
-# re-add dist back later - for now we're pushing it for easier usage
-# dist/
+# Dist folder is generated during install via postinstall script
+dist/
 *.tsbuildinfo
 
 # Test outputs
