@@ -7,8 +7,11 @@
  * to generate a JSON file that can be used by the dev panel.
  */
 
-import { writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { writeFileSync, mkdirSync, readdirSync, existsSync } from 'fs';
+import { join } from 'path';
+
+// Configure base URL for generated endpoints
+const baseUrl = `http://localhost:${process.env.AI_SERVER_PORT || 8000}`;
 
 console.log('🔨 Generating tRPC methods documentation...');
 
@@ -30,6 +33,32 @@ async function extractTRPCMethods() {
       }
     }
     
+    function inferSourceFile(procedurePath) {
+      // Dynamically discover source files from filesystem
+      const namespace = procedurePath.split('.')[0];
+      
+      // First try to find a router file for this namespace
+      const routersDir = 'src/trpc/routers';
+      if (existsSync(routersDir)) {
+        try {
+          const files = readdirSync(routersDir);
+          const routerFile = files.find(file => 
+            file.toLowerCase() === `${namespace.toLowerCase()}.ts` ||
+            file.toLowerCase() === `${namespace.toLowerCase()}.js`
+          );
+          
+          if (routerFile) {
+            return join(routersDir, routerFile);
+          }
+        } catch (e) {
+          // Ignore filesystem errors
+        }
+      }
+      
+      // Fallback to root file
+      return 'src/trpc/root.ts';
+    }
+    
     function extractProcedureInfo(procedure, path) {
       const def = procedure._def;
       const info = {
@@ -40,7 +69,8 @@ async function extractTRPCMethods() {
         tags: [],
         input: null,
         output: null,
-        meta: def.meta || null
+        meta: def.meta || null,
+        sourceFile: inferSourceFile(path)
       };
       
       // Extract OpenAPI metadata if present
@@ -118,7 +148,7 @@ async function extractTRPCMethods() {
         type: method.type,
         calling: {
           mcp: {
-            endpoint: 'http://localhost:8000/mcp',
+            endpoint: `${baseUrl}/mcp`,
             method: 'tools/call',
             example: {
               jsonrpc: '2.0',
@@ -131,14 +161,14 @@ async function extractTRPCMethods() {
             }
           },
           trpc: {
-            endpoint: `http://localhost:8000/trpc/${procedureName}`,
+            endpoint: `${baseUrl}/trpc/${procedureName}`,
             method: httpMethod,
             example: httpMethod === 'GET' 
-              ? `curl -X GET "http://localhost:8000/trpc/${procedureName}?batch=1&input=%7B%220%22%3A%7B%22json%22%3A${encodeURIComponent(JSON.stringify(generateExampleArgs(method.input)))}%7D%7D"`
-              : `curl -X POST "http://localhost:8000/trpc/${procedureName}?batch=1" -H "Content-Type: application/json" -d '[{"0":{"json":${JSON.stringify(generateExampleArgs(method.input))}}}]'`
+              ? `curl -X GET "${baseUrl}/trpc/${procedureName}?batch=1&input=%7B%220%22%3A%7B%22json%22%3A${encodeURIComponent(JSON.stringify(generateExampleArgs(method.input)))}%7D%7D"`
+              : `curl -X POST "${baseUrl}/trpc/${procedureName}?batch=1" -H "Content-Type: application/json" -d '[{"0":{"json":${JSON.stringify(generateExampleArgs(method.input))}}}]'`
           },
           jsonRpc: {
-            endpoint: 'http://localhost:8000/rpc',
+            endpoint: `${baseUrl}/rpc`,
             method: procedureName,
             example: {
               jsonrpc: '2.0',
@@ -281,6 +311,9 @@ async function main() {
     console.error(`⚠️  Generation completed with error: ${documentation.error}`);
     process.exit(1);
   }
+
+  // Force exit to prevent hanging due to async operations (ModelRegistry, etc.)
+  process.exit(0);
 }
 
 main().catch(error => {
