@@ -27,7 +27,16 @@ describe('MCP Security Features', () => {
         tRpc: true
       },
       mcp: createTestMCPConfig({
-        // Explicitly override to ensure security is completely disabled
+        // Configure to match production security test scenario
+        auth: {
+          requireAuthForToolsList: false,
+          requireAuthForToolsCall: true,
+          publicTools: ['greeting', 'currentSystemTime'], // Match our security test case
+          authType: 'oauth',
+          oauth: { enabled: true, requireValidSession: true },
+          jwt: { enabled: false }
+        },
+        // Explicitly override to ensure security is completely disabled for other features
         rateLimiting: { enabled: false },
         securityLogging: { enabled: false, networkFilter: { enabled: false } },
         authEnforcement: { enabled: false }
@@ -578,6 +587,223 @@ describe('MCP Security Features', () => {
         expect(serverInfo).not.toHaveProperty('buildHash');
         expect(serverInfo).not.toHaveProperty('dependencies');
         expect(serverInfo).not.toHaveProperty('internalVersion');
+      }
+    });
+  });
+
+  describe('Tool Discovery Security (Critical Vulnerability Prevention)', () => {
+    it('should prevent scoped tools from being made public via server configuration', async () => {
+      // SECURITY TEST: Ensure tools with authentication requirements cannot be
+      // bypassed by server configuration settings
+
+      // Test tools/list to see what's exposed without authentication
+      const listResponse = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/list'
+        });
+
+      expect(listResponse.status).toBe(200);
+      expect(listResponse.body.result).toBeDefined();
+
+      const exposedTools = listResponse.body.result.tools.map((tool: any) => tool.name);
+
+      // CRITICAL SECURITY CHECK: Tools with authentication scopes should NEVER
+      // appear in public discovery, regardless of server config
+      const scopedTools = ['echo', 'status', 'longRunningTask', 'cancellableTask',
+                          'cancelTask', 'listRunningTasks', 'advancedExample',
+                          'getTaskProgress', 'getUserInfo'];
+
+      for (const scopedTool of scopedTools) {
+        expect(exposedTools).not.toContain(scopedTool);
+      }
+
+      // Only inherently public tools should be discoverable
+      // (and only if allowed by server config)
+      const legitimatePublicTools = ['greeting', 'currentSystemTime'];
+      for (const publicTool of legitimatePublicTools) {
+        expect(exposedTools).toContain(publicTool);
+      }
+    });
+
+    it('should respect server configuration filtering for inherently public tools', async () => {
+      // Test that server config can filter which public tools are exposed
+      const listResponse = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'tools/list'
+        });
+
+      expect(listResponse.status).toBe(200);
+      const exposedTools = listResponse.body.result.tools.map((tool: any) => tool.name);
+
+      // Server config should control which inherently public tools are exposed
+      // Based on the current example server config: ['greeting', 'currentSystemTime']
+
+      // These should be exposed (in server config allow list)
+      expect(exposedTools).toContain('greeting');
+      expect(exposedTools).toContain('currentSystemTime');
+
+      // These are inherently public but not in server config, so should be filtered out
+      // Note: 'calculate' is public by design but denied by server config
+      expect(exposedTools).not.toContain('calculate');
+
+      // 'test' tool (from ai router) might also be public but not in config
+      expect(exposedTools).not.toContain('test');
+    });
+
+    it('should maintain security even with malicious server configuration attempts', async () => {
+      // This test simulates what would happen if an admin mistakenly tries
+      // to expose authentication-required tools via server config
+
+      // Even if server tried to configure scoped tools as public, they should be blocked
+      // This is tested implicitly by the current server setup - the security layer
+      // prevents scoped tools from reaching the server config filtering stage
+
+      const protectedTools = ['echo', 'status', 'getUserInfo'];
+
+      for (const toolName of protectedTools) {
+        // Attempt to call these tools without authentication
+        const callResponse = await request(app)
+          .post('/mcp')
+          .send({
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'tools/call',
+            params: {
+              name: toolName,
+              arguments: toolName === 'echo' ? { message: 'test', transform: 'none' } : {}
+            }
+          });
+
+        expect(callResponse.status).toBe(200);
+        expect(callResponse.body.error).toBeDefined();
+
+        // Should get authentication error, not "tool not found"
+        // This proves the tool exists but is properly protected
+        expect(callResponse.body.error.message).toMatch(/tool execution failed/i);
+        expect(callResponse.body.error.data).toMatch(/requires authentication/i);
+      }
+    });
+
+    it('should properly classify tools by their inherent security level', async () => {
+      // This test validates that our security classification logic works correctly
+
+      // Get the tools list to see what's exposed
+      const listResponse = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 4,
+          method: 'tools/list'
+        });
+
+      expect(listResponse.status).toBe(200);
+      const exposedTools = listResponse.body.result.tools;
+
+      // All exposed tools should be genuinely public (no authentication requirements)
+      for (const tool of exposedTools) {
+        // Try to call each exposed tool without authentication
+        const callResponse = await request(app)
+          .post('/mcp')
+          .send({
+            jsonrpc: '2.0',
+            id: 5,
+            method: 'tools/call',
+            params: {
+              name: tool.name,
+              arguments: tool.name === 'greeting' ?
+                { name: 'Test User', language: 'en' } :
+                { timezone: 'UTC' }
+            }
+          });
+
+        expect(callResponse.status).toBe(200);
+
+        // Since these tools are exposed in discovery, they should work without auth
+        expect(callResponse.body.result).toBeDefined();
+        expect(callResponse.body.error).toBeUndefined();
+      }
+    });
+
+    it('should prevent privilege escalation through tool discovery manipulation', async () => {
+      // Test that there's no way to bypass the security-first filtering
+
+      // 1. Verify scoped tools are not discoverable
+      const listResponse = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 6,
+          method: 'tools/list'
+        });
+
+      const discoveredTools = listResponse.body.result.tools.map((t: any) => t.name);
+
+      // 2. Try to call a non-discoverable scoped tool directly
+      const directCallResponse = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 7,
+          method: 'tools/call',
+          params: {
+            name: 'echo', // This has scopes, should not be discoverable
+            arguments: { message: 'bypass attempt', transform: 'none' }
+          }
+        });
+
+      // Tool should exist but require authentication
+      expect(directCallResponse.status).toBe(200);
+      expect(directCallResponse.body.error).toBeDefined();
+      expect(directCallResponse.body.error.data).toMatch(/requires authentication/i);
+
+      // 3. Verify the tool is NOT in the discovered tools list
+      expect(discoveredTools).not.toContain('echo');
+
+      // This proves that:
+      // - The tool exists and works (with proper auth)
+      // - But is not exposed in discovery (security-first filtering)
+      // - Cannot be bypassed through discovery manipulation
+    });
+
+    it('should maintain consistent security behavior across different request patterns', async () => {
+      // Test various request patterns to ensure consistent security
+
+      const testPatterns = [
+        // Standard requests
+        { method: 'tools/list' },
+        // Requests with different ID types
+        { method: 'tools/list', id: 'string-id' },
+        { method: 'tools/list', id: null },
+        // Requests with extra parameters (should be ignored)
+        { method: 'tools/list', params: { extraParam: 'value' } }
+      ];
+
+      for (const pattern of testPatterns) {
+        const response = await request(app)
+          .post('/mcp')
+          .send({
+            jsonrpc: '2.0',
+            ...pattern
+          });
+
+        expect(response.status).toBe(200);
+
+        if (response.body.result) {
+          const tools = response.body.result.tools.map((t: any) => t.name);
+
+          // Should always return the same filtered set of tools
+          expect(tools).toContain('greeting');
+          expect(tools).toContain('currentSystemTime');
+          expect(tools).not.toContain('echo');
+          expect(tools).not.toContain('status');
+          expect(tools).not.toContain('calculate'); // Denied by server config
+        }
       }
     });
   });

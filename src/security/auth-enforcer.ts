@@ -168,10 +168,14 @@ export class AuthEnforcer {
     this.config = { ...DEFAULT_AUTH_ENFORCEMENT_CONFIG, ...config };
     this.securityLogger = securityLogger || new SecurityLogger();
     
-    this.usageStats = this.initializeUsageStats();
-    this.startAggregationProcess();
-    
-    console.log('✅ Auth enforcement: Authentication enforcer and resource tracker initialized');
+    if (this.config.enabled) {
+      this.usageStats = this.initializeUsageStats();
+      this.startAggregationProcess();
+      console.log('✅ Auth enforcement: Authentication enforcer and resource tracker initialized');
+    } else {
+      this.usageStats = this.initializeUsageStats(); // Minimal stats even when disabled
+      console.log('ℹ️  Auth enforcement: Disabled (simple mode)');
+    }
   }
 
   /**
@@ -206,7 +210,7 @@ export class AuthEnforcer {
    * Start aggregation and cleanup process
    */
   private startAggregationProcess() {
-    if (!this.config.resourceTracking.enabled) return;
+    if (!this.config.enabled || !this.config.resourceTracking.enabled) return;
 
     const intervalMs = this.config.resourceTracking.aggregationInterval * 60 * 1000;
     
@@ -671,17 +675,20 @@ export class AuthEnforcer {
    * Aggregate usage data periodically
    */
   private aggregateUsageData(): void {
-    if (!this.config.resourceTracking.enabled) return;
+    if (!this.config.enabled || !this.config.resourceTracking.enabled) return;
     
-    // This could store aggregated data to database for long-term storage
-    console.log(`📊 Auth enforcement: Aggregated ${this.resourceUsageLog.length} usage entries`);
+    // Only log if there are actual entries to aggregate
+    if (this.resourceUsageLog.length > 0) {
+      // This could store aggregated data to database for long-term storage
+      console.log(`📊 Auth enforcement: Aggregated ${this.resourceUsageLog.length} usage entries`);
+    }
   }
 
   /**
    * Clean up old data based on retention policy
    */
   private cleanupOldData(): void {
-    if (!this.config.resourceTracking.enabled) return;
+    if (!this.config.enabled || !this.config.resourceTracking.enabled) return;
     
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - this.config.resourceTracking.retentionDays);

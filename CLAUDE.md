@@ -39,6 +39,59 @@ pnpm docs:local           # Start panel + local OpenRPC playground
 pnpm dev:docs             # Complete setup: server + panel + OpenRPC playground
 ```
 
+### Dev Panel Integration for Package Consumers
+
+**Option 1: Add to your package.json scripts**
+```json
+{
+  "scripts": {
+    "dev:panel": "node -e \"import('simple-rpc-ai-backend').then(pkg => pkg.startDevPanel({ port: 8080, openBrowser: true, serverUrl: 'http://localhost:8001' }))\"",
+    "dev:server": "node your-server.js",
+    "dev:full": "concurrently \"npm run dev:server\" \"npm run dev:panel\""
+  },
+  "devDependencies": {
+    "concurrently": "^7.0.0"
+  }
+}
+```
+
+**Option 2: Integrated server approach**
+```javascript
+// your-server.js
+import { createServerWithDevPanel } from 'simple-rpc-ai-backend';
+
+const server = await createServerWithDevPanel({
+  serverConfig: {
+    port: 8001,
+    // ... your server configuration
+  },
+  devPanelConfig: {
+    port: 8080,
+    openBrowser: process.env.NODE_ENV === 'development'
+  }
+});
+```
+
+**Option 3: Standalone dev panel**
+```javascript
+// dev-panel.js
+import { startDevPanel, checkDevPanelRunning } from 'simple-rpc-ai-backend';
+
+// Check if panel is already running
+if (!(await checkDevPanelRunning(8080))) {
+  await startDevPanel({
+    port: 8080,
+    serverUrl: 'http://localhost:8001',  // Your server URL
+    openBrowser: true,
+    features: {
+      tRpcPlayground: true,
+      mcpInspector: true,
+      apiExplorer: true
+    }
+  });
+}
+```
+
 
 ## Architecture Overview
 
@@ -124,12 +177,68 @@ await client.ai.configureBYOK.mutate({ provider, apiKey });
 
 ### Server Development
 ```typescript
-import { createAIServer } from 'simple-rpc-ai-backend';
-const server = createAIServer({
-  serviceProviders: ['anthropic', 'openai', 'google'],
-  requirePayment: { enabled: false }
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
+const server = createRpcAiServer({
+  ai: {
+    providers: {
+      anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
+      openai: { apiKey: process.env.OPENAI_API_KEY }
+    }
+  },
+  mcp: {
+    enableMCP: true,
+    ai: {
+      enabled: true,                    // Enable AI-powered sampling tools
+      useServerConfig: true,            // Use same providers as ai.generateText
+      restrictToSampling: true          // Only sampling tools use AI (secure)
+    }
+  }
 });
 server.start();
+```
+
+### Custom Router Extension
+```typescript
+import { createRpcAiServer, router, publicProcedure, createMCPTool } from 'simple-rpc-ai-backend';
+import { z } from 'zod';
+
+// Create custom router with MCP tools
+const mathRouter = router({
+  add: publicProcedure
+    .meta({
+      ...createMCPTool({
+        name: 'add',
+        description: 'Add two numbers together',
+        category: 'math',
+        public: true
+      })
+    })
+    .input(z.object({
+      a: z.number(),
+      b: z.number()
+    }))
+    .query(({ input }) => ({ result: input.a + input.b }))
+});
+
+const server = createRpcAiServer({
+  customRouters: {
+    math: mathRouter  // Merged with built-in namespaces
+  }
+});
+```
+
+### Development Panel Integration
+```typescript
+import { createServerWithDevPanel } from 'simple-rpc-ai-backend';
+
+// Start server with integrated development panel
+const server = await createServerWithDevPanel({
+  serverConfig: { /* your server config */ },
+  devPanelConfig: {
+    port: 8080,
+    openBrowser: true
+  }
+});
 ```
 
 ## JSON-RPC Methods Available
@@ -503,17 +612,135 @@ const server = createRpcAiServer({
 - ✅ **Authentication**: JWT-based protection with configurable public tools
 - ✅ **Schema Compliance**: Proper JSON Schema generation for AI consumption
 
+### 🤖 **AI-Powered Sampling & Elicitation**
+
+**Key Feature**: Real AI integration with secure defaults and explicit opt-in controls.
+
+#### **AI Sampling Configuration**
+```typescript
+const server = createRpcAiServer({
+  mcp: {
+    enableMCP: true,
+    ai: {
+      enabled: true,                    // Enable AI for MCP sampling tools (disabled by default)
+      useServerConfig: true,            // Use same providers as ai.generateText
+      restrictToSampling: true,         // Only sampling tools use AI (recommended)
+      allowByokOverride: false          // Server keys only (secure default)
+    }
+  }
+});
+```
+
+#### **Built-in AI Tools**
+- **`generateWithApproval`**: AI content generation with MCP sampling protocol
+  - Secure: Disabled by default, shows configuration help when AI not enabled
+  - Real AI: Uses AIService with Vercel AI SDK for actual generation
+  - Fallback: Graceful error handling with helpful fallback messages
+  - Security: Uses server-configured API keys, not BYOK by default
+
+- **`requestElicitation`**: User input/decision workflow support
+  - No AI required: Pure workflow orchestration tool
+  - Validation: Full input validation for confirmation, choice, input, approval types
+  - Workflow: Demonstrates MCP elicitation protocol patterns
+
+#### **Security-First Design**
+```typescript
+// AI disabled by default - explicit opt-in required
+mcp: {
+  ai: {
+    enabled: false  // Default: Shows configuration help instead of AI generation
+  }
+}
+
+// When enabled - secure server configuration (default)
+mcp: {
+  ai: {
+    enabled: true,                    // Explicitly enable AI features
+    useServerConfig: true,            // Use same providers/keys as ai.generateText
+    restrictToSampling: true,         // Only sampling tools get AI (not general tools)
+    allowByokOverride: false          // Server manages API keys (no BYOK for MCP)
+  }
+}
+```
+
+#### **MCP-Specific Configuration (useServerConfig: false)**
+```typescript
+// Independent MCP AI configuration - separate from main server
+const server = createRpcAiServer({
+  // Main server AI configuration (e.g., for ai.generateText)
+  ai: {
+    providers: {
+      anthropic: {
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        models: ['claude-3-5-sonnet-20241022'] // Premium model
+      }
+    }
+  },
+
+  mcp: {
+    enableMCP: true,
+    ai: {
+      enabled: true,
+      useServerConfig: false,         // Don't inherit from main server config
+
+      // MCP-specific providers with different keys/models
+      mcpProviders: {
+        anthropic: {
+          apiKey: process.env.MCP_ANTHROPIC_KEY,  // Different API key
+          enabled: true,
+          priority: 1,
+          models: ['claude-3-5-haiku-20241022']   // Budget model for MCP
+        },
+        openai: {
+          apiKey: process.env.MCP_OPENAI_KEY,
+          enabled: true,
+          priority: 2,
+          models: ['gpt-4o-mini']                 // Budget model
+        }
+      },
+
+      // MCP-specific AI service configuration
+      aiServiceConfig: {
+        defaultProvider: 'anthropic',
+        maxTokens: 500,                // Lower limits for MCP tools
+        temperature: 0.1,              // More deterministic for tool usage
+        systemPrompts: {
+          'sampling': 'You are a helpful assistant for MCP sampling tasks.'
+        }
+      },
+
+      // MCP-specific model restrictions
+      modelRestrictions: {
+        anthropic: {
+          allowedModels: ['claude-3-5-haiku-20241022'],
+          blockedModels: ['claude-3-5-sonnet-20241022'] // Block expensive models
+        }
+      },
+
+      restrictToSampling: true,
+      allowByokOverride: false
+    }
+  }
+});
+```
+
+#### **Use Cases for useServerConfig: false**
+- **Cost Control**: Use budget models (haiku, gpt-4o-mini) for MCP tools vs premium models for main AI
+- **Different Keys**: Separate billing/usage tracking between main AI and MCP functionality
+- **Model Restrictions**: Restrict MCP to specific models while allowing full access for main AI
+- **Performance Tuning**: Different temperature/token limits optimized for tool usage vs content generation
+
 ### 🔄 **Integration Architecture**
 ```typescript
-// Unified server supports both protocols simultaneously
+// Unified server supports all protocols simultaneously
 app.post('/rpc', handleJSONRPC);     // AI backend protocol
-app.post('/trpc', handleTRPC);       // TypeScript client protocol  
+app.post('/trpc', handleTRPC);       // TypeScript client protocol
 app.post('/mcp', handleMCP);         // Model Context Protocol
 
 // Tools defined once, available everywhere:
-// - tRPC: mcp.greeting, mcp.echo
-// - JSON-RPC: mcp.greeting, mcp.echo  
-// - MCP: greeting, echo (auto-discovered)
+// - tRPC: mcp.generateWithApproval, mcp.requestElicitation
+// - JSON-RPC: mcp.generateWithApproval, mcp.requestElicitation
+// - MCP: generateWithApproval, requestElicitation (auto-discovered)
 ```
 
 ### 🔐 **Security Integration**

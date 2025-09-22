@@ -292,7 +292,7 @@ export function createTypedAIClient(config: Parameters<typeof createTRPCProxyCli
   // Create a typed wrapper that preserves procedure methods
   // This ensures TypeScript can properly infer .query() vs .mutate()
   return {
-    ai: client.ai as AIRouterType
+    ai: client.ai as unknown as AIRouterType
   };
 }
 

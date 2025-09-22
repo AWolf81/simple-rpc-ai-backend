@@ -18,7 +18,7 @@ import { createTRPCContext, router } from './trpc/index.js';
 import { createAppRouter } from './trpc/root.js';
 import type { AnyRouter } from '@trpc/server';
 import type { AppRouter } from './trpc/root.js';
-import type { AIRouterConfig } from './trpc/routers/ai.js';
+import type { AIRouterConfig } from './trpc/routers/ai/types.js';
 import { JWTMiddleware } from './auth/jwt-middleware.js';
 import { PostgreSQLAdapter } from './database/postgres-adapter.js';
 import { VirtualTokenService } from './services/virtual-token-service.js';
@@ -140,9 +140,10 @@ export interface RpcAiServerConfig {
     webhooks?: string;    // Default: '/webhooks/lemonsqueezy'
   };
 
-  // MCP configuration
+  // MCP configuration  
   mcp?: {
-    enableMCP?: boolean;
+    enabled?: boolean;
+    enableMCP?: boolean;  // Internal property - automatically set based on enabled and mcp object presence
     transports?: {
       http?: boolean;        // HTTP transport (default: true)
       stdio?: boolean;       // STDIO transport for Claude Desktop (default: false)  
@@ -190,6 +191,68 @@ export interface RpcAiServerConfig {
      */
     authEnforcement?: AuthEnforcementConfig;
   }
+
+  /**
+   * Custom router extensions - allows users to add their own tRPC procedures
+   */
+  customRouters?: {
+    [namespace: string]: any; // tRPC router instance
+  };
+
+  /**
+   * Root folder management configuration
+   */
+  rootFolders?: {
+    /** Default root folder configuration */
+    defaultRoot?: {
+      /** Path to default root folder (defaults to current working directory) */
+      path?: string;
+      /** Whether default root is read-only */
+      readOnly?: boolean;
+      /** Allowed file extensions */
+      allowedExtensions?: string[];
+    };
+
+    /** Additional named root folders */
+    additionalRoots?: Record<string, {
+      /** Absolute path to the root folder */
+      path: string;
+      /** Display name */
+      name?: string;
+      /** Description */
+      description?: string;
+      /** Whether read-only */
+      readOnly?: boolean;
+      /** Allowed file extensions */
+      allowedExtensions?: string[];
+      /** Blocked file extensions */
+      blockedExtensions?: string[];
+      /** Maximum file size in bytes */
+      maxFileSize?: number;
+    }>;
+
+    /** Enable file operations via tRPC/MCP */
+    enableAPI?: boolean;
+  };
+}
+
+/**
+ * Parse CORS origin configuration to support flexible formats:
+ * - String: "https://example.com" or "*" 
+ * - Comma-separated: "https://example.com,http://localhost:3000"
+ * - Array: ["https://example.com", "http://localhost:3000"]
+ */
+function parseCorsOrigin(origin?: string | string[]): string | string[] {
+  if (!origin) return '*';
+  if (Array.isArray(origin)) return origin;
+  if (typeof origin === 'string') {
+    // If it contains commas, split into array
+    if (origin.includes(',')) {
+      return origin.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    }
+    return origin;
+  }
+  return '*';
 }
 
 export class RpcAiServer {
@@ -276,7 +339,7 @@ export class RpcAiServer {
         ...config.oauth
       },
       cors: {
-        origin: '*',
+        origin: parseCorsOrigin(config.cors?.origin) || '*',
         credentials: false,
         ...config.cors
       },
@@ -294,11 +357,11 @@ export class RpcAiServer {
         ...config.paths
       },
       mcp: {
-        enableMCP: config.mcp?.enableMCP || false,
+        enableMCP: config.mcp?.enabled !== false && !!config.mcp,  // Enable MCP if mcp config object is provided and not explicitly disabled
         transports: {
-          http: true,    // HTTP transport enabled by default
-          stdio: false,  // STDIO transport disabled by default
-          sse: false,    // SSE transport disabled by default  
+          http: true,    // HTTP transport enabled by default - universal compatibility
+          sse: true,     // SSE transport enabled by default - real-time capabilities
+          stdio: false,  // STDIO transport disabled by default - specialized use case
           sseEndpoint: '/sse',
           ...config.mcp?.transports
         },
@@ -314,9 +377,16 @@ export class RpcAiServer {
           enableFilesystemTools: false,
           ...config.mcp?.defaultConfig
         },
-        extensions: config.mcp?.extensions
+        extensions: config.mcp?.extensions,
+        // Spread any other MCP config properties
+        ...config.mcp
       },
       modelRestrictions: config.modelRestrictions || {},  // Default: no model restrictions
+      rootFolders: {
+        enableAPI: true,
+        ...config.rootFolders
+      },
+      customRouters: config.customRouters || {},  // Default: no custom routers
       ...config
     };
 
@@ -385,14 +455,24 @@ export class RpcAiServer {
 
     // Create router with AI configuration and token tracking
     this.router = createAppRouter(
-      this.config.aiLimits,
+      {
+        config: this.config.aiLimits,
+        tokenTrackingEnabled: this.config.tokenTracking.enabled || false,
+        dbAdapter: this.dbAdapter,
+        serverProviders: this.config.serverProviders,
+        byokProviders: this.config.byokProviders,
+        postgresRPCMethods: this.postgresRPCMethods,
+        modelRestrictions: this.config.modelRestrictions
+      },
       this.config.tokenTracking.enabled || false,
       this.dbAdapter,
       this.config.serverProviders,
       this.config.byokProviders,
       this.postgresRPCMethods,
       this.config.mcp,
-      this.config.modelRestrictions
+      this.config.modelRestrictions,
+      this.config.rootFolders,
+      this.config.customRouters
     );
 
     // Initialize tRPC to JSON-RPC bridge (if JSON-RPC is enabled)
@@ -518,6 +598,26 @@ export class RpcAiServer {
           jsonRpc: this.config.protocols.jsonRpc ? this.config.paths.jsonRpc : null,
           tRpc: this.config.protocols.tRpc ? this.config.paths.tRpc : null,
         }
+      });
+    });
+
+    // Configuration endpoint for development tools
+    this.app.get('/config', (_req: Request, res: Response) => {
+      res.json({
+        port: this.config.port,
+        baseUrl: `http://localhost:${this.config.port}`,
+        endpoints: {
+          health: `http://localhost:${this.config.port}${this.config.paths.health}`,
+          jsonRpc: this.config.protocols.jsonRpc ? `http://localhost:${this.config.port}${this.config.paths.jsonRpc}` : null,
+          tRpc: this.config.protocols.tRpc ? `http://localhost:${this.config.port}${this.config.paths.tRpc}` : null,
+          mcp: this.config.mcp?.enableMCP ? `http://localhost:${this.config.port}/mcp` : null,
+        },
+        protocols: {
+          jsonRpc: this.config.protocols.jsonRpc,
+          tRpc: this.config.protocols.tRpc,
+          mcp: this.config.mcp?.enableMCP || false,
+        },
+        timestamp: new Date().toISOString()
       });
     });
 
@@ -979,97 +1079,6 @@ export class RpcAiServer {
 
 
 
-  /**
-   * Setup the new router-based MCP server with configurable transports
-   */
-  private async setupMCPServer(): Promise<void> {
-    console.log(`🚀 Setting up MCP server...`);
-
-    // Import MCP server components
-    const { createMCPServer } = await import('./mcp-server.js');
-    const { MCPProtocolHandler } = await import('./trpc/routers/mcp.js');
-
-    const transports = this.config.mcp.transports || {
-      http: true,
-      stdio: false,
-      sse: false,
-      sseEndpoint: '/sse'
-    };
-
-    // Create unified MCP server manager
-    const mcpServer = createMCPServer({
-      name: 'simple-rpc-ai-backend',
-      version: '1.0.0',
-      enableStdio: transports.stdio,
-      enableSSE: transports.sse,
-      sseEndpoint: transports.sseEndpoint
-    });
-
-    // Setup transports based on configuration
-    const enabledTransports: string[] = [];
-
-    // HTTP transport (for MCP Jam, testing)
-    if (transports.http) {
-      // Initialize OpenSaaS JWT middleware for MCP if configured
-      let mcpJwtMiddleware: JWTMiddleware | undefined;
-      const opensaasConfig = this.config.mcp?.auth?.opensaas;
-      
-      if (opensaasConfig?.enabled && opensaasConfig.publicKey) {
-        try {
-          mcpJwtMiddleware = new JWTMiddleware({
-            opensaasPublicKey: opensaasConfig.publicKey,
-            audience: opensaasConfig.audience || 'simple-rpc-ai-backend',
-            issuer: opensaasConfig.issuer || 'opensaas',
-            clockTolerance: opensaasConfig.clockTolerance || 30,
-            requireAuthForAllMethods: opensaasConfig.requireAuthForAllMethods || false,
-            skipAuthForMethods: opensaasConfig.skipAuthForMethods || ['tools/list', 'initialize', 'ping']
-          });
-          console.log(`🔐 OpenSaaS JWT authentication enabled for MCP endpoints`);
-        } catch (error: any) {
-          console.error(`❌ Failed to initialize OpenSaaS JWT middleware for MCP: ${error.message}`);
-        }
-      }
-
-      const httpHandler = new MCPProtocolHandler(this.router, { 
-        adminUsers: this.config.mcp?.adminUsers,
-        jwtMiddleware: mcpJwtMiddleware,
-        auth: this.config.mcp?.auth,
-        rateLimiting: this.config.mcp?.rateLimiting,
-        securityLogging: this.config.mcp?.securityLogging,
-        authEnforcement: this.config.mcp?.authEnforcement,
-        extensions: this.config.mcp?.extensions
-      });
-      httpHandler.setupMCPEndpoint(this.app, '/mcp');
-      enabledTransports.push('HTTP');
-    }
-
-    // SSE transport (for web clients)
-    if (transports.sse) {
-      mcpServer.setupSSE(this.app);
-      enabledTransports.push('SSE');
-    }
-
-    // STDIO transport (for Claude Desktop) - handled separately since it's blocking
-    if (transports.stdio) {
-      enabledTransports.push('STDIO');
-      console.log(`⚠️  STDIO transport enabled but not started (use standalone server)`);
-      console.log(`   Start with: node dist/mcp-stdio-server.js`);
-    }
-
-    console.log(`🤖 MCP server ready with tRPC integration:`);
-    if (transports.http) {
-      console.log(`   • HTTP: http://localhost:${this.config.port}/mcp`);
-    }
-    if (transports.sse) {
-      console.log(`   • SSE: http://localhost:${this.config.port}${transports.sseEndpoint}`);
-    }
-    if (transports.stdio) {
-      console.log(`   • STDIO: node dist/mcp-stdio-server.js`);
-    }
-    console.log(`   • Transports: ${enabledTransports.join(', ')}`);
-    console.log(`   • Auto-discovered tools from tRPC procedures with mcp metadata`);
-    console.log(`   • Supports: initialize, ping, tools/list, tools/call, notifications/progress`);
-  }
 
   public async start(setupRoutes?: (app: Application) => void): Promise<void> {
     // Initialize OAuth server session storage (if enabled)
@@ -1080,11 +1089,7 @@ export class RpcAiServer {
     // Setup routes (including OAuth routes)
     await this.setupRoutes();
     
-    // Setup MCP endpoint (only if enabled in config)
-    if (this.config.mcp.enableMCP) {
-      // Setup new router-based MCP server with HTTP transport
-      await this.setupMCPServer();
-    }
+    // MCP functionality is integrated into the tRPC router and automatically exposed via HTTP
 
     if (setupRoutes) {
       setupRoutes(this.app);

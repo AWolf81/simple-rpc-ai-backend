@@ -22,6 +22,19 @@ const server = createRpcAiServer({
     jsonRpc: true,  // Keep JSON-RPC for compatibility
     tRpc: true      // Enable tRPC for development panel
   },
+  cors: {
+    // CORS_ORIGIN examples:
+    // - Single: "*" or "https://app.example.com"  
+    // - Multiple: "https://playground.open-rpc.org,https://inspector.open-rpc.org"
+    // - Array in code: ["https://app1.com", "https://app2.com"]
+    origin: process.env.CORS_ORIGIN || [
+      'http://localhost:3000',           // Local development
+      'https://playground.open-rpc.org', // OpenRPC Playground
+      'https://inspector.open-rpc.org',  // OpenRPC Inspector  
+      'http://localhost:4000'            // MCP Jam Inspector
+    ],
+    credentials: true
+  },
   systemPrompts: {
     default: 'You are a helpful AI assistant.',
   },

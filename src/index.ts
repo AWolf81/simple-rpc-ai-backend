@@ -39,8 +39,11 @@ export { generateTRPCMethods, createAppRouter } from './trpc/root';
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server';
 export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server';
 
+// Note: Simplified server creation has been integrated into the main rpc-ai-server
+// Use createRpcAiServer() with the simplified rootFolders configuration instead
+
 // AI Limit Presets for common use cases
-export { AI_LIMIT_PRESETS } from './trpc/routers/ai';
+export { AI_LIMIT_PRESETS } from './trpc/routers/ai/types';
 export type { AIRouterConfig, AIRouterType } from './trpc/routers/ai';
 
 // Model Registry (new unified registry with @anolilab/ai-model-registry integration)
@@ -60,6 +63,9 @@ export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root';
 // Custom function system
 export { FunctionRegistry } from './services/function-registry';
 export { PromptManager, promptManager } from './services/prompt-manager';
+
+// Root folder management
+export { RootManager, defaultRootManager, createRootManager } from './services/root-manager';
 
 // MCP (Model Context Protocol) Integration
 export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService, setDefaultMCPServiceInstance } from './services/mcp-service';
@@ -141,6 +147,14 @@ export type {
   URLReadResult
 } from './services/ref-mcp-integration';
 
+// Root Manager Types
+export type {
+  RootFolderConfig,
+  ClientRootFolderInfo,
+  FileInfo,
+  RootManagerConfig
+} from './services/root-manager';
+
 export type {
   MCPRouterConfig,
   //MCPRouterType
@@ -205,6 +219,24 @@ export type {
 export type {
   MonetizedServerInstance
 } from './monetization/opensaas-server';
+
+// Development tools
+export { startDevPanel, createServerWithDevPanel, checkDevPanelRunning } from './dev-panel';
+export type { DevPanelConfig } from './dev-panel';
+
+// MCP Helper Functions (simplified imports for common use)
+export {
+  createMCPTool,
+  createAdminMCPTool,
+  ScopeHelpers,
+  ScopeValidator,
+  DefaultScopes
+} from './auth/scopes';
+export type {
+  MCPToolScope,
+  ScopeRequirement,
+  ScopePattern
+} from './auth/scopes';
 
 // Default export - unified server for new projects
 export { createRpcAiServer as default } from './rpc-ai-server';
