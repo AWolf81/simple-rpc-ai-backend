@@ -81,6 +81,14 @@ export interface MCPRouterConfig {
     fallbackToServer?: boolean; // Default: true - fallback to server config if BYOK not provided
   };
   aiService?: any; // AIService instance for sampling procedures (internal)
+  dnsRebinding?: {
+    /** List of allowed host header values for DNS rebinding protection */
+    allowedHosts?: string[];
+    /** List of allowed origin header values for DNS rebinding protection */
+    allowedOrigins?: string[];
+    /** Enable DNS rebinding protection (requires allowedHosts and/or allowedOrigins to be configured) */
+    enableDnsRebindingProtection?: boolean;
+  };
   extensions?: {
     prompts?: {
       includeDefaults?: boolean;

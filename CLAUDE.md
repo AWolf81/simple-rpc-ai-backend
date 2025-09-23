@@ -185,6 +185,21 @@ const server = createRpcAiServer({
       openai: { apiKey: process.env.OPENAI_API_KEY }
     }
   },
+
+  // Server-managed directories (distinct from MCP client roots)
+  serverWorkspaces: {
+    project: {
+      path: '/home/user/project',
+      name: 'Project Files',
+      readOnly: false
+    },
+    templates: {
+      path: '/opt/templates',
+      name: 'Server Templates',
+      readOnly: true
+    }
+  },
+
   mcp: {
     enableMCP: true,
     ai: {
@@ -533,6 +548,98 @@ pnpm test -- ai-service.test.ts    # AI provider tests
 - ✅ **Session isolation** with automatic cleanup
 
 ## MCP Integration: Dynamic tRPC Tool Exposure
+
+### 🔀 MCP Roots vs Server Workspaces: Key Architecture Concepts
+
+**Understanding the Distinction**: The Model Context Protocol separates client-managed roots from server-managed directories. This separation is crucial for proper MCP implementation and user control.
+
+```
+                  Model Context Protocol (MCP)
+
+ ┌─────────────────────────────────────────────────────────────┐
+ │                         CLIENT                              │
+ │                                                             │
+ │   User's local or mounted folders                           │
+ │   (e.g. ~/projects, /mnt/shared/projectX)                   │
+ │                                                             │
+ │   • Client controls what to expose                          │
+ │   • Advertises via MCP roots                                │
+ │                                                             │
+ │   roots/list  ────────────────────────────►                 │
+ │                                                             │
+ └─────────────────────────────────────────────────────────────┘
+                 ▲
+                 │
+                 │ (MCP spec: server queries roots/list)
+                 ▼
+ ┌─────────────────────────────────────────────────────────────┐
+ │                         SERVER                              │
+ │                                                             │
+ │   Server-managed directories                                │
+ │   (e.g. /opt/templates, /srv/data, /home/server/project)    │
+ │                                                             │
+ │   • Configured in server config                             │
+ │   • Exposed through tools (listFiles, readFile, etc.)       │
+ │   • Not part of MCP roots                                   │
+ │                                                             │
+ │   serverWorkspaces / managedDirectories                     │
+ │   (internal server concept)                                 │
+ │                                                             │
+ └─────────────────────────────────────────────────────────────┘
+```
+
+#### 🔑 Key Architectural Principles
+
+**✅ MCP Roots (Client-Managed)**
+- **Who owns it?** → The client
+- **What for?** → To expose user-controlled locations (e.g. IDE workspace, local project folders)
+- **How used?** → The server calls `roots/list` to discover what the client has exposed
+- **Important** → The server should never configure or assume these; they are entirely under the user/client's control
+- **MCP Spec Compliance** → Required part of the MCP spec to ensure servers ask users where they're allowed to operate
+- **Capability Negotiation** → Client must advertise `{"roots": {"listChanged": true}}` during initialization
+- **Error Handling** → Server returns `-32601 (Method not found)` if client doesn't support roots
+
+**✅ Server Workspaces (Server-Managed)**
+- **Who owns it?** → The server
+- **What for?** → To expose the server's own resources (like `/opt/templates`, `/var/data`, `/home/server/project`)
+- **How used?** → The server declares these in its own config and offers tools (`listFiles`, `readFile`) to interact with them
+- **Important** → These are NOT MCP "roots" - they are a different concept because they don't come from the client
+
+**🔀 Why They Must Be Kept Separate**
+If you overload the word "roots" to mean both "client-exposed folders" and "server-exposed folders," it causes confusion:
+- Clients will expect `roots/list` to reflect their workspace exposure
+- But if a server stuffed its own folders in there, you'd mix two unrelated concerns
+
+**📚 References**:
+- [Model Context Protocol - Roots](https://modelcontextprotocol.io/docs/concepts/roots)
+- [Complete Guide: Server Workspaces vs MCP Roots](./docs/SERVER_WORKSPACES_VS_MCP_ROOTS.md)
+- [Quick Reference: Workspace Concepts](./docs/WORKSPACE_QUICK_REFERENCE.md)
+
+#### 🏷️ Configuration Example
+
+```typescript
+const server = createRpcAiServer({
+  // Server-managed directories (not MCP roots)
+  serverWorkspaces: {
+    project: {
+      path: '/home/user/project',
+      name: 'Project Files',
+      readOnly: false
+    },
+    templates: {
+      path: '/opt/templates',
+      name: 'Server Templates',
+      readOnly: true
+    }
+  },
+
+  // MCP roots are discovered dynamically via roots/list call to client
+  mcp: {
+    enableMCP: true,
+    // Server will call client's roots/list to discover user workspaces
+  }
+});
+```
 
 ### Model Context Protocol (MCP) Implementation Status: ✅ **COMPLETE**
 

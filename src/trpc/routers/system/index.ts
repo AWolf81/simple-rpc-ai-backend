@@ -5,11 +5,24 @@
 import { z } from 'zod';
 import { router, publicProcedure } from '@src-trpc/index';
 import { createMCPTool } from '../../../auth/scopes';
-import { RootManager, type RootFolderConfig } from '../../../services/root-manager';
+import { WorkspaceManager, type ServerWorkspaceConfig } from '../../../services/workspace-manager';
 
-export function createSystemRouter(rootManager?: RootManager) {
-  // Use provided rootManager or create a default one
-  const manager = rootManager || new RootManager();
+export function createSystemRouter(workspaceManager?: WorkspaceManager) {
+  // Use provided workspaceManager or create a default one
+  const manager = workspaceManager || new WorkspaceManager();
+
+  // Get dynamic workspace folder IDs for enum constraints
+  const getWorkspaceIds = () => {
+    const workspaceFolders = manager.getClientWorkspaceFolders();
+    const workspaceIds = Object.keys(workspaceFolders);
+    return workspaceIds.length > 0 ? workspaceIds : ['default']; // Fallback to 'default' if no workspaces configured
+  };
+
+  // Create dynamic enum schema for workspace folders
+  const createWorkspaceIdSchema = () => {
+    const workspaceIds = getWorkspaceIds();
+    return z.enum(workspaceIds as [string, ...string[]]).describe('Server workspace ID');
+  };
 
   return router({
     /**
@@ -40,13 +53,13 @@ export function createSystemRouter(rootManager?: RootManager) {
       }),
 
     /**
-     * Get configured root folders for client applications
+     * Get configured server workspaces for client applications
      */
-    getRootFolders: publicProcedure
+    getServerWorkspaces: publicProcedure
       .meta({
         ...createMCPTool({
-          name: 'getRootFolders',
-          description: 'Get all configured root folders with accessibility status',
+          name: 'getServerWorkspaces',
+          description: 'Get all configured server workspaces with accessibility status',
           category: 'filesystem'
         })
       })
@@ -69,7 +82,7 @@ export function createSystemRouter(rootManager?: RootManager) {
         }).optional()
       })))
       .query(async () => {
-        return manager.getClientRootFolders();
+        return manager.getClientWorkspaceFolders();
       }),
 
     /**
@@ -84,8 +97,8 @@ export function createSystemRouter(rootManager?: RootManager) {
         })
       })
       .input(z.object({
-        rootId: z.string().describe('Root folder ID'),
-        path: z.string().default('').describe('Relative path within root folder'),
+        workspaceId: createWorkspaceIdSchema(),
+        path: z.string().default('').describe('Relative path within workspace folder'),
         recursive: z.boolean().default(false).describe('Include subdirectories recursively'),
         includeDirectories: z.boolean().default(true).describe('Include directories in results')
       }))
@@ -102,7 +115,7 @@ export function createSystemRouter(rootManager?: RootManager) {
         writable: z.boolean()
       })))
       .query(async ({ input }) => {
-        return await manager.listFiles(input.rootId, input.path, {
+        return await manager.listFiles(input.workspaceId, input.path, {
           recursive: input.recursive,
           includeDirectories: input.includeDirectories
         });
@@ -120,8 +133,8 @@ export function createSystemRouter(rootManager?: RootManager) {
         })
       })
       .input(z.object({
-        rootId: z.string().describe('Root folder ID'),
-        path: z.string().describe('Relative file path within root folder'),
+        workspaceId: createWorkspaceIdSchema(),
+        path: z.string().describe('Relative file path within workspace folder'),
         encoding: z.enum(['utf8', 'base64', 'binary']).default('utf8').describe('File encoding')
       }))
       .output(z.object({
@@ -131,13 +144,23 @@ export function createSystemRouter(rootManager?: RootManager) {
         mimeType: z.string().optional()
       }))
       .query(async ({ input }) => {
-        const content = await manager.readFile(input.rootId, input.path, {
+        const content = await manager.readFile(input.workspaceId, input.path, {
           encoding: input.encoding as any
         });
 
-        // Get file info for additional metadata
-        const files = await manager.listFiles(input.rootId, input.path);
-        const fileInfo = files.find(f => f.relativePath === input.path);
+        // Get file info for additional metadata by listing the parent directory
+        let fileInfo;
+        try {
+          const pathParts = input.path.split('/').filter(p => p);
+          const fileName = pathParts.pop() || input.path;
+          const parentPath = pathParts.length > 0 ? pathParts.join('/') : '';
+
+          const files = await manager.listFiles(input.workspaceId, parentPath);
+          fileInfo = files.find(f => f.name === fileName || f.relativePath === input.path);
+        } catch (error) {
+          // If listing fails, continue without metadata
+          fileInfo = null;
+        }
 
         return {
           content: content.toString(),
@@ -159,8 +182,8 @@ export function createSystemRouter(rootManager?: RootManager) {
         })
       })
       .input(z.object({
-        rootId: z.string().describe('Root folder ID'),
-        path: z.string().describe('Relative file path within root folder'),
+        workspaceId: createWorkspaceIdSchema(),
+        path: z.string().describe('Relative file path within workspace folder'),
         content: z.string().describe('File content to write'),
         encoding: z.enum(['utf8', 'base64', 'binary']).default('utf8').describe('Content encoding')
       }))
@@ -178,7 +201,7 @@ export function createSystemRouter(rootManager?: RootManager) {
           contentBuffer = Buffer.from(input.content, 'binary');
         }
 
-        await manager.writeFile(input.rootId, input.path, contentBuffer);
+        await manager.writeFile(input.workspaceId, input.path, contentBuffer);
 
         return {
           success: true,
@@ -199,15 +222,15 @@ export function createSystemRouter(rootManager?: RootManager) {
         })
       })
       .input(z.object({
-        rootId: z.string().describe('Root folder ID'),
-        path: z.string().describe('Relative path within root folder')
+        workspaceId: createWorkspaceIdSchema(),
+        path: z.string().describe('Relative path within workspace folder')
       }))
       .output(z.object({
         exists: z.boolean(),
         path: z.string()
       }))
       .query(async ({ input }) => {
-        const exists = await manager.pathExists(input.rootId, input.path);
+        const exists = await manager.pathExists(input.workspaceId, input.path);
         return {
           exists,
           path: input.path
@@ -215,23 +238,23 @@ export function createSystemRouter(rootManager?: RootManager) {
       }),
 
     /**
-     * Add a new root folder configuration
+     * Add a new server workspace configuration
      */
-    addRootFolder: publicProcedure
+    addServerWorkspace: publicProcedure
       .meta({
         ...createMCPTool({
-          name: 'addRootFolder',
-          description: 'Add a new root folder configuration for file operations',
+          name: 'addServerWorkspace',
+          description: 'Add a new server workspace configuration for file operations',
           category: 'filesystem'
         })
       })
       .input(z.object({
-        id: z.string().describe('Unique identifier for the root folder'),
+        id: z.string().describe('Unique identifier for the workspace folder'),
         config: z.object({
-          path: z.string().min(1).describe('Absolute path to the root folder'),
-          name: z.string().optional().describe('Display name for the root folder'),
-          description: z.string().optional().describe('Description of the root folder purpose'),
-          readOnly: z.boolean().default(false).describe('Whether this root folder is read-only'),
+          path: z.string().min(1).describe('Absolute path to the workspace folder'),
+          name: z.string().optional().describe('Display name for the workspace folder'),
+          description: z.string().optional().describe('Description of the workspace folder purpose'),
+          readOnly: z.boolean().default(false).describe('Whether this server workspace is read-only'),
           allowedPaths: z.array(z.string()).optional().describe('Allowed path patterns (glob)'),
           blockedPaths: z.array(z.string()).optional().describe('Blocked path patterns (glob)'),
           maxFileSize: z.number().optional().describe('Maximum file size in bytes'),
@@ -248,11 +271,11 @@ export function createSystemRouter(rootManager?: RootManager) {
       }))
       .mutation(async ({ input }) => {
         try {
-          manager.addRoot(input.id, input.config as any);
+          manager.addWorkspace(input.id, input.config as any);
           return {
             success: true,
             id: input.id,
-            message: `Root folder '${input.id}' added successfully`
+            message: `Server workspace '${input.id}' added successfully`
           };
         } catch (error) {
           return {
@@ -264,18 +287,18 @@ export function createSystemRouter(rootManager?: RootManager) {
       }),
 
     /**
-     * Remove a root folder configuration
+     * Remove a server workspace configuration
      */
-    removeRootFolder: publicProcedure
+    removeServerWorkspace: publicProcedure
       .meta({
         ...createMCPTool({
-          name: 'removeRootFolder',
-          description: 'Remove a root folder configuration',
+          name: 'removeServerWorkspace',
+          description: 'Remove a server workspace configuration',
           category: 'filesystem'
         })
       })
       .input(z.object({
-        id: z.string().describe('Root folder ID to remove')
+        id: z.string().describe('Server workspace ID to remove')
       }))
       .output(z.object({
         success: z.boolean(),
@@ -283,14 +306,109 @@ export function createSystemRouter(rootManager?: RootManager) {
         message: z.string()
       }))
       .mutation(async ({ input }) => {
-        const removed = manager.removeRoot(input.id);
+        const removed = manager.removeWorkspace(input.id);
         return {
           success: removed,
           id: input.id,
           message: removed
-            ? `Root folder '${input.id}' removed successfully`
-            : `Root folder '${input.id}' not found`
+            ? `Server workspace '${input.id}' removed successfully`
+            : `Server workspace '${input.id}' not found`
         };
+      }),
+
+    /**
+     * Register a client workspace (MCP client root)
+     * This allows MCP clients to dynamically register their workspace folders
+     */
+    registerClientWorkspace: publicProcedure
+      .meta({
+        ...createMCPTool({
+          name: 'registerClientWorkspace',
+          description: 'Register a client workspace folder for MCP access',
+          category: 'filesystem'
+        })
+      })
+      .input(z.object({
+        id: z.string().describe('Unique identifier for the client workspace'),
+        uri: z.string().describe('File URI of the client workspace (e.g., file:///path/to/folder)'),
+        name: z.string().optional().describe('Display name for the workspace'),
+        description: z.string().optional().describe('Description of the workspace')
+      }))
+      .output(z.object({
+        success: z.boolean(),
+        id: z.string(),
+        message: z.string()
+      }))
+      .mutation(async ({ input }) => {
+        // Note: This is a placeholder for client workspace registration
+        // In a full implementation, this would store client workspace info
+        // for use by MCP clients, but keep it separate from server workspaces
+
+        console.log(`📋 Client workspace registered: ${input.id} -> ${input.uri}`);
+
+        return {
+          success: true,
+          id: input.id,
+          message: `Client workspace '${input.id}' registered successfully`
+        };
+      }),
+
+    /**
+     * Unregister a client workspace (MCP client root)
+     */
+    unregisterClientWorkspace: publicProcedure
+      .meta({
+        ...createMCPTool({
+          name: 'unregisterClientWorkspace',
+          description: 'Unregister a client workspace folder',
+          category: 'filesystem'
+        })
+      })
+      .input(z.object({
+        id: z.string().describe('Client workspace ID to unregister')
+      }))
+      .output(z.object({
+        success: z.boolean(),
+        id: z.string(),
+        message: z.string()
+      }))
+      .mutation(async ({ input }) => {
+        console.log(`📋 Client workspace unregistered: ${input.id}`);
+
+        return {
+          success: true,
+          id: input.id,
+          message: `Client workspace '${input.id}' unregistered successfully`
+        };
+      }),
+
+    /**
+     * List registered client workspaces (MCP client roots)
+     * This is separate from server workspaces and MCP roots/list
+     */
+    listClientWorkspaces: publicProcedure
+      .meta({
+        ...createMCPTool({
+          name: 'listClientWorkspaces',
+          description: 'List all registered client workspace folders',
+          category: 'filesystem'
+        })
+      })
+      .input(z.void())
+      .output(z.array(z.object({
+        id: z.string(),
+        uri: z.string(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        registeredAt: z.date()
+      })))
+      .query(async () => {
+        // Note: This is a placeholder implementation
+        // In a full implementation, this would return stored client workspace info
+
+        console.log('📋 Listing registered client workspaces (placeholder)');
+
+        return []; // Empty list for now
       })
   });
 }

@@ -530,13 +530,53 @@ export class SecurityLogger {
         // Log response
         const isError = body.error !== undefined;
         const statusCode = res.statusCode;
-        
+
         // Log the response asynchronously
         setImmediate(async () => {
           if (isError) {
+            // Determine if this is an auth failure or validation error
+            const errorMessage = body.error?.message || 'Unknown error';
+            const errorCode = body.error?.code;
+
+            // Authentication-related errors (should count toward blocking)
+            const isAuthError = (
+              errorCode === -32001 || // Unauthorized
+              errorCode === -32002 || // Insufficient permissions
+              errorMessage.toLowerCase().includes('unauthorized') ||
+              errorMessage.toLowerCase().includes('forbidden') ||
+              errorMessage.toLowerCase().includes('authentication') ||
+              errorMessage.toLowerCase().includes('invalid token') ||
+              errorMessage.toLowerCase().includes('access denied')
+            );
+
+            // Parameter validation errors (should NOT count toward blocking)
+            const isValidationError = (
+              errorCode === -32602 || // Invalid params
+              errorMessage.includes('Required parameter missing') ||
+              errorMessage.includes('Invalid value for') ||
+              errorMessage.includes('Resource not found') ||
+              errorMessage.includes('Template validation failed') ||
+              errorMessage.includes('Parameter validation failed')
+            );
+
+            let eventType: SecurityEventType;
+            let severity: SecuritySeverity;
+
+            if (isAuthError) {
+              eventType = SecurityEventType.AUTH_FAILURE;
+              severity = statusCode >= 500 ? SecuritySeverity.HIGH : SecuritySeverity.MEDIUM;
+            } else if (isValidationError) {
+              eventType = SecurityEventType.SUSPICIOUS_REQUEST;
+              severity = SecuritySeverity.LOW; // Much lower severity for validation errors
+            } else {
+              // Generic error - treat as suspicious but not auth failure
+              eventType = SecurityEventType.SUSPICIOUS_REQUEST;
+              severity = statusCode >= 500 ? SecuritySeverity.MEDIUM : SecuritySeverity.LOW;
+            }
+
             await logger.logSecurityEvent({
-              eventType: SecurityEventType.AUTH_FAILURE,
-              severity: statusCode >= 500 ? SecuritySeverity.HIGH : SecuritySeverity.MEDIUM,
+              eventType,
+              severity,
               source: {
                 ip: clientIP,
                 userAgent,
@@ -551,8 +591,13 @@ export class SecurityLogger {
                 toolName
               },
               details: {
-                message: `MCP request failed: ${body.error?.message || 'Unknown error'}`,
-                context: { statusCode, errorCode: body.error?.code }
+                message: `MCP request failed: ${errorMessage}`,
+                context: {
+                  statusCode,
+                  errorCode,
+                  isAuthError,
+                  isValidationError
+                }
               }
             });
           } else if (userInfo) {
@@ -848,17 +893,29 @@ export class SecurityLogger {
     if (this.config.enabled === false) {
       return;
     }
-    
+
     const events = this.securityEvents.get(ip) || [];
-    const recentEvents = events.filter(e => 
+    const recentEvents = events.filter(e =>
       Date.now() - new Date(e.timestamp).getTime() < 60 * 60 * 1000 // Last hour
     );
-    
-    if (recentEvents.length >= this.config.networkFilter.autoBlockThreshold) {
+
+    // Only count serious security events for auto-blocking, not validation errors
+    const blockingEvents = recentEvents.filter(e =>
+      e.eventType === SecurityEventType.AUTH_FAILURE ||
+      e.eventType === SecurityEventType.AUTH_BYPASS_ATTEMPT ||
+      e.eventType === SecurityEventType.COMMAND_INJECTION_ATTEMPT ||
+      e.eventType === SecurityEventType.TEMPLATE_INJECTION_ATTEMPT ||
+      e.eventType === SecurityEventType.SYSTEM_OVERRIDE_ATTEMPT ||
+      e.eventType === SecurityEventType.MALICIOUS_PAYLOAD ||
+      e.severity === SecuritySeverity.HIGH ||
+      e.severity === SecuritySeverity.CRITICAL
+    );
+
+    if (blockingEvents.length >= this.config.networkFilter.autoBlockThreshold) {
       const blockUntil = Date.now() + (this.config.networkFilter.autoBlockDuration * 60 * 1000);
       this.blockedIPs.set(ip, {
         until: blockUntil,
-        reason: `Auto-blocked after ${recentEvents.length} security events`
+        reason: `Auto-blocked after ${blockingEvents.length} serious security events`
       });
       
       await this.logSecurityEvent({
@@ -867,7 +924,7 @@ export class SecurityLogger {
         source: { ip },
         request: { method: 'AUTO', path: '/auto-block', headers: {} },
         details: {
-          message: `IP auto-blocked after ${recentEvents.length} security events`,
+          message: `IP auto-blocked after ${blockingEvents.length} serious security events`,
           context: { 
             blockDuration: this.config.networkFilter.autoBlockDuration,
             eventCount: recentEvents.length,

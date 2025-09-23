@@ -200,7 +200,48 @@ export interface RpcAiServerConfig {
   };
 
   /**
-   * Root folder management configuration
+   * Server workspace management configuration
+   *
+   * NOTE: This is for server-side file access, separate from MCP client roots.
+   * Server workspaces are configured and controlled by the server.
+   * MCP roots are managed by the client and advertised via roots/list.
+   */
+  serverWorkspaces?: {
+    /** Default workspace folder configuration */
+    defaultWorkspace?: {
+      /** Path to default workspace folder (defaults to current working directory) */
+      path?: string;
+      /** Whether default workspace is read-only */
+      readOnly?: boolean;
+      /** Allowed file extensions */
+      allowedExtensions?: string[];
+    };
+
+    /** Additional named workspace folders */
+    additionalWorkspaces?: Record<string, {
+      /** Absolute path to the workspace folder */
+      path: string;
+      /** Display name */
+      name?: string;
+      /** Description */
+      description?: string;
+      /** Whether read-only */
+      readOnly?: boolean;
+      /** Allowed file extensions */
+      allowedExtensions?: string[];
+      /** Blocked file extensions */
+      blockedExtensions?: string[];
+      /** Maximum file size in bytes */
+      maxFileSize?: number;
+    }>;
+
+    /** Enable file operations via tRPC/MCP */
+    enableAPI?: boolean;
+  };
+
+  /**
+   * @deprecated Use serverWorkspaces instead. This will be removed in a future version.
+   * Root folder management configuration (legacy)
    */
   rootFolders?: {
     /** Default root folder configuration */
@@ -382,10 +423,19 @@ export class RpcAiServer {
         ...config.mcp
       },
       modelRestrictions: config.modelRestrictions || {},  // Default: no model restrictions
+
+      // Server workspace configuration (preferred)
+      serverWorkspaces: {
+        enableAPI: true,
+        ...config.serverWorkspaces
+      },
+
+      // Legacy root folders configuration (for backward compatibility)
       rootFolders: {
         enableAPI: true,
         ...config.rootFolders
       },
+
       customRouters: config.customRouters || {},  // Default: no custom routers
       ...config
     };
@@ -454,6 +504,9 @@ export class RpcAiServer {
     }
 
     // Create router with AI configuration and token tracking
+    // Create workspace configuration with fallback to rootFolders for backward compatibility
+    const workspaceConfig = this.config.serverWorkspaces || this.config.rootFolders;
+
     this.router = createAppRouter(
       {
         config: this.config.aiLimits,
@@ -471,7 +524,7 @@ export class RpcAiServer {
       this.postgresRPCMethods,
       this.config.mcp,
       this.config.modelRestrictions,
-      this.config.rootFolders,
+      workspaceConfig, // Pass serverWorkspaces (preferred) or rootFolders (fallback)
       this.config.customRouters
     );
 
@@ -1088,8 +1141,30 @@ export class RpcAiServer {
     
     // Setup routes (including OAuth routes)
     await this.setupRoutes();
-    
-    // MCP functionality is integrated into the tRPC router and automatically exposed via HTTP
+
+    // Setup MCP endpoint if enabled
+    if (this.config.mcp?.enableMCP) {
+      console.log('🚀 Setting up MCP server...');
+      // Import and create the protocol handler
+      const { MCPProtocolHandler } = await import('./trpc/routers/mcp/protocol-handler.js');
+      const protocolHandler = new MCPProtocolHandler(
+        this.router,
+        this.config.mcp
+      );
+
+      // Import and provide the default root manager for roots capability
+      try {
+        const { defaultRootManager } = await import('./services/root-manager.js');
+        protocolHandler.setRootManager(defaultRootManager);
+        console.log('✅ MCP roots capability enabled with defaultRootManager');
+      } catch (error) {
+        console.warn('⚠️ Could not initialize MCP roots capability:', error instanceof Error ? error.message : String(error));
+      }
+
+      // Setup the MCP endpoint
+      protocolHandler.setupMCPEndpoint(this.app, '/mcp');
+      console.log('⚠️ MCP endpoint ready at /mcp (security logging, rate limiting enabled, JWT AUTH configured)');
+    }
 
     if (setupRoutes) {
       setupRoutes(this.app);

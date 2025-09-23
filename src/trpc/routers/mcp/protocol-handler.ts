@@ -7,6 +7,7 @@ import { MCPRateLimiter, getDefaultRateLimiter } from '../../../security/rate-li
 import { SecurityLogger, getDefaultSecurityLogger } from '../../../security/security-logger';
 import { AuthEnforcer, getDefaultAuthEnforcer } from '../../../security/auth-enforcer';
 import { MCPRouterConfig, MCPAuthConfig } from './types';
+import { mcpResourceRegistry } from '../../../services/mcp-resource-registry.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -14,6 +15,18 @@ import path from 'path';
  * MCP Protocol implementation for tRPC router
  * Provides tools/list and tools/call functionality
  */
+/**
+ * DNS rebinding protection configuration
+ */
+export interface DNSRebindingConfig {
+  /** List of allowed host header values for DNS rebinding protection */
+  allowedHosts?: string[];
+  /** List of allowed origin header values for DNS rebinding protection */
+  allowedOrigins?: string[];
+  /** Enable DNS rebinding protection (requires allowedHosts and/or allowedOrigins to be configured) */
+  enableDnsRebindingProtection?: boolean;
+}
+
 export class MCPProtocolHandler {
   private appRouter: any;
   private adminUsers: string[];
@@ -23,6 +36,9 @@ export class MCPProtocolHandler {
   private authEnforcer: AuthEnforcer;
   private authConfig: MCPAuthConfig;
   private extensionsConfig?: MCPRouterConfig['extensions'];
+  private rootManager?: any;
+  private dnsRebindingConfig: DNSRebindingConfig;
+  private clientCapabilities: any = null;
 
   constructor(appRouter: any, config?: MCPRouterConfig) {
     this.appRouter = appRouter;
@@ -35,6 +51,12 @@ export class MCPProtocolHandler {
       requireAuthForToolsCall: true,     // tools/call requires auth by default
       publicTools: ['greeting'],         // greeting is public by default
       ...config?.auth
+    };
+
+    // Initialize DNS rebinding protection config
+    this.dnsRebindingConfig = {
+      enableDnsRebindingProtection: false, // Default to disabled for backward compatibility
+      ...config?.dnsRebinding
     };
 
     // Initialize security components
@@ -53,6 +75,21 @@ export class MCPProtocolHandler {
     this.extensionsConfig = config?.extensions;
 
     this.logInitialization();
+  }
+
+  /**
+   * Set the workspace manager for server-side filesystem access
+   * Note: This is for server-managed directories, not MCP client roots
+   */
+  setWorkspaceManager(workspaceManager: any) {
+    this.rootManager = workspaceManager; // Keep existing property name for compatibility
+  }
+
+  /**
+   * @deprecated Use setWorkspaceManager instead
+   */
+  setRootManager(rootManager: any) {
+    this.setWorkspaceManager(rootManager);
   }
 
   private logInitialization() {
@@ -222,10 +259,55 @@ export class MCPProtocolHandler {
   }
 
   /**
+   * Validates request headers for DNS rebinding protection.
+   * Based on the official MCP SDK implementation.
+   * @returns Error message if validation fails, undefined if validation passes.
+   */
+  private validateRequestHeaders(req: Request): string | undefined {
+    // Skip validation if protection is not enabled
+    if (!this.dnsRebindingConfig.enableDnsRebindingProtection) {
+      return undefined;
+    }
+
+    // Validate Host header if allowedHosts is configured
+    if (this.dnsRebindingConfig.allowedHosts && this.dnsRebindingConfig.allowedHosts.length > 0) {
+      const hostHeader = req.headers.host;
+      if (!hostHeader || !this.dnsRebindingConfig.allowedHosts.includes(hostHeader)) {
+        return `Invalid Host header: ${hostHeader}`;
+      }
+    }
+
+    // Validate Origin header if allowedOrigins is configured
+    if (this.dnsRebindingConfig.allowedOrigins && this.dnsRebindingConfig.allowedOrigins.length > 0) {
+      const originHeader = req.headers.origin;
+      if (!originHeader || !this.dnsRebindingConfig.allowedOrigins.includes(originHeader)) {
+        return `Invalid Origin header: ${originHeader}`;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
    * Handle incoming MCP requests
    */
   public async handleMCPRequest(req: AuthenticatedRequest, res: Response) {
     try {
+      // Validate request headers for DNS rebinding protection
+      const validationError = this.validateRequestHeaders(req);
+      if (validationError) {
+        res.status(403).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message: validationError
+          },
+          id: null
+        });
+        console.error(`🔒 DNS rebinding protection: ${validationError}`);
+        return;
+      }
+
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -263,11 +345,20 @@ export class MCPProtocolHandler {
         case 'resources/read':
           response = await this.handleResourcesRead(mcpRequest, req);
           break;
+        case 'resources/templates/list':
+          response = await this.handleResourcesTemplatesList(mcpRequest, req);
+          break;
+        case 'roots/list':
+          response = await this.handleRootsList(mcpRequest, req);
+          break;
         case 'notifications/cancelled':
           response = this.handleCancellation(mcpRequest);
           break;
         case 'notifications/initialized':
           response = this.handleNotificationInitialized(mcpRequest);
+          break;
+        case 'notifications/roots/list_changed':
+          response = this.handleRootsListChanged(mcpRequest);
           break;
         default:
           response = this.createErrorResponse(
@@ -304,6 +395,16 @@ export class MCPProtocolHandler {
   }
 
   private handleInitialize(request: any) {
+    // Store client capabilities for later use
+    this.clientCapabilities = request.params?.capabilities || {};
+
+    const hasClientRootsCapability = this.clientCapabilities.roots?.listChanged === true;
+
+    console.log('🔗 MCP Initialize:', {
+      clientSupportsRoots: hasClientRootsCapability,
+      clientCapabilities: this.clientCapabilities
+    });
+
     const capabilities: any = { tools: {} };
 
     if (this.extensionsConfig?.prompts) {
@@ -315,6 +416,13 @@ export class MCPProtocolHandler {
         subscribe: true,
         listChanged: true
       };
+    }
+
+    // Note: Server doesn't advertise roots capability since roots are client-managed
+    // The client should call roots/list on the server to discover client roots
+    // We only add this for debugging/compatibility if explicitly requested
+    if (hasClientRootsCapability) {
+      console.log('📋 Client supports roots - server will accept roots/list calls');
     }
 
     return {
@@ -465,20 +573,295 @@ export class MCPProtocolHandler {
     return sanitized;
   }
 
-  // Placeholder methods for the main MCP handlers
+  // MCP handler implementations
   private async handleToolsList(request: any, req?: AuthenticatedRequest): Promise<any> {
-    // Implementation would go here
-    return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Not yet implemented');
+    try {
+      // Check auth requirements for tools/list
+      if (this.authConfig.requireAuthForToolsList && !req?.user) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InternalError,
+          'Authentication required for tools/list'
+        );
+      }
+
+      // Extract user info for authorization checks
+      const userInfo = this.extractUserInfo(req);
+      const userScopes = this.extractUserScopes(req);
+      const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
+
+      // Get all available MCP tools from tRPC procedures
+      const mcpTools = this.extractMCPToolsFromTRPC();
+
+      console.log(`🔍 Found ${mcpTools.length} MCP tools from tRPC procedures`);
+
+      // Filter tools based on auth and visibility rules
+      const availableTools = mcpTools
+        .map(tool => {
+          // Check if tool should be public
+          const isPublic = this.isToolPublic({
+            name: tool.name,
+            public: true // Default to public for tRPC MCP tools
+          });
+
+          // Check scope requirements if defined
+          let hasRequiredScopes = true;
+          if (tool.scopes && userScopes.length > 0) {
+            hasRequiredScopes = ScopeValidator.hasScope(userScopes, tool.scopes, userInfo);
+          }
+
+          return {
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema,
+            isPublic,
+            hasRequiredScopes,
+            procedure: tool.procedure
+          };
+        })
+        .filter(tool => {
+          // Include tool if:
+          // 1. It's public, OR
+          // 2. User is authenticated and has required scopes, OR
+          // 3. User is admin
+          return tool.isPublic || (req?.user && tool.hasRequiredScopes) || isAdmin;
+        })
+        .map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema
+        }));
+
+      console.log(`✅ Returning ${availableTools.length} available tools (user: ${userInfo?.email || 'anonymous'})`);
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          tools: availableTools
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Error in handleToolsList:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        'Failed to list tools',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 
   private async handleToolsCall(request: any, req?: AuthenticatedRequest): Promise<any> {
-    // Implementation would go here
-    return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Not yet implemented');
+    try {
+      const { name, arguments: args } = request.params || {};
+
+      if (!name) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidParams,
+          'Tool name is required'
+        );
+      }
+
+      // Check auth requirements for tools/call
+      if (this.authConfig.requireAuthForToolsCall && !req?.user) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InternalError,
+          'Authentication required for tools/call'
+        );
+      }
+
+      // Extract user info
+      const userInfo = this.extractUserInfo(req);
+      const userScopes = this.extractUserScopes(req);
+      const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
+
+      console.log(`🔧 MCP Tool Call: ${name} (user: ${userInfo?.email || 'anonymous'})`);
+
+      // Find the requested tool
+      const mcpTools = this.extractMCPToolsFromTRPC();
+      const tool = mcpTools.find(t => t.name === name);
+
+      if (!tool) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidParams,
+          `Tool '${name}' not found`
+        );
+      }
+
+      // Check if tool is accessible to user
+      const isPublic = this.isToolPublic({
+        name: tool.name,
+        public: true // Default to public for tRPC MCP tools
+      });
+
+      // Check scope requirements if defined
+      let hasRequiredScopes = true;
+      if (tool.scopes && userScopes.length > 0) {
+        hasRequiredScopes = ScopeValidator.hasScope(userScopes, tool.scopes, userInfo);
+      }
+
+      // Authorization check
+      if (!isPublic && !isAdmin && (!req?.user || !hasRequiredScopes)) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InternalError,
+          `Access denied to tool '${name}'`
+        );
+      }
+
+      // Execute the tRPC procedure
+      const procedure = tool.procedure;
+      const inputParser = procedure._def?.inputs?.[0];
+
+      // Validate input if parser exists
+      let validatedInput = args || {};
+      if (inputParser) {
+        try {
+          validatedInput = inputParser.parse(args || {});
+        } catch (error) {
+          console.error(`❌ Input validation failed for tool ${name}:`, error);
+          return this.createErrorResponse(
+            request.id,
+            ErrorCode.InvalidParams,
+            `Invalid input parameters: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+
+      // Create execution context
+      const ctx = {
+        user: req?.user,
+        type: procedure._def?.type || 'mutation'
+      };
+
+      console.log(`⚡ Executing tool ${name} with input:`, validatedInput);
+
+      // Execute the procedure resolver
+      const result = await procedure._def.resolver({
+        input: validatedInput,
+        ctx,
+        type: procedure._def?.type || 'mutation',
+        path: name,
+        getRawInput: () => validatedInput
+      });
+
+      console.log(`✅ Tool ${name} executed successfully`);
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+            }
+          ]
+        }
+      };
+
+    } catch (error) {
+      console.error(`❌ Error executing tool ${request.params?.name}:`, error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        'Failed to execute tool',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 
   private async handlePromptsList(request: any, req?: AuthenticatedRequest): Promise<any> {
-    // Implementation would go here
-    return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Not yet implemented');
+    try {
+      // Check auth requirements if enabled
+      if (this.authConfig.requireAuthForToolsList && !req?.user) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InternalError,
+          'Authentication required for prompts/list'
+        );
+      }
+
+      const prompts = [];
+
+      // Add default MCP prompts if extensions are configured
+      if (this.extensionsConfig?.prompts) {
+        const promptsConfig = this.extensionsConfig.prompts;
+
+        // Add custom prompts
+        if (promptsConfig.customPrompts) {
+          for (const prompt of promptsConfig.customPrompts) {
+            prompts.push({
+              name: prompt.name,
+              description: prompt.description || `Custom prompt: ${prompt.name}`,
+              arguments: prompt.arguments || []
+            });
+          }
+        }
+
+        // Add built-in prompts if enabled
+        if (promptsConfig.includeDefaults !== false) {
+          prompts.push(
+            {
+              name: "code-review",
+              description: "Comprehensive code review analysis with security, performance, and maintainability insights",
+              arguments: [
+                {
+                  name: "code",
+                  description: "The code to review",
+                  required: true
+                },
+                {
+                  name: "language",
+                  description: "Programming language (optional)",
+                  required: false
+                }
+              ]
+            },
+            {
+              name: "api-documentation",
+              description: "Generate comprehensive API documentation from code",
+              arguments: [
+                {
+                  name: "code",
+                  description: "The API code to document",
+                  required: true
+                },
+                {
+                  name: "format",
+                  description: "Documentation format (markdown, json, yaml)",
+                  required: false
+                }
+              ]
+            }
+          );
+        }
+      }
+
+      console.log(`✅ Returning ${prompts.length} available prompts`);
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          prompts
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Error in handlePromptsList:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        'Failed to list prompts',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 
   private async handlePromptsGet(request: any, req?: AuthenticatedRequest): Promise<any> {
@@ -487,13 +870,240 @@ export class MCPProtocolHandler {
   }
 
   private async handleResourcesList(request: any, req?: AuthenticatedRequest): Promise<any> {
-    // Implementation would go here
-    return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Not yet implemented');
+    try {
+      // Check auth requirements if enabled
+      if (this.authConfig.requireAuthForToolsList && !req?.user) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InternalError,
+          'Authentication required for resources/list'
+        );
+      }
+
+      // Extract user info for permission checks
+      const userInfo = this.extractUserInfo(req);
+      const userScopes = this.extractUserScopes(req);
+
+      // Get all resources from the flexible registry
+      const allResources = mcpResourceRegistry.getAllResources();
+
+      // Filter resources based on access permissions
+      const accessibleResources = allResources
+        .filter(resource => {
+          return mcpResourceRegistry.checkResourceAccess(resource.id, {
+            email: userInfo?.email,
+            scopes: userScopes
+          });
+        })
+        .map(resource => ({
+          uri: resource.uri || `mcp://internal/${resource.id}`,
+          name: resource.name,
+          description: resource.description,
+          mimeType: resource.mimeType
+        }));
+
+      console.log(`✅ Returning ${accessibleResources.length} accessible resources (${allResources.length} total registered)`);
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          resources: accessibleResources
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Error in handleResourcesList:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        'Failed to list resources',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 
   private async handleResourcesRead(request: any, req?: AuthenticatedRequest): Promise<any> {
-    // Implementation would go here
-    return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Not yet implemented');
+    try {
+      const { uri } = request.params || {};
+
+      if (!uri) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidParams,
+          'Resource URI is required'
+        );
+      }
+
+      // Check auth requirements (resources are typically more restricted than lists)
+      const requireAuth = this.authConfig.requireAuthForToolsCall; // Use tools call auth level for resource reading
+      if (requireAuth && !req?.user) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InternalError,
+          'Authentication required for resources/read'
+        );
+      }
+
+      console.log(`📖 MCP Resource Read: ${uri} (user: ${req?.user?.email || 'anonymous'})`);
+
+      // Extract user info for permission checks
+      const userInfo = this.extractUserInfo(req);
+      const userScopes = this.extractUserScopes(req);
+
+      // Extract resource identifier and query parameters from URI
+      let resourceId: string;
+      let queryParams: Record<string, string> = {};
+
+      if (uri.startsWith('mcp://internal/')) {
+        const uriWithoutScheme = uri.replace('mcp://internal/', '');
+
+        // Split URI and query parameters
+        const [baseResourceId, queryString] = uriWithoutScheme.split('?');
+        resourceId = baseResourceId;
+
+        // Parse query parameters if present
+        if (queryString) {
+          const urlParams = new URLSearchParams(queryString);
+          for (const [key, value] of urlParams.entries()) {
+            queryParams[key] = value;
+          }
+        }
+      } else {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidParams,
+          `Unsupported resource URI format: ${uri}`
+        );
+      }
+
+      // Check access permissions using the registry (use base resource ID without parameters)
+      const hasAccess = mcpResourceRegistry.checkResourceAccess(resourceId, {
+        email: userInfo?.email,
+        scopes: userScopes
+      });
+
+      if (!hasAccess) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidParams,
+          `Access denied to resource: ${resourceId}`
+        );
+      }
+
+      // Get resource content from the flexible registry
+      let resourceResult;
+      try {
+        resourceResult = await mcpResourceRegistry.getResourceContent(resourceId, {
+          user: userInfo,
+          timestamp: new Date().toISOString(),
+          ...queryParams  // Pass query parameters to the provider
+        });
+      } catch (error) {
+        // Check if this is a validation error from Template Engine
+        if (error instanceof Error && error.message.includes('Invalid value for')) {
+          // This is a parameter validation error - return as InvalidParams
+          return this.createErrorResponse(
+            request.id,
+            ErrorCode.InvalidParams,
+            `Parameter validation failed: ${error.message}`
+          );
+        } else if (error instanceof Error && error.message.includes('Required parameter missing')) {
+          // This is a missing required parameter error
+          return this.createErrorResponse(
+            request.id,
+            ErrorCode.InvalidParams,
+            `Missing required parameter: ${error.message}`
+          );
+        } else {
+          // Re-throw other errors to be handled by outer catch
+          throw error;
+        }
+      }
+
+      if (!resourceResult) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidParams,
+          `Resource not found: ${resourceId}`
+        );
+      }
+
+      const { content: resourceContent, mimeType } = resourceResult;
+
+      console.log(`✅ Resource ${uri} read successfully (${resourceContent.length} chars)`);
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          contents: [
+            {
+              uri,
+              mimeType,
+              text: resourceContent
+            }
+          ]
+        }
+      };
+
+    } catch (error) {
+      console.error(`❌ Error reading resource ${request.params?.uri}:`, error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        'Failed to read resource',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  private async handleRootsList(request: any, req?: AuthenticatedRequest): Promise<any> {
+    try {
+      // Check if client has indicated roots capability during initialization
+      const hasClientRootsCapability = this.clientCapabilities?.roots?.listChanged === true;
+
+      if (!hasClientRootsCapability) {
+        // Client does not support roots capability
+        console.log('❌ MCP roots/list: Client does not support roots capability');
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.MethodNotFound,
+          'Roots not supported',
+          'Client does not have roots capability'
+        );
+      }
+
+      // According to MCP spec, roots/list should return client-managed directories
+      // In a typical MCP setup, this would be called BY the server TO the client
+      // Since this is a server implementation being called BY a client,
+      // this represents a reverse scenario where the client is asking the server
+      // what roots the server thinks the client has exposed.
+      //
+      // For now, return empty list since this server doesn't track client roots
+      // In a full implementation, this might return roots that were registered
+      // via the registerClientWorkspace tool.
+
+      console.log('📋 MCP roots/list: Client supports roots capability');
+      console.log('📋 Returning empty list (no client roots registered with server)');
+      console.log('ℹ️  Use registerClientWorkspace tool to register client roots');
+      console.log('ℹ️  For server-managed directories, use getServerWorkspaces tool instead');
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          roots: [] // Empty list - no client roots registered
+        }
+      };
+    } catch (error) {
+      console.error('❌ MCP roots/list error:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        `Failed to list roots: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   private handleCancellation(request: any) {
@@ -510,5 +1120,147 @@ export class MCPProtocolHandler {
       id: request.id,
       result: {}
     };
+  }
+
+  private handleRootsListChanged(request: any) {
+    console.log('🗂️ MCP notification/roots/list_changed received');
+    console.log('📋 Client has updated their exposed workspace roots');
+
+    // Note: This notification indicates that the client has changed their
+    // list of exposed workspace roots. The server should call roots/list
+    // to get the updated list if needed. However, since our implementation
+    // returns an empty list (client-managed roots), we just log the event.
+
+    return null; // Notifications don't return responses
+  }
+
+  private async handleResourcesTemplatesList(request: any, req?: AuthenticatedRequest): Promise<any> {
+    try {
+      // Check auth requirements if enabled
+      if (this.authConfig.requireAuthForToolsList && !req?.user) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InternalError,
+          'Authentication required for resources/templates/list'
+        );
+      }
+
+      // Extract user info for permission checks
+      const userInfo = this.extractUserInfo(req);
+      const userScopes = this.extractUserScopes(req);
+
+      // Get all registered templates from the resource registry
+      const allTemplates = mcpResourceRegistry.getAllTemplates();
+
+      // Convert templates to MCP resource template format
+      const templateList = [];
+      for (const [resourceId, template] of allTemplates.entries()) {
+        // Get the corresponding resource to check access
+        const resource = mcpResourceRegistry.getResource(resourceId);
+        if (!resource) {
+          continue; // Skip if resource doesn't exist
+        }
+
+        // Check if user has access to this resource template
+        const hasAccess = mcpResourceRegistry.checkResourceAccess(resourceId, {
+          email: userInfo?.email,
+          scopes: userScopes
+        });
+
+        if (!hasAccess) {
+          continue; // Skip if user doesn't have access
+        }
+
+        // Use Template Engine's URI template and parameters if available
+        let uriTemplate;
+        let templateMeta;
+
+        if (template.uriTemplate && template.parameters) {
+          // Template Engine provides proper URI template and parameters
+          uriTemplate = template.uriTemplate;
+
+          // Convert Template Engine parameters to MCP format
+          const mcpParameters: Record<string, any> = {};
+          for (const [paramName, paramConfig] of Object.entries(template.parameters)) {
+            mcpParameters[paramName] = {
+              type: paramConfig.type || 'string',
+              description: paramConfig.description || `${paramName} parameter`,
+              ...(paramConfig.enum && { enum: paramConfig.enum }),
+              ...(paramConfig.required !== undefined && { required: paramConfig.required }),
+              ...(paramConfig.default !== undefined && { default: paramConfig.default })
+            };
+          }
+
+          templateMeta = {
+            parameters: mcpParameters
+          };
+        } else if (resourceId === 'company-handbook') {
+          // Legacy hardcoded company handbook support
+          uriTemplate = `mcp://internal/company-handbook{?department,version,format}`;
+          templateMeta = {
+            parameters: {
+              department: {
+                type: "string",
+                enum: ["engineering", "product", "design"],
+                description: "Department-specific handbook section"
+              },
+              version: {
+                type: "string",
+                enum: ["latest", "stable"],
+                description: "Handbook version to retrieve"
+              },
+              format: {
+                type: "string",
+                enum: ["md", "xml"],
+                description: "Output format for the handbook content"
+              }
+            }
+          };
+        } else {
+          // Fallback for resources without Template Engine data
+          uriTemplate = `mcp://internal/${resourceId}{?id,format}`;
+          templateMeta = {
+            parameters: {
+              id: {
+                type: "string",
+                description: "Resource identifier"
+              },
+              format: {
+                type: "string",
+                enum: ["md", "xml"],
+                description: "Output format"
+              }
+            }
+          };
+        }
+
+        templateList.push({
+          name: resource.name,
+          uriTemplate: uriTemplate,
+          description: resource.description,
+          mimeType: resource.mimeType,
+          _meta: templateMeta
+        });
+      }
+
+      console.log(`📋 MCP resources/templates/list: Found ${templateList.length} accessible templates (user: ${userInfo?.email || 'anonymous'})`);
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          resourceTemplates: templateList
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Error in handleResourcesTemplatesList:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        'Failed to list resource templates',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 }

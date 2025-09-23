@@ -14,6 +14,7 @@ export { createTypedAIClient } from './client';
 export type { TypedAIClient } from './client';
 export { AIService } from './services/ai-service';      // Direct AI service usage
 export { generateTRPCMethods, createAppRouter } from './trpc/root';
+export { router, publicProcedure, protectedProcedure } from './trpc/index';
 // export { createTestRouter } from './trpc/test-router';
 // OpenAPI-related exports temporarily disabled
 // export { 
@@ -40,7 +41,7 @@ export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-a
 export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server';
 
 // Note: Simplified server creation has been integrated into the main rpc-ai-server
-// Use createRpcAiServer() with the simplified rootFolders configuration instead
+// Use createRpcAiServer() with the serverWorkspaces configuration for file access
 
 // AI Limit Presets for common use cases
 export { AI_LIMIT_PRESETS } from './trpc/routers/ai/types';
@@ -64,7 +65,10 @@ export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root';
 export { FunctionRegistry } from './services/function-registry';
 export { PromptManager, promptManager } from './services/prompt-manager';
 
-// Root folder management
+// Workspace management (replaces root folder management)
+export { WorkspaceManager, defaultWorkspaceManager, createWorkspaceManager } from './services/workspace-manager';
+
+// Legacy root folder management (deprecated - use WorkspaceManager instead)
 export { RootManager, defaultRootManager, createRootManager } from './services/root-manager';
 
 // MCP (Model Context Protocol) Integration
@@ -72,6 +76,41 @@ export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService
 export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp-registry';
 export { MCPAIService } from './services/mcp-ai-service';
 export { RefMCPIntegration, VSCodeRefIntegration } from './services/ref-mcp-integration';
+
+// MCP Resource Registry - Flexible resource system
+export {
+  MCPResourceRegistry,
+  mcpResourceRegistry,
+  registerMCPResource,
+  registerMCPTemplate,
+  registerMCPProvider,
+  MCPResourceHelpers,
+  GlobalResourceTemplates
+} from './services/mcp-resource-registry';
+
+// MCP Template Engine - Reusable template API
+export {
+  TemplateBuilder,
+  QuickTemplates,
+  TemplateRegistry,
+  createTemplate
+} from './services/template-engine';
+
+// MCP Resource Helpers - Common error handlers and utilities
+export {
+  handleMCPResourceParameters,
+  validateMCPParameters,
+  generateMCPHelpText,
+  createMCPResourceHandler,
+  createMissingParameterError
+} from './services/mcp-resource-helpers';
+
+// File Reader Helpers - Easy file access with root manager
+export {
+  createFileReader,
+  createDirectoryLister,
+  FileReaderHelpers
+} from './services/file-reader-helper';
 
 // Authentication system exports
 export {
@@ -147,7 +186,45 @@ export type {
   URLReadResult
 } from './services/ref-mcp-integration';
 
-// Root Manager Types
+// MCP Resource Registry Types
+export type {
+  MCPResource,
+  MCPResourceProvider,
+  MCPResourceTemplate
+} from './services/mcp-resource-registry';
+
+// MCP Template Engine Types
+export type {
+  TemplateParameter,
+  TemplateConfig,
+  ContentResult,
+  ContentGenerator,
+  FormatHandler
+} from './services/template-engine';
+
+// MCP Resource Helper Types
+export type {
+  MCPParameter,
+  MCPResourceHelp,
+  ParameterValidationResult
+} from './services/mcp-resource-helpers';
+
+// File Reader Helper Types
+export type {
+  FileReaderConfig,
+  FileMetadata,
+  FileContent
+} from './services/file-reader-helper';
+
+// Workspace Manager Types (replaces Root Manager Types)
+export type {
+  ServerWorkspaceConfig,
+  ClientWorkspaceInfo,
+  FileInfo as WorkspaceFileInfo,
+  WorkspaceManagerConfig
+} from './services/workspace-manager';
+
+// Legacy Root Manager Types (deprecated - use WorkspaceManager types instead)
 export type {
   RootFolderConfig,
   ClientRootFolderInfo,
