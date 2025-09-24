@@ -5,7 +5,7 @@
  * Stores tokens securely in PostgreSQL with scoped permissions
  */
 
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PostgreSQLSecretManager } from './PostgreSQLSecretManager';
 import * as winston from 'winston';

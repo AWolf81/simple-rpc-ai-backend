@@ -570,3 +570,8 @@ NEVER proactively create documentation files (*.md) or README files. Only create
   - **Execution**: Direct resolver calls with proper error handling
   - **Authentication**: JWT-based protection with configurable public tools
   - **Protocol**: Standard MCP HTTP transport at `/mcp` endpoint
+- ✅ **COMPLETED**: Fixed GitHub installation bcrypt build failure
+  - **Problem**: `bcrypt` native module failed to build on Python 3.12+ due to missing `distutils`
+  - **Solution**: Replaced `bcrypt` with pure JavaScript `bcryptjs` - no functionality loss
+  - **Benefits**: Zero build dependencies, works on all platforms, same API compatibility
+  - **Files Changed**: `package.json`, `src/services/APITokenManager.ts`
