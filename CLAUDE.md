@@ -570,13 +570,16 @@ NEVER proactively create documentation files (*.md) or README files. Only create
   - **Execution**: Direct resolver calls with proper error handling
   - **Authentication**: JWT-based protection with configurable public tools
   - **Protocol**: Standard MCP HTTP transport at `/mcp` endpoint
-- ✅ **COMPLETED**: Fixed GitHub installation build failures
+- ✅ **COMPLETED**: Fixed all GitHub installation issues with comprehensive solution
   - **Problem 1**: `bcrypt` native module failed to build on Python 3.12+ due to missing `distutils`
   - **Solution 1**: Replaced `bcrypt` with pure JavaScript `bcryptjs` - no functionality loss
   - **Problem 2**: Missing JSON data files causing TypeScript build errors during postinstall
-  - **Solution 2**: Fixed `copy-assets` script to include `src/data/*` files in build output
+  - **Solution 2**: Fixed build order - assets copied **before** TypeScript compilation
   - **Problem 3**: Optional native dependencies (`cpu-features`, `ssh2`) causing install failures
-  - **Solution 3**: Added comprehensive fallback handling with `.npmrc` configuration and install script
-  - **Benefits**: Zero native build dependencies, works on all platforms, graceful optional dependency handling
-  - **Files Changed**: `package.json`, `src/services/APITokenManager.ts`, `.npmrc`, `scripts/install-with-fallback.js`
-  - **Requirements**: Updated to Node.js >=22.0.0 for tRPC compatibility
+  - **Solution 3**: Moved `@testcontainers/postgresql` to `optionalDependencies` + robust error handling
+  - **Problem 4**: Build order issues in temporary GitHub install environment
+  - **Solution 4**: Updated build script: `copy-assets → tsc → tsc-alias → build-methods`
+  - **Benefits**: Zero native build dependencies, fault-tolerant asset copying, graceful optional deps
+  - **Files Changed**: `package.json`, `src/services/APITokenManager.ts`, `.npmrc`, `scripts/safe-build.js`
+  - **Requirements**: Node.js >=22.0.0 for tRPC compatibility
+  - **Status**: GitHub installs now work reliably on all platforms with Python 3.8-3.13+

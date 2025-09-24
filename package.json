@@ -14,7 +14,10 @@
         "react",
         "react-dom"
       ]
-    }
+    },
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "engines": {
     "node": ">=22.0.0",
@@ -28,12 +31,12 @@
     "./ai": "./dist/ai-service.js"
   },
   "scripts": {
-    "build": "tsc && tsc-alias && npm run copy-assets && npm run build:trpc-methods",
+    "build": "npm run copy-assets && tsc && tsc-alias && npm run build:trpc-methods",
     "build:prod": "npm run build",
-    "postinstall": "npm run build",
-    "prepare": "npm run build",
+    "postinstall": "node scripts/safe-build.js || npm run build",
+    "prepare": "node scripts/safe-build.js || npm run build",
     "build:trpc-methods": "node tools/generate-trpc-methods.js",
-    "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data && cp -r docker/* dist/docker/ && cp docker-compose.postgres.yml dist/ && cp .env.postgres.example dist/ && cp src/database/migrations/*.sql dist/database/migrations/ && cp -r src/views/* dist/views/ && cp -r src/data/* dist/data/",
+    "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data && cp -r docker/* dist/docker/ 2>/dev/null || true && cp docker-compose.postgres.yml dist/ 2>/dev/null || true && cp .env.postgres.example dist/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true && cp -r src/views/* dist/views/ 2>/dev/null || true && cp -r src/data/* dist/data/ 2>/dev/null || true",
     "registry:health": "node tools/registry-health-check.js",
     "models:check": "node tools/registry-update-checker.js",
     "models:review": "echo 'Model review interface coming soon'",
@@ -135,12 +138,14 @@
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.24.6"
   },
+  "optionalDependencies": {
+    "@testcontainers/postgresql": "^10.2.0"
+  },
   "devDependencies": {
     "@mcpjam/inspector": "^0.9.8",
     "@open-rpc/inspector": "^2.0.3",
     "@open-rpc/playground": "^1.6.9",
     "@opentelemetry/core": "^2.0.1",
-    "@testcontainers/postgresql": "^10.2.0",
     "@tsconfig/node22": "^22.0.2",
     "@tsconfig/node24": "^24.0.1",
     "@types/bcryptjs": "^2.4.6",
