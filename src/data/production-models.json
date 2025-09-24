@@ -1,0 +1,72 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-09-16",
+  "description": "Production-safe model mappings with versioned IDs for consistent behavior",
+  "providers": {
+    "anthropic": {
+      "requiresVersioning": true,
+      "reason": "Anthropic recommends versioned IDs for production to avoid model drift",
+      "models": {
+        "claude-opus-4-1": {
+          "productionId": "claude-opus-4-1-20250805",
+          "releaseDate": "2025-08-05",
+          "status": "stable",
+          "pricingOverride": null,
+          "verified": "2025-09-16"
+        },
+        "claude-sonnet-4": {
+          "productionId": "claude-sonnet-4-20250514",
+          "releaseDate": "2025-05-14",
+          "status": "stable", 
+          "pricingOverride": null,
+          "verified": "2025-09-16"
+        },
+        "claude-sonnet-3-7": {
+          "productionId": "claude-3-7-sonnet-20250219",
+          "releaseDate": "2025-02-19",
+          "status": "stable",
+          "pricingOverride": null,
+          "verified": "2025-09-16"
+        },
+        "claude-sonnet-3-5": {
+          "productionId": "claude-3-5-sonnet-20241022",
+          "releaseDate": "2024-10-22",
+          "status": "deprecated",
+          "deprecatedSince": "2025-02-19",
+          "recommendedReplacement": "claude-sonnet-3-7",
+          "deprecationReason": "Replaced by Claude 3.7 Sonnet with improved capabilities",
+          "pricingOverride": null,
+          "verified": "2025-09-16"
+        },
+        "claude-haiku-3-5": {
+          "productionId": "claude-3-5-haiku-20241022",
+          "releaseDate": "2024-10-22",
+          "status": "stable",
+          "pricingOverride": null,
+          "verified": "2025-09-16"
+        },
+        "claude-haiku-3": {
+          "productionId": "claude-3-haiku-20240307",
+          "releaseDate": "2024-03-07",
+          "status": "stable",
+          "pricingOverride": null,
+          "verified": "2025-09-16"
+        }
+      }
+    }
+  },
+  "metadata": {
+    "notes": {
+      "anthropic": "Requires versioned production IDs to prevent model drift. Aliases like 'claude-3-5-sonnet' can point to different models over time.",
+      "openai": "Model IDs are stable, but we curate for chat compatibility and exclude deprecated models like codex-mini-latest.",
+      "google": "Model IDs are stable (e.g., 'gemini-1.5-flash'). No production mapping needed."
+    },
+    "sources": [
+      "https://docs.anthropic.com/en/docs/about-claude/models/overview",
+      "https://platform.openai.com/docs/models/models",
+      "https://developers.generativeai.google/api/rest/v1beta/models"
+    ],
+    "updateFrequency": "weekly",
+    "lastVerified": "2025-09-16"
+  }
+}

@@ -61,8 +61,8 @@ coverage/
 *.sqlite
 *.sqlite3
 
-# Docker data
-data
+# Docker data (exclude root ./data but allow src/data)
+/data
 
 # Temporary files
 tmp/

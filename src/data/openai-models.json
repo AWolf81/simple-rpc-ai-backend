@@ -1,0 +1,158 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-09-16",
+  "description": "Curated OpenAI models with priority ordering and exclusions for chat compatibility",
+  "provider": "openai",
+  "models": {
+    "gpt-4o-mini": {
+      "productionId": "gpt-4o-mini", 
+      "releaseDate": "2024-07-18",
+      "status": "stable",
+      "priority": 1,
+      "capabilities": ["chat", "vision", "function-calling"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "gpt-4o": {
+      "productionId": "gpt-4o",
+      "releaseDate": "2024-05-13",
+      "status": "stable",
+      "priority": 2,
+      "capabilities": ["chat", "vision", "function-calling"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "gpt-4-turbo": {
+      "productionId": "gpt-4-turbo",
+      "releaseDate": "2024-04-09",
+      "status": "stable",
+      "priority": 3,
+      "capabilities": ["chat", "vision", "function-calling"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "gpt-4": {
+      "productionId": "gpt-4",
+      "releaseDate": "2023-03-14",
+      "status": "stable",
+      "priority": 4,
+      "capabilities": ["chat", "function-calling"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "gpt-4.1": {
+      "productionId": "gpt-4.1",
+      "releaseDate": "2025-01-01",
+      "status": "experimental",
+      "priority": 5,
+      "capabilities": ["chat", "vision", "function-calling"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "gpt-4.1-mini": {
+      "productionId": "gpt-4.1-mini",
+      "releaseDate": "2025-01-01", 
+      "status": "experimental",
+      "priority": 6,
+      "capabilities": ["chat", "vision", "function-calling"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "gpt-4.1-nano": {
+      "productionId": "gpt-4.1-nano",
+      "releaseDate": "2025-01-01",
+      "status": "experimental", 
+      "priority": 7,
+      "capabilities": ["chat"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "gpt-3.5-turbo": {
+      "productionId": "gpt-3.5-turbo",
+      "releaseDate": "2023-03-01",
+      "status": "stable",
+      "priority": 8,
+      "capabilities": ["chat", "function-calling"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "o1": {
+      "productionId": "o1",
+      "releaseDate": "2024-09-12",
+      "status": "stable",
+      "priority": 9,
+      "capabilities": ["reasoning", "chat"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "o1-mini": {
+      "productionId": "o1-mini",
+      "releaseDate": "2024-09-12",
+      "status": "stable",
+      "priority": 10,
+      "capabilities": ["reasoning", "chat"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "o1-preview": {
+      "productionId": "o1-preview",
+      "releaseDate": "2024-09-12",
+      "status": "preview",
+      "priority": 11,
+      "capabilities": ["reasoning", "chat"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "o3": {
+      "productionId": "o3",
+      "releaseDate": "2024-12-20",
+      "status": "experimental",
+      "priority": 12,
+      "capabilities": ["reasoning", "chat"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "o3-mini": {
+      "productionId": "o3-mini",
+      "releaseDate": "2024-12-20",
+      "status": "experimental",
+      "priority": 13,
+      "capabilities": ["reasoning", "chat"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    },
+    "o4-mini": {
+      "productionId": "o4-mini",
+      "releaseDate": "2025-01-01",
+      "status": "experimental",
+      "priority": 14,
+      "capabilities": ["reasoning", "chat"],
+      "pricingOverride": null,
+      "verified": "2025-09-16"
+    }
+  },
+  "excludedModels": {
+    "codex-mini-latest": {
+      "reason": "Deprecated - only supports completions API, not chat",
+      "replacement": "gpt-4o-mini",
+      "deprecatedSince": "2023-03-23"
+    },
+    "gpt-4-32k": {
+      "reason": "Legacy - use gpt-4-turbo for extended context",
+      "replacement": "gpt-4-turbo",
+      "deprecatedSince": "2024-04-09"
+    }
+  },
+  "metadata": {
+    "notes": {
+      "purpose": "Curates OpenAI models for chat compatibility and excludes deprecated/incompatible models like codex-mini-latest",
+      "approach": "Uses priority-based selection for consistent model ordering across different environments"
+    },
+    "sources": [
+      "https://platform.openai.com/docs/models/models",
+      "https://openai.com/api/pricing/"
+    ],
+    "updateFrequency": "monthly",
+    "lastVerified": "2025-09-16"
+  }
+}

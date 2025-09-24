@@ -6,8 +6,26 @@
  */
 
 import { getModelSafetyConfig, ModelValidator, type ModelSafetyConfig } from '../config/model-safety.js';
-import openaiModelsData from '../data/openai-models.json' with { type: 'json' };
-import huggingfaceModelsData from '../data/huggingface-models.json' with { type: 'json' };
+
+// Import model data with fallbacks for GitHub installs
+let openaiModelsData: any = {};
+let huggingfaceModelsData: any = {};
+
+try {
+  // @ts-ignore - Conditional import with fallback
+  openaiModelsData = require('../data/openai-models.json');
+} catch (error) {
+  console.warn('OpenAI models data not found, using empty fallback');
+  openaiModelsData = {};
+}
+
+try {
+  // @ts-ignore - Conditional import with fallback
+  huggingfaceModelsData = require('../data/huggingface-models.json');
+} catch (error) {
+  console.warn('HuggingFace models data not found, using empty fallback');
+  huggingfaceModelsData = {};
+}
 
 export interface ModelInfo {
   id: string;

@@ -1,0 +1,173 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-01-15",
+  "description": "Curated Hugging Face models with priority ordering for coding agents and latest models",
+  "provider": "huggingface",
+  "models": {
+    "qwen-qwen-2-5-14b-instruct": {
+      "productionId": "qwen-qwen-2-5-14b-instruct",
+      "releaseDate": "2024-09-19",
+      "status": "stable",
+      "priority": 1,
+      "capabilities": ["chat", "code", "reasoning", "instruct"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Best coding model available in external registry"
+    },
+    "qwen-qwen-3-8b": {
+      "productionId": "qwen-qwen-3-8b",
+      "releaseDate": "2024-12-23",
+      "status": "stable",
+      "priority": 2,
+      "capabilities": ["chat", "code", "reasoning"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Latest Qwen 3 architecture - excellent for coding"
+    },
+    "qwen-qwen-2-5-7b-instruct": {
+      "productionId": "qwen-qwen-2-5-7b-instruct",
+      "releaseDate": "2024-09-19",
+      "status": "stable",
+      "priority": 3,
+      "capabilities": ["chat", "code", "instruct"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Good balance of performance and efficiency"
+    },
+    "meta-llama-llama-3-2-1b-instruct": {
+      "productionId": "meta-llama-llama-3-2-1b-instruct",
+      "releaseDate": "2024-09-25",
+      "status": "stable",
+      "priority": 4,
+      "capabilities": ["chat", "instruct", "small-size"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Small but capable model for resource-constrained environments"
+    },
+    "mistralai/Mistral-Small-2507": {
+      "productionId": "mistralai/Mistral-Small-2507",
+      "releaseDate": "2025-01-07",
+      "status": "stable",
+      "priority": 5,
+      "capabilities": ["chat", "code", "reasoning", "agentic"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Devstral - Latest Mistral specialized for agentic coding tasks",
+      "source": "extension"
+    },
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct": {
+      "productionId": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+      "releaseDate": "2024-12-20",
+      "status": "stable",
+      "priority": 6,
+      "capabilities": ["code", "specialized-coding", "large-scale"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Specialized 480B coding model - extremely powerful for complex coding tasks",
+      "source": "extension"
+    },
+    "deepseek-ai/DeepSeek-V3": {
+      "productionId": "deepseek-ai/DeepSeek-V3",
+      "releaseDate": "2024-12-26",
+      "status": "stable",
+      "priority": 7,
+      "capabilities": ["chat", "code", "reasoning", "high-performance"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "High-performance alternative with excellent reasoning capabilities",
+      "source": "extension"
+    },
+    "Qwen/Qwen3-235B-A22B-Instruct": {
+      "productionId": "Qwen/Qwen3-235B-A22B-Instruct",
+      "releaseDate": "2024-12-15",
+      "status": "stable",
+      "priority": 8,
+      "capabilities": ["chat", "code", "reasoning", "large-scale"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Large-scale reasoning model for complex problem solving",
+      "source": "extension"
+    },
+    "mistralai/Codestral-Mamba-7B-v0.1": {
+      "productionId": "mistralai/Codestral-Mamba-7B-v0.1",
+      "releaseDate": "2024-11-08",
+      "status": "stable",
+      "priority": 9,
+      "capabilities": ["code", "efficiency", "mamba-architecture"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Efficient Mamba-based architecture for coding tasks",
+      "source": "extension"
+    },
+    "microsoft/Phi-3.5-vision-instruct": {
+      "productionId": "microsoft/Phi-3.5-vision-instruct",
+      "releaseDate": "2024-08-20",
+      "status": "stable",
+      "priority": 10,
+      "capabilities": ["chat", "vision", "code", "multimodal"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Multimodal model for visual development tasks",
+      "source": "extension"
+    },
+    "Qwen/Qwen2-VL-72B-Instruct": {
+      "productionId": "Qwen/Qwen2-VL-72B-Instruct",
+      "releaseDate": "2024-08-29",
+      "status": "stable",
+      "priority": 11,
+      "capabilities": ["chat", "vision", "code", "multimodal", "large-scale"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Large-scale multimodal model for complex visual and coding tasks",
+      "source": "extension"
+    },
+    "meta-llama/Llama-3.1-70B-Instruct": {
+      "productionId": "meta-llama/Llama-3.1-70B-Instruct",
+      "releaseDate": "2024-07-23",
+      "status": "stable",
+      "priority": 12,
+      "capabilities": ["chat", "code", "reasoning"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Legacy stable model for compatibility",
+      "source": "extension"
+    },
+    "mistralai/Mixtral-8x7B-Instruct-v0.1": {
+      "productionId": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+      "releaseDate": "2023-12-11",
+      "status": "stable",
+      "priority": 13,
+      "capabilities": ["chat", "code", "mixture-of-experts"],
+      "pricingOverride": null,
+      "verified": "2025-01-15",
+      "notes": "Mixture-of-experts architecture for efficient processing",
+      "source": "extension"
+    }
+  },
+  "excludedModels": {
+    "amazon-chronos-t-5-small": {
+      "reason": "Not optimized for coding - primarily for time series forecasting",
+      "replacement": "qwen-qwen-2-5-14b-instruct",
+      "excludedSince": "2025-01-15"
+    },
+    "distilbert-distilgpt-2": {
+      "reason": "Legacy model - outdated for modern coding tasks",
+      "replacement": "qwen-qwen-3-8b",
+      "excludedSince": "2025-01-15"
+    }
+  },
+  "metadata": {
+    "notes": {
+      "purpose": "Extends external registry with latest coding models and curates for best coding agent performance",
+      "approach": "Combines registry models with extension models, prioritizing latest coding-specific models",
+      "extension": "Models marked with 'source: extension' are added to supplement the external registry"
+    },
+    "sources": [
+      "https://huggingface.co/models",
+      "https://huggingface.co/docs/hub/models-the-hub",
+      "@anolilab/ai-model-registry"
+    ],
+    "updateFrequency": "monthly",
+    "lastVerified": "2025-01-15"
+  }
+}
