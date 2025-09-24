@@ -570,8 +570,13 @@ NEVER proactively create documentation files (*.md) or README files. Only create
   - **Execution**: Direct resolver calls with proper error handling
   - **Authentication**: JWT-based protection with configurable public tools
   - **Protocol**: Standard MCP HTTP transport at `/mcp` endpoint
-- ✅ **COMPLETED**: Fixed GitHub installation bcrypt build failure
-  - **Problem**: `bcrypt` native module failed to build on Python 3.12+ due to missing `distutils`
-  - **Solution**: Replaced `bcrypt` with pure JavaScript `bcryptjs` - no functionality loss
-  - **Benefits**: Zero build dependencies, works on all platforms, same API compatibility
-  - **Files Changed**: `package.json`, `src/services/APITokenManager.ts`
+- ✅ **COMPLETED**: Fixed GitHub installation build failures
+  - **Problem 1**: `bcrypt` native module failed to build on Python 3.12+ due to missing `distutils`
+  - **Solution 1**: Replaced `bcrypt` with pure JavaScript `bcryptjs` - no functionality loss
+  - **Problem 2**: Missing JSON data files causing TypeScript build errors during postinstall
+  - **Solution 2**: Fixed `copy-assets` script to include `src/data/*` files in build output
+  - **Problem 3**: Optional native dependencies (`cpu-features`, `ssh2`) causing install failures
+  - **Solution 3**: Added comprehensive fallback handling with `.npmrc` configuration and install script
+  - **Benefits**: Zero native build dependencies, works on all platforms, graceful optional dependency handling
+  - **Files Changed**: `package.json`, `src/services/APITokenManager.ts`, `.npmrc`, `scripts/install-with-fallback.js`
+  - **Requirements**: Updated to Node.js >=22.0.0 for tRPC compatibility
