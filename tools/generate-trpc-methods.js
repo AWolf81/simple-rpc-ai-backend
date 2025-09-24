@@ -7,11 +7,26 @@
  * to generate a JSON file that can be used by the dev panel.
  */
 
-import { writeFileSync, mkdirSync, readdirSync, existsSync } from 'fs';
-import { join } from 'path';
+import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync } from 'fs';
+import { join, resolve } from 'path';
 
 // Configure base URL for generated endpoints
 const baseUrl = `http://localhost:${process.env.AI_SERVER_PORT || 8000}`;
+
+// Helper function to get source location
+function getSource() {
+  const stack = new Error().stack?.split('\n');
+  // Stack: [0] Error, [1] getSource, [2] zWithSource, [3] YOUR SCHEMA DEFINITION
+  const callerLine = stack?.[3];
+  const match = callerLine?.match(/(.*?):(\d+):/);
+  return match ? { filePath: match[1], lineNumber: parseInt(match[2]) } : null;
+}
+
+function zWithSource(schema, filePath, lineNumber) {
+  const enhanced = schema;
+  enhanced._source = { filePath, lineNumber };
+  return enhanced;
+}
 
 console.log('🔨 Generating tRPC methods documentation...');
 
@@ -50,6 +65,15 @@ async function extractTRPCMethods() {
           if (routerFile) {
             return join(routersDir, routerFile);
           }
+          
+          // Also check if there's a directory with the namespace name that contains an index.ts
+          if (existsSync(join(routersDir, namespace))) {
+            const namespaceDir = join(routersDir, namespace);
+            const indexPath = join(namespaceDir, 'index.ts');
+            if (existsSync(indexPath)) {
+              return indexPath;
+            }
+          }
         } catch (e) {
           // Ignore filesystem errors
         }
@@ -59,8 +83,205 @@ async function extractTRPCMethods() {
       return 'src/trpc/root.ts';
     }
     
+    function findProcedureLineNumber(sourceFile, procedureName) {
+      // Extract the actual procedure name (last part after the dot)
+      const procName = procedureName.split('.').pop();
+      const namespace = procedureName.split('.')[0];
+      
+      // First, try to find the actual procedure file for this namespace
+      // Procedures are typically defined in src/trpc/routers/{namespace}/index.ts or similar
+      const specificFile = findSpecificProcedureFile(namespace, procName);
+      
+      if (specificFile) {
+        const lineNum = findProcedureLineNumberInFile(specificFile, procName);
+        if (lineNum) {
+          return lineNum;
+        }
+      }
+      
+      // If not found in specific file, check the main source file
+      try {
+        const content = readFileSync(sourceFile, 'utf8');
+        const lines = content.split('\n');
+        
+        // Look for the procedure definition in the file
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          
+          // Look for patterns like: procName: procedure(...), or procName: router.query(...), etc.
+          if (line.includes(`${procName}:`) || 
+              line.includes(`${procName}:`) || 
+              line.includes(`.${procName}:`) || 
+              line.trim().startsWith(`${procName}:`)) {
+            // Return 1-based line number (VSCode uses 1-based indexing)
+            return i + 1;
+          }
+        }
+      } catch (e) {
+        console.log(`Could not find line number for ${procedureName} in ${sourceFile}:`, e.message);
+      }
+      
+      return null; // Line not found
+    }
+    
+    function findSpecificProcedureFile(namespace, procName) {
+      // Look for the procedure in more specific files
+      const namespaceDir = `src/trpc/routers/${namespace}`;
+      
+      if (existsSync(namespaceDir)) {
+        try {
+          // Check the main index file first
+          const mainFile = join(namespaceDir, 'index.ts');
+          if (existsSync(mainFile) && fileIncludesProcedure(mainFile, procName)) {
+            return mainFile;
+          }
+          
+          // Also check for other common files (like methods/, procedures/, etc.)
+          const files = readdirSync(namespaceDir, { withFileTypes: true });
+          for (const file of files) {
+            const fullPath = join(namespaceDir, file.name);
+            
+            if (file.isDirectory()) {
+              // If it's a subdirectory, check files inside it
+              const subDirFiles = readdirSync(fullPath);
+              for (const subFile of subDirFiles) {
+                if (subFile.endsWith('.ts') || subFile.endsWith('.js')) {
+                  const subFilePath = join(fullPath, subFile);
+                  if (fileIncludesProcedure(subFilePath, procName)) {
+                    return subFilePath;
+                  }
+                }
+              }
+            } else if (file.name.endsWith('.ts') || file.name.endsWith('.js')) {
+              // If it's a regular TS/JS file
+              if (fileIncludesProcedure(fullPath, procName)) {
+                return fullPath;
+              }
+            }
+          }
+        } catch (e) {
+          // Ignore filesystem errors
+        }
+      }
+      
+      // Check in nested subdirectories (e.g., src/trpc/routers/ai/methods/, etc.)
+      const commonSubdirs = ['methods', 'procedures', 'endpoints', 'handlers'];
+      for (const subdir of commonSubdirs) {
+        const searchPath = `src/trpc/routers/${namespace}/${subdir}`;
+        if (existsSync(searchPath)) {
+          try {
+            const files = readdirSync(searchPath);
+            for (const file of files) {
+              if (file.endsWith('.ts') || file.endsWith('.js')) {
+                const fullPath = join(searchPath, file);
+                if (fileIncludesProcedure(fullPath, procName)) {
+                  return fullPath;
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore filesystem errors
+          }
+        }
+      }
+      
+      return null;
+    }
+    
+    function fileIncludesProcedure(filePath, procName) {
+      try {
+        const content = readFileSync(filePath, 'utf8');
+        return content.includes(procName);
+      } catch (e) {
+        return false;
+      }
+    }
+    
+    function findProcedureLineNumberInFile(filePath, procName) {
+      try {
+        const content = readFileSync(filePath, 'utf8');
+        const lines = content.split('\n');
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          
+          // Look for procedure definition patterns
+          if (line.includes(`${procName}:`) || 
+              line.trim().startsWith(`${procName}:`) || 
+              line.includes(`${procName}(`) || 
+              line.includes(`const ${procName}`) ||
+              line.includes(`export const ${procName}`)) {
+            return i + 1; // 1-based line number
+          }
+        }
+        return null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function findSchemaLineNumber(sourceFile, procedureName, schemaType) {
+      // Extract the actual procedure name (last part after the dot)
+      const procName = procedureName.split('.').pop();
+      const namespace = procedureName.split('.')[0];
+      
+      // First, try to find the actual procedure file for this namespace
+      const specificFile = findSpecificProcedureFile(namespace, procName);
+      
+      // Use the file where the procedure is most likely defined
+      const fileToSearch = specificFile || sourceFile;
+      
+      try {
+        const content = readFileSync(fileToSearch, 'utf8');
+        const lines = content.split('\n');
+        
+        // Find the procedure definition first
+        let procedureStartLine = -1;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.includes(`${procName}:`) && line.includes('Procedure')) {
+            procedureStartLine = i;
+            break;
+          }
+        }
+        
+        if (procedureStartLine === -1) {
+          return null; // Procedure not found
+        }
+        
+        // Search for the schemaType (.input or .output) in the next 15 lines after the procedure start
+        const searchEnd = Math.min(procedureStartLine + 15, lines.length);
+        
+        for (let i = procedureStartLine; i < searchEnd; i++) {
+          const line = lines[i];
+          // Look for patterns like: .input( or .output( - very simple substring matching
+          if (line.includes(`.${schemaType}(`)) {
+            return i + 1; // 1-based line number
+          }
+        }
+      } catch (e) {
+        console.log(`Could not find ${schemaType} line number for ${procedureName} in ${fileToSearch}:`, e.message);
+      }
+      
+      return null; // Line not found
+    }
+    
     function extractProcedureInfo(procedure, path) {
       const def = procedure._def;
+      const sourceFile = inferSourceFile(path);
+      const lineNumber = findProcedureLineNumber(sourceFile, path);
+      
+      // Extract source info from schema if available (from zWithSource)
+      const inputSchema = def.inputs?.[0] || null;
+      const outputSchema = def.output || null;
+      
+      const inputSource = inputSchema?._source || null;
+      const outputSource = outputSchema?._source || null;
+      
+      // Find specific line numbers for input and output schemas
+      const inputLineNumber = inputSource?.lineNumber || findSchemaLineNumber(sourceFile, path, 'input');
+      const outputLineNumber = outputSource?.lineNumber || findSchemaLineNumber(sourceFile, path, 'output');
+      
       const info = {
         path,
         type: def.type || 'unknown',
@@ -70,7 +291,10 @@ async function extractTRPCMethods() {
         input: null,
         output: null,
         meta: def.meta || null,
-        sourceFile: inferSourceFile(path)
+        sourceFile: inputSource?.filePath || outputSource?.filePath || sourceFile,
+        lineNumber: lineNumber,
+        inputLineNumber: inputLineNumber,
+        outputLineNumber: outputLineNumber
       };
       
       // Extract OpenAPI metadata if present
@@ -101,19 +325,23 @@ async function extractTRPCMethods() {
       if (!schema || !schema._def) {
         return { type: 'unknown' };
       }
-      
+
       const def = schema._def;
       const info = {
         type: def.typeName || 'unknown',
-        description: def.description || null
+        description: def.description || null,
+        _source: schema._source || null  // Preserve source info if available
       };
-      
+
+      // Extract constraints based on schema type
+      extractSchemaConstraints(schema, info);
+
       // Extract shape for objects
       if (def.typeName === 'ZodObject' && def.shape) {
         try {
           const shape = typeof def.shape === 'function' ? def.shape() : def.shape;
           info.properties = {};
-          
+
           for (const [key, propSchema] of Object.entries(shape)) {
             info.properties[key] = extractZodSchemaInfo(propSchema);
           }
@@ -121,16 +349,122 @@ async function extractTRPCMethods() {
           // Ignore shape extraction errors
         }
       }
-      
+
       // Extract other useful info
       if (def.innerType) {
         info.innerType = extractZodSchemaInfo(def.innerType);
       }
-      
+
       return info;
     }
-    
-    // Detect MCP methods and generate calling examples
+
+    function extractSchemaConstraints(schema, info) {
+      const def = schema._def;
+
+      // Handle different Zod types and their constraints
+      switch (def.typeName) {
+        case 'ZodString':
+          info.jsType = 'string';
+          if (def.checks) {
+            for (const check of def.checks) {
+              if (check.kind === 'min') info.minLength = check.value;
+              if (check.kind === 'max') info.maxLength = check.value;
+              if (check.kind === 'email') info.format = 'email';
+              if (check.kind === 'url') info.format = 'url';
+              if (check.kind === 'regex') info.pattern = check.regex.source;
+            }
+          }
+          break;
+
+        case 'ZodNumber':
+          info.jsType = 'number';
+          if (def.checks) {
+            for (const check of def.checks) {
+              if (check.kind === 'min') info.minimum = check.value;
+              if (check.kind === 'max') info.maximum = check.value;
+              if (check.kind === 'int') {
+                info.jsType = 'integer';
+                info.type = 'integer';
+              }
+            }
+          }
+          break;
+
+        case 'ZodBoolean':
+          info.jsType = 'boolean';
+          break;
+
+        case 'ZodArray':
+          info.jsType = 'array';
+          if (def.minLength) info.minItems = def.minLength.value;
+          if (def.maxLength) info.maxItems = def.maxLength.value;
+          if (def.type) info.items = extractZodSchemaInfo(def.type);
+          break;
+
+        case 'ZodObject':
+          info.jsType = 'object';
+          break;
+
+        case 'ZodEnum':
+          info.jsType = 'enum';
+          if (def.values) info.enum = def.values;
+          break;
+
+        case 'ZodLiteral':
+          info.jsType = 'literal';
+          info.const = def.value;
+          break;
+
+        case 'ZodUnion':
+          info.jsType = 'union';
+          if (def.options) {
+            info.oneOf = def.options.map(opt => extractZodSchemaInfo(opt));
+          }
+          break;
+
+        case 'ZodDefault':
+          try {
+            info.default = def.defaultValue();
+          } catch (e) {
+            // If default value can't be computed, mark it as having a default
+            info.hasDefault = true;
+          }
+          if (def.innerType) {
+            const innerInfo = extractZodSchemaInfo(def.innerType);
+            Object.assign(info, innerInfo);
+          }
+          break;
+
+        case 'ZodOptional':
+          info.optional = true;
+          if (def.innerType) {
+            const innerInfo = extractZodSchemaInfo(def.innerType);
+            Object.assign(info, innerInfo);
+          }
+          break;
+
+        case 'ZodNullable':
+          info.nullable = true;
+          if (def.innerType) {
+            const innerInfo = extractZodSchemaInfo(def.innerType);
+            Object.assign(info, innerInfo);
+          }
+          break;
+
+        case 'ZodVoid':
+          info.jsType = 'void';
+          break;
+
+        case 'ZodAny':
+          info.jsType = 'any';
+          break;
+
+        case 'ZodUnknown':
+          info.jsType = 'unknown';
+          break;
+      }
+    }
+
     const mcpMethods = {};
     const mcpProcedures = Object.entries(methods).filter(([name, method]) => 
       method.meta?.mcp

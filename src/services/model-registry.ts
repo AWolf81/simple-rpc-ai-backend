@@ -7,6 +7,7 @@
 
 import { getModelSafetyConfig, ModelValidator, type ModelSafetyConfig } from '../config/model-safety.js';
 import openaiModelsData from '../data/openai-models.json' with { type: 'json' };
+import huggingfaceModelsData from '../data/huggingface-models.json' with { type: 'json' };
 
 export interface ModelInfo {
   id: string;
@@ -18,7 +19,7 @@ export interface ModelInfo {
   };
   contextWindow?: number;
   capabilities?: string[];
-  source: 'registry' | 'fallback' | 'cache';
+  source: 'registry' | 'fallback' | 'cache' | 'extension';
 }
 
 export class ModelRegistry {
@@ -138,6 +139,20 @@ ${this.config.useRegistry ? `
           return 'gpt-4o';
         }
         
+        // Special handling for Hugging Face - curated models with extension support
+        if (provider === 'huggingface') {
+          const curatedModels = await this.getCuratedHuggingFaceModels(models);
+          if (curatedModels.length > 0) {
+            const selectedModel = curatedModels[0]; // Already sorted by priority
+            console.log('📡 Using curated Hugging Face model: huggingface/' + selectedModel);
+            return selectedModel;
+          }
+
+          // If no curated models found, use fallback
+          console.log('📡 No curated Hugging Face models found, using fallback: huggingface/qwen-qwen-2-5-14b-instruct');
+          return 'qwen-qwen-2-5-14b-instruct';
+        }
+
         // Special handling for OpenRouter - prefer Claude 3.7 Sonnet for best cost/performance
         if (provider === 'openrouter') {
           // Look for Claude 3.7 Sonnet models first
@@ -147,7 +162,7 @@ ${this.config.useRegistry ? `
             'claude-3.7-sonnet',
             'claude-3-7-sonnet'
           ];
-          
+
           for (const preferred of preferredModels) {
             const found = models.find(m => (m.id || m.name) === preferred);
             if (found) {
@@ -156,7 +171,7 @@ ${this.config.useRegistry ? `
               return selectedModel;
             }
           }
-          
+
           // If no Claude 3.7 Sonnet found, use first available model
           const defaultModel = models[0]?.id || models[0]?.name;
           console.log('📡 Using first available OpenRouter model: openrouter/' + defaultModel);
@@ -192,14 +207,15 @@ ${this.config.useRegistry ? `
     const fallbacks: Record<string, string> = {
       'openai': 'gpt-4o',
       'google': 'gemini-1.5-flash',
-      'openrouter': 'anthropic/claude-3.7-sonnet'
+      'openrouter': 'anthropic/claude-3.7-sonnet',
+      'huggingface': 'qwen-qwen-2-5-14b-instruct'  // Best coding model available in registry
     };
-    
+
     // Anthropic should not reach this point - it uses registry-based conversion
     if (provider === 'anthropic') {
       throw new Error('Anthropic models should use registry-based conversion, not fallbacks');
     }
-    
+
     const fallback = fallbacks[provider] || 'unknown-model';
     console.log('🔄 Using built-in fallback model: ' + provider + '/' + fallback);
     return fallback;
@@ -209,11 +225,16 @@ ${this.config.useRegistry ? `
     try {
       const registry = await import('@anolilab/ai-model-registry' as any);
       const providerName = this.mapProviderName(provider);
-      
+
       console.log('🔍 Fetching live models for provider:', providerName);
       const models = registry.getModelsByProvider?.(providerName) || [];
       console.log('📊 Found', models.length, 'models for', providerName);
-      
+
+      // Special handling for Hugging Face - use curation system even with live models
+      if (provider === 'huggingface') {
+        return await this.getCuratedHuggingFaceModelsDetailed(models);
+      }
+
       if (models.length === 0) {
         console.warn('⚠️ No models found for', providerName, '- falling back to built-in models');
         return this.getFallbackModels(provider);
@@ -290,12 +311,12 @@ ${this.config.useRegistry ? `
   private getFallbackModels(provider: string): ModelInfo[] {
     // Simple built-in fallback models
     // Note: Anthropic no longer uses fallbacks - uses registry conversion instead
-    
+
     // Anthropic should not reach this point - it uses registry-based conversion
     if (provider === 'anthropic') {
       throw new Error('Anthropic models should use registry-based conversion, not fallbacks');
     }
-    
+
     const fallbacks: Record<string, ModelInfo[]> = {
       'openai': [{
         id: 'gpt-4o',
@@ -312,9 +333,86 @@ ${this.config.useRegistry ? `
         contextWindow: 1000000,
         capabilities: ['text', 'vision', 'reasoning'],
         source: 'fallback' as const
-      }]
+      }],
+      'huggingface': [
+        // Latest coding-specialized models (2025)
+        {
+          id: 'mistralai/Mistral-Small-2507',
+          name: 'Mistral Small 2507 (Devstral)',
+          provider: 'huggingface',
+          contextWindow: 32768,
+          capabilities: ['text', 'code', 'reasoning', 'agentic'],
+          source: 'fallback' as const
+        },
+        {
+          id: 'Qwen/Qwen3-235B-A22B-Instruct',
+          name: 'Qwen3 235B-A22B Instruct',
+          provider: 'huggingface',
+          contextWindow: 32768,
+          capabilities: ['text', 'code', 'reasoning', 'large-scale'],
+          source: 'fallback' as const
+        },
+        {
+          id: 'Qwen/Qwen3-Coder-480B-A35B-Instruct',
+          name: 'Qwen3 Coder 480B-A35B Instruct',
+          provider: 'huggingface',
+          contextWindow: 32768,
+          capabilities: ['text', 'code', 'specialized-coding'],
+          source: 'fallback' as const
+        },
+        {
+          id: 'deepseek-ai/DeepSeek-V3',
+          name: 'DeepSeek-V3',
+          provider: 'huggingface',
+          contextWindow: 64000,
+          capabilities: ['text', 'code', 'reasoning', 'high-performance'],
+          source: 'fallback' as const
+        },
+        {
+          id: 'mistralai/Codestral-Mamba-7B-v0.1',
+          name: 'Codestral Mamba 7B',
+          provider: 'huggingface',
+          contextWindow: 32768,
+          capabilities: ['text', 'code', 'efficiency', 'mamba-architecture'],
+          source: 'fallback' as const
+        },
+        // Multimodal models for visual development tasks
+        {
+          id: 'microsoft/Phi-3.5-vision-instruct',
+          name: 'Phi-3.5 Vision Instruct',
+          provider: 'huggingface',
+          contextWindow: 131072,
+          capabilities: ['text', 'vision', 'code', 'multimodal'],
+          source: 'fallback' as const
+        },
+        {
+          id: 'Qwen/Qwen2-VL-72B-Instruct',
+          name: 'Qwen2-VL 72B Instruct',
+          provider: 'huggingface',
+          contextWindow: 32768,
+          capabilities: ['text', 'vision', 'code', 'multimodal', 'large-scale'],
+          source: 'fallback' as const
+        },
+        // Legacy stable models for compatibility
+        {
+          id: 'meta-llama/Llama-3.1-70B-Instruct',
+          name: 'Llama 3.1 70B Instruct',
+          provider: 'huggingface',
+          contextWindow: 131072,
+          capabilities: ['text', 'code', 'reasoning'],
+          source: 'fallback' as const
+        },
+        {
+          id: 'mistralai/Mixtral-8x7B-Instruct-v0.1',
+          name: 'Mixtral 8x7B Instruct',
+          provider: 'huggingface',
+          contextWindow: 32768,
+          capabilities: ['text', 'code', 'mixture-of-experts'],
+          source: 'fallback' as const
+        }
+      ]
     };
-    
+
     console.log('🔄 Using built-in fallback models for ' + provider);
     return fallbacks[provider] || [];
   }
@@ -326,10 +424,11 @@ ${this.config.useRegistry ? `
       'google': 'Google',
       'openrouter': 'OpenRouter',
       'meta': 'Meta',
-      'groq': 'Groq'
+      'groq': 'Groq',
+      'huggingface': 'Hugging Face'  // External registry uses "Hugging Face" with space
     };
-    
-    return providerNameMap[provider] || 
+
+    return providerNameMap[provider] ||
       provider.charAt(0).toUpperCase() + provider.slice(1);
   }
   
@@ -465,6 +564,118 @@ ${this.config.useRegistry ? `
 
     console.log(`📋 Curated OpenAI models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
     return sortedModels;
+  }
+
+  /**
+   * Get curated Hugging Face models sorted by priority
+   * Combines registry models with extension models and excludes deprecated/unsuitable models
+   */
+  private async getCuratedHuggingFaceModels(models: any[]): Promise<string[]> {
+    const huggingfaceConfig = huggingfaceModelsData;
+
+    if (!huggingfaceConfig) {
+      console.warn('⚠️ No Hugging Face curation config found, using fallback logic');
+      return models
+        .filter(m => {
+          const id = m.id || m.name || '';
+          return ['qwen-qwen-2-5-14b-instruct', 'qwen-qwen-3-8b', 'qwen-qwen-2-5-7b-instruct'].includes(id);
+        })
+        .map(m => m.id || m.name);
+    }
+
+    const curatedModels: Array<{id: string, priority: number, source: string}> = [];
+
+    // Add models from registry that are in our curated list
+    for (const registryModel of models) {
+      const modelId = registryModel.id || registryModel.name;
+      const curatedModel = huggingfaceConfig.models[modelId];
+
+      if (curatedModel) {
+        curatedModels.push({
+          id: modelId,
+          priority: curatedModel.priority || 999,
+          source: 'registry'
+        });
+      } else {
+        // Check if it's in excluded models
+        const isExcluded = huggingfaceConfig.excludedModels?.[modelId];
+        if (isExcluded) {
+          console.warn(`🚫 Excluding Hugging Face model "${modelId}": ${isExcluded.reason}`);
+        }
+      }
+    }
+
+    // Add extension models (models not in external registry but in our curated list)
+    for (const [modelId, curatedModel] of Object.entries(huggingfaceConfig.models)) {
+      const modelConfig = curatedModel as any;
+      if (modelConfig.source === 'extension') {
+        // Only add if not already in registry
+        const alreadyAdded = curatedModels.find(m => m.id === modelId);
+        if (!alreadyAdded) {
+          curatedModels.push({
+            id: modelId,
+            priority: modelConfig.priority || 999,
+            source: 'extension'
+          });
+          console.log(`➕ Adding extension Hugging Face model: ${modelId} (priority ${modelConfig.priority})`);
+        }
+      }
+    }
+
+    // Sort by priority (lower number = higher priority)
+    const sortedModels = curatedModels
+      .sort((a, b) => a.priority - b.priority)
+      .map(m => m.id);
+
+    console.log(`📋 Curated Hugging Face models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
+    console.log(`🔧 Extension models: ${curatedModels.filter(m => m.source === 'extension').length}`);
+    console.log(`📡 Registry models: ${curatedModels.filter(m => m.source === 'registry').length}`);
+
+    return sortedModels;
+  }
+
+  /**
+   * Get curated Hugging Face models with detailed ModelInfo objects
+   * Combines registry models with extension models and creates proper ModelInfo objects
+   */
+  private async getCuratedHuggingFaceModelsDetailed(models: any[]): Promise<ModelInfo[]> {
+    const huggingfaceConfig = huggingfaceModelsData;
+    const curatedModelIds = await this.getCuratedHuggingFaceModels(models);
+
+    const detailedModels: ModelInfo[] = [];
+
+    for (const modelId of curatedModelIds) {
+      const registryModel = models.find(m => (m.id || m.name) === modelId);
+      const configModel = huggingfaceConfig?.models[modelId] as any;
+
+      if (registryModel) {
+        // Model exists in external registry
+        detailedModels.push({
+          id: modelId,
+          name: registryModel.name || modelId,
+          provider: 'huggingface',
+          pricing: registryModel.pricing ? {
+            input: registryModel.pricing.input || 0,
+            output: registryModel.pricing.output || 0
+          } : undefined,
+          contextWindow: registryModel.contextLength,
+          capabilities: configModel?.capabilities || ['chat'],
+          source: 'registry' as const
+        });
+      } else if (configModel && configModel.source === 'extension') {
+        // Extension model not in registry
+        detailedModels.push({
+          id: modelId,
+          name: configModel.productionId || modelId,
+          provider: 'huggingface',
+          capabilities: configModel.capabilities || ['chat', 'code'],
+          source: 'extension' as const
+        });
+      }
+    }
+
+    console.log(`📋 Created ${detailedModels.length} detailed Hugging Face models`);
+    return detailedModels;
   }
 
   /**

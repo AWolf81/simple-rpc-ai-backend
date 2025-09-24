@@ -24,17 +24,13 @@
     "models:apply": "echo 'Model apply interface coming soon'",
     "dev": "tsc --watch",
     "dev:tsx": "tsx --watch src/index.ts",
-    
     "dev:server": "tsx --watch examples/02-mcp-server/server.js",
     "dev:server:basic": "tsx --watch examples/01-basic-server/server.js",
-    
     "dev:panel": "node tools/dev-panel.js",
     "dev:mcpjam": "node ./node_modules/@mcpjam/inspector/bin/start.js --port 4000",
     "dev:playground": "concurrently \"pnpm dev:mcpjam\" \"pnpm dev:panel\"",
-    
     "dev:docs": "concurrently \"pnpm dev:server\" \"pnpm dev:playground\"",
     "dev:docs:basic": "concurrently \"pnpm dev:server:basic\" \"pnpm dev:playground\"",
-    
     "dev:full": "concurrently \"pnpm dev\" \"pnpm dev:server\" \"pnpm dev:playground\"",
     "dev:full:basic": "concurrently \"pnpm dev\" \"pnpm dev:server:basic\" \"pnpm dev:playground\"",
     "start:mcp": "node examples/02-mcp-server/server.js",
@@ -89,6 +85,7 @@
     "@ai-sdk/google": "^0.0.0",
     "@ai-sdk/openai": "^0.0.0",
     "@anolilab/ai-model-registry": "^1.3.0",
+    "@huggingface/inference": "^4.8.0",
     "@modelcontextprotocol/sdk": "^1.17.4",
     "@node-oauth/express-oauth-server": "^4.1.4",
     "@node-oauth/oauth2-server": "^5.2.1",

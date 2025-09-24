@@ -9,18 +9,146 @@ import { generateText } from 'ai';
 import { anthropic, Anthropic } from '@ai-sdk/anthropic';
 import { openai, OpenAI } from '@ai-sdk/openai';
 import { google, Google } from '@ai-sdk/google';
+import { InferenceClient } from '@huggingface/inference';
 import crypto from 'crypto';
+import { LanguageModel } from 'ai';
 import { MCPService, MCPServiceConfig } from './mcp-service';
 import { ModelRegistry } from './model-registry.js';
 import type { ModelInfo } from './model-registry.js';
+
+/**
+ * Configuration options for Hugging Face model adapter
+ */
+interface HuggingFaceModelConfig {
+  apiKey: string;
+  /**
+   * Method to use for text generation:
+   * - 'auto': Try textGeneration first, fallback to chatCompletion on error
+   * - 'textGeneration': Use textGeneration API only
+   * - 'chatCompletion': Use chatCompletion API only
+   */
+  method?: 'auto' | 'textGeneration' | 'chatCompletion';
+  /**
+   * Whether to enable automatic fallback between methods (only for 'auto' mode)
+   */
+  enableFallback?: boolean;
+}
+
+/**
+ * Create a Hugging Face model adapter for Vercel AI SDK
+ */
+function createHuggingFaceModel(modelId: string, config: string | HuggingFaceModelConfig): LanguageModel {
+  // Support both string (backward compatibility) and config object
+  const apiKey = typeof config === 'string' ? config : config.apiKey;
+  const method = typeof config === 'object' ? (config.method || 'auto') : 'auto';
+  const enableFallback = typeof config === 'object' ? (config.enableFallback !== false) : true;
+  const hf = new InferenceClient(apiKey);
+
+  return {
+    specificationVersion: 'v1',
+    modelId,
+    provider: 'huggingface',
+    defaultObjectGenerationMode: 'json',
+    async doGenerate(options) {
+      try {
+        // Convert messages to HF format
+        const prompt = options.prompt
+          ?.map(msg => {
+            if (msg.role === 'system') {
+              return `System: ${msg.content}`;
+            } else if (msg.role === 'user') {
+              return `User: ${msg.content}`;
+            } else if (msg.role === 'assistant') {
+              return `Assistant: ${msg.content}`;
+            }
+            return msg.content;
+          })
+          .join('\n\n') || '';
+
+        let response;
+        let text;
+
+        // Helper function for text generation
+        const tryTextGeneration = async () => {
+          response = await hf.textGeneration({
+            model: modelId,
+            inputs: prompt,
+            parameters: {
+              max_new_tokens: options.maxTokens || 4000,
+              temperature: options.temperature || 0.7,
+              return_full_text: false,
+            },
+          });
+          return typeof response === 'string' ? response : response.generated_text;
+        };
+
+        // Helper function for chat completion
+        const tryChatCompletion = async () => {
+          const messages = options.prompt?.map(msg => ({
+            role: msg.role as 'user' | 'assistant' | 'system',
+            content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
+          })) || [{ role: 'user' as const, content: prompt }];
+
+          response = await hf.chatCompletion({
+            model: modelId,
+            messages: messages,
+            max_tokens: options.maxTokens || 4000,
+            temperature: options.temperature || 0.7,
+          });
+
+          return response.choices?.[0]?.message?.content || '';
+        };
+
+        // Execute based on configured method
+        if (method === 'textGeneration') {
+          // Use textGeneration API only
+          text = await tryTextGeneration();
+        } else if (method === 'chatCompletion') {
+          // Use chatCompletion API only
+          text = await tryChatCompletion();
+        } else {
+          // Auto mode: try textGeneration first, fallback to chatCompletion
+          try {
+            text = await tryTextGeneration();
+          } catch (textGenError: any) {
+            if (enableFallback && textGenError.message?.includes('conversational')) {
+              console.log('🔄 Switching to chat completion API for model:', modelId);
+              text = await tryChatCompletion();
+            } else {
+              throw textGenError;
+            }
+          }
+        }
+
+        return {
+          text: text || '',
+          usage: {
+            promptTokens: Math.ceil(prompt.length / 4), // Rough estimate
+            completionTokens: Math.ceil((text || '').length / 4),
+          },
+          finishReason: 'stop' as const,
+          logprobs: undefined,
+          rawCall: { rawPrompt: prompt, rawSettings: options },
+          rawResponse: { headers: {} },
+          warnings: undefined,
+        };
+      } catch (error: any) {
+        throw new Error(`Hugging Face API error: ${error.message}`);
+      }
+    },
+    async doStream() {
+      throw new Error('Streaming not yet implemented for Hugging Face provider');
+    },
+  };
+}
 
 // Type exports for external usage
 export type ModelDefinition = ModelInfo;
 export type ModelCapability = string;
 
 export interface AIServiceConfig {
-  provider?: 'anthropic' | 'openai' | 'google' | 'openrouter'; // selected in constructor & used 
-  defaultProvider?: 'anthropic' | 'openai' | 'google' | 'openrouter'; // default provider optional, defaults to serviceProvider with highest priority
+  provider?: 'anthropic' | 'openai' | 'google' | 'openrouter' | 'huggingface'; // selected in constructor & used
+  defaultProvider?: 'anthropic' | 'openai' | 'google' | 'openrouter' | 'huggingface'; // default provider optional, defaults to serviceProvider with highest priority
   serviceProviders?: ServiceProvidersConfig;
   systemPrompts?: Record<string, string>; // Custom system prompt definitions
   apiKey?: string;
@@ -96,13 +224,16 @@ export interface SearchResult {
 }
 
 interface ServiceProvider {
-  name: 'anthropic' | 'openai' | 'google' | 'openrouter';
+  name: 'anthropic' | 'openai' | 'google' | 'openrouter' | 'huggingface';
   apiKey: string;
   priority: number;
   model?: string;
   maxTokens?: number;
   temperature?: number;
-  baseURL?: string; // For OpenRouter and custom endpoints
+  baseURL?: string; // For OpenRouter, Hugging Face, and custom endpoints
+  // Hugging Face specific options
+  huggingfaceMethod?: 'auto' | 'textGeneration' | 'chatCompletion';
+  huggingfaceEnableFallback?: boolean;
 }
 
 // Allow either an object mapping provider names to partial config,
@@ -113,6 +244,7 @@ export type ServiceProvidersConfig =
       openai?: Partial<Omit<ServiceProvider, 'name' | 'priority'>> & { priority?: number };
       google?: Partial<Omit<ServiceProvider, 'name' | 'priority'>> & { priority?: number };
       openrouter?: Partial<Omit<ServiceProvider, 'name' | 'priority'>> & { priority?: number };
+      huggingface?: Partial<Omit<ServiceProvider, 'name' | 'priority'>> & { priority?: number };
     }
   | ServiceProvider[];
 
@@ -128,7 +260,7 @@ function normalizeServiceProviders(
     return spConfig.map((provider, index) => {
       if (typeof provider === 'string') {
         return {
-          name: provider as 'anthropic' | 'openai' | 'google' | 'openrouter',
+          name: provider as 'anthropic' | 'openai' | 'google' | 'openrouter' | 'huggingface',
           apiKey: '',
           priority: index,
           model: undefined,
@@ -187,6 +319,18 @@ function normalizeServiceProviders(
       maxTokens: spConfig.openrouter.maxTokens,
       temperature: spConfig.openrouter.temperature,
       baseURL: spConfig.openrouter.baseURL ?? 'https://openrouter.ai/api/v1',
+    });
+  }
+
+  if (spConfig.huggingface) {
+    providers.push({
+      name: 'huggingface',
+      apiKey: spConfig.huggingface.apiKey ?? '',
+      priority: spConfig.huggingface.priority ?? 0,
+      model: spConfig.huggingface.model,
+      maxTokens: spConfig.huggingface.maxTokens,
+      temperature: spConfig.huggingface.temperature,
+      baseURL: spConfig.huggingface.baseURL ?? 'https://api-inference.huggingface.co',
     });
   }
 
@@ -470,10 +614,11 @@ export class AIService {
         anthropic: (name, key) => new Anthropic({ apiKey: key }).messages(name),
         openai: (name, key) => new OpenAI({ apiKey: key }).chat(name),
         google: (name, key) => new Google({ apiKey: key }).generativeAI(name),
-        openrouter: (name, key) => new OpenAI({ 
-          apiKey: key, 
-          baseUrl: 'https://openrouter.ai/api/v1' 
-        }).chat(name)
+        openrouter: (name, key) => new OpenAI({
+          apiKey: key,
+          baseUrl: 'https://openrouter.ai/api/v1'
+        }).chat(name),
+        huggingface: (name, key) => createHuggingFaceModel(name, key)
       };
       const getModelFn = models[provider as keyof typeof models];
       if (getModelFn === undefined) {
@@ -494,10 +639,15 @@ export class AIService {
         anthropic: (name) => new Anthropic({ apiKey: providerApiKey }).messages(name),
         openai: (name) => new OpenAI({ apiKey: providerApiKey }).chat(name),
         google: (name) => new Google({ apiKey: providerApiKey }).generativeAI(name),
-        openrouter: (name) => new OpenAI({ 
-          apiKey: providerApiKey, 
-          baseUrl: 'https://openrouter.ai/api/v1' 
-        }).chat(name)
+        openrouter: (name) => new OpenAI({
+          apiKey: providerApiKey,
+          baseUrl: 'https://openrouter.ai/api/v1'
+        }).chat(name),
+        huggingface: (name) => createHuggingFaceModel(name, {
+          apiKey: providerApiKey,
+          method: currentProvider?.huggingfaceMethod || 'auto',
+          enableFallback: currentProvider?.huggingfaceEnableFallback !== false
+        })
       };
       
       const getModelFn = modelsWithApiKey[provider as keyof typeof modelsWithApiKey];
@@ -520,7 +670,14 @@ export class AIService {
       anthropic: (name) => anthropic.messages(name), // Uses ANTHROPIC_API_KEY
       openai: (name) => openai.chat(name), // Uses OPENAI_API_KEY
       google: (name) => google.generativeAI(name), // Uses GOOGLE_GENERATIVE_AI_API_KEY
-      openrouter: (name) => openai.chat(name) // Uses OPENAI_API_KEY
+      openrouter: (name) => openai.chat(name), // Uses OPENAI_API_KEY
+      huggingface: (name) => {
+        const hfApiKey = process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN;
+        if (!hfApiKey) {
+          throw new Error('HUGGINGFACE_API_KEY or HF_TOKEN environment variable is required for Hugging Face provider');
+        }
+        return createHuggingFaceModel(name, hfApiKey);
+      }
     };
     const getModelFn = models[provider as keyof typeof models];
     if (getModelFn === undefined) {
@@ -533,7 +690,12 @@ export class AIService {
   private async getDefaultModel(provider?: string): Promise<string> {
     const targetProvider = provider || this.config.provider;
     if (!targetProvider) return 'unknown-model';
-    
+
+    // For Hugging Face, provide a sensible default until model registry supports it
+    if (targetProvider === 'huggingface') {
+      return 'meta-llama/Llama-2-7b-chat-hf'; // Popular free chat model
+    }
+
     return await this.modelRegistry.getDefaultModel(targetProvider);
   }
 
@@ -1180,7 +1342,28 @@ The tools will be available during our conversation. Call them when needed to ga
   async getAvailableModels(provider?: string): Promise<string[]> {
     const targetProvider = provider || this.config.provider;
     if (!targetProvider) return [];
-    
+
+    // For Hugging Face, provide a curated list until model registry supports it
+    if (targetProvider === 'huggingface') {
+      return [
+        'meta-llama/Llama-2-7b-chat-hf',
+        'meta-llama/Llama-2-13b-chat-hf',
+        'meta-llama/Meta-Llama-3-8B-Instruct',
+        'meta-llama/Meta-Llama-3.1-8B-Instruct',
+        'microsoft/DialoGPT-medium',
+        'microsoft/DialoGPT-large',
+        'tiiuae/falcon-7b-instruct',
+        'tiiuae/falcon-40b-instruct',
+        'mistralai/Mistral-7B-Instruct-v0.1',
+        'mistralai/Mistral-7B-Instruct-v0.2',
+        'mistralai/Mixtral-8x7B-Instruct-v0.1',
+        'NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO',
+        'openchat/openchat-3.5-1210',
+        'teknium/OpenHermes-2.5-Mistral-7B',
+        'HuggingFaceH4/zephyr-7b-beta'
+      ];
+    }
+
     const models = await this.modelRegistry.getModelsForProvider(targetProvider);
     return models.map(model => model.id);
   }
@@ -1191,7 +1374,28 @@ The tools will be available during our conversation. Call them when needed to ga
   async getAvailableModelsDetailed(provider?: string): Promise<ModelDefinition[]> {
     const targetProvider = provider || this.config.provider;
     if (!targetProvider) return [];
-    
+
+    // For Hugging Face, provide detailed model information until model registry supports it
+    if (targetProvider === 'huggingface') {
+      return [
+        { id: 'meta-llama/Llama-2-7b-chat-hf', name: 'Llama 2 7B Chat', provider: 'huggingface', source: 'fallback', capabilities: ['chat'] },
+        { id: 'meta-llama/Llama-2-13b-chat-hf', name: 'Llama 2 13B Chat', provider: 'huggingface', source: 'fallback', capabilities: ['chat'] },
+        { id: 'meta-llama/Meta-Llama-3-8B-Instruct', name: 'Llama 3 8B Instruct', provider: 'huggingface', source: 'fallback', capabilities: ['chat', 'instruct'] },
+        { id: 'meta-llama/Meta-Llama-3.1-8B-Instruct', name: 'Llama 3.1 8B Instruct', provider: 'huggingface', source: 'fallback', capabilities: ['chat', 'instruct'] },
+        { id: 'microsoft/DialoGPT-medium', name: 'DialoGPT Medium', provider: 'huggingface', source: 'fallback', capabilities: ['chat'] },
+        { id: 'microsoft/DialoGPT-large', name: 'DialoGPT Large', provider: 'huggingface', source: 'fallback', capabilities: ['chat'] },
+        { id: 'tiiuae/falcon-7b-instruct', name: 'Falcon 7B Instruct', provider: 'huggingface', source: 'fallback', capabilities: ['instruct'] },
+        { id: 'tiiuae/falcon-40b-instruct', name: 'Falcon 40B Instruct', provider: 'huggingface', source: 'fallback', capabilities: ['instruct'] },
+        { id: 'mistralai/Mistral-7B-Instruct-v0.1', name: 'Mistral 7B Instruct v0.1', provider: 'huggingface', source: 'fallback', capabilities: ['instruct'] },
+        { id: 'mistralai/Mistral-7B-Instruct-v0.2', name: 'Mistral 7B Instruct v0.2', provider: 'huggingface', source: 'fallback', capabilities: ['instruct'] },
+        { id: 'mistralai/Mixtral-8x7B-Instruct-v0.1', name: 'Mixtral 8x7B Instruct', provider: 'huggingface', source: 'fallback', capabilities: ['instruct'] },
+        { id: 'NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO', name: 'Nous Hermes 2 Mixtral 8x7B', provider: 'huggingface', source: 'fallback', capabilities: ['chat', 'instruct'] },
+        { id: 'openchat/openchat-3.5-1210', name: 'OpenChat 3.5', provider: 'huggingface', source: 'fallback', capabilities: ['chat'] },
+        { id: 'teknium/OpenHermes-2.5-Mistral-7B', name: 'OpenHermes 2.5 Mistral 7B', provider: 'huggingface', source: 'fallback', capabilities: ['chat', 'instruct'] },
+        { id: 'HuggingFaceH4/zephyr-7b-beta', name: 'Zephyr 7B Beta', provider: 'huggingface', source: 'fallback', capabilities: ['chat', 'instruct'] }
+      ];
+    }
+
     return await this.modelRegistry.getModelsForProvider(targetProvider);
   }
 

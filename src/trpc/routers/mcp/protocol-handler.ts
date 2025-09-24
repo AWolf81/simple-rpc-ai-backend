@@ -39,11 +39,13 @@ export class MCPProtocolHandler {
   private rootManager?: any;
   private dnsRebindingConfig: DNSRebindingConfig;
   private clientCapabilities: any = null;
+  private aiEnabled: boolean;
 
   constructor(appRouter: any, config?: MCPRouterConfig) {
     this.appRouter = appRouter;
     this.adminUsers = config?.adminUsers || [];
     this.jwtMiddleware = config?.jwtMiddleware;
+    this.aiEnabled = config?.ai?.enabled || false;
 
     // Initialize auth config with defaults
     this.authConfig = {
@@ -484,6 +486,11 @@ export class MCPProtocolHandler {
         const meta = procedureAny?._def?.meta;
 
         if (meta?.mcp) {
+          // Skip AI tools if AI is disabled
+          if (!this.aiEnabled && fullName.startsWith('ai.')) {
+            continue;
+          }
+
           const inputSchema = this.extractInputSchema(procedureAny);
           const mcpToolName = meta.mcp.name;
           const procedureName = fullName.includes('.') ? fullName.split('.').pop()! : fullName;

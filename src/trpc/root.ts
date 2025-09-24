@@ -125,7 +125,7 @@ export function createAppRouter(
     ai: mcpConfig?.ai,
     aiService: sharedAIService
   });
-  const systemRouter = createSystemRouter(rootManager);
+  const systemRouter = createSystemRouter(undefined);
   const userRouter = createUserRouter(virtualTokenService, usageAnalyticsService, hybridUserService, byokProviders);
   const billingRouter = createBillingRouter(virtualTokenService, usageAnalyticsService, hybridUserService);
   const authRouter = createAuthRouter(postgresRPCMethods);

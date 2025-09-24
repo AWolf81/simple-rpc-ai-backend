@@ -196,12 +196,17 @@ function extractConstraints(prop) {
   return constraints;
 }
 
-function generateVSCodeLink(procedureName, sourceFile) {
+function generateVSCodeLink(procedureName, sourceFile, lineNumber) {
   if (sourceFile) {
-    // Extract just the method name (last part after the dot)
-    const methodName = procedureName.split('.').pop();
-    // Direct file link with search term to scroll to the right line
     const absolutePath = `${process.cwd()}/${sourceFile}`;
+    
+    // If we have a line number, use it for direct navigation
+    if (lineNumber) {
+      return `vscode://file/${absolutePath}:${lineNumber}`;
+    }
+    
+    // Otherwise, try to extract just the method name (last part after the dot) for search
+    const methodName = procedureName.split('.').pop();
     return `vscode://file/${absolutePath}?search=${encodeURIComponent(methodName + ':')}`;
   }
   
@@ -236,7 +241,8 @@ function generateProcedureHTML(name, procedure) {
   const pathDisplay = procPath || name;
   const inputInfo = extractSchemaInfo(input);
   const outputInfo = extractSchemaInfo(output);
-  const vsCodeLink = generateVSCodeLink(name, procedure.sourceFile);
+  const inputVSCodeLink = generateVSCodeLink(name, procedure.sourceFile, procedure.inputLineNumber || procedure.lineNumber);
+  const outputVSCodeLink = generateVSCodeLink(name, procedure.sourceFile, procedure.outputLineNumber || procedure.lineNumber);
   
   const inputTitle = inputInfo.title || (inputInfo.description ? inputInfo.description : 'Input Parameters');
   const outputTitle = outputInfo.title || (outputInfo.description ? outputInfo.description : 'Response');
@@ -261,7 +267,7 @@ function generateProcedureHTML(name, procedure) {
         <div class="io-section">
           <h4 class="io-title" title="Click to view source schema">
             📥 ${inputTitle}
-            <button class="vs-code-btn" onclick="window.open('${vsCodeLink}', '_blank')" title="Open in VS Code">⚡</button>
+            <button class="vs-code-btn" onclick="window.open('${inputVSCodeLink}', '_blank')" title="Open in VS Code">⚡</button>
             <button class="toggle-schema" onclick="toggleSchema('input-${name.replace(/\./g, '-')}')" title="Show/Hide Zod Schema">{ }</button>
           </h4>
           
@@ -281,7 +287,7 @@ function generateProcedureHTML(name, procedure) {
         <div class="io-section">
           <h4 class="io-title" title="Click to view source schema">
             📤 ${outputTitle}
-            <button class="vs-code-btn" onclick="window.open('${vsCodeLink}', '_blank')" title="Open in VS Code">⚡</button>
+            <button class="vs-code-btn" onclick="window.open('${outputVSCodeLink}', '_blank')" title="Open in VS Code">⚡</button>
             <button class="toggle-schema" onclick="toggleSchema('output-${name.replace(/\./g, '-')}')" title="Show/Hide Zod Schema">{ }</button>
           </h4>
           
