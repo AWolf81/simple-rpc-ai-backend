@@ -4,7 +4,9 @@
     // Override module settings for our build setup
     "module": "ESNext",
     "moduleResolution": "bundler",
-    
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+
     // Project-specific settings
     "outDir": "dist",
     "baseUrl": "./",

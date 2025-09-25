@@ -1189,12 +1189,21 @@ export class MCPProtocolHandler {
           // Convert Template Engine parameters to MCP format
           const mcpParameters: Record<string, any> = {};
           for (const [paramName, paramConfig] of Object.entries(template.parameters)) {
+            const config = paramConfig as {
+              type?: string;
+              description?: string;
+              enum?: string[];
+              required?: boolean;
+              default?: any;
+              min?: number;
+              max?: number;
+            };
             mcpParameters[paramName] = {
-              type: paramConfig.type || 'string',
-              description: paramConfig.description || `${paramName} parameter`,
-              ...(paramConfig.enum && { enum: paramConfig.enum }),
-              ...(paramConfig.required !== undefined && { required: paramConfig.required }),
-              ...(paramConfig.default !== undefined && { default: paramConfig.default })
+              type: config.type || 'string',
+              description: config.description || `${paramName} parameter`,
+              ...(config.enum && { enum: config.enum }),
+              ...(config.required !== undefined && { required: config.required }),
+              ...(config.default !== undefined && { default: config.default })
             };
           }
 
