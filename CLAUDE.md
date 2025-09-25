@@ -14,6 +14,33 @@ pnpm dev:docs             # Start server + panel + playground
 pnpm test:coverage        # 80% threshold required
 ```
 
+### tRPC Method Generation Configuration
+Control which methods appear in generated documentation and dev tools:
+
+```bash
+# Environment variables for selective method generation
+TRPC_GEN_AI_ENABLED=false         # Disable AI router methods (default: true)
+TRPC_GEN_MCP_ENABLED=true         # Enable MCP router methods (default: true)
+TRPC_GEN_MCP_AI_ENABLED=false     # Disable AI-powered MCP tools (default: true)
+
+# Usage examples:
+TRPC_GEN_AI_ENABLED=false pnpm build                    # MCP-only build
+TRPC_GEN_MCP_ENABLED=false pnpm build                   # AI-only build
+TRPC_GEN_AI_ENABLED=false TRPC_GEN_MCP_AI_ENABLED=false pnpm build # Pure MCP tools only
+
+# All router configuration options:
+TRPC_GEN_SYSTEM_ENABLED=true      # System router (file operations, workspaces)
+TRPC_GEN_USER_ENABLED=true        # User management router
+TRPC_GEN_BILLING_ENABLED=true     # Billing and usage tracking
+TRPC_GEN_AUTH_ENABLED=true        # Authentication router
+TRPC_GEN_ADMIN_ENABLED=true       # Admin tools and statistics
+```
+
+### Configuration Results
+- **All Enabled**: 59 procedures (40 queries, 19 mutations) + 32 MCP tools
+- **AI Disabled**: 53 procedures (36 queries, 17 mutations) + 32 MCP tools
+- **MCP AI Disabled**: Same procedure count, but AI tools excluded from MCP tools list
+
 ### Dev Panel Integration
 ```javascript
 import { createServerWithDevPanel } from 'simple-rpc-ai-backend';
@@ -179,6 +206,20 @@ const server = createRpcAiServer({
 });
 ```
 When `ai.enabled: false`, MCP clients only see non-AI tools (mcp.*, system.*, etc.) and cannot access any AI functionality.
+
+### Configuration for Consuming Packages
+When using the `simple-rpc-dev-panel` binary in consuming packages, the same environment variables work:
+
+```bash
+# In consuming package (works with binary)
+TRPC_GEN_AI_ENABLED=false npx simple-rpc-dev-panel
+TRPC_GEN_AI_ENABLED=false TRPC_GEN_MCP_AI_ENABLED=false npx simple-rpc-dev-panel
+
+# Or when using the dev panel programmatically:
+import { quickStartDevPanel } from 'simple-rpc-ai-backend/dev-panel';
+process.env.TRPC_GEN_AI_ENABLED = 'false';
+await quickStartDevPanel(8000);
+```
 
 ## AI Provider Registry System
 

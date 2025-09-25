@@ -32,11 +32,18 @@ console.log('🔨 Generating tRPC methods documentation...');
 
 async function extractTRPCMethods() {
   try {
-    // Import the router after TypeScript compilation
-    const { createAppRouter } = await import('../dist/trpc/root.js');
-    
-    const router = createAppRouter();
+    // Import the router configuration after TypeScript compilation
+    const { createRouterForGeneration, loadTRPCGenerationConfig } = await import('../dist/trpc/router-config.js');
+
+    // Load configuration from environment variables
+    const config = loadTRPCGenerationConfig();
+
+    // Create router with configuration filtering
+    const router = await createRouterForGeneration(config);
     const methods = {};
+
+    // Store configuration for later use in MCP filtering
+    const generationConfig = config;
     
     // Extract procedures from router
     // Use the flattened procedures object for nested routers
@@ -466,9 +473,23 @@ async function extractTRPCMethods() {
     }
 
     const mcpMethods = {};
-    const mcpProcedures = Object.entries(methods).filter(([name, method]) => 
-      method.meta?.mcp
-    );
+
+    // Only include MCP methods if MCP is enabled in configuration
+    const includeMCPMethods = generationConfig.mcp?.enabled && generationConfig.mcp?.includeInGeneration;
+    const includeAITools = generationConfig.mcp?.ai?.enabled && generationConfig.mcp?.ai?.includeAIToolsInGeneration;
+
+    const mcpProcedures = includeMCPMethods
+      ? Object.entries(methods).filter(([name, method]) => {
+          if (!method.meta?.mcp) return false;
+
+          // If AI tools are disabled, exclude AI-powered MCP tools
+          if (!includeAITools && method.meta.mcp.requiresAI) {
+            return false;
+          }
+
+          return true;
+        })
+      : [];
     
     for (const [name, method] of mcpProcedures) {
       const mcpMeta = method.meta.mcp;
@@ -566,9 +587,24 @@ async function extractTRPCMethods() {
       generated: new Date().toISOString(),
       version: '1.0.0',
       description: 'tRPC procedure documentation extracted from router',
+      configuration: {
+        ai: {
+          enabled: generationConfig.ai?.enabled ?? false,
+          includedInGeneration: generationConfig.ai?.includeInGeneration ?? false
+        },
+        mcp: {
+          enabled: generationConfig.mcp?.enabled ?? false,
+          includedInGeneration: generationConfig.mcp?.includeInGeneration ?? false,
+          ai: {
+            enabled: generationConfig.mcp?.ai?.enabled ?? false,
+            includedInGeneration: generationConfig.mcp?.ai?.includeAIToolsInGeneration ?? false
+          }
+        }
+      },
       procedures: methods,
       mcp: {
         available: Object.keys(mcpMethods).length > 0,
+        enabled: includeMCPMethods,
         methods: mcpMethods,
         endpoint: 'http://localhost:8000/mcp',
         protocolVersion: '2024-11-05'
@@ -620,13 +656,21 @@ async function main() {
   console.log(`   - ${documentation.stats.queries} queries`);
   console.log(`   - ${documentation.stats.mutations} mutations`);
   console.log(`   - ${documentation.stats.subscriptions} subscriptions`);
-  
-  if (documentation.mcp.available) {
+
+  // Show configuration status
+  console.log(`⚙️  Generation Configuration:`);
+  console.log(`   - AI: ${documentation.configuration.ai.enabled ? '✅ Enabled' : '❌ Disabled'}`);
+  console.log(`   - MCP: ${documentation.configuration.mcp.enabled ? '✅ Enabled' : '❌ Disabled'}`);
+  if (documentation.configuration.mcp.enabled) {
+    console.log(`   - MCP AI Tools: ${documentation.configuration.mcp.ai.enabled ? '✅ Enabled' : '❌ Disabled'}`);
+  }
+
+  if (documentation.mcp.enabled && documentation.mcp.available) {
     console.log(`🔧 MCP Integration:`);
     console.log(`   - ${documentation.stats.mcpMethods} MCP tools available`);
     console.log(`   - Endpoint: ${documentation.mcp.endpoint}`);
     console.log(`   - Protocol: ${documentation.mcp.protocolVersion}`);
-    
+
     if (documentation.stats.mcpMethods > 0) {
       console.log(`🛠️  Available MCP Tools:`);
       for (const [name, tool] of Object.entries(documentation.mcp.methods)) {
@@ -637,8 +681,10 @@ async function main() {
         console.log(`      🔹 JSON-RPC: POST ${tool.calling.jsonRpc.endpoint} (method: ${tool.calling.jsonRpc.method})`);
       }
     }
+  } else if (documentation.configuration.mcp.enabled) {
+    console.log(`🔧 MCP Integration: Enabled but no tools found (add .meta({ mcp: {...} }) to procedures)`);
   } else {
-    console.log(`🔧 MCP Integration: No tools found (add .meta({ mcp: {...} }) to procedures)`);
+    console.log(`🔧 MCP Integration: ❌ Disabled in configuration`);
   }
   
   if (documentation.error) {
