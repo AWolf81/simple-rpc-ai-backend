@@ -93,12 +93,50 @@ function getServerConfig() {
   };
 }
 
-// Load tRPC methods from generated JSON, auto-build if needed
-async function loadTRPCMethods() {
-  const methodsPath = path.join(process.cwd(), 'dist/trpc-methods.json');
+// Smart JSON file lookup with environment variable fallback
+function findTrpcMethodsJson() {
+  // 1. Check environment variable first (repo development case)
+  if (process.env.TRPC_METHODS_JSON_PATH) {
+    const envPath = path.resolve(process.env.TRPC_METHODS_JSON_PATH);
+    if (existsSync(envPath)) {
+      console.log(`📋 Using tRPC methods from env variable: ${envPath}`);
+      return envPath;
+    } else {
+      console.warn(`⚠️ TRPC_METHODS_JSON_PATH points to non-existent file: ${envPath}`);
+    }
+  }
 
-  if (!existsSync(methodsPath)) {
-    console.log(`📦 trpc-methods.json not found at ${methodsPath}`);
+  // 2. Look in current directory (consumer project case)
+  const currentDir = path.join(process.cwd(), 'dist/trpc-methods.json');
+  if (existsSync(currentDir)) {
+    console.log(`📋 Found tRPC methods in current project: ${currentDir}`);
+    return currentDir;
+  }
+
+  // 3. Check common fallback locations
+  const commonPaths = [
+    path.join(process.cwd(), 'trpc-methods.json'),
+    path.join(__dirname, '../trpc-methods.json'),
+    path.join(__dirname, '../../dist/trpc-methods.json')
+  ];
+
+  for (const fallbackPath of commonPaths) {
+    if (existsSync(fallbackPath)) {
+      console.log(`📋 Found tRPC methods at fallback location: ${fallbackPath}`);
+      return fallbackPath;
+    }
+  }
+
+  console.log(`🔍 No tRPC methods file found in any location`);
+  return null;
+}
+
+// Load tRPC methods from discovered JSON file, auto-build if needed
+async function loadTRPCMethods() {
+  let methodsPath = findTrpcMethodsJson();
+
+  if (!methodsPath) {
+    console.log(`📦 trpc-methods.json not found in any location`);
     console.log(`🔍 Checking if this is a consumer project...`);
 
     // Check if consumer has build:trpc-methods script in package.json
@@ -137,6 +175,13 @@ async function loadTRPCMethods() {
         });
 
         console.log(`✅ Built tRPC methods successfully`);
+
+        // Try to find the file again after build
+        methodsPath = findTrpcMethodsJson();
+        if (!methodsPath) {
+          console.error(`❌ trpc-methods.json still not found after build attempt`);
+          return null;
+        }
       } catch (error) {
         console.error(`❌ Failed to build trpc-methods.json:`, error.message);
         return null;
@@ -160,15 +205,16 @@ async function loadTRPCMethods() {
     }
   }
 
-  // Now try to load the file again
-  if (!existsSync(methodsPath)) {
-    console.error(`❌ trpc-methods.json still not found after build attempt`);
-    return null;
-  }
-
+  // Load the discovered or built file
   try {
     const data = JSON.parse(readFileSync(methodsPath, 'utf8'));
     console.log(`✅ Loaded ${data.stats.totalProcedures} tRPC procedures from ${methodsPath}`);
+
+    // Show configuration information if available
+    if (data.config) {
+      console.log(`📋 Configuration: AI=${data.config.ai?.enabled}, MCP=${data.config.mcp?.enabled}`);
+    }
+
     return data;
   } catch (error) {
     console.error(`❌ Failed to parse trpc-methods.json:`, error.message);
