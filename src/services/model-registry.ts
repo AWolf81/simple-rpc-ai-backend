@@ -6,22 +6,34 @@
  */
 
 import { getModelSafetyConfig, ModelValidator, type ModelSafetyConfig } from '../config/model-safety.js';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// Get the directory of this file for proper path resolution
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Import model data with fallbacks for GitHub installs
 let openaiModelsData: any = {};
 let huggingfaceModelsData: any = {};
 
+// Load data synchronously using createRequire for ES modules
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
 try {
-  // @ts-ignore - Conditional import with fallback
-  openaiModelsData = require('../data/openai-models.json');
+  // Use absolute path resolution relative to this file
+  const openaiDataPath = path.resolve(__dirname, '../data/openai-models.json');
+  openaiModelsData = require(openaiDataPath);
 } catch (error) {
   console.warn('OpenAI models data not found, using empty fallback');
   openaiModelsData = {};
 }
 
 try {
-  // @ts-ignore - Conditional import with fallback
-  huggingfaceModelsData = require('../data/huggingface-models.json');
+  // Use absolute path resolution relative to this file
+  const huggingfaceDataPath = path.resolve(__dirname, '../data/huggingface-models.json');
+  huggingfaceModelsData = require(huggingfaceDataPath);
 } catch (error) {
   console.warn('HuggingFace models data not found, using empty fallback');
   huggingfaceModelsData = {};
