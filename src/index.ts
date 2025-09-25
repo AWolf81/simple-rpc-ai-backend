@@ -297,9 +297,9 @@ export type {
   MonetizedServerInstance
 } from './monetization/opensaas-server';
 
-// Development tools
-export { startDevPanel, createServerWithDevPanel, checkDevPanelRunning } from './dev-panel';
-export type { DevPanelConfig } from './dev-panel';
+// Development tools (legacy - use the new dev-panel-api for easier integration)
+// export { startDevPanel, createServerWithDevPanel, checkDevPanelRunning } from './dev-panel';
+// export type { DevPanelConfig } from './dev-panel';
 
 // MCP Helper Functions (simplified imports for common use)
 export {
@@ -314,6 +314,10 @@ export type {
   ScopeRequirement,
   ScopePattern
 } from './auth/scopes';
+
+// Dev Panel - Easy development tools for package consumers
+export { startDevPanel, quickStartDevPanel } from './tools/dev-panel-api';
+export type { DevPanelConfig } from './tools/dev-panel-api';
 
 // Default export - unified server for new projects
 export { createRpcAiServer as default } from './rpc-ai-server';

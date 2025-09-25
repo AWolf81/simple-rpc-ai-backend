@@ -24,11 +24,15 @@
     "pnpm": ">=7.0.0"
   },
   "main": "dist/index.js",
+  "bin": {
+    "simple-rpc-dev-panel": "./dist/tools/dev-panel.js"
+  },
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
     "./server": "./dist/server.js",
-    "./ai": "./dist/ai-service.js"
+    "./ai": "./dist/ai-service.js",
+    "./dev-panel": "./dist/tools/dev-panel-api.js"
   },
   "scripts": {
     "build": "npm run copy-assets && tsc && tsc-alias && npm run build:trpc-methods",

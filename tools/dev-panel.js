@@ -14,6 +14,7 @@ import { zodResolveTypes } from './trpc-playground-fix.js';
 
 const app = express();
 const port = process.env.DEV_PANEL_PORT || 8080;
+const openBrowser = process.env.DEV_PANEL_OPEN_BROWSER !== 'false';
 const playgroundEndpoint = '/api/trpc-playground';
 const mcpJamEndpoint = 'http://localhost:4000';
 const trpcApiEndpoint = '/api/trpc'; // endpoint used by trpc playground
@@ -92,16 +93,79 @@ function getServerConfig() {
   };
 }
 
-// Load tRPC methods from generated JSON
-function loadTRPCMethods() {
+// Load tRPC methods from generated JSON, auto-build if needed
+async function loadTRPCMethods() {
   const methodsPath = path.join(process.cwd(), 'dist/trpc-methods.json');
-  
+
   if (!existsSync(methodsPath)) {
-    console.error(`❌ trpc-methods.json not found at ${methodsPath}`);
-    console.log('💡 Run "npm run build:trpc-methods" to generate it');
+    console.log(`📦 trpc-methods.json not found at ${methodsPath}`);
+    console.log(`🔍 Checking if this is a consumer project...`);
+
+    // Check if consumer has build:trpc-methods script in package.json
+    const packageJsonPath = path.join(process.cwd(), 'package.json');
+    let hasBuildScript = false;
+
+    if (existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+        hasBuildScript = packageJson.scripts && packageJson.scripts['build:trpc-methods'];
+      } catch (error) {
+        console.warn(`⚠️ Could not read package.json: ${error.message}`);
+      }
+    }
+
+    if (hasBuildScript) {
+      console.log(`📦 Found build:trpc-methods script, building...`);
+
+      try {
+        const { spawn } = await import('child_process');
+
+        const buildProcess = spawn('npm', ['run', 'build:trpc-methods'], {
+          cwd: process.cwd(),
+          stdio: 'inherit'
+        });
+
+        await new Promise((resolve, reject) => {
+          buildProcess.on('close', (code) => {
+            if (code === 0) {
+              resolve();
+            } else {
+              reject(new Error(`Build failed with code ${code}`));
+            }
+          });
+          buildProcess.on('error', reject);
+        });
+
+        console.log(`✅ Built tRPC methods successfully`);
+      } catch (error) {
+        console.error(`❌ Failed to build trpc-methods.json:`, error.message);
+        return null;
+      }
+    } else {
+      console.log(`💡 Consumer project detected without build:trpc-methods script`);
+      console.log(`📝 To use dev-panel with your tRPC methods, add to your package.json:`);
+      console.log(`   "scripts": {`);
+      console.log(`     "build:trpc-methods": "node node_modules/simple-rpc-ai-backend/tools/generate-trpc-methods.js"`);
+      console.log(`   }`);
+      console.log(`🚀 Then run: npm run build:trpc-methods && npx simple-rpc-dev-panel`);
+
+      // Still try to provide basic dev panel functionality
+      console.log(`🔄 Continuing with basic dev panel (no tRPC method discovery)...`);
+      return {
+        procedures: {},
+        stats: { totalProcedures: 0, queries: 0, mutations: 0, subscriptions: 0 },
+        generated: new Date().toISOString(),
+        isPlaceholder: true
+      };
+    }
+  }
+
+  // Now try to load the file again
+  if (!existsSync(methodsPath)) {
+    console.error(`❌ trpc-methods.json still not found after build attempt`);
     return null;
   }
-  
+
   try {
     const data = JSON.parse(readFileSync(methodsPath, 'utf8'));
     console.log(`✅ Loaded ${data.stats.totalProcedures} tRPC procedures from ${methodsPath}`);
@@ -112,12 +176,17 @@ function loadTRPCMethods() {
   }
 }
 
-const trpcMethods = loadTRPCMethods();
+// Initialize everything async
+let trpcMethods = null;
 
-// Set up tRPC playground if methods are available
-if (trpcMethods) {
-  setupTRPCPlayground();
-}
+(async () => {
+  trpcMethods = await loadTRPCMethods();
+
+  // Set up tRPC playground if methods are available
+  if (trpcMethods) {
+    setupTRPCPlayground();
+  }
+})();
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -518,8 +587,55 @@ app.get('/', async (req, res) => {
       <html>
         <head><title>tRPC Development Panel</title></head>
         <body style="font-family: system-ui; padding: 2rem;">
-          <h1>❌ tRPC Methods Not Found</h1>
-          <p>Please run <code>npm run build:trpc-methods</code> to generate the methods documentation.</p>
+          <h1>🔄 Loading tRPC Methods...</h1>
+          <p>Dev panel is starting up. If this persists:</p>
+          <ol>
+            <li>Ensure you have a <code>build:trpc-methods</code> script in package.json</li>
+            <li>Run <code>npm run build:trpc-methods</code> manually</li>
+            <li>Refresh this page</li>
+          </ol>
+          <script>setTimeout(() => window.location.reload(), 3000);</script>
+        </body>
+      </html>
+    `);
+    return;
+  }
+
+  // Handle placeholder case (consumer without tRPC methods)
+  if (trpcMethods.isPlaceholder) {
+    res.send(`
+      <html>
+        <head><title>tRPC Development Panel - Setup Required</title></head>
+        <body style="font-family: system-ui; padding: 2rem; background: #f8fafc;">
+          <div style="max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <h1>🎨 Dev Panel Ready - tRPC Setup Required</h1>
+
+            <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <strong>📡 Connected Server:</strong> ${config.baseUrl}
+            </div>
+
+            <h2>🚀 Quick Setup for tRPC Method Discovery</h2>
+            <p>To see your tRPC methods in the dev panel, add this script to your <code>package.json</code>:</p>
+
+            <pre style="background: #1a202c; color: #f7fafc; padding: 1rem; border-radius: 4px; overflow-x: auto;"><code>"scripts": {
+  "build:trpc-methods": "node node_modules/simple-rpc-ai-backend/tools/generate-trpc-methods.js"
+}</code></pre>
+
+            <p>Then run:</p>
+            <pre style="background: #1a202c; color: #f7fafc; padding: 1rem; border-radius: 4px; overflow-x: auto;"><code>npm run build:trpc-methods
+npx simple-rpc-dev-panel</code></pre>
+
+            <h2>🔗 Available Tools (No tRPC Setup Required)</h2>
+            <ul>
+              <li><strong>🎮 MCP JAM:</strong> <a href="${mcpJamEndpoint}" target="_blank">Open MCP JAM Playground</a></li>
+              <li><strong>🎮 Open-RPC Playground:</strong> <a href="https://playground.open-rpc.org/?url=${config.baseUrl}/openrpc.json&rpcUrl=${config.endpoints.jsonRpc}" target="_blank">Open RPC Playground</a></li>
+              <li><strong>🎮 Open-RPC Inspector:</strong> <a href="https://inspector.open-rpc.org/?url=${config.endpoints.jsonRpc}" target="_blank">Open RPC Inspector</a></li>
+            </ul>
+
+            <div style="background: #e6fffa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4fd1c7;">
+              <strong>💡 Pro Tip:</strong> You can use the JSON-RPC tools above even without tRPC method discovery!
+            </div>
+          </div>
         </body>
       </html>
     `);
@@ -1114,12 +1230,30 @@ app.get('/api/methods', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`🎨 tRPC Development Panel running at http://localhost:${port}`);
-  
+  const url = `http://localhost:${port}`;
+  console.log(`🎨 tRPC Development Panel running at ${url}`);
+
   if (trpcMethods) {
-    console.log(`📊 Serving ${trpcMethods.stats.totalProcedures} procedures`);
-    console.log(`📄 JSON API: http://localhost:${port}/api/methods`);
+    if (trpcMethods.isPlaceholder) {
+      console.log(`📋 Setup page available - add build:trpc-methods script to see tRPC methods`);
+    } else {
+      console.log(`📊 Serving ${trpcMethods.stats.totalProcedures} procedures`);
+      console.log(`📄 JSON API: ${url}/api/methods`);
+    }
   } else {
-    console.log(`⚠️  Run 'npm run build:trpc-methods' to generate documentation`);
+    console.log(`🔄 Loading tRPC methods...`);
+  }
+
+  // Auto-open browser
+  if (openBrowser) {
+    setTimeout(async () => {
+      try {
+        const open = await import('open');
+        await open.default(url);
+        console.log(`🌐 Browser opened to ${url}`);
+      } catch (error) {
+        console.log(`💡 Open browser manually: ${url}`);
+      }
+    }, 1000);
   }
 });
