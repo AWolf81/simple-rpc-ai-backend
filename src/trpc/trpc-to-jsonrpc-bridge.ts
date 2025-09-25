@@ -71,132 +71,80 @@ export class TRPCToJSONRPCBridge {
    */
   createHandler() {
     return async (req: Request, res: Response): Promise<void> => {
-      // Set CORS headers
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
       try {
         const { method, params, id }: JSONRPCRequest = req.body;
 
-        if (!method) {
-          res.json({
-            jsonrpc: '2.0',
-            id: id || null,
-            error: { code: -32600, message: 'Invalid Request' }
-          } as JSONRPCResponse);
-          return;
-        }
-
-        // Convert JSON-RPC method format to tRPC procedure path
-        // e.g., "ai.executeAIRequest" or "executeAIRequest" -> ["ai", "executeAIRequest"]
-        const procedurePath = method.includes('.') ? method.split('.') : ['ai', method];
-        
-        // Handle legacy method names by mapping them to new ones
-        const legacyMethodMapping: Record<string, string[]> = {
-          'health': ['ai', 'health'],
-          'generateText': ['ai', 'generateText'],
-          'listAllowedModels': ['ai', 'listAllowedModels'],
-          'listProviders': ['ai', 'listProviders'],
-          'storeUserKey': ['ai', 'storeUserKey'],
-          'getUserKey': ['ai', 'getUserKey'],
-          'getUserProviders': ['ai', 'getUserProviders'],
-          'validateUserKey': ['ai', 'validateUserKey'],
-          'rotateUserKey': ['ai', 'rotateUserKey'],
-          'deleteUserKey': ['ai', 'deleteUserKey'],
-        };
-
-        const actualPath = legacyMethodMapping[method] || procedurePath;
-
-        // Create tRPC context using the enhanced context creation function if provided
+        // Create tRPC context
         const ctx = this.contextCreator 
-          ? this.contextCreator({ req, res, info: {} as any })
-          : createTRPCContext({ req, res, info: {} as any });
+          ? await this.contextCreator({ req, res, info: {} as any })
+          : await createTRPCContext({ req, res, info: {} as any });
 
         try {
-          // Use tRPC's createCaller API for clean procedure calling
-          const caller = this.router.createCaller(ctx);
+          // Direct server-side call using the full method path
+          const result = await this.router.createCaller(ctx)[method](params);
           
-          // Navigate to the procedure using dot notation
-          const [routerName, procedureName] = actualPath;
-          
-          let result;
-          if (routerName === 'ai' && caller.ai) {
-            const aiCaller = caller.ai as any;
-            if (aiCaller[procedureName]) {
-              result = await aiCaller[procedureName](params);
-            } else {
-              res.json({
-                jsonrpc: '2.0',
-                id,
-                error: { code: -32601, message: `AI procedure not found: ${procedureName}` }
-              } as JSONRPCResponse);
-              return;
-            }
-          } else if (routerName === 'mcp' && caller.mcp) {
-            const mcpCaller = caller.mcp as any;
-            if (mcpCaller[procedureName]) {
-              result = await mcpCaller[procedureName](params);
-            } else {
-              res.json({
-                jsonrpc: '2.0',
-                id,
-                error: { code: -32601, message: `MCP procedure not found: ${procedureName}` }
-              } as JSONRPCResponse);
-              return;
-            }
-          } else {
-            res.json({
-              jsonrpc: '2.0',
-              id,
-              error: { code: -32601, message: `Router not found: ${routerName}` }
-            } as JSONRPCResponse);
-            return;
-          }
-
-          // Return successful JSON-RPC response
           res.json({
             jsonrpc: '2.0',
             id,
             result
           } as JSONRPCResponse);
-
-        } catch (error) {
-          // Handle tRPC errors
-          if (error && typeof error === 'object' && 'code' in error) {
-            const trpcError = error as TRPCError;
-            const jsonRpcError = mapTRPCErrorToJSONRPC(trpcError);
-            
+        } catch (error: any) {
+          // If method not found, return proper JSON-RPC error
+          if (error.message?.includes('No such procedure')) {
             res.json({
               jsonrpc: '2.0',
               id,
-              error: jsonRpcError
+              error: { 
+                code: -32601, 
+                message: `Method not found: ${method}`
+              }
             } as JSONRPCResponse);
             return;
           }
 
-          // Handle generic errors
-          console.error('JSON-RPC Bridge Error:', error);
+          // Map other tRPC errors to JSON-RPC errors
+          console.error('Procedure error:', error);
           res.json({
             jsonrpc: '2.0',
             id,
-            error: {
-              code: -32603,
-              message: 'Internal error',
-              data: error instanceof Error ? error.message : 'Unknown error'
-            }
+            error: mapTRPCErrorToJSONRPC(error)
           } as JSONRPCResponse);
         }
-
-      } catch (parseError) {
-        // Handle JSON parsing errors
+      } catch (error: any) {
         res.json({
           jsonrpc: '2.0',
-          id: null,
-          error: { code: -32700, message: 'Parse error' }
+          id: (req.body as JSONRPCRequest)?.id,
+          error: { 
+            code: -32700, 
+            message: 'Parse error', 
+            data: error.message 
+          }
         } as JSONRPCResponse);
       }
     };
+  }
+
+  /**
+   * Resolve a procedure from a flattened path like ['mcp', 'greeting']
+   * Uses a more robust approach to access deeply nested procedures
+   */
+  private resolveProcedureFromPath(caller: any, path: string[]): ((params: any) => Promise<any>) | ((params: any) => any) | null {
+    try {
+      // Try direct path resolution
+      let current = caller;
+      for (const segment of path) {
+        if (current && typeof current === 'object' && current[segment]) {
+          current = current[segment];
+        } else {
+          return null;
+        }
+      }
+
+      return typeof current === 'function' ? current : null;
+    } catch (error) {
+      console.warn('Error resolving procedure from path:', path, error);
+      return null;
+    }
   }
 
   /**
@@ -204,57 +152,220 @@ export class TRPCToJSONRPCBridge {
    * This introspects the tRPC router to generate documentation
    */
   generateOpenRPCSchema(serverUrl: string) {
-    // For now, return a basic schema
-    // TODO: Implement full schema generation by introspecting tRPC router
+    const methods: any[] = [];
+
+    // Introspect the tRPC router to extract all procedures dynamically
+    try {
+      // Access the router definition which contains all procedures
+      const routerDef = this.router._def;
+
+      if (routerDef && routerDef.procedures) {
+        // Iterate through all procedures in the flattened structure
+        for (const [procedurePath, procedure] of Object.entries(routerDef.procedures)) {
+          const procedureDef = (procedure as any)._def;
+
+          if (procedureDef) {
+            // Extract method information
+            const methodName = procedurePath; // e.g., "ai.generateText", "admin.status"
+            const description = this.extractDescription(procedureDef) || `${procedurePath} (auto-generated from tRPC)`;
+
+            // Convert tRPC input schema to OpenRPC params
+            const params = this.extractParams(procedureDef.inputs?.[0]);
+
+            // Convert tRPC output schema to OpenRPC result
+            const result = this.extractResult(procedureDef.output, procedurePath);
+
+            methods.push({
+              name: methodName,
+              description,
+              params,
+              result
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to introspect tRPC router for OpenRPC generation:', error);
+
+      // Fallback to basic methods if introspection fails
+      methods.push(
+        {
+          name: "ai.health",
+          description: "Check server health",
+          params: [],
+          result: { name: "healthResult", schema: { type: "object" } }
+        },
+        {
+          name: "ai.generateText",
+          description: "Generate text using AI",
+          params: [
+            { name: "content", required: true, schema: { type: "string" } },
+            { name: "systemPrompt", required: true, schema: { type: "string" } },
+            { name: "provider", required: false, schema: { type: "string" } },
+            { name: "apiKey", required: false, schema: { type: "string" } },
+            { name: "options", required: false, schema: { type: "object" } }
+          ],
+          result: { name: "aiResult", schema: { type: "object" } }
+        }
+      );
+    }
+
     return {
       openrpc: "1.2.6",
       info: {
         title: "Simple RPC AI Backend",
-        description: "Auto-generated from tRPC router",
+        description: "Dynamically generated from tRPC router - includes all routers and custom routers",
         version: "0.1.0"
       },
       servers: [{
         name: "AI Server",
         url: serverUrl,
-        description: "JSON-RPC endpoint generated from tRPC"
+        description: "JSON-RPC endpoint generated from tRPC router with dynamic procedure discovery"
       }],
-      methods: [
-        {
-          name: "ai.health",
-          description: "Check server health (auto-generated from tRPC)",
-          params: [],
-          result: {
-            name: "healthResult",
-            schema: { type: "object" }
-          }
-        },
-        {
-          name: "ai.generateText", 
-          description: "Generate text using AI (auto-generated from tRPC)",
-          params: [
-            { name: "content", required: true, schema: { type: "string" } },
-            { name: "promptId", required: true, schema: { type: "string" } },
-            { name: "options", required: false, schema: { type: "object" } }
-          ],
-          result: {
-            name: "aiResult",
-            schema: { type: "object" }
-          }
-        },
-        {
-          name: "ai.listAllowedModels", 
-          description: "List allowed AI models with optional provider filtering (auto-generated from tRPC)",
-          params: [
-            { name: "provider", required: false, schema: { type: "string" } }
-          ],
-          result: {
-            name: "modelsResult",
-            schema: { type: "array", items: { type: "object" } }
-          }
-        },
-        // Add more methods as needed - these should be auto-generated from tRPC schema
-      ]
+      methods: methods.sort((a, b) => a.name.localeCompare(b.name))
     };
+  }
+
+  /**
+   * Extract description from tRPC procedure metadata
+   */
+  private extractDescription(procedureDef: any): string | null {
+    // Check various places where description might be stored
+    if (procedureDef.meta?.openapi?.description) {
+      return procedureDef.meta.openapi.description;
+    }
+    if (procedureDef.meta?.openapi?.summary) {
+      return procedureDef.meta.openapi.summary;
+    }
+    if (procedureDef.meta?.description) {
+      return procedureDef.meta.description;
+    }
+    return null;
+  }
+
+  /**
+   * Extract parameters from tRPC input schema
+   */
+  private extractParams(inputSchema: any): any[] {
+    if (!inputSchema) {
+      return [];
+    }
+
+    try {
+      // Handle Zod object schema
+      if (inputSchema._def?.typeName === 'ZodObject' && inputSchema._def?.shape) {
+        const shape = typeof inputSchema._def.shape === 'function'
+          ? inputSchema._def.shape()
+          : inputSchema._def.shape;
+
+        const params = [];
+        for (const [key, fieldSchema] of Object.entries(shape)) {
+          const param = {
+            name: key,
+            required: !this.isOptional(fieldSchema as any),
+            schema: this.zodSchemaToOpenRPCSchema(fieldSchema as any)
+          };
+          params.push(param);
+        }
+        return params;
+      }
+
+      // Handle other schema types
+      if (inputSchema._def?.typeName === 'ZodVoid') {
+        return [];
+      }
+
+      // Fallback for unknown schema types
+      return [{
+        name: "params",
+        required: false,
+        schema: { type: "object" }
+      }];
+    } catch (error) {
+      // Fallback if schema parsing fails
+      return [{
+        name: "params",
+        required: false,
+        schema: { type: "object" }
+      }];
+    }
+  }
+
+  /**
+   * Extract result schema from tRPC output
+   */
+  private extractResult(outputSchema: any, procedurePath: string): any {
+    const resultName = `${procedurePath.replace('.', '_')}_result`;
+
+    if (!outputSchema) {
+      return {
+        name: resultName,
+        schema: { type: "object" }
+      };
+    }
+
+    return {
+      name: resultName,
+      schema: this.zodSchemaToOpenRPCSchema(outputSchema)
+    };
+  }
+
+  /**
+   * Check if a Zod schema is optional
+   */
+  private isOptional(schema: any): boolean {
+    return schema._def?.typeName === 'ZodOptional' ||
+           (schema._def?.typeName === 'ZodDefault');
+  }
+
+  /**
+   * Convert Zod schema to OpenRPC schema format
+   */
+  private zodSchemaToOpenRPCSchema(zodSchema: any): any {
+    if (!zodSchema || !zodSchema._def) {
+      return { type: "object" };
+    }
+
+    const def = zodSchema._def;
+
+    switch (def.typeName) {
+      case 'ZodString':
+        return { type: "string" };
+      case 'ZodNumber':
+        return { type: "number" };
+      case 'ZodBoolean':
+        return { type: "boolean" };
+      case 'ZodArray':
+        return {
+          type: "array",
+          items: def.type ? this.zodSchemaToOpenRPCSchema(def.type) : { type: "object" }
+        };
+      case 'ZodObject':
+        const properties: any = {};
+        if (def.shape) {
+          const shape = typeof def.shape === 'function' ? def.shape() : def.shape;
+          for (const [key, fieldSchema] of Object.entries(shape)) {
+            properties[key] = this.zodSchemaToOpenRPCSchema(fieldSchema as any);
+          }
+        }
+        return { type: "object", properties };
+      case 'ZodEnum':
+        return { type: "string", enum: def.values };
+      case 'ZodLiteral':
+        return { type: typeof def.value, const: def.value };
+      case 'ZodUnion':
+        return { oneOf: def.options?.map((opt: any) => this.zodSchemaToOpenRPCSchema(opt)) || [] };
+      case 'ZodOptional':
+      case 'ZodDefault':
+        return def.innerType ? this.zodSchemaToOpenRPCSchema(def.innerType) : { type: "object" };
+      case 'ZodNullable':
+        const innerSchema = def.innerType ? this.zodSchemaToOpenRPCSchema(def.innerType) : { type: "object" };
+        return { ...innerSchema, nullable: true };
+      case 'ZodVoid':
+        return { type: "null" };
+      default:
+        return { type: "object" };
+    }
   }
 }
 
