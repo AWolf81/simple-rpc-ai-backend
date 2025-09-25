@@ -21,6 +21,7 @@ const trpcApiEndpoint = '/api/trpc'; // endpoint used by trpc playground
 
 // Dynamic server configuration discovery
 let serverConfig = null;
+let mcpInspectorStatus = { running: false, token: null };
 
 // Check if MCP Inspector is running and get auth token
 async function checkMCPInspector() {
@@ -52,7 +53,6 @@ async function discoverServerConfig() {
       const response = await fetch(`http://localhost:${testPort}/config`);
       if (response.ok) {
         const config = await response.json();
-        console.log(`🔍 Discovered AI server on port ${testPort}`);
         return config;
       }
     } catch (error) {
@@ -62,7 +62,6 @@ async function discoverServerConfig() {
   
   // Fallback to default configuration
   const fallbackPort = manualPort || 8000;
-  console.log(`⚠️  No running server discovered, using fallback port ${fallbackPort}`);
   return {
     port: fallbackPort,
     baseUrl: `http://localhost:${fallbackPort}`,
@@ -78,6 +77,7 @@ async function discoverServerConfig() {
 // Initialize server configuration
 (async () => {
   serverConfig = await discoverServerConfig();
+  mcpInspectorStatus = await checkMCPInspector();
 })();
 
 // Helper function to get current config or fallback
@@ -254,6 +254,17 @@ function generatePlaygroundURL(procedureName, inputSchema) {
   return `${playgroundEndpoint}`; //?state=${encodedState}`;
 }
 
+// Generate tRPC call code from procedure info
+function generateTRPCCall(procedureName, procedureType, inputSchema) {
+  const sampleInput = generateSampleInput(inputSchema);
+  const hasInput = sampleInput !== null;
+
+  const inputCode = hasInput ? `(${sampleInput})` : '()';
+  const methodCall = procedureType === 'query' ? 'query' : 'mutation';
+
+  return `await trpc.${procedureName}.${methodCall}${inputCode}`;
+}
+
 // Generate HTML for a procedure
 // Extract descriptions and metadata from Zod schemas
 function extractSchemaInfo(schema) {
@@ -348,11 +359,15 @@ function renderSchemaField(field) {
 }
 
 function generateProcedureHTML(name, procedure) {
-  const { type, method, path: procPath, summary, description, tags, input, output } = procedure;
-  
-  const methodBadge = method ? `<span class="method-badge method-${method.toLowerCase()}">${method}</span>` : 
-                     `<span class="method-badge method-${type}">${type.toUpperCase()}</span>`;
-  
+  const { type, method, path: procPath, summary, description, tags, input, output, requiresAuth } = procedure;
+
+  // Add lock icon for procedures that require authentication
+  const authIcon = requiresAuth ? ' 🔒' : '';
+  const authTitle = requiresAuth ? 'Authentication required' : '';
+
+  const methodBadge = method ? `<span class="method-badge method-${method.toLowerCase()}" title="${authTitle}">${method}${authIcon}</span>` :
+                     `<span class="method-badge method-${type}" title="${authTitle}">${type.toUpperCase()}${authIcon}</span>`;
+
   const pathDisplay = procPath || name;
   const inputInfo = extractSchemaInfo(input);
   const outputInfo = extractSchemaInfo(output);
@@ -428,9 +443,16 @@ function generateProcedureHTML(name, procedure) {
         
         <div class="playground-section">
           <h4>🎮 Interactive Testing</h4>
-          <a href="${generatePlaygroundURL(name, input)}" target="_blank" class="playground-btn">
-            🚀 Open in tRPC Playground
-          </a>
+          <button
+            class="playground-copy-btn"
+            onclick="copyAndOpenPlayground('trpc-${name.replace(/\./g, '-')}', '${generatePlaygroundURL(name, input)}')"
+            title="Copy tRPC call to clipboard and open playground. Paste the copied call to test this method."
+          >
+            📋🚀 Copy & Open Playground
+          </button>
+          <div class="trpc-call-example">
+            <pre class="trpc-call" id="trpc-${name.replace(/\./g, '-')}"><code>${generateTRPCCall(name, type, input)}</code></pre>
+          </div>
         </div>
       </div>
     </div>
@@ -439,17 +461,17 @@ function generateProcedureHTML(name, procedure) {
 
 function generateSampleInput(inputSchema) {
   // Check for void/empty schemas (z.void(), no input, etc.)
-  if (!inputSchema || 
-      inputSchema.type === 'ZodVoid' || 
+  if (!inputSchema ||
+      inputSchema.type === 'ZodVoid' ||
       inputSchema.type === 'ZodUndefined' ||
       (!inputSchema.properties && !inputSchema.type)) {
     return null; // No parameters needed
   }
-  
+
   if (!inputSchema.properties) {
     return '{}';
   }
-  
+
   const sample = {};
   for (const [key, prop] of Object.entries(inputSchema.properties)) {
     if (prop.type === 'ZodString') {
@@ -458,11 +480,14 @@ function generateSampleInput(inputSchema) {
       sample[key] = 123;
     } else if (prop.type === 'ZodBoolean') {
       sample[key] = true;
+    } else if (prop.type === 'ZodEnum' && prop.enum && prop.enum.length > 0) {
+      // Use the first enum value for realistic examples
+      sample[key] = prop.enum[0];
     } else {
       sample[key] = 'value';
     }
   }
-  
+
   return JSON.stringify(sample, null, 2);
 }
 
@@ -583,22 +608,22 @@ async function setupTRPCPlayground() {
 
 function generateJsonRpcExample(procedureName, procedureType, inputSchema) {
   const sampleInput = generateSampleInput(inputSchema);
-  
-  // Convert tRPC procedure name to JSON-RPC method name
-  // ai.health -> health, ai.executeAIRequest -> executeAIRequest
-  const methodName = procedureName.includes('.') ? procedureName.split('.')[1] : procedureName;
-  
+
+  // Use full procedure name as JSON-RPC method name (preserve namespace)
+  // ai.generateText -> ai.generateText, mcp.greeting -> mcp.greeting
+  const methodName = procedureName;
+
   const jsonRpcRequest = {
     jsonrpc: "2.0",
     method: methodName,
     id: 1
   };
-  
+
   // Only add params if there are actual parameters (not void)
   if (sampleInput !== null) {
     jsonRpcRequest.params = JSON.parse(sampleInput);
   }
-  
+
   return `curl -X POST ${getServerConfig().endpoints.jsonRpc} \\
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(jsonRpcRequest)}'`;
@@ -1120,55 +1145,245 @@ npx simple-rpc-dev-panel</code></pre>
       text-decoration: none;
       color: white;
     }
-    
+
+    .playground-copy-btn {
+      background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      margin-bottom: 1rem;
+      display: inline-block;
+    }
+
+    .playground-copy-btn:hover {
+      background: linear-gradient(135deg, #059669 0%, #2563eb 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .playground-copy-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .trpc-call-example {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 0.75rem;
+    }
+
+    .trpc-call {
+      background: #1a202c;
+      color: #f7fafc;
+      padding: 0.75rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      margin: 0;
+      white-space: pre-wrap;
+    }
+
     .playground-link {
       color: #10b981;
       font-weight: bold;
       text-decoration: none;
     }
-    
+
     .playground-link:hover {
       text-decoration: underline;
+    }
+
+    /* Two-column layout styles */
+    .main-content {
+      display: flex;
+      gap: 2rem;
+      margin-top: 1rem;
+    }
+
+    .left-panel {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .right-panel {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .status-card, .tools-card {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border: 1px solid #e2e8f0;
+    }
+
+    .status-card h3, .tools-card h3 {
+      margin: 0 0 1rem 0;
+      color: #2d3748;
+      font-size: 1.1rem;
+    }
+
+    .tool-links {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .tool-link {
+      display: block;
+      padding: 1rem;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #2d3748;
+      transition: all 0.2s;
+    }
+
+    .tool-link:hover {
+      background: #edf2f7;
+      border-color: #cbd5e0;
+      text-decoration: none;
+      color: #2d3748;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .tool-link.disabled {
+      background: #f7fafc;
+      color: #718096;
+      cursor: not-allowed;
+      border-color: #e2e8f0;
+    }
+
+    .tool-link strong {
+      color: #2b6cb0;
+    }
+
+    .tool-link.disabled strong {
+      color: #718096;
+    }
+
+    .tool-link small {
+      color: #4a5568;
+      font-size: 0.875rem;
+    }
+
+    /* Responsive design */
+    @media (max-width: 1024px) {
+      .main-content {
+        flex-direction: column;
+      }
     }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>🚀 tRPC Development Panel</h1>
-    <div style="background: #f3f4f6; padding: 10px; border-radius: 8px; margin: 10px 0;">
-      <strong>📡 Connected Server:</strong> ${config.baseUrl} 
+    <!-- Connected Server at the top -->
+    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+      <strong>📡 Connected Server:</strong> ${config.baseUrl}
       <span style="margin-left: 10px;">
-        ${config.protocols ? Object.entries(config.protocols).map(([protocol, enabled]) => 
+        ${config.protocols ? Object.entries(config.protocols).map(([protocol, enabled]) =>
           `<span style="color: ${enabled ? '#059669' : '#6b7280'}; margin-right: 15px;">${protocol.toUpperCase()}: ${enabled ? '✅' : '❌'}</span>`
         ).join('') : 'Loading...'}
       </span>
     </div>
-    <p><strong>🎮 MCP jam:</strong> <a href="${mcpJamEndpoint}" target="_blank">Open MCP JAM Playground</a></p>
-    <p><strong>🔍 Official MCP Inspector:</strong>
-      ${mcpInspectorStatus.running
-        ? `<span style="color: #059669;">✅ Running</span> - <a href="http://localhost:6274" target="_blank">Open Inspector</a> <em>(Add ?MCP_PROXY_AUTH_TOKEN=your-token from console)</em>`
-        : `<span style="color: #dc2626;">❌ Not Running</span> - Run: <code>npx @modelcontextprotocol/inspector --transport http --server-url http://localhost:${config.port}/mcp</code>`
-      }
-    </p>
-    ${mcpInspectorStatus.running
-      ? `<div style="background: #f3f4f6; padding: 10px; border-radius: 5px; margin: 10px 0;"><small><strong>💡 Auth Token Required:</strong> Copy the full URL with <code>MCP_PROXY_AUTH_TOKEN</code> parameter from your console when you started the Inspector.</small></div>`
-      : `<div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;"><small><strong>💡 MCP Inspector Setup:</strong> When you run the command above, it will print the full URL with auth token in your console. Use that URL to access the Inspector.</small></div>`
-    }
-    <p>Generated from <code>dist/trpc-methods.json</code> on ${new Date(generated).toLocaleString()}</p>
-    <p><strong>💡 Start AI Server:</strong> <code>pnpm start:ai</code> or <code>pnpm dev:server</code> ${config.endpoints.tRpc ? `(with tRPC at <code>${config.endpoints.tRpc}</code>)` : '(JSON-RPC only)'}</p>
-    ${config.endpoints.tRpc ? `<p><strong>🎮 Interactive Playground:</strong> <a href="${playgroundEndpoint}" target="_blank" class="playground-link">Open tRPC Playground</a></p>` : `<p><strong>⚠️ tRPC Playground:</strong> <em>Not available - server has JSON-RPC only</em></p>`}
+  </div>
 
-    <h2>Open-RPC tools</h2>
-    <p>Enable JSON-RPC protocol and ensure CORS is allowing 'https://playground.open-rpc.org/' and 'https://inspector.open-rpc.org' in server config.    
-    <p><strong>🎮 Open-RPC Playground:</strong> <a href="https://playground.open-rpc.org/?url=${config.baseUrl}/openrpc.json&rpcUrl=${config.endpoints.jsonRpc}" target="_blank" class="playground-link">Open RPC Playground</a></p>
-    <p><strong>🎮 Open-RPC Inspector:</strong> <a href="https://inspector.open-rpc.org/?url=${config.endpoints.jsonRpc}" target="_blank" class="playground-link">Open RPC Inspector</a></p>
-    
-    <h2>tRPC statistics</h2>
-    <div class="stats">
-      <div class="stat">Total: ${stats.totalProcedures}</div>
-      <div class="stat">Queries: ${stats.queries}</div>
-      <div class="stat">Mutations: ${stats.mutations}</div>
-      <div class="stat">Subscriptions: ${stats.subscriptions}</div>
+  <!-- Two column layout: Status on left, Tools on right -->
+  <div class="main-content">
+    <div class="left-panel">
+      <h2>📊 Status & Information</h2>
+
+      <div class="status-card">
+        <h3>🔍 Official MCP Inspector</h3>
+        <p><strong>Status:</strong>
+          ${mcpInspectorStatus.running
+            ? `<span style="color: #059669;">✅ Running</span> - <a href="http://localhost:6274" target="_blank">Open Inspector</a>`
+            : `<span style="color: #dc2626;">❌ Not Running</span> - <em>requires manual setup</em>`
+          }
+        </p>
+        ${!mcpInspectorStatus.running ? `
+          <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
+            <small><strong>Manual Setup Required:</strong><br>
+            <code>npx @modelcontextprotocol/inspector --transport http --server-url http://localhost:${config.port}/mcp</code><br>
+            <em>This will generate a proxyAuthToken URL that you must use.</em></small>
+          </div>
+        ` : `
+          <div style="background: #e6fffa; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #4fd1c7;">
+            <small><strong>💡 Note:</strong> Use the full URL with <code>MCP_PROXY_AUTH_TOKEN</code> parameter from your console for authenticated access.</small>
+          </div>
+        `}
+      </div>
+
+      <div class="status-card">
+        <h3>📈 tRPC Statistics</h3>
+        <div class="stats">
+          <div class="stat">Total: ${stats.totalProcedures}</div>
+          <div class="stat">Queries: ${stats.queries}</div>
+          <div class="stat">Mutations: ${stats.mutations}</div>
+          <div class="stat">Subscriptions: ${stats.subscriptions}</div>
+        </div>
+      </div>
+
+      <div class="status-card">
+        <h3>ℹ️ Build Info</h3>
+        <p><small>Generated from <code>dist/trpc-methods.json</code><br>
+        ${new Date(generated).toLocaleString()}</small></p>
+        <p><small><strong>Start Server:</strong> <code>pnpm start:ai</code> or <code>pnpm dev:server</code></small></p>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <h2>🛠️ Development Tools</h2>
+
+      <div class="tools-card">
+        <h3>🎮 Interactive Playgrounds</h3>
+        <div class="tool-links">
+          <a href="${mcpJamEndpoint}" target="_blank" class="tool-link">
+            <strong>🎮 MCP JAM</strong><br>
+            <small>Model Context Protocol testing (auto-started)</small>
+          </a>
+
+          ${config.endpoints.tRpc ? `
+            <a href="${playgroundEndpoint}" target="_blank" class="tool-link">
+              <strong>🚀 tRPC Playground</strong><br>
+              <small>Type-safe API testing</small>
+            </a>
+          ` : `
+            <div class="tool-link disabled">
+              <strong>⚠️ tRPC Playground</strong><br>
+              <small>Not available - JSON-RPC only server</small>
+            </div>
+          `}
+        </div>
+      </div>
+
+      <div class="tools-card">
+        <h3>🌐 Open-RPC Tools</h3>
+        <p><small>Enable JSON-RPC protocol and ensure CORS allows 'https://playground.open-rpc.org/' and 'https://inspector.open-rpc.org'</small></p>
+        <div class="tool-links">
+          <a href="https://playground.open-rpc.org/?url=${config.baseUrl}/openrpc.json?pretty=true&rpcUrl=${config.endpoints.jsonRpc}" target="_blank" class="tool-link">
+            <strong>🎮 Open-RPC Playground</strong><br>
+            <small>Standard JSON-RPC testing</small>
+          </a>
+
+          <a href="https://inspector.open-rpc.org/?url=${config.endpoints.jsonRpc}" target="_blank" class="tool-link">
+            <strong>🔍 Open-RPC Inspector</strong><br>
+            <small>API schema inspection</small>
+          </a>
+        </div>
+      </div>
     </div>
   </div>
   
@@ -1204,15 +1419,16 @@ npx simple-rpc-dev-panel</code></pre>
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      
+
+      let successful = false;
       try {
-        document.execCommand('copy');
-        showCopyFeedback();
+        successful = document.execCommand('copy');
       } catch (err) {
         console.error('Fallback: Unable to copy', err);
       }
-      
+
       document.body.removeChild(textArea);
+      return successful;
     }
     
     function showCopyFeedback(elementId) {
@@ -1222,11 +1438,36 @@ npx simple-rpc-dev-panel</code></pre>
         const originalText = button.textContent;
         button.textContent = '✅ Copied!';
         button.style.background = '#48bb78';
-        
+
         setTimeout(() => {
           button.textContent = originalText;
           button.style.background = '#4299e1';
         }, 2000);
+      }
+    }
+
+    function copyAndOpenPlayground(elementId, playgroundUrl) {
+      const element = document.getElementById(elementId);
+      const text = element.textContent || element.innerText;
+
+      // Copy to clipboard
+      if (navigator.clipboard && window.isSecureContext) {
+        // Modern async clipboard API
+        navigator.clipboard.writeText(text).then(() => {
+          // Open playground after successful copy
+          window.open(playgroundUrl, '_blank');
+        }).catch(err => {
+          console.error('Failed to copy tRPC call: ', err);
+          // Try fallback copy, then open playground
+          if (fallbackCopyTextToClipboard(text)) {
+            window.open(playgroundUrl, '_blank');
+          }
+        });
+      } else {
+        // Fallback for older browsers
+        if (fallbackCopyTextToClipboard(text)) {
+          window.open(playgroundUrl, '_blank');
+        }
       }
     }
     
@@ -1267,7 +1508,7 @@ npx simple-rpc-dev-panel</code></pre>
 });
 
 // JSON endpoint for raw data
-app.get('/api/methods', (req, res) => {
+app.get('/api/methods', (_, res) => {
   if (trpcMethods) {
     res.json(trpcMethods);
   } else {
@@ -1303,3 +1544,21 @@ app.listen(port, () => {
     }, 1000);
   }
 });
+// Periodically check server status and MCP Inspector status
+setInterval(async () => {
+  try {
+    // Check server status (silent)
+    const newServerConfig = await discoverServerConfig();
+    if (newServerConfig && !serverConfig) {
+      serverConfig = newServerConfig;
+    } else if (!newServerConfig && serverConfig) {
+      serverConfig = null;
+    }
+
+    // Check MCP Inspector status (silent)
+    const newMcpInspectorStatus = await checkMCPInspector();
+    mcpInspectorStatus = newMcpInspectorStatus;
+  } catch (error) {
+    // Silent error handling - don't spam console
+  }
+}, 10000); // Check every 10 seconds

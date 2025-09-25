@@ -6,11 +6,11 @@ import { router } from '@src-trpc/index';
 import { AIService } from '@services/ai-service';
 import { VirtualTokenService } from '@services/virtual-token-service';
 import { UsageAnalyticsService } from '@services/usage-analytics-service';
-import { PostgreSQLAdapter } from '@database/postgres-adapter';
-import { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
+import { PostgreSQLAdapter } from '@database/postgres-adapter'; // unused, why?
+import { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods'; // unused, why?
 import { createGenerationProcedures } from './methods/generation';
 import { createProviderProcedures } from './methods/providers';
-import { AIRouterFactoryConfig, DEFAULT_CONFIG, createServiceProvidersConfig, AIRouterConfig } from './types';
+import { AIRouterFactoryConfig, DEFAULT_CONFIG, createServiceProvidersConfig, AIRouterConfig } from './types'; // AIRouterConig is imported but not used, why?
 
 export function createAIRouter(factoryConfig: AIRouterFactoryConfig = {}) {
   const {
@@ -18,8 +18,8 @@ export function createAIRouter(factoryConfig: AIRouterFactoryConfig = {}) {
     tokenTrackingEnabled = false,
     dbAdapter,
     serverProviders = ['anthropic'],
-    byokProviders = ['anthropic'],
-    postgresRPCMethods,
+    byokProviders = ['anthropic'], // where is it used?
+    postgresRPCMethods, // where is it used?
     modelRestrictions
   } = factoryConfig;
 

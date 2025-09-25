@@ -22,6 +22,7 @@ import type { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
 import { VirtualTokenService } from '@services/virtual-token-service';
 import { UsageAnalyticsService } from '@services/usage-analytics-service';
 import { RootManager } from '@services/root-manager';
+import { WorkspaceManager } from '@services/workspace-manager';
 
 
 /**
@@ -57,7 +58,26 @@ export function createAppRouter(
     }
   }
 
-  // Initialize RootManager
+  // Initialize WorkspaceManager for server workspaces
+  let workspaceManager: WorkspaceManager | undefined;
+  if (rootFolders?.enableAPI !== false && (rootFolders as any)?.additionalRoots) {
+    // Create workspace manager from serverWorkspaces config
+    workspaceManager = new WorkspaceManager();
+
+    // Add workspaces from additionalRoots (which maps to serverWorkspaces in server config)
+    const serverWorkspaces = (rootFolders as any).additionalRoots;
+    if (serverWorkspaces) {
+      for (const [workspaceId, config] of Object.entries(serverWorkspaces)) {
+        try {
+          workspaceManager.addWorkspace(workspaceId, config as any);
+        } catch (error) {
+          console.warn(`Failed to add workspace ${workspaceId}:`, error);
+        }
+      }
+    }
+  }
+
+  // Initialize RootManager for MCP client roots
   let rootManager: RootManager | undefined;
   if (rootFolders?.enableAPI !== false) {
     // Create basic root manager configuration
@@ -125,7 +145,7 @@ export function createAppRouter(
     ai: mcpConfig?.ai,
     aiService: sharedAIService
   });
-  const systemRouter = createSystemRouter(undefined);
+  const systemRouter = createSystemRouter(workspaceManager);
   const userRouter = createUserRouter(virtualTokenService, usageAnalyticsService, hybridUserService, byokProviders);
   const billingRouter = createBillingRouter(virtualTokenService, usageAnalyticsService, hybridUserService);
   const authRouter = createAuthRouter(postgresRPCMethods);

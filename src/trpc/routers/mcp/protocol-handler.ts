@@ -1004,6 +1004,7 @@ export class MCPProtocolHandler {
         resourceResult = await mcpResourceRegistry.getResourceContent(resourceId, {
           user: userInfo,
           timestamp: new Date().toISOString(),
+          workspaceManager: this.rootManager,  // Pass workspace manager for server workspace access
           ...queryParams  // Pass query parameters to the provider
         });
       } catch (error) {

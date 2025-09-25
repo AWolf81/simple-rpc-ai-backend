@@ -273,6 +273,103 @@ async function extractTRPCMethods() {
       return null; // Line not found
     }
     
+    function checkIfProcedureRequiresAuth(def) {
+      // Check if the procedure has any authentication requirements in its middleware
+      if (def.middlewares && Array.isArray(def.middlewares)) {
+        // Look through the middleware chain for authentication checks
+        for (const middleware of def.middlewares) {
+          // Check if the middleware is a function that contains authentication logic
+          if (typeof middleware === 'function') {
+            const middlewareSource = middleware.toString();
+            // Look for authentication-related patterns in the middleware
+            if (
+              // Look for ctx.user checks which indicate protected procedures
+              middlewareSource.includes('ctx.user') &&
+              (middlewareSource.includes('UNAUTHORIZED') || middlewareSource.includes('Authentication required'))
+            ) {
+              return true;
+            }
+          }
+        }
+      }
+
+      // For procedures with resolvers, also check the resolver function itself
+      // This handles cases like admin procedures that use publicProcedure but have
+      // auth checks inside the resolver function
+      if (def.resolver && typeof def.resolver === 'function') {
+        const resolverSource = def.resolver.toString();
+
+        // Look for admin/user authentication checks inside resolver
+        if (
+          resolverSource.includes('ctx.user') &&
+          (resolverSource.includes('FORBIDDEN') || resolverSource.includes('Admin privileges required'))
+        ) {
+          return true;
+        }
+
+        // Enhanced auth detection for patterns in ai.generateText and similar procedures
+        if (resolverSource.includes('ctx.user')) {
+          // Look for user access patterns that indicate authentication handling
+          const authPatterns = [
+            // Direct user access patterns
+            'const { user } = ctx',
+            'ctx.user?.userId',
+            'user?.userId',
+            'userId = user?.userId',
+
+            // Authentication requirement patterns
+            'API key required',
+            'apiKey required',
+            'Please provide your AI provider API key',
+            'BAD_REQUEST.*API key',
+
+            // User-specific execution paths
+            'if (userId &&',
+            'if (user &&',
+            'userType === ',
+            'getUserStatus',
+            'ensureUserAccount',
+
+            // Payment/auth related errors
+            'PAYMENT_REQUIRED',
+            'Insufficient token balance',
+            'token balance',
+            'subscription',
+
+            // BYOK patterns that still require some form of user identification
+            'Authenticated BYOK user',
+            'byok.*user',
+            'user.*byok'
+          ];
+
+          for (const pattern of authPatterns) {
+            if (resolverSource.match(new RegExp(pattern, 'i'))) {
+              return true;
+            }
+          }
+
+          // Check for branching logic based on user presence
+          // This catches procedures that handle both auth and unauth cases
+          if (
+            resolverSource.includes('if (userId') ||
+            resolverSource.includes('if (user') ||
+            resolverSource.includes('} else if (userId') ||
+            resolverSource.includes('} else if (user')
+          ) {
+            return true;
+          }
+        }
+      }
+
+      // Additional checks could be implemented here:
+      // - Check for specific meta properties that indicate auth requirement
+      // - Check for naming patterns (though this is less reliable)
+
+      // By default, assume procedures don't require authentication
+      // unless explicitly detected from the middleware chain or resolver
+      return false;
+    }
+    
     function extractProcedureInfo(procedure, path) {
       const def = procedure._def;
       const sourceFile = inferSourceFile(path);
@@ -289,6 +386,9 @@ async function extractTRPCMethods() {
       const inputLineNumber = inputSource?.lineNumber || findSchemaLineNumber(sourceFile, path, 'input');
       const outputLineNumber = outputSource?.lineNumber || findSchemaLineNumber(sourceFile, path, 'output');
       
+      // Determine if this procedure requires authentication
+      const requiresAuth = checkIfProcedureRequiresAuth(def);
+      
       const info = {
         path,
         type: def.type || 'unknown',
@@ -298,6 +398,7 @@ async function extractTRPCMethods() {
         input: null,
         output: null,
         meta: def.meta || null,
+        requiresAuth: requiresAuth,
         sourceFile: inputSource?.filePath || outputSource?.filePath || sourceFile,
         lineNumber: lineNumber,
         inputLineNumber: inputLineNumber,

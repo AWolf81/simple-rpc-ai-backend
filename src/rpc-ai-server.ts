@@ -982,15 +982,24 @@ export class RpcAiServer {
 
     // OpenRPC schema endpoint (for JSON-RPC discovery)
     if (this.config.protocols.jsonRpc && this.jsonRpcBridge) {
-      this.app.get('/openrpc.json', (_req: Request, res: Response) => {
+      this.app.get('/openrpc.json', (req: Request, res: Response) => {
+        const prettyReturn = req.query.pretty === 'true' || Boolean(req.query.pretty) === true;
         // Explicit CORS headers for OpenRPC tools
         res.header('Access-Control-Allow-Origin', '*');
         res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-        
+        res.header('Content-Type', 'application/json');
+
         // Use bridge to generate schema from tRPC router
         const serverUrl = process.env.OPENRPC_SERVER_URL || `http://localhost:${this.config.port}${this.config.paths.jsonRpc}`;
-        res.json(this.jsonRpcBridge!.generateOpenRPCSchema(serverUrl));
+
+        const jsonOpenRpcObj = this.jsonRpcBridge!.generateOpenRPCSchema(serverUrl);
+        if(prettyReturn) {          
+          res.send(JSON.stringify(jsonOpenRpcObj, null, 3));
+        }
+        else {          
+          res.send(jsonOpenRpcObj);
+        }
       });
     }
 
@@ -1159,6 +1168,32 @@ export class RpcAiServer {
         console.log('✅ MCP roots capability enabled with defaultRootManager');
       } catch (error) {
         console.warn('⚠️ Could not initialize MCP roots capability:', error instanceof Error ? error.message : String(error));
+      }
+
+      // Also set up workspace manager for server workspaces if configured
+      if (this.config.serverWorkspaces) {
+        try {
+          const { WorkspaceManager } = await import('./services/workspace-manager.js');
+          const workspaceManager = new WorkspaceManager();
+
+          // Add configured server workspaces
+          for (const [workspaceId, config] of Object.entries(this.config.serverWorkspaces)) {
+            if (workspaceId !== 'enableAPI' && config && typeof config === 'object') {
+              try {
+                workspaceManager.addWorkspace(workspaceId, config as any);
+                console.log(`✅ Added server workspace: ${workspaceId} at ${config.path}`);
+              } catch (error) {
+                console.warn(`⚠️ Failed to add workspace ${workspaceId}:`, error instanceof Error ? error.message : String(error));
+              }
+            }
+          }
+
+          // Set the workspace manager on the protocol handler
+          protocolHandler.setWorkspaceManager(workspaceManager);
+          console.log('✅ MCP server workspace manager configured');
+        } catch (error) {
+          console.warn('⚠️ Could not initialize server workspace manager:', error instanceof Error ? error.message : String(error));
+        }
       }
 
       // Setup the MCP endpoint

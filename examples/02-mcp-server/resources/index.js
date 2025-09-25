@@ -257,47 +257,177 @@ function convertContentToXML(content, department, version) {
 }
 
 /**
+ * Helper function to easily add workspace file resources
+ * Uses relative paths from workspace root (e.g., './README.md', 'package.json', 'src/config.json')
+ */
+function addWorkspaceFileResource(id, name, filePath, options = {}) {
+  const {
+    description = `${name} from project workspace`,
+    category = 'project',
+    requireAuth = false,
+    mimeType = detectMimeType(filePath)
+  } = options;
+
+  // Clean up the file path - remove leading ./ if present
+  const cleanPath = filePath.startsWith('./') ? filePath.substring(2) : filePath;
+
+  registerFileResource(id, name, description, mimeType, category, requireAuth, (context) => {
+    return readFromWorkspace(context, cleanPath);
+  });
+}
+
+/**
+ * Helper function to add file resources from absolute paths
+ * Supports local paths and UNC network shares
+ * Examples: '/home/user/file.txt', '//server/share/file.txt', '\\\\server\\share\\file.txt'
+ */
+function addFileResource(id, name, filePath, options = {}) {
+  const {
+    description = `${name} from ${filePath}`,
+    category = 'files',
+    requireAuth = false,
+    mimeType = detectMimeType(filePath)
+  } = options;
+
+  registerFileResource(id, name, description, mimeType, category, requireAuth, async () => {
+    return await readFromAbsolutePath(filePath);
+  });
+}
+
+/**
+ * Detect MIME type from file extension
+ */
+function detectMimeType(filePath) {
+  if (filePath.endsWith('.md')) return 'text/markdown';
+  if (filePath.endsWith('.json')) return 'application/json';
+  if (filePath.endsWith('.xml')) return 'application/xml';
+  if (filePath.endsWith('.html')) return 'text/html';
+  if (filePath.endsWith('.css')) return 'text/css';
+  if (filePath.endsWith('.js') || filePath.endsWith('.ts')) return 'text/javascript';
+  if (filePath.endsWith('.py')) return 'text/x-python';
+  if (filePath.endsWith('.yml') || filePath.endsWith('.yaml')) return 'application/x-yaml';
+  if (filePath.endsWith('.toml')) return 'application/toml';
+  if (filePath.endsWith('.csv')) return 'text/csv';
+  return 'text/plain';
+}
+
+/**
+ * Common resource registration logic
+ */
+function registerFileResource(id, name, description, mimeType, category, requireAuth, contentReader) {
+  mcpResourceRegistry.registerResource({
+    id, name, description, mimeType, category, requireAuth
+  });
+
+  mcpResourceRegistry.registerProvider(id, {
+    generateContent: async (_resourceId, context) => {
+      try {
+        return await contentReader(context);
+      } catch (error) {
+        const errorContent = mimeType === 'application/json'
+          ? JSON.stringify({ error: `Failed to read ${name}: ${error.message}`, generatedAt: new Date().toISOString() }, null, 2)
+          : `# Error Reading ${name}\n\n**Error**: ${error.message}\n\n*Generated at: ${new Date().toISOString()}*`;
+
+        return errorContent;
+      }
+    }
+  });
+}
+
+/**
+ * Read file from workspace manager
+ */
+async function readFromWorkspace(context, fileName) {
+  const workspaceManager = context?.workspaceManager;
+
+  if (workspaceManager) {
+    return await workspaceManager.readFile('projectRoot', fileName);
+  } else {
+    try {
+      return await defaultRootManager.readFile('project-root', fileName);
+    } catch (rootError) {
+      throw new Error(`No workspace manager available and root manager failed: ${rootError.message}`);
+    }
+  }
+}
+
+/**
+ * Protocol handlers registry for different file path types
+ * Consumers can extend this to add SMB, SFTP, etc.
+ */
+const protocolHandlers = new Map();
+
+/**
+ * Register a custom protocol handler
+ * @param {string} protocol - Protocol identifier (e.g., 'smb', 'sftp', 'ftp')
+ * @param {Function} handler - Async function (filePath) => string content
+ * @param {Function} matcher - Function (filePath) => boolean to detect if this handler should be used
+ */
+export function registerProtocolHandler(protocol, handler, matcher) {
+  protocolHandlers.set(protocol, { handler, matcher });
+}
+
+/**
+ * Read file from absolute path with extensible protocol support
+ *
+ * Built-in support:
+ * - Local files: /home/user/file.txt
+ * - UNC paths: //server/share/file.txt (Windows only)
+ *
+ * Extensible support (via registerProtocolHandler):
+ * - SMB: registerProtocolHandler('smb', smbHandler, path => path.startsWith('smb://'))
+ * - SFTP: registerProtocolHandler('sftp', sftpHandler, path => path.startsWith('sftp://'))
+ * - FTP: registerProtocolHandler('ftp', ftpHandler, path => path.startsWith('ftp://'))
+ */
+async function readFromAbsolutePath(filePath) {
+  const fs = await import('fs/promises');
+
+  try {
+    // Check for custom protocol handlers first
+    for (const [protocol, { handler, matcher }] of protocolHandlers) {
+      if (matcher(filePath)) {
+        console.log(`📡 Using ${protocol} protocol handler for: ${filePath}`);
+        return await handler(filePath);
+      }
+    }
+
+    // Built-in protocol handling
+    if (filePath.startsWith('//') || filePath.startsWith('\\\\')) {
+      // UNC path (Windows network share)
+      // Note: On Linux, UNC paths don't work directly - need to mount first
+      if (process.platform !== 'win32') {
+        throw new Error(`UNC paths not supported on ${process.platform}. Consider:\n` +
+          `1. Mount the share: sudo mount -t cifs ${filePath.split('/').slice(0, 4).join('/')} /mnt/share\n` +
+          `2. Or register SMB protocol handler: registerProtocolHandler('smb', smbHandler, matcher)`);
+      }
+      return await fs.readFile(filePath, 'utf8');
+    } else {
+      // Regular absolute path
+      return await fs.readFile(filePath, 'utf8');
+    }
+  } catch (error) {
+    throw new Error(`Failed to read file '${filePath}': ${error.message}`);
+  }
+}
+
+/**
  * Setup custom resources
  */
 export function setupCustomResources() {
-  // Package info resource
-  mcpResourceRegistry.registerResource({
-    id: 'package-info',
-    name: 'Package Information',
-    description: 'Detailed information about this npm package',
-    mimeType: 'application/json',
-    category: 'project',
-    requireAuth: false
+  // Simple workspace file resources - much cleaner!
+  addWorkspaceFileResource('package-info', 'Package Information', '${workspaceRoot}/package.json', {
+    description: 'Detailed information about this npm package'
   });
 
-  mcpResourceRegistry.registerProvider('package-info', {
-    generateContent: async (_resourceId, _context) => {
-      try {
-        // Use the secure file reader to get package.json
-        const packageContent = await defaultRootManager.readFile('project-root', 'package.json');
-        const packageData = JSON.parse(packageContent);
+  addWorkspaceFileResource('readme', 'Project README', '${workspaceRoot}/README.md', {
+    description: 'Main README.md file with project documentation',
+    category: 'documentation'
+  });
 
-        return JSON.stringify({
-          name: packageData.name,
-          version: packageData.version,
-          description: packageData.description,
-          author: packageData.author,
-          license: packageData.license,
-          dependencies: Object.keys(packageData.dependencies || {}).length,
-          devDependencies: Object.keys(packageData.devDependencies || {}).length,
-          scripts: Object.keys(packageData.scripts || {}),
-          engines: packageData.engines,
-          repository: packageData.repository,
-          keywords: packageData.keywords,
-          generatedAt: new Date().toISOString()
-        }, null, 2);
-      } catch (error) {
-        return JSON.stringify({
-          error: `Failed to read package info: ${error.message}`,
-          generatedAt: new Date().toISOString()
-        }, null, 2);
-      }
-    }
+  // You can easily add more files:
+  addWorkspaceFileResource('claude-md', 'Claude Instructions', '${workspaceRoot}/CLAUDE.md', {
+    description: 'Claude Code instructions and project guidance',
+    category: 'documentation'
   });
 }
 

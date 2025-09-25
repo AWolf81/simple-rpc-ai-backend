@@ -14,6 +14,7 @@
 
 import { createRpcAiServer, PostgreSQLAdapter } from 'simple-rpc-ai-backend';
 import dotenv from 'dotenv';
+import path from 'path';
 
 // Import modular components
 import { getCustomRouters } from './methods/index.js';
@@ -140,6 +141,13 @@ async function startServer() {
       // Server Workspace Configuration (for server-managed file access)
       // Note: This is separate from MCP client roots (which are client-managed)
       serverWorkspaces: {
+        projectRoot: {
+          path: path.resolve(import.meta.dirname, '../..'),  // Resolve relative to this file's directory
+          name: 'Project Root',
+          description: 'Main project directory with package.json and core files',
+          readOnly: true,
+          allowedExtensions: ['json', 'md', 'txt', 'js', 'ts']  // Extensions without dots
+        },
         exampleDocs: {
           path: './docs',
           name: 'Example Documentation',
