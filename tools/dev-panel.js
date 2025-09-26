@@ -1136,23 +1136,29 @@ npx simple-rpc-dev-panel</code></pre>
   const { procedures, stats, generated } = trpcMethods;
 
   // Generate server setup status HTML
-  const routerExists = existsSync(path.join(process.cwd(), 'dist/trpc/root.js'));
+  const routerPath = findTrpcRouterFile();
+  const routerExists = routerPath && existsSync(routerPath);
   const hasServerRunning = config.baseUrl !== `http://localhost:${process.env.AI_SERVER_PORT || 8000}` || config.endpoints.tRpc;
 
   let serverSetupStatusHTML = '';
   if (routerExists && hasServerRunning) {
-    serverSetupStatusHTML = `<p style="color: #059669;"><strong>✅ Full Setup</strong><br><small>Schema discovery + server proxy working</small></p>`;
+    const relativePath = path.relative(process.cwd(), routerPath);
+    serverSetupStatusHTML = `<p style="color: #059669;"><strong>✅ Full Setup</strong><br><small>Schema discovery + server proxy working</small></p>
+      <div style="background: #d1fae5; padding: 10px; border-radius: 5px; margin: 10px 0;">
+        <small><strong>Router file:</strong> <code>${relativePath}</code></small>
+      </div>`;
   } else if (!routerExists && hasServerRunning) {
     serverSetupStatusHTML = `<p style="color: #f59e0b;"><strong>⚠️ Proxy Mode</strong><br><small>Server running, but no local schema discovery</small></p>
       <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
         <small><strong>To enable full schema discovery:</strong><br>
-        Run <code>pnpm build</code> to generate <code>dist/trpc/root.js</code></small>
+        Run <code>pnpm build</code> to generate tRPC router file</small>
       </div>`;
   } else if (routerExists && !hasServerRunning) {
+    const relativePath = path.relative(process.cwd(), routerPath);
     serverSetupStatusHTML = `<p style="color: #f59e0b;"><strong>⚠️ No Server</strong><br><small>Schema available, but server not detected</small></p>
       <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <small><strong>To start server:</strong><br>
-        Run <code>pnpm start</code> or <code>pnpm dev:server</code></small>
+        <small><strong>Router file:</strong> <code>${relativePath}</code><br>
+        <strong>To start server:</strong> Run <code>pnpm start</code> or <code>pnpm dev:server</code></small>
       </div>`;
   } else {
     serverSetupStatusHTML = `<p style="color: #dc2626;"><strong>❌ Setup Required</strong><br><small>No server detected, no schema available</small></p>
@@ -1164,7 +1170,7 @@ npx simple-rpc-dev-panel</code></pre>
   }
 
   // Generate tRPC playground link HTML
-  const hasRouter = existsSync(path.join(process.cwd(), 'dist/trpc/root.js'));
+  const hasRouter = routerExists;
   const trpcPlaygroundHTML = config.endpoints.tRpc ? `
     <a href="${playgroundEndpoint}" target="_blank" class="tool-link ${!hasRouter ? 'proxy-mode' : ''}">
       <strong>🚀 tRPC Playground</strong><br>
