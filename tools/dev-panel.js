@@ -26,6 +26,8 @@ const trpcApiEndpoint = '/api/trpc'; // endpoint used by trpc playground
 // Dynamic server configuration discovery
 let serverConfig = null;
 let mcpInspectorStatus = { running: false, token: null };
+let mcpJamProcess = null;
+let mcpJamStatus = { running: false, port: 4000 };
 
 // Check if MCP Inspector is running and get auth token
 async function checkMCPInspector() {
@@ -40,6 +42,84 @@ async function checkMCPInspector() {
     return { running: false, token: null };
   }
   return { running: false, token: null };
+}
+
+// Check if MCP JAM is running and start it if not
+async function checkAndStartMCPJam() {
+  try {
+    // First, check if MCP JAM is already running
+    const response = await fetch(`http://localhost:${mcpJamStatus.port}/health`);
+    if (response.ok) {
+      console.log(`🎮 MCP JAM already running on port ${mcpJamStatus.port}`);
+      mcpJamStatus.running = true;
+      return mcpJamStatus;
+    }
+  } catch (error) {
+    // Not running, try to start it
+  }
+
+  try {
+    // Check if @mcpjam/inspector is available
+    const mcpJamPath = path.join(process.cwd(), 'node_modules/@mcpjam/inspector/bin/start.js');
+    if (!existsSync(mcpJamPath)) {
+      console.log('⚠️  MCP JAM not found - install with: pnpm add -D @mcpjam/inspector');
+      mcpJamStatus.running = false;
+      return mcpJamStatus;
+    }
+
+    console.log(`🚀 Starting MCP JAM on port ${mcpJamStatus.port}...`);
+
+    const { spawn } = await import('child_process');
+    mcpJamProcess = spawn('node', [mcpJamPath, '--port', mcpJamStatus.port.toString()], {
+      stdio: 'pipe',
+      detached: false
+    });
+
+    mcpJamProcess.stdout?.on('data', (data) => {
+      const output = data.toString();
+      if (output.includes('Server running') || output.includes('listening')) {
+        console.log('✅ MCP JAM started successfully');
+        mcpJamStatus.running = true;
+      }
+    });
+
+    mcpJamProcess.stderr?.on('data', (data) => {
+      console.log(`MCP JAM: ${data.toString().trim()}`);
+    });
+
+    mcpJamProcess.on('close', (code) => {
+      console.log(`🎮 MCP JAM process exited with code ${code}`);
+      mcpJamStatus.running = false;
+      mcpJamProcess = null;
+    });
+
+    mcpJamProcess.on('error', (error) => {
+      console.error(`❌ MCP JAM failed to start: ${error.message}`);
+      mcpJamStatus.running = false;
+      mcpJamProcess = null;
+    });
+
+    // Give it a moment to start
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Check if it's actually running
+    try {
+      const testResponse = await fetch(`http://localhost:${mcpJamStatus.port}/health`);
+      if (testResponse.ok) {
+        mcpJamStatus.running = true;
+      }
+    } catch (e) {
+      // Might still be starting
+      mcpJamStatus.running = true; // Assume it's starting
+    }
+
+    return mcpJamStatus;
+
+  } catch (error) {
+    console.error(`❌ Failed to start MCP JAM: ${error.message}`);
+    mcpJamStatus.running = false;
+    return mcpJamStatus;
+  }
 }
 
 async function discoverServerConfig() {
@@ -82,6 +162,7 @@ async function discoverServerConfig() {
 (async () => {
   serverConfig = await discoverServerConfig();
   mcpInspectorStatus = await checkMCPInspector();
+  mcpJamStatus = await checkAndStartMCPJam();
 })();
 
 // Helper function to get current config or fallback
@@ -752,7 +833,49 @@ npx simple-rpc-dev-panel</code></pre>
   }
 
   const { procedures, stats, generated } = trpcMethods;
-  
+
+  // Generate server setup status HTML
+  const routerExists = existsSync(path.join(process.cwd(), 'dist/trpc/root.js'));
+  const hasServerRunning = config.baseUrl !== `http://localhost:${process.env.AI_SERVER_PORT || 8000}` || config.endpoints.tRpc;
+
+  let serverSetupStatusHTML = '';
+  if (routerExists && hasServerRunning) {
+    serverSetupStatusHTML = `<p style="color: #059669;"><strong>✅ Full Setup</strong><br><small>Schema discovery + server proxy working</small></p>`;
+  } else if (!routerExists && hasServerRunning) {
+    serverSetupStatusHTML = `<p style="color: #f59e0b;"><strong>⚠️ Proxy Mode</strong><br><small>Server running, but no local schema discovery</small></p>
+      <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
+        <small><strong>To enable full schema discovery:</strong><br>
+        Run <code>pnpm build</code> to generate <code>dist/trpc/root.js</code></small>
+      </div>`;
+  } else if (routerExists && !hasServerRunning) {
+    serverSetupStatusHTML = `<p style="color: #f59e0b;"><strong>⚠️ No Server</strong><br><small>Schema available, but server not detected</small></p>
+      <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
+        <small><strong>To start server:</strong><br>
+        Run <code>pnpm start</code> or <code>pnpm dev:server</code></small>
+      </div>`;
+  } else {
+    serverSetupStatusHTML = `<p style="color: #dc2626;"><strong>❌ Setup Required</strong><br><small>No server detected, no schema available</small></p>
+      <div style="background: #fee2e2; padding: 10px; border-radius: 5px; margin: 10px 0;">
+        <small><strong>Quick setup:</strong><br>
+        1. Run <code>pnpm build</code><br>
+        2. Run <code>pnpm start</code> or <code>pnpm dev:server</code></small>
+      </div>`;
+  }
+
+  // Generate tRPC playground link HTML
+  const hasRouter = existsSync(path.join(process.cwd(), 'dist/trpc/root.js'));
+  const trpcPlaygroundHTML = config.endpoints.tRpc ? `
+    <a href="${playgroundEndpoint}" target="_blank" class="tool-link ${!hasRouter ? 'proxy-mode' : ''}">
+      <strong>🚀 tRPC Playground</strong><br>
+      <small>${!hasRouter ?
+        'Proxy mode - limited schema discovery' :
+        'Type-safe API testing with full schema'}</small>
+    </a>` : `
+    <div class="tool-link disabled">
+      <strong>⚠️ tRPC Playground</strong><br>
+      <small>Not available - JSON-RPC only server</small>
+    </div>`;
+
   // Group procedures by namespace
   const groupedProcedures = {};
   Object.entries(procedures).forEach(([name, proc]) => {
@@ -1386,33 +1509,7 @@ npx simple-rpc-dev-panel</code></pre>
 
       <div class="status-card">
         <h3>🔧 Server Setup Status</h3>
-        ${(() => {
-          const routerExists = existsSync(path.join(process.cwd(), 'dist/trpc/root.js'));
-          const hasServerRunning = config.baseUrl !== `http://localhost:${process.env.AI_SERVER_PORT || 8000}` || config.endpoints.tRpc;
-
-          if (routerExists && hasServerRunning) {
-            return `<p style="color: #059669;"><strong>✅ Full Setup</strong><br><small>Schema discovery + server proxy working</small></p>`;
-          } else if (!routerExists && hasServerRunning) {
-            return `<p style="color: #f59e0b;"><strong>⚠️ Proxy Mode</strong><br><small>Server running, but no local schema discovery</small></p>
-              <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
-                <small><strong>To enable full schema discovery:</strong><br>
-                Run <code>pnpm build</code> to generate <code>dist/trpc/root.js</code></small>
-              </div>`;
-          } else if (routerExists && !hasServerRunning) {
-            return `<p style="color: #f59e0b;"><strong>⚠️ No Server</strong><br><small>Schema available, but server not detected</small></p>
-              <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
-                <small><strong>To start server:</strong><br>
-                Run <code>pnpm start</code> or <code>pnpm dev:server</code></small>
-              </div>`;
-          } else {
-            return `<p style="color: #dc2626;"><strong>❌ Setup Required</strong><br><small>No server detected, no schema available</small></p>
-              <div style="background: #fee2e2; padding: 10px; border-radius: 5px; margin: 10px 0;">
-                <small><strong>Quick setup:</strong><br>
-                1. Run <code>pnpm build</code><br>
-                2. Run <code>pnpm start</code> or <code>pnpm dev:server</code></small>
-              </div>`;
-          }
-        })()}
+        ${serverSetupStatusHTML}
       </div>
 
       <div class="status-card">
@@ -1428,26 +1525,12 @@ npx simple-rpc-dev-panel</code></pre>
       <div class="tools-card">
         <h3>🎮 Interactive Playgrounds</h3>
         <div class="tool-links">
-          <a href="${mcpJamEndpoint}" target="_blank" class="tool-link">
+          <a href="${mcpJamEndpoint}" target="_blank" class="tool-link ${!mcpJamStatus.running ? 'disabled' : ''}">
             <strong>🎮 MCP JAM</strong><br>
-            <small>Model Context Protocol testing (auto-started)</small>
+            <small>${mcpJamStatus.running ? 'Model Context Protocol testing (auto-started)' : 'MCP JAM not available - install @mcpjam/inspector'}</small>
           </a>
 
-          ${config.endpoints.tRpc ? (() => {
-            const hasRouter = existsSync(path.join(process.cwd(), 'dist/trpc/root.js'));
-            return `
-            <a href="${playgroundEndpoint}" target="_blank" class="tool-link ${!hasRouter ? 'proxy-mode' : ''}">
-              <strong>🚀 tRPC Playground</strong><br>
-              <small>${!hasRouter ?
-                'Proxy mode - limited schema discovery' :
-                'Type-safe API testing with full schema'}</small>
-            </a>`;
-          })() : `
-            <div class="tool-link disabled">
-              <strong>⚠️ tRPC Playground</strong><br>
-              <small>Not available - JSON-RPC only server</small>
-            </div>
-          `}
+          ${trpcPlaygroundHTML}
         </div>
       </div>
 
@@ -1644,3 +1727,22 @@ setInterval(async () => {
     // Silent error handling - don't spam console
   }
 }, 10000); // Check every 10 seconds
+
+// Cleanup on exit
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down dev-panel...');
+
+  if (mcpJamProcess) {
+    console.log('🎮 Stopping MCP JAM...');
+    mcpJamProcess.kill();
+  }
+
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  if (mcpJamProcess) {
+    mcpJamProcess.kill();
+  }
+  process.exit(0);
+});
