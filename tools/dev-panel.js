@@ -8,9 +8,13 @@
 import express from 'express';
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { expressHandler } from 'trpc-playground/handlers/express';
 import * as trpcExpress from '@trpc/server/adapters/express';
 import { zodResolveTypes } from './trpc-playground-fix.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.DEV_PANEL_PORT || 8080;
@@ -494,21 +498,28 @@ function generateSampleInput(inputSchema) {
 // Setup tRPC Playground with proxy to actual server
 async function setupTRPCPlayground() {
   try {
-    // Load the actual router for playground schema discovery only
+    // Try to load the actual router for playground schema discovery
     const routerPath = path.join(process.cwd(), 'dist/trpc/root.js');
-    
-    if (!existsSync(routerPath)) {
-      console.log('⚠️  Router not found at', routerPath, '- skipping playground setup');
-      return;
+    let schemaRouter = null;
+
+    if (existsSync(routerPath)) {
+      try {
+        // Dynamic import the router
+        const { createAppRouter } = await import(routerPath);
+
+        // Create a minimal router instance for schema discovery only
+        schemaRouter = createAppRouter();
+
+        console.log('🔍 Router loaded for schema discovery...');
+      } catch (error) {
+        console.log('⚠️  Failed to load router for schema discovery:', error.message);
+        console.log('🔄 Continuing with proxy-only setup...');
+        schemaRouter = null;
+      }
+    } else {
+      console.log('⚠️  Router not found at', routerPath);
+      console.log('🔄 Setting up playground with proxy-only mode (no schema discovery)...');
     }
-    
-    // Dynamic import the router
-    const { createAppRouter } = await import(routerPath);
-    
-    // Create a minimal router instance for schema discovery only
-    const schemaRouter = createAppRouter();
-    
-    console.log('🔍 Router loaded for schema discovery...');
     
     // Proxy tRPC requests to the actual server instead of handling them locally
     app.use(trpcApiEndpoint, async (req, res, next) => {
@@ -574,7 +585,33 @@ async function setupTRPCPlayground() {
         });
       }
     });
-    
+
+    // Set up playground endpoint - create minimal fallback if no schema router
+    if (!schemaRouter) {
+      // Import tRPC for minimal router creation
+      try {
+        const { initTRPC } = await import('@trpc/server');
+        const { z } = await import('zod');
+
+        const t = initTRPC.create();
+        const router = t.router;
+        const publicProcedure = t.procedure;
+
+        // Create a minimal fallback router with a health check
+        schemaRouter = router({
+          health: publicProcedure
+            .query(() => ({ status: 'Playground proxy mode - schema discovery unavailable' }))
+        });
+
+        console.log('🔧 Created minimal fallback router for playground');
+        console.log('💡 For full schema discovery, ensure your server is built: pnpm build');
+      } catch (error) {
+        console.log('❌ Failed to create fallback router:', error.message);
+        console.log('💡 tRPC Playground will not be available');
+        return;
+      }
+    }
+
     // Set up playground endpoint with schema router for discovery
     app.use(
       playgroundEndpoint,
@@ -583,7 +620,7 @@ async function setupTRPCPlayground() {
         playgroundEndpoint,
         // zodResolveTypes fix - only need because trpc-playground is not supporting trpc v11 yet.
         // Can be removed once PR #61 is merged https://github.com/sachinraja/trpc-playground/pull/61
-        resolveTypes: zodResolveTypes, 
+        resolveTypes: zodResolveTypes,
         router: schemaRouter, // Used for schema discovery only
         request: {
           superjson: true, // Adjust based on your setup
@@ -596,7 +633,8 @@ async function setupTRPCPlayground() {
       })
     );
     
-    console.log(`🎮 tRPC Playground available at http://localhost:${port}${playgroundEndpoint}`);
+    const modeText = schemaRouter ? (existsSync(routerPath) ? 'full schema discovery' : 'proxy mode') : 'proxy mode';
+    console.log(`🎮 tRPC Playground available at http://localhost:${port}${playgroundEndpoint} (${modeText})`);
     console.log(`🔄 tRPC requests proxied to ${getServerConfig().endpoints.tRpc}`);
   } catch (error) {
     console.log('⚠️  Failed to setup tRPC Playground:', error.message);
@@ -1273,6 +1311,16 @@ npx simple-rpc-dev-panel</code></pre>
       color: #718096;
     }
 
+    .tool-link.proxy-mode {
+      border-left: 4px solid #f59e0b;
+      background: #fffbeb;
+    }
+
+    .tool-link.proxy-mode:hover {
+      background: #fef3c7;
+      border-color: #d97706;
+    }
+
     .tool-link small {
       color: #4a5568;
       font-size: 0.875rem;
@@ -1337,10 +1385,40 @@ npx simple-rpc-dev-panel</code></pre>
       </div>
 
       <div class="status-card">
+        <h3>🔧 Server Setup Status</h3>
+        ${(() => {
+          const routerExists = existsSync(path.join(process.cwd(), 'dist/trpc/root.js'));
+          const hasServerRunning = config.baseUrl !== `http://localhost:${process.env.AI_SERVER_PORT || 8000}` || config.endpoints.tRpc;
+
+          if (routerExists && hasServerRunning) {
+            return `<p style="color: #059669;"><strong>✅ Full Setup</strong><br><small>Schema discovery + server proxy working</small></p>`;
+          } else if (!routerExists && hasServerRunning) {
+            return `<p style="color: #f59e0b;"><strong>⚠️ Proxy Mode</strong><br><small>Server running, but no local schema discovery</small></p>
+              <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                <small><strong>To enable full schema discovery:</strong><br>
+                Run <code>pnpm build</code> to generate <code>dist/trpc/root.js</code></small>
+              </div>`;
+          } else if (routerExists && !hasServerRunning) {
+            return `<p style="color: #f59e0b;"><strong>⚠️ No Server</strong><br><small>Schema available, but server not detected</small></p>
+              <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                <small><strong>To start server:</strong><br>
+                Run <code>pnpm start</code> or <code>pnpm dev:server</code></small>
+              </div>`;
+          } else {
+            return `<p style="color: #dc2626;"><strong>❌ Setup Required</strong><br><small>No server detected, no schema available</small></p>
+              <div style="background: #fee2e2; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                <small><strong>Quick setup:</strong><br>
+                1. Run <code>pnpm build</code><br>
+                2. Run <code>pnpm start</code> or <code>pnpm dev:server</code></small>
+              </div>`;
+          }
+        })()}
+      </div>
+
+      <div class="status-card">
         <h3>ℹ️ Build Info</h3>
         <p><small>Generated from <code>dist/trpc-methods.json</code><br>
         ${new Date(generated).toLocaleString()}</small></p>
-        <p><small><strong>Start Server:</strong> <code>pnpm start:ai</code> or <code>pnpm dev:server</code></small></p>
       </div>
     </div>
 
@@ -1355,12 +1433,16 @@ npx simple-rpc-dev-panel</code></pre>
             <small>Model Context Protocol testing (auto-started)</small>
           </a>
 
-          ${config.endpoints.tRpc ? `
-            <a href="${playgroundEndpoint}" target="_blank" class="tool-link">
+          ${config.endpoints.tRpc ? (() => {
+            const hasRouter = existsSync(path.join(process.cwd(), 'dist/trpc/root.js'));
+            return `
+            <a href="${playgroundEndpoint}" target="_blank" class="tool-link ${!hasRouter ? 'proxy-mode' : ''}">
               <strong>🚀 tRPC Playground</strong><br>
-              <small>Type-safe API testing</small>
-            </a>
-          ` : `
+              <small>${!hasRouter ?
+                'Proxy mode - limited schema discovery' :
+                'Type-safe API testing with full schema'}</small>
+            </a>`;
+          })() : `
             <div class="tool-link disabled">
               <strong>⚠️ tRPC Playground</strong><br>
               <small>Not available - JSON-RPC only server</small>
