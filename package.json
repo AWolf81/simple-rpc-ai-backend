@@ -78,7 +78,7 @@
     "dev:server:basic": "tsx --watch examples/01-basic-server/server.js",
     "dev:panel": "node tools/dev-panel.js",
     "dev:mcpjam": "node ./node_modules/@mcpjam/inspector/bin/start.js --port 4000",
-    "dev:playground": "concurrently \"pnpm dev:mcpjam\" \"pnpm dev:panel\"",
+    "dev:playground": "pnpm dev:panel",
     "dev:docs": "concurrently \"pnpm dev:server\" \"pnpm dev:playground\"",
     "dev:docs:basic": "concurrently \"pnpm dev:server:basic\" \"pnpm dev:playground\"",
     "dev:full": "concurrently \"pnpm dev\" \"pnpm dev:server\" \"pnpm dev:playground\"",
@@ -139,6 +139,7 @@
     "@ai-sdk/openai": "^0.0.0",
     "@anolilab/ai-model-registry": "^1.3.0",
     "@huggingface/inference": "^4.8.0",
+    "@mcpjam/inspector": "^0.9.8",
     "@modelcontextprotocol/sdk": "^1.17.4",
     "@node-oauth/express-oauth-server": "^4.1.4",
     "@node-oauth/oauth2-server": "^5.2.1",
@@ -177,7 +178,6 @@
     "@testcontainers/postgresql": "^10.2.0"
   },
   "devDependencies": {
-    "@mcpjam/inspector": "^0.9.8",
     "@open-rpc/inspector": "^2.0.3",
     "@open-rpc/playground": "^1.6.9",
     "@opentelemetry/core": "^2.0.1",

@@ -9,6 +9,7 @@ import express from 'express';
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 import { expressHandler } from 'trpc-playground/handlers/express';
 import * as trpcExpress from '@trpc/server/adapters/express';
 import { zodResolveTypes } from './trpc-playground-fix.js';
@@ -59,32 +60,33 @@ async function checkAndStartMCPJam() {
   }
 
   try {
-    // Check if @mcpjam/inspector is available
-    const mcpJamPath = path.join(process.cwd(), 'node_modules/@mcpjam/inspector/bin/start.js');
-    if (!existsSync(mcpJamPath)) {
-      console.log('⚠️  MCP JAM not found - install with: pnpm add -D @mcpjam/inspector');
-      mcpJamStatus.running = false;
-      return mcpJamStatus;
-    }
-
     console.log(`🚀 Starting MCP JAM on port ${mcpJamStatus.port}...`);
 
-    const { spawn } = await import('child_process');
-    mcpJamProcess = spawn('node', [mcpJamPath, '--port', mcpJamStatus.port.toString()], {
+    // Use npx to run the MCP JAM binary
+    mcpJamProcess = spawn('npx', ['@mcpjam/inspector', '--port', mcpJamStatus.port.toString()], {
       stdio: 'pipe',
-      detached: false
+      detached: false,
+      env: {
+        ...process.env,
+        PORT: mcpJamStatus.port.toString(),
+        NODE_ENV: 'production'
+      }
     });
 
     mcpJamProcess.stdout?.on('data', (data) => {
       const output = data.toString();
-      if (output.includes('Server running') || output.includes('listening')) {
+      if (output.includes('Inspector Launched') || output.includes('localhost:')) {
         console.log('✅ MCP JAM started successfully');
         mcpJamStatus.running = true;
       }
     });
 
     mcpJamProcess.stderr?.on('data', (data) => {
-      console.log(`MCP JAM: ${data.toString().trim()}`);
+      // Suppress MCP JAM logs unless there's an error
+      const output = data.toString().trim();
+      if (output.includes('error') || output.includes('Error')) {
+        console.log(`MCP JAM: ${output}`);
+      }
     });
 
     mcpJamProcess.on('close', (code) => {
@@ -101,17 +103,7 @@ async function checkAndStartMCPJam() {
 
     // Give it a moment to start
     await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Check if it's actually running
-    try {
-      const testResponse = await fetch(`http://localhost:${mcpJamStatus.port}/health`);
-      if (testResponse.ok) {
-        mcpJamStatus.running = true;
-      }
-    } catch (e) {
-      // Might still be starting
-      mcpJamStatus.running = true; // Assume it's starting
-    }
+    mcpJamStatus.running = true; // Assume it started
 
     return mcpJamStatus;
 
