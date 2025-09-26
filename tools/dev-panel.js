@@ -62,8 +62,86 @@ async function checkAndStartMCPJam() {
   try {
     console.log(`🚀 Starting MCP JAM on port ${mcpJamStatus.port}...`);
 
-    // Use npx to run the MCP JAM binary
-    mcpJamProcess = spawn('npx', ['@mcpjam/inspector', '--port', mcpJamStatus.port.toString()], {
+    // Find the MCP JAM binary in node_modules
+    const possiblePaths = [
+      path.join(process.cwd(), 'node_modules/@mcpjam/inspector/bin/start.js'),
+      path.join(__dirname, '../node_modules/@mcpjam/inspector/bin/start.js'),
+      path.join(__dirname, '../../node_modules/@mcpjam/inspector/bin/start.js'),
+    ];
+
+    let mcpJamPath = null;
+    for (const testPath of possiblePaths) {
+      if (existsSync(testPath)) {
+        mcpJamPath = testPath;
+        break;
+      }
+    }
+
+    if (!mcpJamPath) {
+      // Try npx as a fallback for out-of-the-box functionality
+      console.log('📦 Local MCP JAM not found, trying npx @mcpjam/inspector...');
+      try {
+        mcpJamProcess = spawn('npx', ['@mcpjam/inspector', '--port', mcpJamStatus.port.toString()], {
+          stdio: 'pipe',
+          detached: false,
+          env: {
+            ...process.env,
+            PORT: mcpJamStatus.port.toString(),
+            NODE_ENV: 'production'
+          }
+        });
+
+        // Set up event handlers for npx approach
+        mcpJamProcess.stdout?.on('data', (data) => {
+          const output = data.toString();
+          if (output.includes('Inspector Launched') || output.includes('localhost:')) {
+            console.log('✅ MCP JAM started successfully via npx');
+            mcpJamStatus.running = true;
+          }
+        });
+
+        mcpJamProcess.stderr?.on('data', (data) => {
+          const output = data.toString().trim();
+          if (output.includes('error') || output.includes('Error')) {
+            console.log(`MCP JAM (npx): ${output}`);
+          }
+        });
+
+        mcpJamProcess.on('exit', (code) => {
+          if (code !== 0) {
+            console.log(`⚠️  MCP JAM (npx) exited with code ${code}`);
+          }
+          mcpJamStatus.running = false;
+        });
+
+        // Wait a moment to see if it starts successfully
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Check if it's actually running
+        try {
+          const response = await fetch(`http://localhost:${mcpJamStatus.port}/health`);
+          if (response.ok) {
+            console.log('✅ MCP JAM confirmed running via npx');
+            mcpJamStatus.running = true;
+            return mcpJamStatus;
+          }
+        } catch (error) {
+          // Still not running, fall through to warning
+        }
+      } catch (error) {
+        console.log(`⚠️  MCP JAM could not be started via npx: ${error.message}`);
+      }
+
+      // Final fallback: graceful degradation
+      console.log('⚠️  MCP JAM could not be started - @mcpjam/inspector not accessible');
+      console.log('💡 Dev-panel will work without MCP JAM. To enable MCP JAM:');
+      console.log('   • Install locally: npm install @mcpjam/inspector');
+      console.log('   • Or ensure npx can access it globally');
+      mcpJamStatus.running = false;
+      return mcpJamStatus;
+    }
+
+    mcpJamProcess = spawn('node', [mcpJamPath, '--port', mcpJamStatus.port.toString()], {
       stdio: 'pipe',
       detached: false,
       env: {
@@ -108,7 +186,8 @@ async function checkAndStartMCPJam() {
     return mcpJamStatus;
 
   } catch (error) {
-    console.error(`❌ Failed to start MCP JAM: ${error.message}`);
+    console.log(`⚠️  MCP JAM could not be started: ${error.message}`);
+    console.log('💡 Dev-panel will work without MCP JAM.');
     mcpJamStatus.running = false;
     return mcpJamStatus;
   }
