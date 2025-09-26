@@ -262,28 +262,108 @@ function findTrpcMethodsJson() {
     }
   }
 
-  // 2. Look in current directory (consumer project case)
-  const currentDir = path.join(process.cwd(), 'dist/trpc-methods.json');
-  if (existsSync(currentDir)) {
-    console.log(`📋 Found tRPC methods in current project: ${currentDir}`);
-    return currentDir;
-  }
+  const cwd = process.cwd();
+  console.log(`🔍 Searching for trpc-methods.json from working directory: ${cwd}`);
 
-  // 3. Check common fallback locations
-  const commonPaths = [
-    path.join(process.cwd(), 'trpc-methods.json'),
-    path.join(__dirname, '../trpc-methods.json'),
-    path.join(__dirname, '../../dist/trpc-methods.json')
+  // 2. Comprehensive search strategy for flexible project structures
+  const searchPaths = [
+    // Current directory variations
+    path.join(cwd, 'dist/trpc-methods.json'),                    // ./dist/trpc-methods.json
+    path.join(cwd, 'trpc-methods.json'),                         // ./trpc-methods.json
+    path.join(cwd, 'build/trpc-methods.json'),                   // ./build/trpc-methods.json
+
+    // Monorepo patterns - apps/backend
+    path.join(cwd, 'apps/backend/dist/trpc-methods.json'),       // ./apps/backend/dist/trpc-methods.json
+    path.join(cwd, 'apps/backend/trpc-methods.json'),            // ./apps/backend/trpc-methods.json
+    path.join(cwd, 'apps/backend/build/trpc-methods.json'),      // ./apps/backend/build/trpc-methods.json
+
+    // Monorepo patterns - packages/backend
+    path.join(cwd, 'packages/backend/dist/trpc-methods.json'),   // ./packages/backend/dist/trpc-methods.json
+    path.join(cwd, 'packages/backend/trpc-methods.json'),        // ./packages/backend/trpc-methods.json
+
+    // Monorepo patterns - server
+    path.join(cwd, 'apps/server/dist/trpc-methods.json'),        // ./apps/server/dist/trpc-methods.json
+    path.join(cwd, 'packages/server/dist/trpc-methods.json'),    // ./packages/server/dist/trpc-methods.json
+    path.join(cwd, 'server/dist/trpc-methods.json'),             // ./server/dist/trpc-methods.json
+
+    // Common subdirectory patterns
+    path.join(cwd, 'backend/dist/trpc-methods.json'),            // ./backend/dist/trpc-methods.json
+    path.join(cwd, 'backend/trpc-methods.json'),                 // ./backend/trpc-methods.json
+    path.join(cwd, 'api/dist/trpc-methods.json'),                // ./api/dist/trpc-methods.json
+    path.join(cwd, 'src/dist/trpc-methods.json'),                // ./src/dist/trpc-methods.json
+
+    // Parent directory patterns (in case dev-panel is run from a subdirectory)
+    path.join(cwd, '../dist/trpc-methods.json'),                 // ../dist/trpc-methods.json
+    path.join(cwd, '../trpc-methods.json'),                      // ../trpc-methods.json
+
+    // Simple-rpc-ai-backend package fallbacks (when used as dependency)
+    path.join(__dirname, '../trpc-methods.json'),                // package/trpc-methods.json
+    path.join(__dirname, '../../dist/trpc-methods.json'),        // package/dist/trpc-methods.json
+    path.join(__dirname, '../dist/trpc-methods.json'),           // package/dist/trpc-methods.json
   ];
 
-  for (const fallbackPath of commonPaths) {
-    if (existsSync(fallbackPath)) {
-      console.log(`📋 Found tRPC methods at fallback location: ${fallbackPath}`);
-      return fallbackPath;
+  // Search with detailed logging
+  for (let i = 0; i < searchPaths.length; i++) {
+    const searchPath = searchPaths[i];
+    if (existsSync(searchPath)) {
+      const relativePath = path.relative(cwd, searchPath);
+      console.log(`✅ Found tRPC methods at: ${searchPath}`);
+      console.log(`   Relative to working directory: ${relativePath}`);
+      return searchPath;
     }
   }
 
-  console.log(`🔍 No tRPC methods file found in any location`);
+  // Final attempt: recursive search in common directories (limited depth)
+  const recursiveSearchDirs = [
+    path.join(cwd, 'apps'),
+    path.join(cwd, 'packages'),
+    path.join(cwd, 'services'),
+    cwd
+  ];
+
+  for (const searchDir of recursiveSearchDirs) {
+    if (existsSync(searchDir)) {
+      const found = findTrpcMethodsRecursive(searchDir, 3); // max 3 levels deep
+      if (found) {
+        const relativePath = path.relative(cwd, found);
+        console.log(`✅ Found tRPC methods via recursive search: ${found}`);
+        console.log(`   Relative to working directory: ${relativePath}`);
+        return found;
+      }
+    }
+  }
+
+  console.log(`🔍 No trpc-methods.json found after comprehensive search`);
+  console.log(`💡 Searched ${searchPaths.length} common locations plus recursive search`);
+  return null;
+}
+
+// Helper function for recursive search (limited depth)
+function findTrpcMethodsRecursive(dir, maxDepth) {
+  if (maxDepth <= 0) return null;
+
+  try {
+    const items = require('fs').readdirSync(dir, { withFileTypes: true });
+
+    // First check for trpc-methods.json in this directory
+    const methodsFile = path.join(dir, 'trpc-methods.json');
+    if (existsSync(methodsFile)) return methodsFile;
+
+    // Then check dist/trpc-methods.json
+    const distMethodsFile = path.join(dir, 'dist/trpc-methods.json');
+    if (existsSync(distMethodsFile)) return distMethodsFile;
+
+    // Then recurse into subdirectories
+    for (const item of items) {
+      if (item.isDirectory() && !item.name.startsWith('.') && item.name !== 'node_modules') {
+        const found = findTrpcMethodsRecursive(path.join(dir, item.name), maxDepth - 1);
+        if (found) return found;
+      }
+    }
+  } catch (error) {
+    // Ignore permission errors, etc.
+  }
+
   return null;
 }
 
@@ -647,29 +727,179 @@ function generateSampleInput(inputSchema) {
   return JSON.stringify(sample, null, 2);
 }
 
+// Helper function to find tRPC router files with flexible discovery
+function findTrpcRouterFile() {
+  const cwd = process.cwd();
+  console.log(`🔍 Searching for tRPC router file from working directory: ${cwd}`);
+
+  const routerSearchPaths = [
+    // Standard patterns
+    path.join(cwd, 'dist/trpc/root.js'),                     // ./dist/trpc/root.js (standard)
+    path.join(cwd, 'dist/trpc/router.js'),                   // ./dist/trpc/router.js
+    path.join(cwd, 'dist/trpc/index.js'),                    // ./dist/trpc/index.js
+    path.join(cwd, 'dist/router.js'),                        // ./dist/router.js
+    path.join(cwd, 'dist/index.js'),                         // ./dist/index.js
+
+    // Custom patterns (like src/methods.js)
+    path.join(cwd, 'dist/methods.js'),                       // ./dist/methods.js
+    path.join(cwd, 'src/methods.js'),                        // ./src/methods.js (your use case)
+    path.join(cwd, 'src/methods/index.js'),                  // ./src/methods/index.js (your requested pattern)
+    path.join(cwd, 'methods.js'),                            // ./methods.js
+    path.join(cwd, 'methods/index.js'),                      // ./methods/index.js
+
+    // Monorepo patterns
+    path.join(cwd, 'apps/backend/dist/trpc/root.js'),        // ./apps/backend/dist/trpc/root.js
+    path.join(cwd, 'apps/backend/dist/methods.js'),          // ./apps/backend/dist/methods.js
+    path.join(cwd, 'apps/backend/src/methods.js'),           // ./apps/backend/src/methods.js
+    path.join(cwd, 'apps/backend/src/methods/index.js'),     // ./apps/backend/src/methods/index.js
+    path.join(cwd, 'packages/backend/dist/trpc/root.js'),    // ./packages/backend/dist/trpc/root.js
+    path.join(cwd, 'packages/backend/src/methods/index.js'), // ./packages/backend/src/methods/index.js
+    path.join(cwd, 'backend/dist/trpc/root.js'),             // ./backend/dist/trpc/root.js
+    path.join(cwd, 'backend/src/methods/index.js'),          // ./backend/src/methods/index.js
+
+    // Build variations
+    path.join(cwd, 'build/trpc/root.js'),                    // ./build/trpc/root.js
+    path.join(cwd, 'build/router.js'),                       // ./build/router.js
+    path.join(cwd, 'build/methods.js'),                      // ./build/methods.js
+  ];
+
+  for (const routerPath of routerSearchPaths) {
+    if (existsSync(routerPath)) {
+      const relativePath = path.relative(cwd, routerPath);
+      console.log(`✅ Found tRPC router at: ${routerPath}`);
+      console.log(`   Relative to working directory: ${relativePath}`);
+      return routerPath;
+    }
+  }
+
+  // Recursive search for router files
+  const recursiveSearchDirs = [
+    path.join(cwd, 'apps'),
+    path.join(cwd, 'packages'),
+    path.join(cwd, 'dist'),
+    path.join(cwd, 'src'),
+    cwd
+  ];
+
+  for (const searchDir of recursiveSearchDirs) {
+    if (existsSync(searchDir)) {
+      const found = findRouterFileRecursive(searchDir, 3);
+      if (found) {
+        const relativePath = path.relative(cwd, found);
+        console.log(`✅ Found tRPC router via recursive search: ${found}`);
+        console.log(`   Relative to working directory: ${relativePath}`);
+        return found;
+      }
+    }
+  }
+
+  console.log(`🔍 No tRPC router file found after comprehensive search`);
+  return null;
+}
+
+// Helper function for recursive router search
+function findRouterFileRecursive(dir, maxDepth) {
+  if (maxDepth <= 0) return null;
+
+  try {
+    const items = require('fs').readdirSync(dir, { withFileTypes: true });
+
+    // Common router file names to look for
+    const routerFileNames = [
+      'root.js', 'router.js', 'index.js', 'methods.js',
+      'trpc.js', 'app.js', 'api.js'
+    ];
+
+    for (const fileName of routerFileNames) {
+      const routerFile = path.join(dir, fileName);
+      if (existsSync(routerFile)) {
+        // Basic check to see if it might be a tRPC router file
+        try {
+          const content = require('fs').readFileSync(routerFile, 'utf8');
+          if (content.includes('router') || content.includes('trpc') || content.includes('procedure')) {
+            return routerFile;
+          }
+        } catch (error) {
+          // Ignore read errors
+        }
+      }
+    }
+
+    // Recurse into subdirectories (especially trpc subdirectories)
+    for (const item of items) {
+      if (item.isDirectory() && !item.name.startsWith('.') && item.name !== 'node_modules') {
+        const found = findRouterFileRecursive(path.join(dir, item.name), maxDepth - 1);
+        if (found) return found;
+      }
+    }
+  } catch (error) {
+    // Ignore permission errors, etc.
+  }
+
+  return null;
+}
+
 // Setup tRPC Playground with proxy to actual server
 async function setupTRPCPlayground() {
   try {
     // Try to load the actual router for playground schema discovery
-    const routerPath = path.join(process.cwd(), 'dist/trpc/root.js');
+    const routerPath = findTrpcRouterFile();
     let schemaRouter = null;
 
-    if (existsSync(routerPath)) {
+    if (routerPath && existsSync(routerPath)) {
       try {
         // Dynamic import the router
-        const { createAppRouter } = await import(routerPath);
+        const routerModule = await import(routerPath);
+        console.log('📁 Router module imported, available exports:', Object.keys(routerModule));
 
-        // Create a minimal router instance for schema discovery only
-        schemaRouter = createAppRouter();
+        // Try different export patterns
+        if (routerModule.createAppRouter) {
+          // Standard simple-rpc-ai-backend pattern
+          schemaRouter = routerModule.createAppRouter();
+          console.log('✅ Router loaded via createAppRouter export');
+        } else if (routerModule.getCustomRouters) {
+          // Custom pattern like your src/methods.js
+          const customRouters = routerModule.getCustomRouters();
+          console.log('✅ Router loaded via getCustomRouters export');
+          console.log('📋 Available custom routers:', Object.keys(customRouters));
+          // For schema discovery, we'll use proxy mode since custom routers need server integration
+          schemaRouter = null;
+        } else if (routerModule.default) {
+          // Default export pattern
+          if (typeof routerModule.default === 'function') {
+            try {
+              schemaRouter = routerModule.default();
+              console.log('✅ Router loaded via default function export');
+            } catch (error) {
+              console.log('⚠️  Default export is not a router factory function');
+              schemaRouter = null;
+            }
+          } else if (routerModule.default.getCustomRouters) {
+            const customRouters = routerModule.default.getCustomRouters();
+            console.log('✅ Router loaded via default.getCustomRouters export');
+            console.log('📋 Available custom routers:', Object.keys(customRouters));
+            schemaRouter = null;
+          } else {
+            console.log('⚠️  Default export is not a recognized router pattern');
+            schemaRouter = null;
+          }
+        } else {
+          console.log('⚠️  No recognized router export pattern found');
+          console.log('💡 Expected: createAppRouter, getCustomRouters, or default function');
+          schemaRouter = null;
+        }
 
-        console.log('🔍 Router loaded for schema discovery...');
+        if (schemaRouter) {
+          console.log('🔍 Router loaded for schema discovery...');
+        } else {
+          console.log('🔄 Using proxy-only mode (custom routers require server integration)...');
+        }
       } catch (error) {
         console.log('⚠️  Failed to load router for schema discovery:', error.message);
         console.log('🔄 Continuing with proxy-only setup...');
         schemaRouter = null;
       }
     } else {
-      console.log('⚠️  Router not found at', routerPath);
       console.log('🔄 Setting up playground with proxy-only mode (no schema discovery)...');
     }
     
