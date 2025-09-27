@@ -42,18 +42,27 @@ Usage: simple-rpc-dev-panel [options]
 Options:
   --port <number>          Dev panel port (default: 8080)
   --server-port <number>   Backend server port (default: auto-discover)
-  --wait-ready             Wait for services to be ready and output READY signal
+  --wait-ready             Wait for services to be ready, then stay running
   --help                   Show this help message
 
 Examples:
   # Basic usage
   simple-rpc-dev-panel --port 8080
 
-  # Wait for readiness (useful for scripting)
+  # Wait for readiness then stay running (recommended)
   simple-rpc-dev-panel --server-port 8001 --port 8080 --wait-ready
 
-  # Use in package.json scripts for sequencing
-  "dev-panel": "npx simple-rpc-dev-panel --wait-ready && npm run start-browser"
+  # Use with wait-on for better workflow (recommended)
+  "dev-panel": "npx simple-rpc-dev-panel --server-port 8001 --port 8080 --wait-ready"
+  "start-chrome": "wait-on http://localhost:8080/ready && google-chrome ..."
+
+  # Or use wait-on with stdout detection
+  "start-chrome": "wait-on -l 'READY' npx simple-rpc-dev-panel --wait-ready"
+
+Readiness Detection:
+  - HTTP endpoint: GET http://localhost:<port>/ready (returns 200 when ready)
+  - Stdout signal: "READY" is output when all services are ready
+  - Process stays running for ongoing development
 `);
     process.exit(0);
   }
@@ -2133,6 +2142,29 @@ app.get('/api/methods', (_, res) => {
   }
 });
 
+// Readiness endpoint for wait-on and other tools
+let isReady = false;
+app.get('/ready', (_, res) => {
+  if (isReady) {
+    res.status(200).json({
+      status: 'ready',
+      message: 'All services are ready',
+      timestamp: new Date().toISOString(),
+      services: {
+        devPanel: true,
+        backendServer: true,
+        mcpJam: mcpJamStatus.running
+      }
+    });
+  } else {
+    res.status(503).json({
+      status: 'not_ready',
+      message: 'Services are still starting up',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 app.listen(port, async () => {
   const url = `http://localhost:${port}`;
   console.log(`🎨 tRPC Development Panel running at ${url}`);
@@ -2152,7 +2184,9 @@ app.listen(port, async () => {
   if (waitReady) {
     const ready = await waitForServicesReady();
     if (ready) {
-      console.log('READY'); // Signal for scripts to detect readiness
+      isReady = true; // Set readiness flag for /ready endpoint
+      console.log('READY'); // Signal for wait-on and other tools to detect readiness
+      // Don't exit - keep dev-panel running for ongoing development
     } else {
       console.log('NOT_READY'); // Signal for scripts to detect failure
       process.exit(1);
