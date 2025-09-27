@@ -17,12 +17,59 @@ import { zodResolveTypes } from './trpc-playground-fix.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Parse command line arguments
+const args = process.argv.slice(2);
+let waitReady = false;
+let serverPort = null;
+let devPanelPort = null;
+
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  if (arg === '--wait-ready') {
+    waitReady = true;
+  } else if (arg === '--server-port') {
+    serverPort = parseInt(args[i + 1]);
+    i++;
+  } else if (arg === '--port') {
+    devPanelPort = parseInt(args[i + 1]);
+    i++;
+  } else if (arg === '--help') {
+    console.log(`
+🚀 Simple RPC AI Backend Dev Panel
+
+Usage: simple-rpc-dev-panel [options]
+
+Options:
+  --port <number>          Dev panel port (default: 8080)
+  --server-port <number>   Backend server port (default: auto-discover)
+  --wait-ready             Wait for services to be ready and output READY signal
+  --help                   Show this help message
+
+Examples:
+  # Basic usage
+  simple-rpc-dev-panel --port 8080
+
+  # Wait for readiness (useful for scripting)
+  simple-rpc-dev-panel --server-port 8001 --port 8080 --wait-ready
+
+  # Use in package.json scripts for sequencing
+  "dev-panel": "npx simple-rpc-dev-panel --wait-ready && npm run start-browser"
+`);
+    process.exit(0);
+  }
+}
+
 const app = express();
-const port = process.env.DEV_PANEL_PORT || 8080;
+const port = devPanelPort || process.env.DEV_PANEL_PORT || 8080;
 const openBrowser = process.env.DEV_PANEL_OPEN_BROWSER !== 'false';
 const playgroundEndpoint = '/api/trpc-playground';
 const mcpJamEndpoint = 'http://localhost:4000';
 const trpcApiEndpoint = '/api/trpc'; // endpoint used by trpc playground
+
+// Override server port discovery if specified
+if (serverPort) {
+  process.env.AI_SERVER_PORT = serverPort.toString();
+}
 
 // Dynamic server configuration discovery
 let serverConfig = null;
@@ -197,12 +244,12 @@ async function discoverServerConfig() {
   // Try to discover running servers on common ports
   const commonPorts = [8000, 8001, 8002, 3000];
   const manualPort = process.env.AI_SERVER_PORT;
-  
+
   // If manual port is specified, try it first
   if (manualPort) {
     commonPorts.unshift(parseInt(manualPort));
   }
-  
+
   for (const testPort of commonPorts) {
     try {
       const response = await fetch(`http://localhost:${testPort}/config`);
@@ -214,7 +261,7 @@ async function discoverServerConfig() {
       // Server not running on this port, continue
     }
   }
-  
+
   // Fallback to default configuration
   const fallbackPort = manualPort || 8000;
   return {
@@ -228,6 +275,104 @@ async function discoverServerConfig() {
     }
   };
 }
+
+// Health check functions for readiness polling
+async function checkServerHealth() {
+  try {
+    const config = getServerConfig();
+    const response = await fetch(config.endpoints.health, {
+      timeout: 2000,
+      signal: AbortSignal.timeout(2000)
+    });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function checkMCPJamHealth() {
+  try {
+    const response = await fetch(`http://localhost:${mcpJamStatus.port}/health`, {
+      timeout: 2000,
+      signal: AbortSignal.timeout(2000)
+    });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function checkDevPanelHealth() {
+  try {
+    const response = await fetch(`http://localhost:${port}/api/methods`, {
+      timeout: 2000,
+      signal: AbortSignal.timeout(2000)
+    });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function waitForServicesReady() {
+  console.log('🔄 Waiting for services to be ready...');
+
+  const maxWaitTime = 60000; // 60 seconds
+  const pollInterval = 1000; // 1 second
+  const startTime = Date.now();
+
+  let serverReady = false;
+  let mcpJamReady = false;
+  let devPanelReady = false;
+
+  while (Date.now() - startTime < maxWaitTime) {
+    // Check server health
+    if (!serverReady) {
+      serverReady = await checkServerHealth();
+      if (serverReady) {
+        console.log('✅ Backend server is ready');
+      }
+    }
+
+    // Check MCP JAM health (only if enabled)
+    if (!mcpJamReady && mcpJamStatus.running) {
+      mcpJamReady = await checkMCPJamHealth();
+      if (mcpJamReady) {
+        console.log('✅ MCP JAM is ready');
+      }
+    } else if (!mcpJamStatus.running) {
+      mcpJamReady = true; // Skip if not running
+    }
+
+    // Check dev panel health
+    if (!devPanelReady) {
+      devPanelReady = await checkDevPanelHealth();
+      if (devPanelReady) {
+        console.log('✅ Dev Panel is ready');
+      }
+    }
+
+    // All services ready
+    if (serverReady && mcpJamReady && devPanelReady) {
+      console.log('🎉 All services are ready!');
+      return true;
+    }
+
+    // Wait before next poll
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+  }
+
+  // Timeout reached
+  console.log('⚠️  Timeout waiting for services to be ready');
+  console.log(`   Backend server: ${serverReady ? '✅' : '❌'}`);
+  if (mcpJamStatus.running) {
+    console.log(`   MCP JAM: ${mcpJamReady ? '✅' : '❌'}`);
+  }
+  console.log(`   Dev Panel: ${devPanelReady ? '✅' : '❌'}`);
+
+  return false;
+}
+
 
 // Initialize server configuration
 (async () => {
@@ -1988,7 +2133,7 @@ app.get('/api/methods', (_, res) => {
   }
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   const url = `http://localhost:${port}`;
   console.log(`🎨 tRPC Development Panel running at ${url}`);
 
@@ -2003,17 +2148,28 @@ app.listen(port, () => {
     console.log(`🔄 Loading tRPC methods...`);
   }
 
-  // Auto-open browser
-  if (openBrowser) {
-    setTimeout(async () => {
-      try {
-        const open = await import('open');
-        await open.default(url);
-        console.log(`🌐 Browser opened to ${url}`);
-      } catch (error) {
-        console.log(`💡 Open browser manually: ${url}`);
-      }
-    }, 1000);
+  // Wait for readiness if requested
+  if (waitReady) {
+    const ready = await waitForServicesReady();
+    if (ready) {
+      console.log('READY'); // Signal for scripts to detect readiness
+    } else {
+      console.log('NOT_READY'); // Signal for scripts to detect failure
+      process.exit(1);
+    }
+  } else {
+    // Auto-open browser (only if not in wait-ready mode)
+    if (openBrowser) {
+      setTimeout(async () => {
+        try {
+          const open = await import('open');
+          await open.default(url);
+          console.log(`🌐 Browser opened to ${url}`);
+        } catch (error) {
+          console.log(`💡 Open browser manually: ${url}`);
+        }
+      }, 1000);
+    }
   }
 });
 // Periodically check server status and MCP Inspector status
