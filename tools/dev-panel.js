@@ -19,14 +19,14 @@ const __dirname = path.dirname(__filename);
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-let waitReady = false;
 let serverPort = null;
 let devPanelPort = null;
+let skipServerCheck = false;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
-  if (arg === '--wait-ready') {
-    waitReady = true;
+  if (arg === '--skip-server-check') {
+    skipServerCheck = true;
   } else if (arg === '--server-port') {
     serverPort = parseInt(args[i + 1]);
     i++;
@@ -42,27 +42,31 @@ Usage: simple-rpc-dev-panel [options]
 Options:
   --port <number>          Dev panel port (default: 8080)
   --server-port <number>   Backend server port (default: auto-discover)
-  --wait-ready             Wait for services to be ready, then stay running
+  --skip-server-check      Skip backend server health check (dev-panel only mode)
   --help                   Show this help message
 
 Examples:
-  # Basic usage
+  # Basic usage (readiness detection included by default)
   simple-rpc-dev-panel --port 8080
 
-  # Wait for readiness then stay running (recommended)
-  simple-rpc-dev-panel --server-port 8001 --port 8080 --wait-ready
+  # With backend server port
+  simple-rpc-dev-panel --server-port 8001 --port 8080
 
-  # Use with wait-on for better workflow (recommended)
-  "dev-panel": "npx simple-rpc-dev-panel --server-port 8001 --port 8080 --wait-ready"
+  # Use with wait-on for workflow sequencing
+  "dev-panel": "npx simple-rpc-dev-panel --server-port 8001 --port 8080"
   "start-chrome": "wait-on http://localhost:8080/ready && google-chrome ..."
 
   # Or use wait-on with stdout detection
-  "start-chrome": "wait-on -l 'READY' npx simple-rpc-dev-panel --wait-ready"
+  "start-chrome": "wait-on -l 'READY' && google-chrome ..."
 
-Readiness Detection:
+  # Skip backend server check if only using dev-panel
+  simple-rpc-dev-panel --port 8080 --skip-server-check
+
+Readiness Detection (Always Available):
   - HTTP endpoint: GET http://localhost:<port>/ready (returns 200 when ready)
   - Stdout signal: "READY" is output when all services are ready
   - Process stays running for ongoing development
+  - Use --skip-server-check if backend server not available
 `);
     process.exit(0);
   }
@@ -289,12 +293,51 @@ async function discoverServerConfig() {
 async function checkServerHealth() {
   try {
     const config = getServerConfig();
-    const response = await fetch(config.endpoints.health, {
+    const healthUrl = config.endpoints.health;
+
+    const response = await fetch(healthUrl, {
       timeout: 2000,
       signal: AbortSignal.timeout(2000)
     });
-    return response.ok;
+
+    if (response.ok) {
+      return true;
+    } else {
+      console.log(`⚠️  Backend server responded with status ${response.status} at ${healthUrl}`);
+      return false;
+    }
   } catch (error) {
+    const config = getServerConfig();
+
+    // Try alternative endpoints if health check fails
+    const alternativeEndpoints = [
+      `${config.baseUrl}/config`,
+      `${config.baseUrl}/`,
+      config.endpoints.tRpc,
+      config.endpoints.jsonRpc
+    ].filter(url => url && url !== config.endpoints.health);
+
+    console.log(`⚠️  Backend server health check failed: ${error.message} (trying ${config.endpoints.health})`);
+
+    // Try alternative endpoints to see if server is running
+    for (const altUrl of alternativeEndpoints) {
+      try {
+        const altResponse = await fetch(altUrl, {
+          timeout: 1000,
+          signal: AbortSignal.timeout(1000)
+        });
+
+        if (altResponse.ok) {
+          console.log(`✅ Backend server detected via alternative endpoint: ${altUrl}`);
+          return true;
+        }
+      } catch (altError) {
+        // Continue trying other endpoints
+      }
+    }
+
+    // If all endpoints fail, server is likely not running
+    console.log(`💡 Backend server not detected on port ${config.port}. Is it running?`);
     return false;
   }
 }
@@ -326,8 +369,9 @@ async function checkDevPanelHealth() {
 async function waitForServicesReady() {
   console.log('🔄 Waiting for services to be ready...');
 
-  const maxWaitTime = 60000; // 60 seconds
+  const maxWaitTime = 30000; // 30 seconds (reduced from 60)
   const pollInterval = 1000; // 1 second
+  const serverMaxWaitTime = 10000; // Only wait 10 seconds for server
   const startTime = Date.now();
 
   let serverReady = false;
@@ -335,11 +379,20 @@ async function waitForServicesReady() {
   let devPanelReady = false;
 
   while (Date.now() - startTime < maxWaitTime) {
-    // Check server health
+    // Check server health with shorter timeout
     if (!serverReady) {
-      serverReady = await checkServerHealth();
-      if (serverReady) {
-        console.log('✅ Backend server is ready');
+      if (skipServerCheck) {
+        serverReady = true; // Skip server check
+        console.log('⏭️  Backend server check skipped');
+      } else if (Date.now() - startTime > serverMaxWaitTime) {
+        // After 10 seconds, give up on server and continue with dev-panel only
+        console.log('⚠️  Backend server timeout after 10s - continuing with dev-panel only mode');
+        serverReady = true; // Continue without server
+      } else {
+        serverReady = await checkServerHealth();
+        if (serverReady) {
+          console.log('✅ Backend server is ready');
+        }
       }
     }
 
@@ -373,11 +426,17 @@ async function waitForServicesReady() {
 
   // Timeout reached
   console.log('⚠️  Timeout waiting for services to be ready');
-  console.log(`   Backend server: ${serverReady ? '✅' : '❌'}`);
+  console.log(`   Backend server: ${serverReady ? '✅' : '❌'} ${serverReady && Date.now() - startTime > serverMaxWaitTime ? '(timeout - continuing anyway)' : ''}`);
   if (mcpJamStatus.running) {
     console.log(`   MCP JAM: ${mcpJamReady ? '✅' : '❌'}`);
   }
   console.log(`   Dev Panel: ${devPanelReady ? '✅' : '❌'}`);
+
+  // If dev panel is ready, we can continue even if backend server failed
+  if (devPanelReady) {
+    console.log('💡 Dev panel is ready - continuing in dev-panel only mode');
+    return true;
+  }
 
   return false;
 }
@@ -2180,30 +2239,27 @@ app.listen(port, async () => {
     console.log(`🔄 Loading tRPC methods...`);
   }
 
-  // Wait for readiness if requested
-  if (waitReady) {
-    const ready = await waitForServicesReady();
-    if (ready) {
-      isReady = true; // Set readiness flag for /ready endpoint
-      console.log('READY'); // Signal for wait-on and other tools to detect readiness
-      // Don't exit - keep dev-panel running for ongoing development
-    } else {
-      console.log('NOT_READY'); // Signal for scripts to detect failure
-      process.exit(1);
-    }
+  // Always check for readiness and provide signals
+  const ready = await waitForServicesReady();
+  if (ready) {
+    isReady = true; // Set readiness flag for /ready endpoint
+    console.log('READY'); // Signal for wait-on and other tools to detect readiness
   } else {
-    // Auto-open browser (only if not in wait-ready mode)
-    if (openBrowser) {
-      setTimeout(async () => {
-        try {
-          const open = await import('open');
-          await open.default(url);
-          console.log(`🌐 Browser opened to ${url}`);
-        } catch (error) {
-          console.log(`💡 Open browser manually: ${url}`);
-        }
-      }, 1000);
-    }
+    console.log('NOT_READY'); // Signal for scripts to detect failure
+    process.exit(1);
+  }
+
+  // Auto-open browser if enabled (after readiness check)
+  if (openBrowser) {
+    setTimeout(async () => {
+      try {
+        const open = await import('open');
+        await open.default(url);
+        console.log(`🌐 Browser opened to ${url}`);
+      } catch (error) {
+        console.log(`💡 Open browser manually: ${url}`);
+      }
+    }, 1000);
   }
 });
 // Periodically check server status and MCP Inspector status
