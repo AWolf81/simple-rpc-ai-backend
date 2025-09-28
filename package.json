@@ -213,6 +213,7 @@
   },
   "files": [
     "dist/**/*",
+    "src/data",
     "scripts/**/*",
     "README.md",
     "LICENSE.md",
