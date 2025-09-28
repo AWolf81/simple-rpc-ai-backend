@@ -220,7 +220,8 @@
     "docker/**/*",
     "docker-compose.postgres.yml",
     ".env.postgres.example",
-    "src/database/migrations/*.sql"
+    "src/database/migrations/*.sql",
+    "tsconfig.json"
   ],
   "repository": {
     "type": "git",
