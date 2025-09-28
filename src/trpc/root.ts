@@ -44,7 +44,7 @@ export function createAppRouter(
   }>,
   rootFolders?: any,
   customRouters?: { [namespace: string]: any }
-) {
+): ReturnType<typeof router> {
   // Initialize services if database is available
   let virtualTokenService: VirtualTokenService | null = null;
   let usageAnalyticsService: UsageAnalyticsService | null = null;

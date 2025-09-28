@@ -5,7 +5,7 @@ import { createMCPTool } from '../../../../auth/scopes';
 /**
  * Basic utility procedures for MCP
  */
-export const utilityProcedures = {
+export const utilityProcedures: Record<string, any> = {
   // Greeting tool with MCP metadata - Public tool (no auth required)
   greeting: publicProcedure
     .meta({

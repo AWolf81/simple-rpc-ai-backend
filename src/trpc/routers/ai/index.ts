@@ -12,7 +12,7 @@ import { createGenerationProcedures } from './methods/generation';
 import { createProviderProcedures } from './methods/providers';
 import { AIRouterFactoryConfig, DEFAULT_CONFIG, createServiceProvidersConfig, AIRouterConfig } from './types'; // AIRouterConig is imported but not used, why?
 
-export function createAIRouter(factoryConfig: AIRouterFactoryConfig = {}) {
+export function createAIRouter(factoryConfig: AIRouterFactoryConfig = {}): ReturnType<typeof router> {
   const {
     config = {},
     tokenTrackingEnabled = false,

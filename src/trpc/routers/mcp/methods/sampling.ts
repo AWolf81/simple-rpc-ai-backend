@@ -12,7 +12,7 @@ export function createSamplingProcedures(aiService: AIService, aiConfig: {
   useServerConfig: boolean;
   restrictToSampling: boolean;
   allowByokOverride: boolean;
-}) {
+}): Record<string, any> {
   return {
   // Generate content with approval workflow (demonstrates MCP sampling protocol)
   generateWithApproval: publicProcedure

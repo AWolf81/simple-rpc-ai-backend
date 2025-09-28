@@ -150,7 +150,7 @@ export function loadTRPCGenerationConfig(): TRPCGenerationConfig {
 /**
  * Create a router for tRPC method generation with configuration filtering
  */
-export async function createRouterForGeneration(config?: TRPCGenerationConfig) {
+export async function createRouterForGeneration(config?: TRPCGenerationConfig): Promise<any> {
   const generationConfig = config || loadTRPCGenerationConfig();
 
   // Import the createAppRouter function dynamically for ES modules

@@ -80,8 +80,26 @@ export class TRPCToJSONRPCBridge {
           : await createTRPCContext({ req, res, info: {} as any });
 
         try {
-          // Direct server-side call using the full method path
-          const result = await this.router.createCaller(ctx)[method](params);
+          // Parse nested method path (e.g., "ai.health" -> caller.ai.health)
+          const caller = this.router.createCaller(ctx);
+          const methodParts = method.split('.');
+
+          // Navigate to the nested procedure
+          let procedure: any = caller;
+          for (const part of methodParts) {
+            if (procedure && typeof procedure === 'object' && part in procedure) {
+              procedure = procedure[part];
+            } else {
+              throw new Error(`No such procedure: ${method}`);
+            }
+          }
+
+          // Call the procedure
+          if (typeof procedure !== 'function') {
+            throw new Error(`No such procedure: ${method}`);
+          }
+
+          const result = await procedure(params);
           
           res.json({
             jsonrpc: '2.0',

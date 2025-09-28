@@ -16,7 +16,7 @@ interface AdminConfig {
   virtualTokenService?: VirtualTokenService | null;
 }
 
-export function createAdminRouter(config: AdminConfig = {}) {
+export function createAdminRouter(config: AdminConfig = {}): ReturnType<typeof router> {
   const {
     adminUsers = ['admin@company.com'],
     requireAdminAuth = true,
@@ -376,4 +376,4 @@ export function createAdminRouter(config: AdminConfig = {}) {
   });
 }
 
-export const adminRouter = createAdminRouter();
+export const adminRouter: ReturnType<typeof createAdminRouter> = createAdminRouter();

@@ -18,7 +18,7 @@ export function createBillingRouter(
   virtualTokenService: VirtualTokenService | null,
   usageAnalyticsService: UsageAnalyticsService | null,
   hybridUserService: HybridUserService | null
-) {
+): ReturnType<typeof router> {
   return router({
     /**
      * Get user's token balances (all types)
@@ -254,4 +254,4 @@ export function createBillingRouter(
   });
 }
 
-export const billingRouter = createBillingRouter(null, null, null);
+export const billingRouter: ReturnType<typeof createBillingRouter> = createBillingRouter(null, null, null);

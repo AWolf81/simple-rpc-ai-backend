@@ -5,7 +5,7 @@ import { createMCPTool, createAdminMCPTool } from '../../../../auth/scopes';
 /**
  * Administrative procedures for MCP
  */
-export const adminProcedures = {
+export const adminProcedures: Record<string, any> = {
 
   // Server status with detailed information
   status: publicProcedure

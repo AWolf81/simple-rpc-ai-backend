@@ -7,7 +7,7 @@ import { router, publicProcedure } from '@src-trpc/index';
 import { createMCPTool } from '../../../auth/scopes';
 import { WorkspaceManager, type ServerWorkspaceConfig } from '../../../services/workspace-manager';
 
-export function createSystemRouter(workspaceManager?: WorkspaceManager) {
+export function createSystemRouter(workspaceManager?: WorkspaceManager): ReturnType<typeof router> {
   // Use provided workspaceManager or create a default one
   const manager = workspaceManager || new WorkspaceManager();
 
@@ -413,4 +413,4 @@ export function createSystemRouter(workspaceManager?: WorkspaceManager) {
   });
 }
 
-export const systemRouter = createSystemRouter();
+export const systemRouter: ReturnType<typeof createSystemRouter> = createSystemRouter();

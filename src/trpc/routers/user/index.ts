@@ -20,7 +20,7 @@ export function createUserRouter(
   usageAnalyticsService: UsageAnalyticsService | null,
   hybridUserService: HybridUserService | null,
   byokProviders: string[] = ['anthropic', 'openai', 'google']
-) {
+): ReturnType<typeof router> {
   return router({
     /**
      * Get user profile with capabilities and preferences (hybrid users)
@@ -238,4 +238,4 @@ export function createUserRouter(
   });
 }
 
-export const userRouter = createUserRouter(null, null, null);
+export const userRouter: ReturnType<typeof createUserRouter> = createUserRouter(null, null, null);

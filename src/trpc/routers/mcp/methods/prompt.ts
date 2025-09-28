@@ -5,7 +5,7 @@ import { createMCPTool } from '../../../../auth/scopes';
 /**
  * Prompt management procedures for MCP
  */
-export const promptProcedures = {
+export const promptProcedures: Record<string, any> = {
   // Get available prompts
   getPrompts: publicProcedure
     .meta({

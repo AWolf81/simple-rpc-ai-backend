@@ -21,7 +21,7 @@ const tasks = new Map<string, Task>();
 /**
  * Task management procedures for MCP
  */
-export const taskProcedures = {
+export const taskProcedures: Record<string, any> = {
   // Long running task example with progress tracking
   longRunningTask: publicProcedure
     .meta({

@@ -11,7 +11,7 @@ import type { MCPRouterConfig } from "./types";
 /**
  * Create MCP router with all procedure modules
  */
-export function createMCPRouter(config: MCPRouterConfig = {}) {
+export function createMCPRouter(config: MCPRouterConfig = {}): ReturnType<typeof router> {
   // Only enable AI-powered sampling if explicitly enabled
   const aiConfig = {
     enabled: config.ai?.enabled || false,
