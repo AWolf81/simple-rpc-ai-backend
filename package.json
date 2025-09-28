@@ -131,7 +131,7 @@
     "jsonrpc",
     "secure"
   ],
-  "author": "Extracted from universal-ai-encryption-mcp",
+  "author": "Alexander Wolf <AWolf81>",
   "license": "MIT",
   "dependencies": {
     "@ai-sdk/anthropic": "^0.0.0",
@@ -213,6 +213,7 @@
   },
   "files": [
     "dist/**/*",
+    "scripts/**/*",
     "README.md",
     "LICENSE.md",
     "docker/**/*",
