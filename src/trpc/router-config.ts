@@ -56,6 +56,12 @@ export interface TRPCGenerationConfig {
     enabled: boolean;
     includeInGeneration?: boolean;
   };
+
+  /**
+   * Namespace whitelist for filtering tools/methods
+   * If specified, only tools from these namespaces will be included
+   */
+  namespaceWhitelist?: string[];
 }
 
 /**
@@ -144,6 +150,15 @@ export function loadTRPCGenerationConfig(): TRPCGenerationConfig {
     config.admin!.includeInGeneration = config.admin!.enabled;
   }
 
+  // Namespace whitelist configuration
+  if (process.env.TRPC_GEN_NAMESPACE_WHITELIST !== undefined) {
+    const whitelist = process.env.TRPC_GEN_NAMESPACE_WHITELIST
+      .split(',')
+      .map(ns => ns.trim())
+      .filter(ns => ns.length > 0);
+    config.namespaceWhitelist = whitelist;
+  }
+
   return config;
 }
 
@@ -184,12 +199,12 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
     // Default AI configuration
   } : undefined;
 
-  console.log(`🔧 tRPC Generation Config:`);
-  console.log(`   AI: ${includeAI ? '✅ Enabled' : '❌ Disabled'}`);
-  console.log(`   MCP: ${includeMCP ? '✅ Enabled' : '❌ Disabled'}`);
-  if (includeMCP && generationConfig.mcp?.ai) {
-    console.log(`   MCP AI Tools: ${generationConfig.mcp.ai.enabled ? '✅ Enabled' : '❌ Disabled'}`);
-  }
+  const aiStatus = includeAI ? 'enabled' : 'disabled';
+  const mcpStatus = includeMCP ? 'enabled' : 'disabled';
+  const mcpAiStatus = includeMCP && generationConfig.mcp?.ai
+    ? (generationConfig.mcp.ai.enabled ? 'AI tools enabled' : 'AI tools disabled')
+    : null;
+  console.log(`🔧 tRPC generation – AI ${aiStatus}, MCP ${mcpStatus}${mcpAiStatus ? ` (${mcpAiStatus})` : ''}`);
 
   // Import router creation functions individually using relative paths
   const { router } = await import('./index.js');
@@ -228,7 +243,8 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
     baseRouters.mcp = createMCPRouter({
       auth: (mcpConfig as any)?.auth || undefined, // Safe fallback for auth config
       ai: mcpConfig?.ai,
-      aiService: null // No shared AI service for generation
+      aiService: null, // No shared AI service for generation
+      namespaceWhitelist: generationConfig.namespaceWhitelist
     });
   }
 
@@ -259,6 +275,42 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
     });
   }
 
-  const generatedRouter = router(baseRouters);
+  // Check for custom routers from consumer projects
+  // Look for common patterns: getCustomRouters() export from router files
+  let customRouters = {};
+
+  try {
+    // Try to find consumer's custom routers
+    // When running from dist/trpc/, we need to adjust paths accordingly
+    const consumerPaths = [
+      // Relative to the dist/trpc/ directory where this code runs during generation
+      '../../examples/02-mcp-server/methods/index.js', // For this repo's example
+      '../../../methods/index.js',                       // Consumer project methods/
+      '../../../src/methods/index.js',                   // Consumer project src/methods/
+      '../../methods/index.js',                          // Another consumer pattern
+      './methods/index.js',                              // Local methods if any
+      '../methods/index.js',                             // Parent methods
+    ];
+
+    for (const consumerPath of consumerPaths) {
+      try {
+        const consumerModule = await import(consumerPath);
+        if (consumerModule.getCustomRouters && typeof consumerModule.getCustomRouters === 'function') {
+          customRouters = consumerModule.getCustomRouters();
+          console.log(`✅ Found custom routers: ${Object.keys(customRouters).join(', ')}`);
+          break;
+        }
+      } catch (e) {
+        // Continue searching - most paths will fail which is expected
+      }
+    }
+  } catch (error) {
+    // No custom routers found - this is fine
+    console.log(`ℹ️ No custom routers detected: ${error.message}`);
+  }
+
+  // Merge base routers with custom routers
+  const allRouters = { ...baseRouters, ...customRouters };
+  const generatedRouter = router(allRouters);
   return generatedRouter;
 }

@@ -5,6 +5,7 @@
  */
 
 import { handleMCPResourceParameters } from './mcp-resource-helpers.js';
+import { logger } from '../utils/logger.js';
 
 export interface MCPResource {
   /** Unique identifier for the resource */
@@ -91,7 +92,7 @@ export class MCPResourceRegistry {
       this.providers.set(resource.id, provider);
     }
 
-    console.log(`📝 Registered MCP resource: ${resource.id} (${resource.mimeType})`);
+    logger.debug(`📝 Registered MCP resource: ${resource.id} (${resource.mimeType})`);
   }
 
   /**
@@ -99,7 +100,7 @@ export class MCPResourceRegistry {
    */
   registerTemplate(resourceId: string, template: MCPResourceTemplate): void {
     this.templates.set(resourceId, template);
-    console.log(`📋 Registered MCP template: ${resourceId}`);
+    logger.debug(`📋 Registered MCP template: ${resourceId}`);
   }
 
   /**
@@ -107,7 +108,7 @@ export class MCPResourceRegistry {
    */
   registerProvider(resourceId: string, provider: MCPResourceProvider): void {
     this.providers.set(resourceId, provider);
-    console.log(`🏭 Registered MCP provider: ${resourceId}`);
+    logger.debug(`🏭 Registered MCP provider: ${resourceId}`);
   }
 
   /**
@@ -243,7 +244,7 @@ export class MCPResourceRegistry {
     this.templates.delete(resourceId);
 
     if (removed) {
-      console.log(`🗑️ Unregistered MCP resource: ${resourceId}`);
+      logger.debug(`🗑️ Unregistered MCP resource: ${resourceId}`);
     }
 
     return removed;
@@ -258,7 +259,7 @@ export class MCPResourceRegistry {
       .map(r => r.id);
 
     customResources.forEach(id => this.unregisterResource(id));
-    console.log(`🧹 Cleared ${customResources.length} custom resources`);
+    logger.debug(`🧹 Cleared ${customResources.length} custom resources`);
   }
 
   /**
@@ -424,7 +425,7 @@ export class MCPResourceRegistry {
 `
     });
 
-    console.log('✅ Registered 3 built-in MCP resources');
+    logger.debug('✅ Registered 3 built-in MCP resources');
   }
 
   /**
@@ -524,7 +525,7 @@ export class GlobalResourceTemplates {
       }
     });
 
-    console.log('📁 Registered global file-reader resource with rootsManager integration');
+    logger.debug('📁 Registered global file-reader resource with rootsManager integration');
   }
 
   /**
@@ -560,7 +561,7 @@ export class GlobalResourceTemplates {
       }
     });
 
-    console.log('📂 Registered global root-folders resource');
+    logger.debug('📂 Registered global root-folders resource');
   }
 
   /**
@@ -654,7 +655,7 @@ export class GlobalResourceTemplates {
       }
     });
 
-    console.log('📋 Registered global directory-listing resource');
+    logger.debug('📋 Registered global directory-listing resource');
   }
 
   /**
@@ -664,7 +665,7 @@ export class GlobalResourceTemplates {
     this.createFileReader(rootManager);
     this.createRootFoldersLister(rootManager);
     this.createDirectoryLister(rootManager);
-    console.log('✅ Registered all global resource templates');
+    logger.debug('✅ Registered all global resource templates');
   }
 }
 

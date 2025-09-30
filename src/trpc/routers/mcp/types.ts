@@ -91,16 +91,22 @@ export interface MCPRouterConfig {
   };
   extensions?: {
     prompts?: {
-      includeDefaults?: boolean;
       customPrompts?: any[];
       customTemplates?: Record<string, any>;
     };
     resources?: {
-      includeDefaults?: boolean;
       customResources?: any[];
       customHandlers?: Record<string, any>;
       customTemplates?: any[];
       templateHandlers?: Record<string, any>;
     };
   };
+
+  /**
+   * Namespace whitelist for MCP tool filtering
+   * If specified, only tools from these namespaces will be exposed via MCP
+   * Examples: ['math', 'utility'], ['ai', 'system'], ['custom']
+   * If not specified, all available tools are exposed
+   */
+  namespaceWhitelist?: string[];
 }

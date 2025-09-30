@@ -574,10 +574,16 @@ async function extractTRPCMethods() {
     }
 
     const mcpMethods = {};
+    const mcpToolIndex = {};
 
     // Only include MCP methods if MCP is enabled in configuration
     const includeMCPMethods = generationConfig.mcp?.enabled && generationConfig.mcp?.includeInGeneration;
     const includeAITools = generationConfig.mcp?.ai?.enabled && generationConfig.mcp?.ai?.includeAIToolsInGeneration;
+
+    // Log namespace whitelist if configured
+    if (generationConfig.namespaceWhitelist && generationConfig.namespaceWhitelist.length > 0) {
+      console.log(`🔍 Namespace whitelist active: [${generationConfig.namespaceWhitelist.join(', ')}]`);
+    }
 
     const mcpProcedures = includeMCPMethods
       ? Object.entries(methods).filter(([name, method]) => {
@@ -588,6 +594,15 @@ async function extractTRPCMethods() {
             return false;
           }
 
+          // Apply namespace whitelist filtering
+          if (generationConfig.namespaceWhitelist && generationConfig.namespaceWhitelist.length > 0) {
+            const namespace = name.includes('.') ? name.split('.')[0] : name;
+            if (!generationConfig.namespaceWhitelist.includes(namespace)) {
+              console.log(`🚫 Tool ${name} filtered out: namespace "${namespace}" not in whitelist [${generationConfig.namespaceWhitelist.join(', ')}]`);
+              return false;
+            }
+          }
+
           return true;
         })
       : [];
@@ -596,8 +611,24 @@ async function extractTRPCMethods() {
       const mcpMeta = method.meta.mcp;
       const procedureName = name;
       const httpMethod = method.type === 'mutation' ? 'POST' : 'GET';
+      const toolName = (mcpMeta?.toolName || mcpMeta?.name || procedureName.split('.').pop() || procedureName).trim();
+
+      if (!toolName) {
+        console.error(`❌ MCP tool detected without a valid name: ${procedureName}`);
+        throw new Error(`MCP tool '${procedureName}' does not specify a tool name`);
+      }
+
+      if (mcpToolIndex[toolName]) {
+        const conflictWith = mcpToolIndex[toolName];
+        console.error(`❌ Duplicate MCP tool name detected: '${toolName}' used by both '${conflictWith}' and '${procedureName}'`);
+        throw new Error(`Duplicate MCP tool name '${toolName}' detected in procedures '${conflictWith}' and '${procedureName}'. Tool names must be unique.`);
+      }
+
+      mcpToolIndex[toolName] = procedureName;
       
       mcpMethods[name] = {
+        toolName,
+        procedure: procedureName,
         title: mcpMeta.title || mcpMeta.name || mcpMeta.description || `Tool ${name}`,
         description: mcpMeta.description,
         category: mcpMeta.category || 'general',
@@ -611,7 +642,7 @@ async function extractTRPCMethods() {
               id: 1,
               method: 'tools/call',
               params: {
-                name: name.split('.').pop(), // Remove router prefix for MCP
+                name: toolName,
                 arguments: generateExampleArgs(method.input)
               }
             }
@@ -707,7 +738,8 @@ async function extractTRPCMethods() {
         available: Object.keys(mcpMethods).length > 0,
         enabled: includeMCPMethods,
         methods: mcpMethods,
-        endpoint: 'http://localhost:8000/mcp',
+        endpoint: `${baseUrl}/mcp`,
+        toolIndex: mcpToolIndex,
         protocolVersion: '2024-11-05'
       },
       stats: {
@@ -715,7 +747,8 @@ async function extractTRPCMethods() {
         queries: Object.values(methods).filter(m => m.type === 'query').length,
         mutations: Object.values(methods).filter(m => m.type === 'mutation').length,
         subscriptions: Object.values(methods).filter(m => m.type === 'subscription').length,
-        mcpMethods: Object.keys(mcpMethods).length
+        mcpMethods: Object.keys(mcpMethods).length,
+        uniqueMcpTools: Object.keys(mcpToolIndex).length
       }
     };
     

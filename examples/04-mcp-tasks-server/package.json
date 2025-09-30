@@ -1,0 +1,26 @@
+{
+  "name": "mcp-tasks-server-example",
+  "version": "1.0.0",
+  "description": "Task Management MCP Server Example - Demonstrates task lifecycle management with MCP protocol",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "mcp",
+    "task-management",
+    "rpc",
+    "example",
+    "tasks",
+    "progress-tracking"
+  ],
+  "dependencies": {
+    "simple-rpc-ai-backend": "file:../..",
+    "dotenv": "^16.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

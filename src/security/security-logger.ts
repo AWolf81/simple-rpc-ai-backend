@@ -13,6 +13,7 @@ import { AuthenticatedRequest } from '../auth/jwt-middleware';
 import winston from 'winston';
 import fs from 'fs/promises';
 import path from 'path';
+import { logger as appLogger } from '../utils/logger.js';
 
 // Security event types
 export enum SecurityEventType {
@@ -235,8 +236,8 @@ export class SecurityLogger {
     this.initializeLogger();
     this.initializeAlertCounters();
     this.startAnomalyDetection();
-    
-    console.log('✅ Security logging: Security logger and network filter initialized');
+
+    appLogger.debug('✅ Security logging: Security logger and network filter initialized');
   }
 
   /**

@@ -41,15 +41,18 @@ Usage: simple-rpc-dev-panel [options]
 
 Options:
   --port <number>          Dev panel port (default: 8080)
-  --server-port <number>   Backend server port (default: auto-discover)
+  --server-port <number>   Backend server port (default: auto-discover 8001, 8000, ...)
   --skip-server-check      Skip backend server health check (dev-panel only mode)
   --help                   Show this help message
 
 Examples:
-  # Basic usage (readiness detection included by default)
+  # Basic usage (auto-discovers server on 8001, 8000, etc.)
   simple-rpc-dev-panel --port 8080
 
-  # With backend server port
+  # Force specific server port (basic server on 8000)
+  simple-rpc-dev-panel --server-port 8000 --port 8080
+
+  # Force specific server port (MCP server on 8001)
   simple-rpc-dev-panel --server-port 8001 --port 8080
 
   # Use with wait-on for workflow sequencing
@@ -89,6 +92,15 @@ let serverConfig = null;
 let mcpInspectorStatus = { running: false, token: null };
 let mcpJamProcess = null;
 let mcpJamStatus = { running: false, port: 4000 };
+let mcpJamStartLogged = false;
+
+function logMcpJamStarted(message = '✅ MCP JAM started successfully') {
+  if (mcpJamStartLogged) {
+    return;
+  }
+  console.log(message);
+  mcpJamStartLogged = true;
+}
 
 // Check if MCP Inspector is running and get auth token
 async function checkMCPInspector() {
@@ -155,8 +167,8 @@ async function checkAndStartMCPJam() {
         mcpJamProcess.stdout?.on('data', (data) => {
           const output = data.toString();
           if (output.includes('Inspector Launched') || output.includes('localhost:')) {
-            console.log('✅ MCP JAM started successfully via npx');
             mcpJamStatus.running = true;
+            logMcpJamStarted();
           }
         });
 
@@ -181,8 +193,8 @@ async function checkAndStartMCPJam() {
         try {
           const response = await fetch(`http://localhost:${mcpJamStatus.port}/health`);
           if (response.ok) {
-            console.log('✅ MCP JAM confirmed running via npx');
             mcpJamStatus.running = true;
+            logMcpJamStarted();
             return mcpJamStatus;
           }
         } catch (error) {
@@ -214,8 +226,8 @@ async function checkAndStartMCPJam() {
     mcpJamProcess.stdout?.on('data', (data) => {
       const output = data.toString();
       if (output.includes('Inspector Launched') || output.includes('localhost:')) {
-        console.log('✅ MCP JAM started successfully');
         mcpJamStatus.running = true;
+        logMcpJamStarted();
       }
     });
 
@@ -231,17 +243,20 @@ async function checkAndStartMCPJam() {
       console.log(`🎮 MCP JAM process exited with code ${code}`);
       mcpJamStatus.running = false;
       mcpJamProcess = null;
+      mcpJamStartLogged = false;
     });
 
     mcpJamProcess.on('error', (error) => {
       console.error(`❌ MCP JAM failed to start: ${error.message}`);
       mcpJamStatus.running = false;
       mcpJamProcess = null;
+      mcpJamStartLogged = false;
     });
 
     // Give it a moment to start
     await new Promise(resolve => setTimeout(resolve, 2000));
     mcpJamStatus.running = true; // Assume it started
+    logMcpJamStarted();
 
     return mcpJamStatus;
 
@@ -255,7 +270,8 @@ async function checkAndStartMCPJam() {
 
 async function discoverServerConfig() {
   // Try to discover running servers on common ports
-  const commonPorts = [8000, 8001, 8002, 3000];
+  // Default to 8001 (MCP server with more features) but also check 8000 (basic server)
+  const commonPorts = [8001, 8000, 8002, 3000];
   const manualPort = process.env.AI_SERVER_PORT;
 
   // If manual port is specified, try it first
@@ -268,7 +284,10 @@ async function discoverServerConfig() {
       const response = await fetch(`http://localhost:${testPort}/config`);
       if (response.ok) {
         const config = await response.json();
-        return config;
+        return {
+          ...config,
+          detected: true
+        };
       }
     } catch (error) {
       // Server not running on this port, continue
@@ -276,15 +295,22 @@ async function discoverServerConfig() {
   }
 
   // Fallback to default configuration
-  const fallbackPort = manualPort || 8000;
+  // Default to 8001 (MCP server) but allow override via environment
+  const fallbackPort = manualPort || 8001;
   return {
     port: fallbackPort,
     baseUrl: `http://localhost:${fallbackPort}`,
+    detected: false,
     endpoints: {
       health: `http://localhost:${fallbackPort}/health`,
       jsonRpc: `http://localhost:${fallbackPort}/rpc`,
       tRpc: `http://localhost:${fallbackPort}/trpc`,
       mcp: `http://localhost:${fallbackPort}/mcp`,
+    },
+    protocols: {
+      jsonRpc: false,
+      tRpc: false,
+      mcp: false
     }
   };
 }
@@ -293,7 +319,9 @@ async function discoverServerConfig() {
 async function checkServerHealth() {
   try {
     const config = getServerConfig();
-    const healthUrl = config.endpoints.health;
+    const healthUrl = config.endpoints && config.endpoints.health
+      ? config.endpoints.health
+      : `${config.baseUrl}/health`;
 
     const response = await fetch(healthUrl, {
       timeout: 2000,
@@ -301,9 +329,17 @@ async function checkServerHealth() {
     });
 
     if (response.ok) {
+      if (!config.detected) {
+        serverConfig = await discoverServerConfig();
+      } else if (serverConfig && !serverConfig.detected) {
+        serverConfig = { ...serverConfig, detected: true };
+      }
       return true;
     } else {
       console.log(`⚠️  Backend server responded with status ${response.status} at ${healthUrl}`);
+      if (serverConfig && serverConfig.detected) {
+        serverConfig = { ...serverConfig, detected: false };
+      }
       return false;
     }
   } catch (error) {
@@ -338,6 +374,9 @@ async function checkServerHealth() {
 
     // If all endpoints fail, server is likely not running
     console.log(`💡 Backend server not detected on port ${config.port}. Is it running?`);
+    if (serverConfig && serverConfig.detected) {
+      serverConfig = { ...serverConfig, detected: false };
+    }
     return false;
   }
 }
@@ -452,14 +491,116 @@ async function waitForServicesReady() {
 // Helper function to get current config or fallback
 function getServerConfig() {
   return serverConfig || {
-    port: process.env.AI_SERVER_PORT || 8000,
-    baseUrl: `http://localhost:${process.env.AI_SERVER_PORT || 8000}`,
+    port: process.env.AI_SERVER_PORT || 8001,
+    baseUrl: `http://localhost:${process.env.AI_SERVER_PORT || 8001}`,
+    detected: false,
+    protocols: {
+      jsonRpc: false,
+      tRpc: false,
+      mcp: false
+    },
     endpoints: {
-      jsonRpc: `http://localhost:${process.env.AI_SERVER_PORT || 8000}/rpc`,
-      tRpc: `http://localhost:${process.env.AI_SERVER_PORT || 8000}/trpc`,
-      mcp: `http://localhost:${process.env.AI_SERVER_PORT || 8000}/mcp`,
+      jsonRpc: `http://localhost:${process.env.AI_SERVER_PORT || 8001}/rpc`,
+      tRpc: `http://localhost:${process.env.AI_SERVER_PORT || 8001}/trpc`,
+      mcp: `http://localhost:${process.env.AI_SERVER_PORT || 8001}/mcp`,
+      health: `http://localhost:${process.env.AI_SERVER_PORT || 8001}/health`
     }
   };
+}
+
+// Discover custom routers from consumer project
+async function discoverCustomRouters() {
+  try {
+    const cwd = process.cwd();
+
+    // Common patterns for custom router discovery
+    const possiblePaths = [
+      './src/methods.js',
+      './src/methods/index.js',
+      './methods/index.js',
+      './methods.js',
+      './src/routers.js',
+      './routers.js',
+      './src/trpc/custom-routers.js',
+      './src/trpc/custom-routers/index.js'
+    ];
+
+    // Check if we're running a specific example server (detect from running process)
+    // Try to detect which server is running by checking for process arguments
+    try {
+      const { execSync } = await import('child_process');
+      const psOutput = execSync('ps aux | grep -E "node|tsx" | grep -E "server\\.js|server\\.ts" | grep -v grep', { encoding: 'utf-8' });
+
+      // Look for example server paths in running processes
+      const exampleDirs = ['examples/02-mcp-server', 'examples/01-basic-server', 'examples/04-mcp-tasks-server'];
+      for (const exampleDir of exampleDirs) {
+        if (psOutput.includes(exampleDir)) {
+          const exampleMethodsPath = path.join(cwd, exampleDir, 'methods/index.js');
+          const relativeExamplePath = `./${path.relative(cwd, exampleMethodsPath)}`;
+          if (existsSync(exampleMethodsPath) && !possiblePaths.includes(relativeExamplePath)) {
+            possiblePaths.unshift(relativeExamplePath);
+            console.log(`📋 Detected running server: ${exampleDir}`);
+          }
+        }
+      }
+    } catch (error) {
+      // Fallback: check all example directories
+      const exampleDirs = ['examples/02-mcp-server', 'examples/01-basic-server', 'examples'];
+      for (const exampleDir of exampleDirs) {
+        const examplePath = path.join(cwd, exampleDir, 'methods/index.js');
+        const relativeExamplePath = `./${path.relative(cwd, examplePath)}`;
+        if (existsSync(examplePath) && !possiblePaths.includes(relativeExamplePath)) {
+          possiblePaths.unshift(relativeExamplePath);
+        }
+      }
+    }
+
+    // Also check if we're in an example directory with methods
+    if (cwd.includes('examples/')) {
+      possiblePaths.unshift('./methods/index.js');
+      possiblePaths.unshift('./methods.js');
+    }
+
+    for (const testPath of possiblePaths) {
+      if (existsSync(testPath)) {
+        try {
+          const methodsModule = await import(path.resolve(testPath));
+
+          // Try different export patterns
+          if (methodsModule.getCustomRouters) {
+            return methodsModule.getCustomRouters();
+          } else if (methodsModule.default && methodsModule.default.getCustomRouters) {
+            return methodsModule.default.getCustomRouters();
+          } else if (methodsModule.customRouters) {
+            return methodsModule.customRouters;
+          } else {
+            // Check for individual router exports
+            const routers = {};
+            const possibleRouterNames = ['mathRouter', 'utilityRouter', 'fileRouter', 'customMathRouter', 'customUtilityRouter', 'fileOperationsRouter'];
+
+            for (const routerName of possibleRouterNames) {
+              if (methodsModule[routerName]) {
+                // Extract namespace from router name
+                const namespace = routerName.replace(/Router$/, '').replace(/^custom/, '').toLowerCase();
+                routers[namespace] = methodsModule[routerName];
+              }
+            }
+
+            if (Object.keys(routers).length > 0) {
+              return routers;
+            }
+          }
+        } catch (error) {
+          console.log(`⚠️  Failed to load custom routers from ${testPath}:`, error.message);
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.log('⚠️  Error discovering custom routers:', error.message);
+    return null;
+  }
 }
 
 // Smart JSON file lookup with environment variable fallback
@@ -579,6 +720,7 @@ function findTrpcMethodsRecursive(dir, maxDepth) {
 
   return null;
 }
+
 
 // Load tRPC methods from discovered JSON file, auto-build if needed
 async function loadTRPCMethods() {
@@ -807,12 +949,30 @@ function renderSchemaField(field) {
   `;
 }
 
-function generateProcedureHTML(name, procedure) {
-  const { type, method, path: procPath, summary, description, tags, input, output, requiresAuth } = procedure;
+function generateProcedureHTML(name, procedure, anchorRegistry, options = {}) {
+  const { toolNameLookup = {} } = options;
+  const { type, method, path: procPath, summary, description, tags, input, output, requiresAuth, meta } = procedure;
 
   // Add lock icon for procedures that require authentication
   const authIcon = requiresAuth ? ' 🔒' : '';
   const authTitle = requiresAuth ? 'Authentication required' : '';
+
+  // Create shareable anchor (default to last segment of tRPC name)
+  const anchorBase = (meta && meta.anchor) || name.split('.').pop() || name;
+  const sanitizedAnchor = anchorBase
+    .toString()
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '') || 'method';
+  const usageCount = anchorRegistry.get(sanitizedAnchor) || 0;
+  anchorRegistry.set(sanitizedAnchor, usageCount + 1);
+  const anchorId = usageCount === 0 ? sanitizedAnchor : `${sanitizedAnchor}-${usageCount + 1}`;
+
+  // Check if this procedure is exposed as an MCP tool
+  const isMCPTool = meta && meta.mcp;
+  const toolLabel = isMCPTool
+    ? (toolNameLookup[name] || meta.mcp.toolName || meta.mcp.name || name.split('.').pop() || name)
+    : null;
+  const mcpBadge = isMCPTool ? `<span class="mcp-badge" title="Available as MCP tool: ${toolLabel}">MCP</span>` : '';
 
   const methodBadge = method ? `<span class="method-badge method-${method.toLowerCase()}" title="${authTitle}">${method}${authIcon}</span>` :
                      `<span class="method-badge method-${type}" title="${authTitle}">${type.toUpperCase()}${authIcon}</span>`;
@@ -827,10 +987,15 @@ function generateProcedureHTML(name, procedure) {
   const outputTitle = outputInfo.title || (outputInfo.description ? outputInfo.description : 'Response');
   
   return `
-    <div class="procedure" data-type="${type}">
+    <div class="procedure" data-type="${type}" id="method-${name.replace(/\./g, '-')}" data-anchor="${anchorId}">
+      <span class="procedure-anchor" id="${anchorId}"></span>
       <div class="procedure-header">
         ${methodBadge}
-        <code class="procedure-name">${pathDisplay}</code>
+        <div class="procedure-title">
+          <code class="procedure-name">${pathDisplay}</code>
+          <a class="procedure-permalink" href="#${anchorId}" title="Copy link to ${pathDisplay}">#</a>
+        </div>
+        ${mcpBadge}
         ${summary ? `<span class="summary">${summary}</span>` : ''}
       </div>
       
@@ -1068,8 +1233,41 @@ async function setupTRPCPlayground() {
         // Try different export patterns
         if (routerModule.createAppRouter) {
           // Standard simple-rpc-ai-backend pattern
-          schemaRouter = routerModule.createAppRouter();
-          console.log('✅ Router loaded via createAppRouter export');
+          // Try to detect and include custom routers for complete schema discovery
+          let customRouters = null;
+
+          // Check if there are custom routers available in the current context
+          if (routerModule.getCustomRouters) {
+            customRouters = routerModule.getCustomRouters();
+            console.log('📋 Found custom routers:', Object.keys(customRouters));
+          } else {
+            // Try to discover custom routers from consumer project
+            customRouters = await discoverCustomRouters();
+            if (customRouters && Object.keys(customRouters).length > 0) {
+              console.log('📋 Discovered custom routers from project:', Object.keys(customRouters));
+            }
+          }
+
+          // Create router with custom routers if available
+          if (customRouters && Object.keys(customRouters).length > 0) {
+            // Pass customRouters as 10th parameter: createAppRouter(aiConfig, tokenTracking, db, serverProviders, byokProviders, postgresRPC, mcpConfig, modelRestrictions, rootFolders, customRouters)
+            schemaRouter = routerModule.createAppRouter(
+              undefined,  // aiConfig
+              false,      // tokenTrackingEnabled
+              undefined,  // dbAdapter
+              ['anthropic'],  // serverProviders
+              ['anthropic'],  // byokProviders
+              undefined,  // postgresRPCMethods
+              { enableMCP: true },  // mcpConfig
+              undefined,  // modelRestrictions
+              {},         // rootFolders
+              customRouters  // customRouters (10th parameter)
+            );
+            console.log('✅ Router loaded via createAppRouter with custom routers:', Object.keys(customRouters));
+          } else {
+            schemaRouter = routerModule.createAppRouter();
+            console.log('✅ Router loaded via createAppRouter (core only)');
+          }
         } else if (routerModule.getCustomRouters) {
           // Custom pattern like your src/methods.js
           const customRouters = routerModule.getCustomRouters();
@@ -1286,6 +1484,74 @@ app.get('/', async (req, res) => {
   const mcpInspectorStatus = await checkMCPInspector();
 
   const config = getServerConfig();
+  // Ensure protocols is always set for template rendering
+  if (!config.protocols) {
+    config.protocols = {
+      jsonRpc: false,
+      tRpc: false,
+      mcp: false
+    };
+  }
+
+  const protocolLabel = (name) => {
+    const normalized = name.replace(/[^a-zA-Z]/g, '').toLowerCase();
+    const friendlyNames = {
+      trpc: 'tRPC',
+      jsonrpc: 'JSON-RPC',
+      mcp: 'MCP'
+    };
+    return friendlyNames[normalized] || name.toUpperCase();
+  };
+
+  const protocolStatusHTML = config.protocols
+    ? Object.entries(config.protocols)
+        .map(([protocol, enabled]) => {
+          const isDetected = Boolean(config.detected);
+          const isEnabled = Boolean(enabled) && isDetected;
+          const statusSymbol = isDetected ? (isEnabled ? '✅' : '❌') : '❓';
+          const color = isDetected
+            ? (isEnabled ? '#059669' : '#b91c1c')
+            : '#6b7280';
+          return `<span style="color: ${color}; margin-right: 15px;">${protocolLabel(protocol)}: ${statusSymbol}</span>`;
+        })
+        .join('')
+    : '';
+
+  const serverStatusDescriptor = (() => {
+    if (skipServerCheck) {
+      return {
+        color: '#b45309',
+        icon: '⏭️',
+        text: 'Server check skipped (dev-panel only mode)',
+        detail: config.baseUrl ? `Expected server: ${config.baseUrl}` : null
+      };
+    }
+    if (config.detected) {
+      return {
+        color: '#059669',
+        icon: '✅',
+        text: `Connected at ${config.baseUrl}`,
+        detail: null
+      };
+    }
+    return {
+      color: '#dc2626',
+      icon: '⚠️',
+      text: 'Server not detected',
+      detail: config.baseUrl ? `Last attempt: ${config.baseUrl}` : null
+    };
+  })();
+
+  const serverStatusBanner = `
+    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+      <strong>📡 Server Status:</strong>
+      <span style="margin-left: 10px; color: ${serverStatusDescriptor.color};">
+        ${serverStatusDescriptor.icon} ${serverStatusDescriptor.text}
+      </span>
+      ${serverStatusDescriptor.detail ? `<div style='margin-top: 6px; color: #4a5568;'>${serverStatusDescriptor.detail}</div>` : ''}
+      ${protocolStatusHTML ? `<div style='margin-top: 6px;'>${protocolStatusHTML}</div>` : ''}
+    </div>
+  `;
   if (!trpcMethods) {
     res.send(`
       <html>
@@ -1314,9 +1580,7 @@ app.get('/', async (req, res) => {
           <div style="max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <h1>🎨 Dev Panel Ready - tRPC Setup Required</h1>
 
-            <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <strong>📡 Connected Server:</strong> ${config.baseUrl}
-            </div>
+            ${serverStatusBanner}
 
             <h2>🚀 Quick Setup for tRPC Method Discovery</h2>
             <p>To see your tRPC methods in the dev panel, add this script to your <code>package.json</code>:</p>
@@ -1347,11 +1611,20 @@ npx simple-rpc-dev-panel</code></pre>
   }
 
   const { procedures, stats, generated } = trpcMethods;
+  const mcpToolIndex = (trpcMethods.mcp && trpcMethods.mcp.toolIndex) ? trpcMethods.mcp.toolIndex : {};
+  const mcpMethods = (trpcMethods.mcp && trpcMethods.mcp.methods) ? trpcMethods.mcp.methods : {};
+  const mcpToolNameLookup = Object.fromEntries(
+    Object.entries(mcpMethods).map(([procName, toolInfo]) => [
+      procName,
+      toolInfo.toolName || toolInfo.name || procName.split('.').pop() || procName
+    ])
+  );
+  const serializedMcpToolIndex = JSON.stringify(mcpToolIndex).replace(/</g, '\\u003c');
 
   // Generate server setup status HTML
   const routerPath = findTrpcRouterFile();
   const routerExists = routerPath && existsSync(routerPath);
-  const hasServerRunning = config.baseUrl !== `http://localhost:${process.env.AI_SERVER_PORT || 8000}` || config.endpoints.tRpc;
+  const hasServerRunning = Boolean(config.detected);
 
   let serverSetupStatusHTML = '';
   if (routerExists && hasServerRunning) {
@@ -1407,6 +1680,8 @@ npx simple-rpc-dev-panel</code></pre>
   });
   
   // Generate accordion HTML
+  const anchorRegistry = new Map();
+
   const accordionHTML = Object.entries(groupedProcedures)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([namespace, procs]) => {
@@ -1415,7 +1690,7 @@ npx simple-rpc-dev-panel</code></pre>
       const mutationsCount = procs.filter(([, proc]) => proc.type === 'mutation').length;
       
       const proceduresHTML = procs
-        .map(([name, proc]) => generateProcedureHTML(name, proc))
+        .map(([name, proc]) => generateProcedureHTML(name, proc, anchorRegistry, { toolNameLookup: mcpToolNameLookup }))
         .join('\n');
       
       return `
@@ -1446,6 +1721,10 @@ npx simple-rpc-dev-panel</code></pre>
   <meta charset="utf-8">
   <title>tRPC Development Panel</title>
   <style>
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
@@ -1484,10 +1763,22 @@ npx simple-rpc-dev-panel</code></pre>
       overflow: hidden;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
+
+    .procedure-anchor {
+      display: block;
+      position: relative;
+      top: -90px;
+      visibility: hidden;
+    }
     
     .procedure:hover {
       border-color: #cbd5e0;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .procedure-highlight {
+      border-color: #63b3ed !important;
+      box-shadow: 0 0 20px rgba(66, 153, 225, 0.5) !important;
     }
     
     .procedure-header {
@@ -1497,6 +1788,31 @@ npx simple-rpc-dev-panel</code></pre>
       display: flex;
       align-items: center;
       gap: 1rem;
+    }
+
+    .procedure-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .procedure-permalink {
+      color: #4a5568;
+      text-decoration: none;
+      font-size: 0.9rem;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .procedure-permalink:focus,
+    .procedure-permalink:focus-visible,
+    .procedure-permalink:active {
+      opacity: 1;
+    }
+
+    .procedure-permalink:focus-visible {
+      outline: 2px solid #63b3ed;
+      outline-offset: 2px;
     }
     
     .method-badge {
@@ -1969,6 +2285,70 @@ npx simple-rpc-dev-panel</code></pre>
       font-size: 0.875rem;
     }
 
+    /* MCP Tools Styles */
+    .mcp-tools-container {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #f8fafc;
+    }
+
+    .mcp-tool-item {
+      padding: 0.75rem;
+      border-bottom: 1px solid #e2e8f0;
+      transition: background-color 0.2s;
+      cursor: pointer;
+    }
+
+    .mcp-tool-item:last-child {
+      border-bottom: none;
+    }
+
+    .mcp-tool-item:hover {
+      background: #edf2f7;
+    }
+
+    .mcp-tool-name {
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 0.25rem;
+      font-size: 0.875rem;
+    }
+
+    .mcp-tool-description {
+      color: #4a5568;
+      font-size: 0.75rem;
+      line-height: 1.4;
+    }
+
+    .mcp-badge {
+      background: #4299e1;
+      color: white;
+      padding: 0.125rem 0.375rem;
+      border-radius: 3px;
+      font-size: 0.625rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-left: 0.5rem;
+    }
+
+    .loading-placeholder {
+      padding: 2rem;
+      text-align: center;
+      color: #718096;
+      font-style: italic;
+    }
+
+    .error-placeholder {
+      padding: 1rem;
+      text-align: center;
+      color: #e53e3e;
+      background: #fed7d7;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+
     /* Responsive design */
     @media (max-width: 1024px) {
       .main-content {
@@ -1981,40 +2361,27 @@ npx simple-rpc-dev-panel</code></pre>
   <div class="header">
     <h1>🚀 tRPC Development Panel</h1>
     <!-- Connected Server at the top -->
-    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
-      <strong>📡 Connected Server:</strong> ${config.baseUrl}
-      <span style="margin-left: 10px;">
-        ${config.protocols ? Object.entries(config.protocols).map(([protocol, enabled]) =>
-          `<span style="color: ${enabled ? '#059669' : '#6b7280'}; margin-right: 15px;">${protocol.toUpperCase()}: ${enabled ? '✅' : '❌'}</span>`
-        ).join('') : 'Loading...'}
-      </span>
-    </div>
+    ${serverStatusBanner}
   </div>
 
-  <!-- Two column layout: Status on left, Tools on right -->
+  <!-- Two column layout: MCP Tools on left, Development Tools on right -->
   <div class="main-content">
     <div class="left-panel">
-      <h2>📊 Status & Information</h2>
+      <h2>🔧 MCP Tools</h2>
 
       <div class="status-card">
-        <h3>🔍 Official MCP Inspector</h3>
-        <p><strong>Status:</strong>
-          ${mcpInspectorStatus.running
-            ? `<span style="color: #059669;">✅ Running</span> - <a href="http://localhost:6274" target="_blank">Open Inspector</a>`
-            : `<span style="color: #dc2626;">❌ Not Running</span> - <em>requires manual setup</em>`
-          }
-        </p>
-        ${!mcpInspectorStatus.running ? `
-          <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
-            <small><strong>Manual Setup Required:</strong><br>
-            <code>npx @modelcontextprotocol/inspector --transport http --server-url http://localhost:${config.port}/mcp</code><br>
-            <em>This will generate a proxyAuthToken URL that you must use.</em></small>
+        <h3>🛠️ Available Tools</h3>
+        <div style="margin-bottom: 1rem;">
+          <button onclick="refreshMCPTools()" class="copy-btn" style="background: #4299e1;">
+            🔄 Refresh Tools
+          </button>
+          <span id="tools-status" style="margin-left: 0.5rem; color: #4a5568; font-size: 0.875rem;"></span>
+        </div>
+        <div id="mcp-tools-list" class="mcp-tools-container">
+          <div class="loading-placeholder" style="text-align: center; padding: 2rem; color: #718096;">
+            🔄 Loading MCP tools...
           </div>
-        ` : `
-          <div style="background: #e6fffa; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #4fd1c7;">
-            <small><strong>💡 Note:</strong> Use the full URL with <code>MCP_PROXY_AUTH_TOKEN</code> parameter from your console for authenticated access.</small>
-          </div>
-        `}
+        </div>
       </div>
 
       <div class="status-card">
@@ -2030,12 +2397,6 @@ npx simple-rpc-dev-panel</code></pre>
       <div class="status-card">
         <h3>🔧 Server Setup Status</h3>
         ${serverSetupStatusHTML}
-      </div>
-
-      <div class="status-card">
-        <h3>ℹ️ Build Info</h3>
-        <p><small>Generated from <code>dist/trpc-methods.json</code><br>
-        ${new Date(generated).toLocaleString()}</small></p>
       </div>
     </div>
 
@@ -2069,6 +2430,33 @@ npx simple-rpc-dev-panel</code></pre>
           </a>
         </div>
       </div>
+
+      <div class="tools-card">
+        <h3>🔍 Official MCP Inspector</h3>
+        <p><strong>Status:</strong>
+          ${mcpInspectorStatus.running
+            ? `<span style="color: #059669;">✅ Running</span> - <a href="http://localhost:6274" target="_blank">Open Inspector</a>`
+            : `<span style="color: #dc2626;">❌ Not Running</span> - <em>requires manual setup</em>`
+          }
+        </p>
+        ${!mcpInspectorStatus.running ? `
+          <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
+            <small><strong>Manual Setup Required:</strong><br>
+            <code>npx @modelcontextprotocol/inspector --transport http --server-url http://localhost:${config.port}/mcp</code><br>
+            <em>This will generate a proxyAuthToken URL that you must use.</em></small>
+          </div>
+        ` : `
+          <div style="background: #e6fffa; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #4fd1c7;">
+            <small><strong>💡 Note:</strong> Use the full URL with <code>MCP_PROXY_AUTH_TOKEN</code> parameter from your console for authenticated access.</small>
+          </div>
+        `}
+      </div>
+
+      <div class="tools-card">
+        <h3>ℹ️ Build Info</h3>
+        <p><small>Generated from <code>dist/trpc-methods.json</code><br>
+        ${new Date(generated).toLocaleString()}</small></p>
+      </div>
     </div>
   </div>
   
@@ -2077,6 +2465,18 @@ npx simple-rpc-dev-panel</code></pre>
   </div>
   
   <script>
+    // Configuration from server
+    const serverConfig = {
+      baseUrl: '${config.baseUrl}',
+      endpoints: {
+        mcp: '${config.endpoints.mcp}',
+        tRpc: '${config.endpoints.tRpc}',
+        jsonRpc: '${config.endpoints.jsonRpc}'
+      }
+    };
+    const mcpToolIndex = ${serializedMcpToolIndex};
+    const mcpToolIndexLower = Object.fromEntries(Object.entries(mcpToolIndex).map(([key, value]) => [key.toLowerCase(), value]));
+
     function copyToClipboard(elementId) {
       const element = document.getElementById(elementId);
       const text = element.textContent || element.innerText;
@@ -2177,15 +2577,227 @@ npx simple-rpc-dev-panel</code></pre>
     function toggleAccordion(namespace) {
       const content = document.getElementById(\`content-\${namespace}\`);
       const arrow = document.getElementById(\`arrow-\${namespace}\`);
-      
+      const header = content ? content.previousElementSibling : null;
+
+      if (!content) {
+        return;
+      }
+
       if (content.style.display === 'none' || content.style.display === '') {
         content.style.display = 'block';
-        arrow.classList.add('rotated');
+        if (arrow) {
+          arrow.classList.add('rotated');
+        }
+        if (header && header.setAttribute) {
+          header.setAttribute('aria-expanded', 'true');
+        }
       } else {
         content.style.display = 'none';
-        arrow.classList.remove('rotated');
+        if (arrow) {
+          arrow.classList.remove('rotated');
+        }
+        if (header && header.setAttribute) {
+          header.setAttribute('aria-expanded', 'false');
+        }
       }
     }
+
+    // MCP Tools functionality
+    async function refreshMCPTools() {
+      const container = document.getElementById('mcp-tools-list');
+      const status = document.getElementById('tools-status');
+
+      // Show loading state
+      container.innerHTML = '<div class="loading-placeholder">🔄 Loading MCP tools...</div>';
+      status.textContent = 'Refreshing...';
+
+      try {
+        const response = await fetch(serverConfig.endpoints.mcp, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/list'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(\`HTTP \${response.status}: \${response.statusText}\`);
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error.message || 'MCP request failed');
+        }
+
+        const tools = data.result?.tools || [];
+        displayMCPTools(tools);
+        status.textContent = \`\${tools.length} tools found - \${new Date().toLocaleTimeString()}\`;
+
+      } catch (error) {
+        console.error('Failed to fetch MCP tools:', error);
+        container.innerHTML = \`
+          <div class="error-placeholder">
+            ❌ Failed to load MCP tools<br>
+            <small>\${error.message}</small>
+          </div>
+        \`;
+        status.textContent = 'Error - check console';
+      }
+    }
+
+    function displayMCPTools(tools) {
+      const container = document.getElementById('mcp-tools-list');
+
+      if (tools.length === 0) {
+        container.innerHTML = '<div class="loading-placeholder">📭 No MCP tools available</div>';
+        return;
+      }
+
+      const toolsHTML = tools.map(tool => \`
+        <div class="mcp-tool-item" onclick="showToolDetails('\${tool.name}')">
+          <div class="mcp-tool-name">
+            \${tool.name}
+            <span class="mcp-badge">MCP</span>
+          </div>
+          <div class="mcp-tool-description">
+            \${tool.description || 'No description available'}
+          </div>
+        </div>
+      \`).join('');
+
+      container.innerHTML = toolsHTML;
+    }
+
+    function showToolDetails(toolName) {
+      // Try to find the corresponding method by searching for the tool name
+      const methodElement = findMethodByToolName(toolName);
+
+      if (methodElement) {
+        const anchorId = methodElement.dataset ? methodElement.dataset.anchor : null;
+        focusProcedureElement(methodElement, anchorId || toolName, { skipHash: false });
+      } else {
+        // Fallback if method not found
+        console.log(\`Could not find method for tool: \${toolName}\`);
+        alert(\`Tool: \${toolName}\\n\\nUse the MCP Inspector or tRPC Playground to test this tool.\`);
+      }
+    }
+
+    function findMethodByToolName(toolName) {
+      if (!toolName) return null;
+
+      const trimmed = toolName.trim();
+      if (!trimmed) return null;
+
+      const directMapping = mcpToolIndex[trimmed] || mcpToolIndexLower[trimmed.toLowerCase()];
+      if (directMapping) {
+        const mappedId = 'method-' + directMapping.replace(/\./g, '-');
+        const mappedElement = document.getElementById(mappedId);
+        if (mappedElement) {
+          return mappedElement;
+        }
+      }
+
+      const directAnchor = document.getElementById(trimmed);
+      if (directAnchor) {
+        const directProcedure = directAnchor.closest('.procedure');
+        if (directProcedure) return directProcedure;
+      }
+
+      const lowerAnchor = document.getElementById(trimmed.toLowerCase());
+      if (lowerAnchor) {
+        const lowerProcedure = lowerAnchor.closest('.procedure');
+        if (lowerProcedure) return lowerProcedure;
+      }
+
+      const fallbackId = 'method-' + trimmed.replace(/\./g, '-');
+      const fallbackElement = document.getElementById(fallbackId);
+      if (fallbackElement) {
+        return fallbackElement;
+      }
+
+      const procedures = document.querySelectorAll('.procedure');
+      for (const proc of procedures) {
+        const nameElement = proc.querySelector('.procedure-name');
+        if (nameElement && nameElement.textContent.includes(trimmed)) {
+          return proc;
+        }
+      }
+
+      return null;
+    }
+
+    function openAccordionForElement(element) {
+      const content = element.closest('.accordion-content');
+      if (content && content.style.display === 'none') {
+        content.style.display = 'block';
+        const namespace = content.id.replace('content-', '');
+        const arrow = document.getElementById('arrow-' + namespace);
+        if (arrow) {
+          arrow.classList.add('rotated');
+        }
+        const accordionHeader = content.previousElementSibling;
+        if (accordionHeader && accordionHeader.setAttribute) {
+          accordionHeader.setAttribute('aria-expanded', 'true');
+        }
+      }
+    }
+
+    function focusProcedureElement(procedureElement, anchorId, options = {}) {
+      if (!procedureElement) return;
+
+      openAccordionForElement(procedureElement);
+
+      const targetAnchor = anchorId ? document.getElementById(anchorId) : null;
+      const scrollTarget = targetAnchor || procedureElement;
+
+      scrollTarget.scrollIntoView({
+        behavior: options.instant ? 'auto' : 'smooth',
+        block: 'start',
+        inline: 'nearest'
+      });
+
+      if (!options.skipHash && anchorId) {
+        if (history.replaceState) {
+          history.replaceState(null, '', '#' + anchorId);
+        } else {
+          window.location.hash = anchorId;
+        }
+      }
+
+      if (!options.skipHighlight) {
+        procedureElement.classList.add('procedure-highlight');
+        setTimeout(() => {
+          procedureElement.classList.remove('procedure-highlight');
+        }, 2000);
+      }
+    }
+
+    function handleHashNavigation(options = {}) {
+      const rawHash = window.location.hash ? window.location.hash.substring(1) : '';
+      if (!rawHash) return;
+
+      const anchorId = decodeURIComponent(rawHash);
+      const anchorElement = document.getElementById(anchorId);
+      if (!anchorElement) return;
+
+      const procedureElement = anchorElement.closest('.procedure') || anchorElement;
+      focusProcedureElement(procedureElement, anchorId, options);
+    }
+
+    // Auto-refresh MCP tools on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      refreshMCPTools();
+      if (window.location.hash) {
+        setTimeout(() => handleHashNavigation({ instant: true, skipHash: true }), 150);
+      }
+    });
+
+    window.addEventListener('hashchange', () => handleHashNavigation());
   </script>
 </body>
 </html>

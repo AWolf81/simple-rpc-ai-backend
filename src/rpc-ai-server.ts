@@ -14,7 +14,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as trpcExpress from '@trpc/server/adapters/express';
-import { createTRPCContext, router } from './trpc/index.js';
+import { createTRPCContext } from './trpc/index.js';
 import { createAppRouter } from './trpc/root.js';
 import type { AnyRouter } from '@trpc/server';
 import type { AppRouter } from './trpc/root.js';
@@ -475,15 +475,16 @@ export class RpcAiServer {
 
     // Debug: log MCP config only if MCP is enabled
     if (this.config.mcp?.enableMCP) {
-      console.log('🔍 RPC Server MCP Config:', {
-        hasMcpConfig: !!this.config.mcp,
-        extensions: this.config.mcp?.extensions ? {
-          hasPrompts: !!this.config.mcp.extensions.prompts,
-          hasResources: !!this.config.mcp.extensions.resources,
-          promptsConfig: this.config.mcp.extensions.prompts,
-          resourcesConfig: this.config.mcp.extensions.resources
-        } : null
-      });
+      const promptsInfo = this.config.mcp.extensions?.prompts;
+      const resourcesInfo = this.config.mcp.extensions?.resources;
+      const promptsSummary = promptsInfo?.customPrompts?.length
+        ? `${promptsInfo.customPrompts.length} custom prompts`
+        : promptsInfo ? 'extensions configured' : 'none';
+      const resourcesSummary = resourcesInfo?.customResources?.length
+        ? `${resourcesInfo.customResources.length} custom resources`
+        : resourcesInfo ? 'extensions configured' : 'none';
+
+      console.log(`🔍 MCP enabled – prompts: ${promptsSummary}, resources: ${resourcesSummary}`);
     }
 
     if ((config as any).providers) {
@@ -882,7 +883,7 @@ export class RpcAiServer {
         try {
           res.header('Access-Control-Allow-Origin', '*');
           
-          const { redirect_uris, client_name, grant_types } = req.body;
+          const { redirect_uris, grant_types } = req.body;
           
           if (!redirect_uris || !Array.isArray(redirect_uris) || redirect_uris.length === 0) {
             res.status(400).json({ 

@@ -139,11 +139,12 @@ export function createAppRouter(
       })()
     : null;
 
-  // Create all routers
+  // Create MCP router with only essential/non-opinionated tools
   const mcpRouter = createMCPRouter({
     auth: mcpConfig?.auth,
     ai: mcpConfig?.ai,
-    aiService: sharedAIService
+    aiService: sharedAIService,
+    namespaceWhitelist: mcpConfig?.namespaceWhitelist
   });
   const systemRouter = createSystemRouter(workspaceManager);
   const userRouter = createUserRouter(virtualTokenService, usageAnalyticsService, hybridUserService, byokProviders);

@@ -56,7 +56,7 @@ import { z, ZodFirstPartyTypeKind } from 'zod';
 import { createTypeAlias, printNode, zodToTs } from 'zod-to-ts';
 
 const buildTrpcTsType = (router, procedureTypes) => {
-  const procedures = router._def.procedures;
+  const procedures = getAllProceduresRecursive(router);
   const procedureObject = {};
 
   Object.entries(procedures)
@@ -85,8 +85,40 @@ const buildTrpcTsType = (router, procedureTypes) => {
   return `type Trpc = {${buildNestedTrpcObject(procedureObject)}}\ndeclare var trpc: Trpc;`;
 };
 
+/**
+ * Recursively extract all procedures from nested routers
+ * Handles custom routers merged with base routers
+ */
+const getAllProceduresRecursive = (router, prefix = '') => {
+  const allProcedures = {};
+
+  // Process direct procedures
+  if (router._def?.procedures) {
+    Object.entries(router._def.procedures).forEach(([name, procedure]) => {
+      const fullName = prefix ? `${prefix}.${name}` : name;
+      allProcedures[fullName] = procedure;
+    });
+  }
+
+  // Process nested routers (custom routers are in _def.record)
+  if (router._def?.record) {
+    Object.entries(router._def.record).forEach(([namespace, subRouter]) => {
+      if (subRouter?._def) {
+        const nestedProcedures = getAllProceduresRecursive(
+          subRouter,
+          prefix ? `${prefix}.${namespace}` : namespace
+        );
+        Object.assign(allProcedures, nestedProcedures);
+      }
+    });
+  }
+
+  return allProcedures;
+};
+
 export const zodResolveTypes = async (router) => {
-  const { schemas, types } = getProcedureSchemas(router._def.procedures);
+  const allProcedures = getAllProceduresRecursive(router);
+  const { schemas, types } = getProcedureSchemas(allProcedures);
 
   return {
     tsTypes: buildTrpcTsType(router, types),
@@ -165,9 +197,11 @@ const getDefaultForDef = (def) => {
     case ZodFirstPartyTypeKind.ZodLiteral: return defaultLiteral(def);
     case ZodFirstPartyTypeKind.ZodNullable: return defaultNullable(def);
     case ZodFirstPartyTypeKind.ZodOptional: return defaultOptional(def);
+    case ZodFirstPartyTypeKind.ZodDefault: return defaultWithDefault(def);
     case ZodFirstPartyTypeKind.ZodIntersection: return defaultIntersection(def);
     case ZodFirstPartyTypeKind.ZodEnum: return defaultEnum(def);
     case ZodFirstPartyTypeKind.ZodNativeEnum: return defaultNativeEnum(def);
+    case ZodFirstPartyTypeKind.ZodLazy: return defaultLazy(def);
     case ZodFirstPartyTypeKind.ZodMap: return defaultMap(def);
     case ZodFirstPartyTypeKind.ZodSet: return defaultSet(def);
     case ZodFirstPartyTypeKind.ZodPromise: return defaultPromise(def);
@@ -213,6 +247,17 @@ const defaultRecord = (_def) => `{ ${getDefaultForDef(_def.keyType._def)}: ${get
 const defaultLiteral = (def) => (typeof def.value === 'string' ? `"${def.value}"` : `${def.value}`);
 const defaultNullable = (def) => getDefaultForDef(def.innerType._def);
 const defaultOptional = (def) => getDefaultForDef(def.innerType._def) ?? `undefined`;
+const defaultWithDefault = (def) => {
+  // Use the actual default value from the schema
+  const defaultValue = def.defaultValue();
+  if (typeof defaultValue === 'string') return `"${defaultValue}"`;
+  if (typeof defaultValue === 'boolean' || typeof defaultValue === 'number') return `${defaultValue}`;
+  if (defaultValue === null) return 'null';
+  if (defaultValue === undefined) return 'undefined';
+  // For objects/arrays, try to stringify
+  if (typeof defaultValue === 'object') return JSON.stringify(defaultValue);
+  return `${defaultValue}`;
+};
 const defaultEnum = (def) => `"${def.values[0]}"`;
 const defaultUnion = (def) => {
   const options = def.options instanceof Map ? Array.from(def.options.values()) : def.options;
@@ -228,6 +273,16 @@ const defaultNativeEnum = (def) => {
 const defaultMap = (_def) => `new Map([[${getDefaultForDef(_def.keyType._def)}, ${getDefaultForDef(_def.valueType._def)}]])`;
 const defaultSet = (_def) => `new Set([${getDefaultForDef(_def.valueType._def)}])`;
 const defaultPromise = (def) => `Promise.resolve(${getDefaultForDef(def.type._def)})`;
+const defaultLazy = (def) => {
+  // For lazy types, we need to evaluate the getter function to get the actual schema
+  try {
+    const schema = def.getter();
+    return getDefaultForDef(schema._def);
+  } catch (error) {
+    // If we can't evaluate the lazy schema, return a placeholder
+    return '{}';
+  }
+};
 
 /*module.exports = {
   zodResolveTypes,

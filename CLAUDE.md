@@ -1,96 +1,27 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Simple RPC AI Backend - Secure, platform-agnostic AI integration with system prompt protection and MCP support.
 
-## Package Overview
-Building a **Simple RPC AI Backend** that provides secure, platform-agnostic JSON-RPC communication for AI integration in VS Code extensions, web applications, and CLI tools. **System prompt protection and corporate proxy bypass are mission-critical** since this package enables AI-powered applications to work in enterprise environments while keeping proprietary prompts secure.
+## Quick Start
 
-## Development Commands
-
-### Key Commands
 ```bash
 pnpm build && pnpm test:coverage && pnpm typecheck  # Build & validate
-pnpm dev:docs             # Start server + panel + playground
-pnpm test:coverage        # 80% threshold required
+pnpm dev:docs             # Start server + dev panel + playground
+LOG_LEVEL=info pnpm dev   # Quiet logs (debug/warn/error/silent)
 ```
 
-### tRPC Method Generation Configuration
-Control which methods appear in generated documentation and dev tools:
+**Dev URLs**: `http://localhost:8080` (dev panel), `http://localhost:8080/api/trpc-playground` (tRPC), `http://localhost:8080/mcp` (MCP)
 
-```bash
-# Environment variables for selective method generation
-TRPC_GEN_AI_ENABLED=false         # Disable AI router methods (default: true)
-TRPC_GEN_MCP_ENABLED=true         # Enable MCP router methods (default: true)
-TRPC_GEN_MCP_AI_ENABLED=false     # Disable AI-powered MCP tools (default: true)
+## Core Concepts
 
-# Usage examples:
-TRPC_GEN_AI_ENABLED=false pnpm build                    # MCP-only build
-TRPC_GEN_MCP_ENABLED=false pnpm build                   # AI-only build
-TRPC_GEN_AI_ENABLED=false TRPC_GEN_MCP_AI_ENABLED=false pnpm build # Pure MCP tools only
-
-# All router configuration options:
-TRPC_GEN_SYSTEM_ENABLED=true      # System router (file operations, workspaces)
-TRPC_GEN_USER_ENABLED=true        # User management router
-TRPC_GEN_BILLING_ENABLED=true     # Billing and usage tracking
-TRPC_GEN_AUTH_ENABLED=true        # Authentication router
-TRPC_GEN_ADMIN_ENABLED=true       # Admin tools and statistics
-```
-
-### Configuration Results
-- **All Enabled**: 59 procedures (40 queries, 19 mutations) + 32 MCP tools
-- **AI Disabled**: 53 procedures (36 queries, 17 mutations) + 32 MCP tools
-- **MCP AI Disabled**: Same procedure count, but AI tools excluded from MCP tools list
-
-### Dev Panel Integration
-```javascript
-import { createServerWithDevPanel } from 'simple-rpc-ai-backend';
-const server = await createServerWithDevPanel({
-  serverConfig: { port: 8001 },
-  devPanelConfig: { port: 8080, openBrowser: true }
-});
-```
+**Mission**: System prompt protection + corporate proxy bypass for enterprise AI
+**Architecture**: JSON-RPC + tRPC + MCP protocols on unified Express server
+**Security**: AES-256-GCM encryption, progressive auth, server-side prompts
 
 
-## Architecture Overview
+## Usage Patterns
 
-### Architecture
-1. **JSON-RPC Client** - Platform-agnostic RPC client
-2. **Express Server** - HTTP server with JSON-RPC endpoint and security
-3. **Platform Extensions** - VS Code, web, CLI integrations
-
-### System Prompt Protection Architecture
-
-**Key Security Features**:
-- System prompts server-side only (proxy bypass)
-- Progressive auth: anonymous → OAuth → Pro
-- AES-256-GCM encrypted API keys
-- Works behind corporate firewalls
-
-
-## Import Patterns
-
-
-### tRPC Client Development (Recommended for TypeScript)
-```typescript
-import { createTypedAIClient } from 'simple-rpc-ai-backend';
-import { httpBatchLink } from '@trpc/client';
-
-const client = createTypedAIClient({
-  links: [
-    httpBatchLink({ 
-      url: 'http://localhost:8000/trpc',
-      headers: { authorization: `Bearer ${authToken}` }
-    })
-  ]
-});
-
-// Full type safety - no 'as any' casts needed
-await client.ai.health.query();
-await client.ai.executeAIRequest.mutate({ content, systemPrompt });
-await client.ai.configureBYOK.mutate({ provider, apiKey });
-```
-
-### Server Development
+### Server Setup
 ```typescript
 import { createRpcAiServer } from 'simple-rpc-ai-backend';
 const server = createRpcAiServer({
@@ -100,91 +31,53 @@ const server = createRpcAiServer({
       openai: { apiKey: process.env.OPENAI_API_KEY }
     }
   },
-
-  // Server-managed directories (distinct from MCP client roots)
   serverWorkspaces: {
-    project: {
-      path: '/home/user/project',
-      name: 'Project Files',
-      readOnly: false
-    },
-    templates: {
-      path: '/opt/templates',
-      name: 'Server Templates',
-      readOnly: true
-    }
+    project: { path: '/home/user/project', name: 'Project Files', readOnly: false }
   },
-
   mcp: {
     enableMCP: true,
-    ai: {
-      enabled: true,                    // Enable AI-powered sampling tools
-      useServerConfig: true,            // Use same providers as ai.generateText
-      restrictToSampling: true          // Only sampling tools use AI (secure)
-    }
+    ai: { enabled: true, useServerConfig: true, restrictToSampling: true }
   }
 });
 server.start();
 ```
 
-### Custom Router Extension
+### tRPC Client (TypeScript)
 ```typescript
-import { createRpcAiServer, router, publicProcedure, createMCPTool } from 'simple-rpc-ai-backend';
+import { createTypedAIClient } from 'simple-rpc-ai-backend';
+import { httpBatchLink } from '@trpc/client';
+
+const client = createTypedAIClient({
+  links: [httpBatchLink({ url: 'http://localhost:8000/trpc', headers: { authorization: `Bearer ${token}` } })]
+});
+
+await client.ai.executeAIRequest.mutate({ content, systemPrompt });
+```
+
+### Custom MCP Tools
+```typescript
+import { router, publicProcedure, createMCPTool } from 'simple-rpc-ai-backend';
 import { z } from 'zod';
 
-// Create custom router with MCP tools
 const mathRouter = router({
   add: publicProcedure
-    .meta({
-      ...createMCPTool({
-        name: 'add',
-        description: 'Add two numbers together',
-        category: 'math',
-        public: true
-      })
-    })
-    .input(z.object({
-      a: z.number(),
-      b: z.number()
-    }))
+    .meta({ ...createMCPTool({ name: 'add', description: 'Add numbers', category: 'math' }) })
+    .input(z.object({ a: z.number(), b: z.number() }))
     .query(({ input }) => ({ result: input.a + input.b }))
 });
 
-const server = createRpcAiServer({
-  customRouters: {
-    math: mathRouter  // Merged with built-in namespaces
-  }
-});
+const server = createRpcAiServer({ customRouters: { math: mathRouter } });
 ```
 
+## Key Methods
 
-## JSON-RPC Methods Available
-
-The package provides these JSON-RPC methods:
-
-### Core AI Methods
-1. **`executeAIRequest`** - Execute AI request with system prompt protection
-2. **`health`** - Check server health and availability
-
-### Authentication Methods
-3. **`initializeSession`** - Create device session for progressive auth
-4. **`upgradeToOAuth`** - Upgrade to OAuth authentication
-5. **`getAuthStatus`** - Get current authentication status
-6. **`shouldSuggestUpgrade`** - Check if auth upgrade should be suggested
-
-### Key Management Methods (BYOK)
-**User Identification**: All key management methods use email addresses as user identifiers. Any valid email format works: `user@gmail.com`, `admin@company.com`, `developer@startup.io`, etc.
-
-7. **`storeUserKey`** - Store encrypted API key for user
-8. **`getUserKey`** - Retrieve user's API key
-9. **`getUserProviders`** - Get configured providers for user
-10. **`validateUserKey`** - Validate user's API key
-11. **`rotateUserKey`** - Rotate user's API key
-12. **`deleteUserKey`** - Delete user's API key
+**AI**: `executeAIRequest` (AI with system prompts), `health`
+**Auth**: `initializeSession`, `upgradeToOAuth`, `getAuthStatus`
+**BYOK**: `storeUserKey`, `getUserKey`, `validateUserKey`, `rotateUserKey`, `deleteUserKey` (email-based identifiers)
 
 ## Development URLs
 - **Dev Panel**: `http://localhost:8080` - API explorer with MCP integration
-- **tRPC Playground**: `http://localhost:8080/trpc` - Type-safe testing
+- **tRPC Playground**: `http://localhost:8080/api/trpc-playground` - Type-safe testing with full custom router support
 - **MCP Inspector**: `http://localhost:8080/mcp` - Tool explorer
 - **OpenRPC Playground**: `http://localhost:3000` - JSON-RPC testing
 
@@ -192,6 +85,20 @@ The package provides these JSON-RPC methods:
 1. Add `meta({ mcp: {...} })` to tRPC procedure
 2. Visit `http://localhost:8080/mcp` for auto-discovery
 3. Test with `tools/list` and `tools/call`
+
+### tRPC Playground Zod Type Support
+The playground automatically generates proper default values for all Zod types via `trpc-playground-fix.js`:
+
+**Fully Supported Types:**
+- ✅ Primitives: `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodBigInt`, `ZodDate`
+- ✅ Special Values: `ZodNull`, `ZodUndefined`, `ZodNaN`
+- ✅ Complex Types: `ZodObject`, `ZodArray`, `ZodTuple`, `ZodRecord`
+- ✅ Modifiers: `ZodOptional`, `ZodNullable`, `ZodDefault` (fixed!)
+- ✅ Unions: `ZodUnion`, `ZodDiscriminatedUnion`, `ZodIntersection`
+- ✅ Enums: `ZodEnum`, `ZodNativeEnum`
+- ✅ Advanced: `ZodLazy`, `ZodLiteral`, `ZodMap`, `ZodSet`, `ZodPromise`
+
+**Key Fix**: `ZodDefault` now properly extracts and uses actual default values (e.g., `.default(false)` → `false`, not empty string)
 
 ### AI-Free MCP Configuration
 To use MCP without any AI interaction (automatically hides AI tools from MCP tools/list):

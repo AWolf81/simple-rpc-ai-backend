@@ -125,7 +125,7 @@ export const customUtilityRouter = router({
       };
     }),
 
-  status: publicProcedure
+  serverStatus: publicProcedure
     .meta({
       ...createMCPTool({
         title: 'Server Status',
@@ -155,6 +155,84 @@ export const customUtilityRouter = router({
       }
 
       return basic;
+    }),
+
+  // Time utility tool (moved from core)
+  currentSystemTime: publicProcedure
+    .meta({
+      ...createMCPTool({
+        title: 'Current System Time',
+        description: 'Get the current system time in a specified timezone',
+        category: 'utility'
+      })
+    })
+    .input(z.object({
+      timezone: z.string().default('UTC').describe('Timezone identifier (e.g., "UTC", "America/New_York", "Europe/Berlin")'),
+    }))
+    .query(async ({ input }) => {
+      const timezone = input.timezone || 'UTC';
+      const now = new Date();
+
+      try {
+        const time = now.toLocaleString('en-US', { timeZone: timezone });
+        console.log(`🕐 Time query: ${time} (${timezone})`);
+        return {
+          time,
+          timezone,
+          timestamp: now.getTime(),
+          iso: now.toISOString()
+        };
+      } catch (error) {
+        // Fallback to UTC if timezone is invalid
+        const time = now.toISOString();
+        console.log(`🕐 Time query (fallback): ${time} (UTC)`);
+        return {
+          time,
+          timezone: 'UTC',
+          timestamp: now.getTime(),
+          iso: time
+        };
+      }
+    }),
+
+  // Enhanced calculator tool (moved from core)
+  calculator: publicProcedure
+    .meta({
+      ...createMCPTool({
+        title: 'Safe Calculator',
+        description: 'Perform basic mathematical calculations safely with input validation',
+        category: 'utility'
+      })
+    })
+    .input(z.object({
+      expression: z.string().min(1).max(100).describe('Mathematical expression to evaluate (e.g., "2 + 2", "10 * 5")'),
+    }))
+    .mutation(async ({ input }) => {
+      // Simple safe calculator - only allow basic operations
+      const safeExpression = input.expression.replace(/[^0-9+\-*/.() ]/g, '');
+
+      if (!safeExpression || safeExpression !== input.expression) {
+        throw new Error('Invalid expression. Only numbers and basic operators (+, -, *, /, parentheses) are allowed.');
+      }
+
+      try {
+        // Use Function constructor for safer evaluation than eval()
+        const result = Function(`"use strict"; return (${safeExpression})`)();
+
+        if (typeof result !== 'number' || !isFinite(result)) {
+          throw new Error('Expression resulted in an invalid number');
+        }
+
+        console.log(`🧮 Safe Calculator: ${safeExpression} = ${result}`);
+        return {
+          result,
+          expression: input.expression,
+          sanitized: safeExpression,
+          timestamp: new Date().toISOString()
+        };
+      } catch (error) {
+        throw new Error(`Calculation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     })
 });
 

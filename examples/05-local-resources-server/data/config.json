@@ -1,0 +1,17 @@
+{
+  "application": {
+    "name": "Local Resources Demo",
+    "version": "1.0.0",
+    "environment": "development"
+  },
+  "features": {
+    "fileReading": true,
+    "templates": true,
+    "database": false
+  },
+  "limits": {
+    "maxFileSize": "10MB",
+    "maxUsers": 100,
+    "requestsPerMinute": 60
+  }
+}

@@ -8,6 +8,7 @@
 import { getModelSafetyConfig, ModelValidator, type ModelSafetyConfig } from '../config/model-safety.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { logger } from '../utils/logger.js';
 
 // Get the directory of this file for proper path resolution
 const __filename = fileURLToPath(import.meta.url);
@@ -65,14 +66,14 @@ export class ModelRegistry {
   private logConfiguration() {
     const env = process.env.NODE_ENV || 'development';
     const mode = this.config.useRegistry ? '📡 Live Registry' : '🔒 Cached Models';
-    
-    console.log(`
+
+    logger.debug(`
 🤖 AI Model Registry Configuration:
    Mode: ${mode}
    Environment: ${env}
    Price Updates: ${this.config.allowPriceUpdates ? '✅ Enabled' : '🔒 Disabled'}
    Validation: ${this.config.validationMode}
-   
+
 ${this.config.useRegistry ? `
    💡 Using live models from @anolilab/ai-model-registry
    ${env === 'development' ? '🔒 For production, set: MODEL_REGISTRY_MODE=production' : ''}

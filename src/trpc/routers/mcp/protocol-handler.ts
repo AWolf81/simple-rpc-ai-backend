@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { TRPCError } from '@trpc/server';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { ErrorCode, LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { ScopeValidator } from '../../../auth/scopes';
@@ -8,6 +9,7 @@ import { SecurityLogger, getDefaultSecurityLogger } from '../../../security/secu
 import { AuthEnforcer, getDefaultAuthEnforcer } from '../../../security/auth-enforcer';
 import { MCPRouterConfig, MCPAuthConfig } from './types';
 import { mcpResourceRegistry } from '../../../services/mcp-resource-registry.js';
+import { logger } from '../../../utils/logger.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -40,12 +42,14 @@ export class MCPProtocolHandler {
   private dnsRebindingConfig: DNSRebindingConfig;
   private clientCapabilities: any = null;
   private aiEnabled: boolean;
+  private namespaceWhitelist?: string[];
 
   constructor(appRouter: any, config?: MCPRouterConfig) {
     this.appRouter = appRouter;
     this.adminUsers = config?.adminUsers || [];
     this.jwtMiddleware = config?.jwtMiddleware;
     this.aiEnabled = config?.ai?.enabled || false;
+    this.namespaceWhitelist = config?.namespaceWhitelist;
 
     // Initialize auth config with defaults
     this.authConfig = {
@@ -95,26 +99,24 @@ export class MCPProtocolHandler {
   }
 
   private logInitialization() {
-    console.log('🔍 MCP Extensions Config:', {
-      hasExtensions: !!this.extensionsConfig,
-      prompts: this.extensionsConfig?.prompts ? {
-        hasCustomPrompts: !!this.extensionsConfig.prompts.customPrompts,
-        customPromptsCount: this.extensionsConfig.prompts.customPrompts?.length || 0,
-        customPrompts: this.extensionsConfig.prompts.customPrompts?.map(p => p.name) || []
-      } : null,
-      resources: this.extensionsConfig?.resources ? {
-        hasCustomResources: !!this.extensionsConfig.resources.customResources,
-        customResourcesCount: this.extensionsConfig.resources.customResources?.length || 0,
-        customResources: this.extensionsConfig.resources.customResources?.map(r => r.name) || []
-      } : null
-    });
+    const hasExtensions = !!this.extensionsConfig;
+    const prompts = this.extensionsConfig?.prompts?.customPrompts || [];
+    const resources = this.extensionsConfig?.resources?.customResources || [];
 
-    console.log('✅ Rate limiting: MCP rate limiter initialized');
-    console.log('✅ Security logging: MCP security logger initialized');
-    if (this.authEnforcer && (this.authEnforcer as any).config?.enabled !== false) {
-      console.log('✅ Auth enforcement: MCP auth enforcer initialized');
+    if (hasExtensions) {
+      const promptSummary = prompts.length ? `${prompts.length} custom prompts (${prompts.map(p => p.name).join(', ')})` : 'no custom prompts';
+      const resourceSummary = resources.length ? `${resources.length} custom resources (${resources.map(r => r.name).join(', ')})` : 'no custom resources';
+      logger.debug(`🔍 MCP extensions – ${promptSummary}; ${resourceSummary}`);
     } else {
-      console.log('ℹ️  Auth enforcement: Disabled (simple mode)');
+      logger.debug('🔍 MCP extensions disabled');
+    }
+
+    logger.debug('✅ Rate limiting: MCP rate limiter initialized');
+    logger.debug('✅ Security logging: MCP security logger initialized');
+    if (this.authEnforcer && (this.authEnforcer as any).config?.enabled !== false) {
+      logger.debug('✅ Auth enforcement: MCP auth enforcer initialized');
+    } else {
+      logger.debug('ℹ️  Auth enforcement: Disabled (simple mode)');
     }
   }
 
@@ -126,6 +128,28 @@ export class MCPProtocolHandler {
     if (this.adminUsers.length === 0) return false;
 
     return this.adminUsers.includes(userEmail || '') || this.adminUsers.includes(userId || '');
+  }
+
+  /**
+   * Apply namespace whitelist filtering to tools
+   */
+  private applyNamespaceWhitelist(tools: Array<{ name: string; fullName: string; description: string; inputSchema: any; procedure: any; scopes?: any }>): Array<{ name: string; fullName: string; description: string; inputSchema: any; procedure: any; scopes?: any }> {
+    if (!this.namespaceWhitelist || this.namespaceWhitelist.length === 0) {
+      // No whitelist specified - allow all tools
+      return tools;
+    }
+
+    return tools.filter(tool => {
+      // Extract namespace from fullName (e.g., "math.add" -> "math")
+      const namespace = tool.fullName.includes('.') ? tool.fullName.split('.')[0] : tool.fullName;
+      const isWhitelisted = this.namespaceWhitelist!.includes(namespace);
+
+      if (!isWhitelisted) {
+        console.log(`🚫 Tool ${tool.fullName} filtered out: namespace "${namespace}" not in whitelist [${this.namespaceWhitelist!.join(', ')}]`);
+      }
+
+      return isWhitelisted;
+    });
   }
 
   /**
@@ -471,8 +495,28 @@ export class MCPProtocolHandler {
   }
 
   // Tool discovery and execution methods
-  private extractMCPToolsFromTRPC(): Array<{ name: string; description: string; inputSchema: any; procedure: any; scopes?: any }> {
-    const tools: Array<{ name: string; description: string; inputSchema: any; procedure: any; scopes?: any }> = [];
+  private extractMCPToolsFromTRPC(): Array<{
+    name: string;
+    fullName: string;
+    description: string;
+    inputSchema: any;
+    procedure: any;
+    scopes?: any;
+    category?: string;
+    public?: boolean;
+    requireAdminUser?: boolean;
+  }> {
+    const tools: Array<{
+      name: string;
+      fullName: string;
+      description: string;
+      inputSchema: any;
+      procedure: any;
+      scopes?: any;
+      category?: string;
+      public?: boolean;
+      requireAdminUser?: boolean;
+    }> = [];
 
     try {
       const allProcedures = this.appRouter?._def?.procedures;
@@ -499,10 +543,14 @@ export class MCPProtocolHandler {
 
           tools.push({
             name: toolName,
+            fullName: fullName,
             description: sanitizedDescription,
             inputSchema,
             procedure: procedureAny,
-            scopes: meta.mcp.scopes
+            scopes: meta.mcp.scopes,
+            category: meta.mcp.category,
+            public: meta.mcp.public,
+            requireAdminUser: meta.mcp.requireAdminUser
           });
         }
       }
@@ -510,7 +558,14 @@ export class MCPProtocolHandler {
       console.error('Error extracting MCP tools from tRPC:', error);
     }
 
-    return tools;
+    // Apply namespace whitelist filtering
+    const filteredTools = this.applyNamespaceWhitelist(tools);
+
+    if (this.namespaceWhitelist && this.namespaceWhitelist.length > 0) {
+      console.log(`🔍 Namespace filtering: ${tools.length} tools found, ${filteredTools.length} after whitelist filter [${this.namespaceWhitelist.join(', ')}]`);
+    }
+
+    return filteredTools;
   }
 
   private extractInputSchema(procedure: any): any {
@@ -690,7 +745,7 @@ export class MCPProtocolHandler {
 
       // Find the requested tool
       const mcpTools = this.extractMCPToolsFromTRPC();
-      const tool = mcpTools.find(t => t.name === name);
+      const tool = mcpTools.find(t => t.name === name || t.fullName === name);
 
       if (!tool) {
         return this.createErrorResponse(
@@ -703,21 +758,55 @@ export class MCPProtocolHandler {
       // Check if tool is accessible to user
       const isPublic = this.isToolPublic({
         name: tool.name,
-        public: true // Default to public for tRPC MCP tools
+        category: tool.category,
+        public: tool.public
       });
 
       // Check scope requirements if defined
       let hasRequiredScopes = true;
-      if (tool.scopes && userScopes.length > 0) {
+      let missingScopeInfo: { missing: string[]; type: 'required' | 'anyOf' | 'none' } = {
+        missing: [],
+        type: 'none'
+      };
+
+      if (tool.scopes) {
         hasRequiredScopes = ScopeValidator.hasScope(userScopes, tool.scopes, userInfo);
+        if (!hasRequiredScopes) {
+          missingScopeInfo = ScopeValidator.getMissingScopes(userScopes, tool.scopes);
+        }
       }
 
       // Authorization check
       if (!isPublic && !isAdmin && (!req?.user || !hasRequiredScopes)) {
+        const requiresAdminUser = tool.requireAdminUser || Boolean((tool.scopes as any)?.adminUsers);
+        const responseMessage = !req?.user
+          ? `Authentication required for tool '${name}'`
+          : requiresAdminUser
+            ? `Admin privileges required for tool '${name}'`
+            : missingScopeInfo.missing.length > 0
+              ? `Missing required permissions for tool '${name}': ${missingScopeInfo.missing.join(', ')}`
+              : `Missing required permissions for tool '${name}'`;
+
+        const errorData = {
+          reason: !req?.user
+            ? 'authentication_required'
+            : requiresAdminUser
+              ? 'admin_required'
+              : 'insufficient_scopes',
+          user: userInfo?.email || userInfo?.id || 'anonymous',
+          ...(missingScopeInfo.type !== 'none'
+            ? {
+                missingScopes: missingScopeInfo.missing,
+                missingType: missingScopeInfo.type
+              }
+            : {})
+        };
+
         return this.createErrorResponse(
           request.id,
-          ErrorCode.InternalError,
-          `Access denied to tool '${name}'`
+          ErrorCode.InvalidRequest,
+          responseMessage,
+          errorData
         );
       }
 
@@ -774,6 +863,23 @@ export class MCPProtocolHandler {
 
     } catch (error) {
       console.error(`❌ Error executing tool ${request.params?.name}:`, error);
+
+      if (error instanceof TRPCError) {
+        const errorCode = error.code === 'FORBIDDEN'
+          ? ErrorCode.InvalidRequest
+          : ErrorCode.InternalError;
+
+        return this.createErrorResponse(
+          request.id,
+          errorCode,
+          error.message || 'Tool execution failed',
+          {
+            reason: error.code,
+            ...(error.cause ? { cause: String(error.cause) } : {})
+          }
+        );
+      }
+
       return this.createErrorResponse(
         request.id,
         ErrorCode.InternalError,
@@ -811,8 +917,9 @@ export class MCPProtocolHandler {
           }
         }
 
-        // Add built-in prompts if enabled
-        if (promptsConfig.includeDefaults !== false) {
+        // Note: Built-in prompts are no longer automatically included
+        // Add them manually via customPrompts if needed
+        if (false) { // Disabled - only custom prompts are supported
           prompts.push(
             {
               name: "code-review",
