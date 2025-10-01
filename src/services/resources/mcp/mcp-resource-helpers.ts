@@ -64,8 +64,9 @@ export function validateMCPParameters(
     }
   }
 
-  // Show help if no user parameters provided and there are required parameters
-  const showHelp = userProvidedKeys.length === 0 && missingRequired.length > 0;
+  // Show help if any required parameters are missing
+  // This provides helpful guidance instead of cryptic errors
+  const showHelp = missingRequired.length > 0;
 
   return {
     showHelp,
@@ -277,14 +278,12 @@ export function createMCPResourceHandler(
   return async (resourceId: string, context: any): Promise<string> => {
     const result = handleMCPResourceParameters(context, helpConfig);
 
+    // Show help if any required parameters are missing
     if (result.showHelp) {
       return result.helpText;
     }
 
-    if (result.missingRequired.length > 0) {
-      throw createMissingParameterError(result.missingRequired);
-    }
-
+    // At this point, all required parameters are present
     return await implementation(result.userParams);
   };
 }

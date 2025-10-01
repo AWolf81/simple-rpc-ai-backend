@@ -212,7 +212,7 @@ const getDefaultForDef = (def) => {
   }
 };
 
-const defaultString = () => `""`;
+const defaultString = () => `''`;  // Use single quotes for JavaScript
 const defaultDate = () => `new Date()`;
 const defaultNumber = () => `0`;
 const defaultBigInt = () => `BigInt(0)`;
@@ -221,15 +221,14 @@ const defaultUndefined = () => `undefined`;
 const defaultNull = () => `null`;
 
 const defaultObject = (def) => {
-  let ret = '{ ';
   const entries = Object.entries(def.shape());
-  entries.forEach(([name, propDef], idx) => {
-    ret += `${name}: ${getDefaultForDef(propDef._def)}`;
-    if (idx !== entries.length - 1) ret += ', ';
-    else ret += ' ';
-  });
-  ret += '}';
-  return ret;
+  if (entries.length === 0) return '{}';
+
+  const props = entries.map(([name, propDef]) =>
+    `${name}: ${getDefaultForDef(propDef._def)}`
+  ).join(', ');
+
+  return `{ ${props} }`;
 };
 
 const defaultArray = (def) => `[${getDefaultForDef(def.type._def)}]`;
@@ -244,13 +243,13 @@ const defaultTuple = (def) => {
 };
 
 const defaultRecord = (_def) => `{ ${getDefaultForDef(_def.keyType._def)}: ${getDefaultForDef(_def.valueType._def)} }`;
-const defaultLiteral = (def) => (typeof def.value === 'string' ? `"${def.value}"` : `${def.value}`);
+const defaultLiteral = (def) => (typeof def.value === 'string' ? `'${def.value}'` : `${def.value}`);
 const defaultNullable = (def) => getDefaultForDef(def.innerType._def);
 const defaultOptional = (def) => getDefaultForDef(def.innerType._def) ?? `undefined`;
 const defaultWithDefault = (def) => {
   // Use the actual default value from the schema
   const defaultValue = def.defaultValue();
-  if (typeof defaultValue === 'string') return `"${defaultValue}"`;
+  if (typeof defaultValue === 'string') return `'${defaultValue}'`;  // Single quotes
   if (typeof defaultValue === 'boolean' || typeof defaultValue === 'number') return `${defaultValue}`;
   if (defaultValue === null) return 'null';
   if (defaultValue === undefined) return 'undefined';
@@ -258,7 +257,7 @@ const defaultWithDefault = (def) => {
   if (typeof defaultValue === 'object') return JSON.stringify(defaultValue);
   return `${defaultValue}`;
 };
-const defaultEnum = (def) => `"${def.values[0]}"`;
+const defaultEnum = (def) => `'${def.values[0]}'`;  // Single quotes
 const defaultUnion = (def) => {
   const options = def.options instanceof Map ? Array.from(def.options.values()) : def.options;
   if (options.length === 0) return '';
@@ -267,7 +266,7 @@ const defaultUnion = (def) => {
 const defaultIntersection = (def) => getDefaultForDef(def.right._def);
 const defaultNativeEnum = (def) => {
   const val = Object.values(def.values)[Object.values(def.values).length - 1];
-  if (val) return typeof val === 'string' ? `"${val}"` : `${val}`;
+  if (val) return typeof val === 'string' ? `'${val}'` : `${val}`;  // Single quotes
   return '';
 };
 const defaultMap = (_def) => `new Map([[${getDefaultForDef(_def.keyType._def)}, ${getDefaultForDef(_def.valueType._def)}]])`;

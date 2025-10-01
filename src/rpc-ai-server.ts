@@ -509,15 +509,7 @@ export class RpcAiServer {
     const workspaceConfig = this.config.serverWorkspaces || this.config.rootFolders;
 
     this.router = createAppRouter(
-      {
-        config: this.config.aiLimits,
-        tokenTrackingEnabled: this.config.tokenTracking.enabled || false,
-        dbAdapter: this.dbAdapter,
-        serverProviders: this.config.serverProviders,
-        byokProviders: this.config.byokProviders,
-        postgresRPCMethods: this.postgresRPCMethods,
-        modelRestrictions: this.config.modelRestrictions
-      },
+      undefined, // aiConfig - handled by separate params below
       this.config.tokenTracking.enabled || false,
       this.dbAdapter,
       this.config.serverProviders,
@@ -586,6 +578,7 @@ export class RpcAiServer {
       return {
         ...baseCtx,
         apiKey: apiKey || null,
+        appRouter: this.router, // Add router to context for prompt access tools
       };
     };
   }
@@ -968,7 +961,7 @@ export class RpcAiServer {
         res.json({
           message: 'JSON-RPC endpoint - use POST method',
           endpoint: this.config.paths.jsonRpc,
-          methods: [RPC_METHODS.HEALTH, RPC_METHODS.EXECUTE_AI_REQUEST, RPC_METHODS.LIST_PROVIDERS, RPC_METHODS.STORE_USER_KEY, RPC_METHODS.GET_USER_KEY, RPC_METHODS.GET_USER_PROVIDERS, RPC_METHODS.VALIDATE_USER_KEY, RPC_METHODS.ROTATE_USER_KEY, RPC_METHODS.DELETE_USER_KEY],
+          methods: [RPC_METHODS.HEALTH, RPC_METHODS.GENERATE_TEXT, RPC_METHODS.LIST_PROVIDERS, RPC_METHODS.STORE_USER_KEY, RPC_METHODS.GET_USER_KEY, RPC_METHODS.GET_USER_PROVIDERS, RPC_METHODS.VALIDATE_USER_KEY, RPC_METHODS.ROTATE_USER_KEY, RPC_METHODS.DELETE_USER_KEY],
           example: {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

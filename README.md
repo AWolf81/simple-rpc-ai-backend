@@ -77,7 +77,7 @@ const response = await fetch('http://localhost:8000/rpc', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     jsonrpc: '2.0',
-    method: 'executeAIRequest',
+    method: 'ai.generateText',
     params: {
       content: 'Explain quantum computing',
       systemPrompt: 'You are a physics teacher',
@@ -98,7 +98,7 @@ const client = createTypedAIClient({
   links: [httpBatchLink({ url: 'http://localhost:8000/trpc' })]
 });
 
-const result = await client.ai.executeAIRequest.mutate({
+const result = await client.ai.generateText.mutate({
   content: 'Explain quantum computing',
   provider: 'anthropic'
 });
@@ -122,6 +122,54 @@ const server = createRpcAiServer({
 });
 // Auto-exposed via tRPC, JSON-RPC, and MCP
 ```
+
+#### Working with complex MCP tools (`getPromptTemplate`)
+
+Some tools expose nested arguments that are awkward for current MCP clients. The reference prompt tools in [`examples/02-mcp-server/methods/prompt-access.js`](examples/02-mcp-server/methods/prompt-access.js) show a reliable call sequence:
+
+1. **Discover prompts** – call `getPrompts` via `tools/call` to list available prompt IDs plus example invocations.
+   ```jsonc
+   {
+     "jsonrpc": "2.0",
+     "method": "tools/call",
+     "params": {
+       "name": "getPrompts",
+       "arguments": {}
+     },
+     "id": 1
+   }
+   ```
+
+2. **Inspect a prompt** – call `getPromptTemplate` with just the `name`. The response includes `template`, `variables`, and `exampleArguments` to guide the final request.
+   ```jsonc
+   {
+     "jsonrpc": "2.0",
+     "method": "tools/call",
+     "params": {
+       "name": "getPromptTemplate",
+       "arguments": { "name": "explain-concept" }
+     },
+     "id": 2
+   }
+   ```
+
+3. **Render the prompt** – send the same call again with `argumentsJson` populated using the guidance from step 2.
+   ```jsonc
+   {
+     "jsonrpc": "2.0",
+     "method": "tools/call",
+     "params": {
+       "name": "getPromptTemplate",
+       "arguments": {
+         "name": "explain-concept",
+         "argumentsJson": "{\"concept\":\"event loop\",\"level\":\"beginner\",\"includeExamples\":\"yes\"}"
+       }
+     },
+     "id": 3
+   }
+   ```
+
+Following this pattern makes it easy for an AI agent to self-discover complex prompts, read the built-in usage notes, and only send structured arguments once it knows exactly what the tool expects.
 
 ## 🔐 API Key Management
 
@@ -213,7 +261,7 @@ TRPC_GEN_MCP_ENABLED=true         # Include MCP methods
 
 ## 📚 Key Methods
 
-**AI**: `executeAIRequest`, `health`  
+**AI**: `ai.generateText`, `health`  
 **Auth**: `initializeSession`, `upgradeToOAuth`, `getAuthStatus`  
 **BYOK**: `storeUserKey`, `getUserKey`, `validateUserKey`, `rotateUserKey`, `deleteUserKey`
 

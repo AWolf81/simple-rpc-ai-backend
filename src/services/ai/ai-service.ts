@@ -14,6 +14,7 @@ import crypto from 'crypto';
 import { LanguageModel } from 'ai';
 import { MCPService, MCPServiceConfig } from '../mcp/mcp-service';
 import { ModelRegistry } from './model-registry.js';
+import { hybridRegistry } from './hybrid-model-registry.js';
 import type { ModelInfo } from './model-registry.js';
 
 /**
@@ -432,10 +433,10 @@ export class AIService {
       webSearchPreference: metadata.webSearchPreference || 'duckduckgo'
     };
 
-    // Debug logging
+    // Debug logging (privacy-safe - no user content)
     console.log('🔍 AI Execute Debug:');
-    console.log(`   System Prompt: ${systemPrompt ? `"${systemPrompt.substring(0, 100)}..."` : 'MISSING'}`);
-    console.log(`   User Content: ${content ? `"${content.substring(0, 100)}..."` : 'MISSING'}`);
+    console.log(`   System Prompt: ${systemPrompt ? `[${systemPrompt.length} chars]` : 'MISSING'}`);
+    console.log(`   User Content: ${content ? `[${content.length} chars]` : 'MISSING'}`);
     console.log(`   Raw metadata:`, metadata);
     console.log(`   Raw options.model:`, options.model);
     console.log(`   Raw this.config.provider:`, this.config.provider);
@@ -997,7 +998,8 @@ The tools will be available during our conversation. Call them when needed to ga
     const toolResults: any[] = [];
     
     for (const toolCall of toolCalls) {
-      console.log(`🔧 Executing tool: ${toolCall.toolName} with args:`, toolCall.args);
+      // Privacy: Don't log user input - only log tool name
+      console.log(`🔧 Executing tool: ${toolCall.toolName}`);
       
       try {
         let result;
@@ -1468,6 +1470,22 @@ The tools will be available during our conversation. Call them when needed to ga
     
     // Filter models by restrictions for the specific provider
     return this.filterModelsByRestrictions(provider, allModels);
+  }
+
+  /**
+   * Resolve the production-safe model identifier for a provider/model alias
+   */
+  getProductionModelId(provider: string, modelId: string): string {
+    try {
+      return hybridRegistry.getProductionModelId(modelId, provider);
+    } catch (error) {
+      console.warn('Failed to resolve production model id', {
+        provider,
+        modelId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return modelId;
+    }
   }
 
   /**

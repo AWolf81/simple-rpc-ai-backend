@@ -6,7 +6,7 @@
 
 import { router, publicProcedure, createMCPTool, defaultRootManager } from 'simple-rpc-ai-backend';
 import { z } from 'zod';
-import { promises as fs } from 'fs';
+import { promises as fs, constants as fsConstants } from 'fs';
 import path from 'path';
 
 /**
@@ -27,7 +27,8 @@ export const customMathRouter = router({
     }))
     .mutation(async ({ input }) => {
       const result = input.a + input.b;
-      console.log(`🧮 Math: ${input.a} + ${input.b} = ${result}`);
+      // Privacy: Don't log user input or results
+      console.log(`🧮 Math: Addition completed`);
       return {
         operation: 'addition',
         operands: [input.a, input.b],
@@ -50,7 +51,8 @@ export const customMathRouter = router({
     }))
     .mutation(async ({ input }) => {
       const result = input.a * input.b;
-      console.log(`🧮 Math: ${input.a} × ${input.b} = ${result}`);
+      // Privacy: Don't log user input or results
+      console.log(`🧮 Math: Multiplication completed`);
       return {
         operation: 'multiplication',
         operands: [input.a, input.b],
@@ -77,7 +79,8 @@ export const customMathRouter = router({
         const sanitized = input.expression.replace(/[^0-9+\-*/(). ]/g, '');
         const result = eval(sanitized);
 
-        console.log(`🧮 Calculator: ${sanitized} = ${result}`);
+        // Privacy: Don't log user input or results
+        console.log(`🧮 Calculator: Expression evaluated`);
         return {
           operation: 'calculate',
           expression: sanitized,
@@ -118,7 +121,8 @@ export const customUtilityRouter = router({
       const greeting = greetings[input.language][input.formal ? 'formal' : 'casual'];
       const message = `${greeting}, ${input.name}!`;
 
-      console.log(`👋 Greeting: ${message}`);
+      // Privacy: Don't log user input
+      console.log(`👋 Greeting generated (language: ${input.language}, formal: ${input.formal})`);
       return {
         message,
         language: input.language,
@@ -219,6 +223,8 @@ export const customUtilityRouter = router({
 
       try {
         // Use Function constructor for safer evaluation than eval()
+        // In a real-world scenario, consider using a dedicated math expression parser
+        // to avoid any potential security risks. e.g. import { evaluate } from 'mathjs';
         const result = Function(`"use strict"; return (${safeExpression})`)();
 
         if (typeof result !== 'number' || !isFinite(result)) {
@@ -255,8 +261,17 @@ export const fileOperationsRouter = router({
       })
     })
     .input(z.object({
-      rootId: z.string().describe('Root directory identifier (use system.getRootFolders to see available roots)'),
-      path: z.string().describe('File path relative to root directory')
+      rootId: z.string()
+        .min(1)
+        .max(100)
+        .regex(/^[a-zA-Z0-9_-]+$/)
+        .describe('Root directory identifier (use system.getRootFolders to see available roots)'),
+      path: z.string()
+        .min(1)
+        .max(1000)
+        .refine(value => !value.includes('\0'), 'Path cannot contain null bytes')
+        .refine(value => !/[<>:"|?*]/.test(value), 'Path contains invalid characters')
+        .describe('File path relative to root directory')
     }))
     .query(async ({ input }) => {
       try {
@@ -269,9 +284,28 @@ export const fileOperationsRouter = router({
           throw new Error(`Root '${rootId}' not found`);
         }
 
-        // Build full path and get stats
-        const fullPath = path.join(rootConfig.path, relativePath);
+        // Normalize and validate the provided path before accessing the filesystem
+        const normalizedPath = path.normalize(relativePath);
+
+        if (path.isAbsolute(normalizedPath) || normalizedPath.startsWith('..')) {
+          throw new Error('Invalid path: directory traversal not allowed');
+        }
+
+        const fullPath = path.resolve(rootConfig.path, normalizedPath);
+        const resolvedRoot = path.resolve(rootConfig.path);
+        const relativeToRoot = path.relative(resolvedRoot, fullPath);
+
+        if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
+          throw new Error('Invalid path: outside root directory');
+        }
+
+        // Build full path and get stats after validation
         const stats = await fs.stat(fullPath);
+
+        // Determine file permissions using fs.access checks rather than hard-coded assumptions
+        const isReadable = await fs.access(fullPath, fsConstants.R_OK).then(() => true).catch(() => false);
+        const isWritableTarget = stats.isDirectory() ? fullPath : path.dirname(fullPath);
+        const isWritable = await fs.access(isWritableTarget, fsConstants.W_OK).then(() => true).catch(() => false);
 
         console.log(`ℹ️ File info: ${rootId}/${relativePath}`);
 
@@ -285,17 +319,23 @@ export const fileOperationsRouter = router({
           modified: stats.mtime?.toISOString(),
           accessed: stats.atime?.toISOString(),
           permissions: {
-            readable: true, // Default - RootManager handles access control
-            writable: !stats.isDirectory() // Directories typically need different handling
+            readable: isReadable,
+            writable: isWritable
           },
           timestamp: new Date().toISOString()
         };
 
       } catch (error) {
-        throw new Error(`Failed to get file info: ${error.message}`);
+        console.warn('Failed to get file info', { error: error instanceof Error ? error.message : String(error) });
+        throw new Error('Failed to get file info. Please verify the path and permissions.');
       }
     })
 });
+
+/**
+ * Import the prompt access router (reference implementation)
+ */
+import { promptAccessRouter } from './prompt-access.js';
 
 /**
  * Get all custom routers
@@ -304,6 +344,7 @@ export function getCustomRouters() {
   return {
     math: customMathRouter,
     utility: customUtilityRouter,
-    file: fileOperationsRouter
+    file: fileOperationsRouter,
+    prompts: promptAccessRouter
   };
 }

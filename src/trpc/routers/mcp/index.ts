@@ -3,7 +3,7 @@ import { utilityProcedures } from "./methods/utility";
 import { taskProcedures } from "./methods/task";
 import { resourceProcedures } from "./methods/resource";
 import { createSamplingProcedures } from "./methods/sampling";
-import { promptProcedures } from "./methods/prompt";
+import { promptProcedures, mcpPromptProcedures } from "./methods/prompt";
 import { adminProcedures } from "./methods/admin";
 import { MCPProtocolHandler } from "./protocol-handler";
 import type { MCPRouterConfig } from "./types";
@@ -38,8 +38,11 @@ export function createMCPRouter(config: MCPRouterConfig = {}): ReturnType<typeof
     // Sampling and elicitation procedures
     ...samplingProcedures,
 
-    // Prompt management procedures
+    // Prompt management procedures (tools)
     ...promptProcedures,
+
+    // MCP Prompts (prompts/list, prompts/get)
+    ...mcpPromptProcedures,
 
     // Administrative procedures
     ...adminProcedures,
@@ -65,6 +68,7 @@ export {
   resourceProcedures,
   createSamplingProcedures,
   promptProcedures,
+  mcpPromptProcedures,
   adminProcedures,
   MCPProtocolHandler
 };

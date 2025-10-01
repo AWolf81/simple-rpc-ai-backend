@@ -126,79 +126,12 @@ async function startServer() {
         auth: {
           requireAuthForToolsList: false,
           requireAuthForToolsCall: false,
-          publicTools: ['add', 'multiply', 'calculate', 'greeting', 'status', 'readFile', 'listFiles', 'getFileInfo']
+          publicTools: ['add', 'multiply', 'calculate', 'greeting', 'status', 'readFile', 'listFiles', 'getFileInfo', 'getPrompts', 'getPromptTemplate', 'explainConcept']
         },
         extensions: {
-          prompts: {
-            customPrompts: [
-              {
-                name: "code-review",
-                description: "Comprehensive code review analysis with security, performance, and maintainability insights",
-                arguments: [
-                  {
-                    name: "code",
-                    description: "The code to review",
-                    required: true
-                  },
-                  {
-                    name: "language",
-                    description: "Programming language (optional)",
-                    required: false
-                  }
-                ]
-              },
-              {
-                name: "api-documentation",
-                description: "Generate comprehensive API documentation from code",
-                arguments: [
-                  {
-                    name: "code",
-                    description: "The API code to document",
-                    required: true
-                  },
-                  {
-                    name: "format",
-                    description: "Documentation format (markdown, json, yaml)",
-                    required: false
-                  }
-                ]
-              },
-              {
-                name: "bug-fix-helper",
-                description: "Analyze code and suggest bug fixes with explanations",
-                arguments: [
-                  {
-                    name: "code",
-                    description: "The buggy code to analyze",
-                    required: true
-                  },
-                  {
-                    name: "error_message",
-                    description: "Error message or description of the bug",
-                    required: false
-                  }
-                ]
-              }
-            ],
-            customTemplates: {
-              "code-review": {
-                name: "code-review",
-                description: "Code review template with configurable focus areas",
-                arguments: [
-                  {
-                    name: "code",
-                    description: "Code to review",
-                    required: true
-                  },
-                  {
-                    name: "focus",
-                    description: "Focus area: security, performance, maintainability, or all",
-                    required: false
-                  }
-                ]
-              }
-            }
-          },
+          // Legacy prompt system removed - use tRPC-based MCP prompts instead
+          // See: src/trpc/routers/mcp/methods/prompt.ts (mcpPromptProcedures)
+          prompts: {},
           resources: {
             customResources: [
               {
@@ -432,7 +365,13 @@ Format: ${format}`;
       // Server Configuration
       port: process.env.PORT || 8001,
       cors: {
-        origin: ['http://localhost:3000', 'http://localhost:8080', 'http://localhost:4000'],
+        origin: process.env.CORS_ORIGIN || [
+          'http://localhost:3000',           // Local development
+          'http://localhost:8080',           // Dev panel
+          'http://localhost:4000',           // MCP Jam Inspector
+          'https://playground.open-rpc.org', // OpenRPC Playground
+          'https://inspector.open-rpc.org'   // OpenRPC Inspector
+        ],
         credentials: true
       },
 

@@ -163,16 +163,18 @@ export function createAppRouter(
   }
 
   // Create the main app router with proper namespace structure and custom routers
+  const aiRouter = createAIRouter({
+    config: aiConfig,
+    tokenTrackingEnabled,
+    dbAdapter,
+    serverProviders,
+    byokProviders,
+    postgresRPCMethods,
+    modelRestrictions
+  } as any);
+
   const baseRouters = {
-    ai: createAIRouter({
-      config: aiConfig,
-      tokenTrackingEnabled,
-      dbAdapter,
-      serverProviders,
-      byokProviders,
-      postgresRPCMethods,
-      modelRestrictions
-    } as any),
+    ai: aiRouter,
     mcp: mcpRouter,
     system: systemRouter,
     user: userRouter,

@@ -399,18 +399,21 @@ export class HybridModelRegistry {
 
   /**
    * Get production model ID for API calls
+   * Always returns production ID when available, since SDKs require full versioned IDs
    */
   getProductionModelId(aliasId: string, provider: string): string {
     const mapping = productionModels.providers[provider];
     if (!mapping) return aliasId;
-    
+
     const model = mapping.models[aliasId];
-    
-    if (this.config.productionMode && mapping.requiresVersioning) {
-      return model?.productionId || aliasId;
+
+    // Always use production ID when available and provider requires versioning
+    // SDKs (Anthropic, etc.) need the full versioned ID like claude-3-5-haiku-20241022
+    if (mapping.requiresVersioning && model?.productionId) {
+      return model.productionId;
     }
-    
-    // In development, allow aliases
+
+    // Fallback to alias for providers that don't require versioning
     return aliasId;
   }
 }

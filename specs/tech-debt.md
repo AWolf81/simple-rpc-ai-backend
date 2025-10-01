@@ -8,15 +8,15 @@ This document tracks known technical debt, incomplete implementations, and areas
 
 ###  **Completed Major Refactoring**
 - Replaced custom RPC implementation with `json-rpc-2.0` library
-- Renamed classes for platform-agnostic usage (`VSCodeAIRPCClient` ’ `RPCClient`)
-- Consolidated folder structure (`validation/` ’ `services/`)
+- Renamed classes for platform-agnostic usage (`VSCodeAIRPCClient` ï¿½ `RPCClient`)
+- Consolidated folder structure (`validation/` ï¿½ `services/`)
 - Updated all imports and documentation
 - Fixed TypeScript compilation errors
 
 ### =% **High Priority Issues**
 
 #### 1. **Incomplete Billing Integration** 
-**Status**: =« Broken  
+**Status**: =ï¿½ Broken  
 **Location**: `src/billing/opensaas-integration.ts`  
 **Impact**: 6 TypeScript compilation errors  
 
@@ -126,7 +126,24 @@ if (!method || typeof method !== 'string') {
 
 **Estimated Effort**: 2 days
 
-#### 6. **Database Migration System**
+#### 6. **Hardcoded JSON-RPC Method Catalog**
+**Status**: =6 Legacy  
+**Location**: `src/constants.ts`, JSON-RPC docs and clients  
+**Impact**: Manual maintenance, name drift between tRPC and JSON-RPC  
+
+**Current State**:
+- JSON-RPC method names (`generateText`, `health`, etc.) are hand-maintained constants
+- Bridge introspection is only used opportunistically; fallback schema relies on constants
+- Example clients, billing code, and docs all reference the hardcoded list
+
+**Fix Required**:
+- Remove the manual method list and rely on `TRPCToJSONRPCBridge.generateOpenRPCSchema()` output
+- Ensure bridge introspection is robust (no fallback) and automatically exposes `ai.*` names
+- Update examples and analytics code to read method names dynamically
+
+**Estimated Effort**: 1â€“2 days
+
+#### 7. **Database Migration System**
 **Status**: =6 Missing  
 **Location**: `src/database/sqlite-adapter.ts`  
 **Impact**: Production deployment issues  
@@ -156,10 +173,10 @@ if (!method || typeof method !== 'string') {
 
 **Estimated Effort**: 1 day
 
-### =á **Low Priority Issues**
+### =ï¿½ **Low Priority Issues**
 
 #### 8. **Unused Client Code**
-**Status**: =á Dead code  
+**Status**: =ï¿½ Dead code  
 **Location**: `src/client/` directory  
 **Impact**: Bundle size and confusion  
 
@@ -172,7 +189,7 @@ if (!method || typeof method !== 'string') {
 **Estimated Effort**: 10 minutes
 
 #### 9. **Example Code Inconsistencies**
-**Status**: =á Minor  
+**Status**: =ï¿½ Minor  
 **Location**: `examples/` directory  
 **Impact**: Developer experience  
 
@@ -189,7 +206,7 @@ if (!method || typeof method !== 'string') {
 **Estimated Effort**: 1 day
 
 #### 10. **Missing Test Coverage**
-**Status**: =á Incomplete  
+**Status**: =ï¿½ Incomplete  
 **Location**: Multiple test files  
 **Impact**: Quality assurance  
 
@@ -210,7 +227,7 @@ if (!method || typeof method !== 'string') {
 
 ## Future Improvements
 
-### =€ **Performance Optimizations**
+### =ï¿½ **Performance Optimizations**
 
 #### 1. **Connection Pooling**
 **Description**: Reuse HTTP connections to AI providers  
@@ -263,7 +280,7 @@ if (!method || typeof method !== 'string') {
 
 ## Development Workflow Debt
 
-### =à **Tooling Improvements Needed**
+### =ï¿½ **Tooling Improvements Needed**
 
 #### 1. **Pre-commit Hooks**
 **Status**: Missing  
@@ -298,9 +315,9 @@ npm install husky lint-staged
 ### **Debt by Category**
 ```
 Security:     =4 High   (device ID hashing, input validation)
-Performance:  =á Medium (no major bottlenecks identified)
+Performance:  =ï¿½ Medium (no major bottlenecks identified)
 Reliability:  =4 High   (billing integration broken)
-Maintainability: =â Good (recent refactoring improved structure)
+Maintainability: =ï¿½ Good (recent refactoring improved structure)
 ```
 
 ## Debt Reduction Plan

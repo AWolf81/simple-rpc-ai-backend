@@ -9,7 +9,7 @@ import type { AnyRouter, inferRouterContext, TRPCError } from '@trpc/server';
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import type { Request, Response } from 'express';
 import type { AppRouter } from './root';
-import { createTRPCContext } from './index';
+import { createTRPCContext, t } from './index';
 
 interface JSONRPCRequest {
   jsonrpc: '2.0';
@@ -61,10 +61,16 @@ function mapTRPCErrorToJSONRPC(error: TRPCError): JSONRPCError {
  * Bridge class that converts tRPC router to JSON-RPC handler
  */
 export class TRPCToJSONRPCBridge {
+  private callerFactory: any; // TODO: Fix type - should be ReturnType<ReturnType<typeof createCallerFactory>>
+
   constructor(
-    private router: AppRouter, 
+    private router: AppRouter,
     private contextCreator?: (opts: CreateExpressContextOptions) => any
-  ) {}
+  ) {
+    // Create the caller factory once during initialization (tRPC v11 API)
+    // t.createCallerFactory(router) returns a function that accepts context
+    this.callerFactory = t.createCallerFactory(this.router);
+  }
 
   /**
    * Create Express middleware that handles JSON-RPC requests using tRPC procedures
@@ -75,20 +81,22 @@ export class TRPCToJSONRPCBridge {
         const { method, params, id }: JSONRPCRequest = req.body;
 
         // Create tRPC context
-        const ctx = this.contextCreator 
+        const ctx = this.contextCreator
           ? await this.contextCreator({ req, res, info: {} as any })
           : await createTRPCContext({ req, res, info: {} as any });
 
         try {
-          // Parse nested method path (e.g., "ai.health" -> caller.ai.health)
-          const caller = this.router.createCaller(ctx);
+          // Parse nested method path (e.g., "ai.listAllowedModels" -> caller.ai.listAllowedModels)
+          // Use tRPC v11 callerFactory API
+          const caller = this.callerFactory(ctx);
           const methodParts = method.split('.');
 
           // Navigate to the nested procedure
           let procedure: any = caller;
           for (const part of methodParts) {
-            if (procedure && typeof procedure === 'object' && part in procedure) {
-              procedure = procedure[part];
+            const nextValue = procedure[part];
+            if (nextValue !== undefined) {
+              procedure = nextValue;
             } else {
               throw new Error(`No such procedure: ${method}`);
             }

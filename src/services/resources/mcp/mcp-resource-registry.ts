@@ -4,7 +4,7 @@
  * Allows package users to register custom resources with template helpers and dynamic content.
  */
 
-import { handleMCPResourceParameters } from './mcp-resource-helpers.js';
+import { handleMCPResourceParameters, createMCPResourceHandler } from './mcp-resource-helpers.js';
 import { logger } from '../../../utils/logger.js';
 
 export interface MCPResource {
@@ -58,6 +58,16 @@ export interface MCPResourceTemplate {
   }>;
 }
 
+export interface MCPResourceRegistryConfig {
+  /** Enable/disable built-in resources */
+  enableBuiltinResources?: boolean;
+  /** Specific built-in resources to enable (overrides enableBuiltinResources if set) */
+  builtinResources?: {
+    apiSchemas?: boolean;
+    securityGuidelines?: boolean;
+  };
+}
+
 /**
  * Flexible MCP Resource Registry
  * Allows registration of resources, providers, and templates
@@ -66,10 +76,18 @@ export class MCPResourceRegistry {
   private resources = new Map<string, MCPResource>();
   private providers = new Map<string, MCPResourceProvider>();
   private templates = new Map<string, MCPResourceTemplate>();
+  private config: MCPResourceRegistryConfig;
 
-  constructor() {
-    // Register built-in resources
-    this.registerBuiltinResources();
+  constructor(config: MCPResourceRegistryConfig = {}) {
+    this.config = {
+      enableBuiltinResources: config.enableBuiltinResources ?? true,
+      builtinResources: config.builtinResources ?? {}
+    };
+
+    // Register built-in resources if enabled
+    if (this.config.enableBuiltinResources) {
+      this.registerBuiltinResources();
+    }
   }
 
   /**
@@ -183,8 +201,9 @@ export class MCPResourceRegistry {
           return { content: String(result), mimeType: resource.mimeType };
         }
       } catch (error) {
+        // Log the error but don't swallow it - let caller handle
         console.error(`❌ Error generating content for ${resourceId}:`, error);
-        return null;
+        throw error;
       }
     }
 
@@ -327,16 +346,22 @@ export class MCPResourceRegistry {
     // Note: Built-in resources should be minimal and non-opinionated
     // Users can create their own resources using the Template Engine API
 
+    // Check if specific resources are enabled
+    const { builtinResources } = this.config;
+    const apiSchemasEnabled = builtinResources?.apiSchemas ?? true;
+    const securityGuidelinesEnabled = builtinResources?.securityGuidelines ?? true;
+
     // API Schemas
-    this.registerResource({
-      id: 'api-schemas',
-      name: 'API Schema Definitions',
-      description: 'OpenAPI/JSON Schema definitions for all internal APIs and services',
-      mimeType: 'application/json',
-      category: 'api',
-      requireAuth: false,
-      builtin: true
-    });
+    if (apiSchemasEnabled) {
+      this.registerResource({
+        id: 'api-schemas',
+        name: 'API Schema Definitions',
+        description: 'OpenAPI/JSON Schema definitions for all internal APIs and services',
+        mimeType: 'application/json',
+        category: 'api',
+        requireAuth: false,
+        builtin: true
+      });
 
     this.registerProvider('api-schemas', {
       generateContent: async () => {
@@ -378,18 +403,20 @@ export class MCPResourceRegistry {
         }, null, 2);
       }
     });
+    }
 
     // Security Guidelines
-    this.registerResource({
-      id: 'security-guidelines',
-      name: 'Security Guidelines',
-      description: 'Comprehensive security policies, procedures, and implementation guidelines',
-      mimeType: 'text/markdown',
-      category: 'security',
-      requireAuth: true,
-      scopes: ['security:read', 'admin'],
-      builtin: true
-    });
+    if (securityGuidelinesEnabled) {
+      this.registerResource({
+        id: 'security-guidelines',
+        name: 'Security Guidelines',
+        description: 'Comprehensive security policies, procedures, and implementation guidelines',
+        mimeType: 'text/markdown',
+        category: 'security',
+        requireAuth: true,
+        scopes: ['security:read', 'admin'],
+        builtin: true
+      });
 
     this.registerTemplate('security-guidelines', {
       template: `# Security Guidelines
@@ -423,9 +450,14 @@ export class MCPResourceRegistry {
 *Last updated: {{timestamp}}*
 *Classification: Internal Use Only*
 `
-    });
+      });
+    }
 
-    logger.debug('✅ Registered 3 built-in MCP resources');
+    // Log what was registered
+    const registeredCount = (apiSchemasEnabled ? 1 : 0) + (securityGuidelinesEnabled ? 1 : 0);
+    if (registeredCount > 0) {
+      logger.debug(`✅ Registered ${registeredCount} built-in MCP resource${registeredCount > 1 ? 's' : ''}`);
+    }
   }
 
   /**
@@ -579,11 +611,8 @@ export class GlobalResourceTemplates {
     });
 
     mcpResourceRegistry.registerProvider('directory-listing', {
-      generateContent: async (resourceId: string, context: any) => {
-        const availableRoots = rootManager.getClientRootFolders();
-
-        // Use common helper for parameter validation and help text
-        const result = handleMCPResourceParameters(context, {
+      generateContent: createMCPResourceHandler(
+        {
           id: 'directory-listing',
           name: 'Directory Contents',
           description: 'List files and directories within configured root folders',
@@ -592,7 +621,7 @@ export class GlobalResourceTemplates {
               type: 'string',
               description: 'Root folder ID',
               required: true,
-              availableValues: Object.keys(availableRoots)
+              availableValues: Object.keys(rootManager.getClientRootFolders())
             },
             path: {
               type: 'string',
@@ -606,53 +635,45 @@ export class GlobalResourceTemplates {
             }
           },
           additionalData: {
-            availableRoots: availableRoots
+            availableRoots: rootManager.getClientRootFolders()
           }
-        });
+        },
+        async (params) => {
+          const { rootId, path = '', recursive = false } = params;
 
-        if (result.showHelp) {
-          return result.helpText;
+          try {
+            const files = await rootManager.listFiles(rootId, path, {
+              recursive,
+              includeDirectories: true
+            });
+
+            return JSON.stringify({
+              rootId,
+              path,
+              recursive,
+              timestamp: new Date().toISOString(),
+              count: files.length,
+              files: files.map((file: any) => ({
+                name: file.name,
+                path: file.relativePath,
+                size: file.size,
+                lastModified: file.lastModified,
+                isDirectory: file.isDirectory,
+                mimeType: file.mimeType,
+                readable: file.readable,
+                writable: file.writable
+              }))
+            }, null, 2);
+          } catch (error) {
+            return JSON.stringify({
+              error: `Failed to list directory: ${error instanceof Error ? error.message : String(error)}`,
+              rootId,
+              path,
+              recursive
+            }, null, 2);
+          }
         }
-
-        // Extract parameters with defaults
-        const { rootId, path = '', recursive = false } = result.userParams;
-
-        if (!rootId) {
-          throw new Error('rootId is required for directory listing');
-        }
-
-        try {
-          const files = await rootManager.listFiles(rootId, path, {
-            recursive,
-            includeDirectories: true
-          });
-
-          return JSON.stringify({
-            rootId,
-            path,
-            recursive,
-            timestamp: new Date().toISOString(),
-            count: files.length,
-            files: files.map((file: any) => ({
-              name: file.name,
-              path: file.relativePath,
-              size: file.size,
-              lastModified: file.lastModified,
-              isDirectory: file.isDirectory,
-              mimeType: file.mimeType,
-              readable: file.readable,
-              writable: file.writable
-            }))
-          }, null, 2);
-        } catch (error) {
-          return JSON.stringify({
-            error: `Failed to list directory: ${error instanceof Error ? error.message : String(error)}`,
-            rootId,
-            path,
-            recursive
-          }, null, 2);
-        }
-      }
+      )
     });
 
     logger.debug('📋 Registered global directory-listing resource');

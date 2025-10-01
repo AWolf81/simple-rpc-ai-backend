@@ -8,14 +8,14 @@ Your question identified a critical security gap - the authentication wasn't pro
 
 ### **Before (Insecure)**
 ```typescript
-executeAIRequest: publicProcedure  // ❌ Allowed unauthenticated access
+generateText: publicProcedure  // ❌ Allowed unauthenticated access
   .input({ apiKey: z.string().optional() })  // ❌ API keys in requests
 ```
 
 ### **After (Secure)**  
 ```typescript
-executeAIRequest: protectedProcedure  // ✅ Requires JWT authentication
-  .input(executeAIRequestSchema)  // ✅ No API keys in requests
+generateText: protectedProcedure  // ✅ Requires JWT authentication
+  .input(generateTextSchema)  // ✅ No API keys in requests
 ```
 
 ## 📱 **VS Code Extension Authentication Flow**
@@ -53,7 +53,7 @@ await fetch('/trpc/ai.configureBYOK', {
 // Same flow for ALL user types
 const jwtToken = await context.secrets.get('opensaas-jwt');
 
-const response = await fetch('/trpc/ai.executeAIRequest', {
+const response = await fetch('/trpc/ai.generateText', {
   headers: { 
     'Authorization': `Bearer ${jwtToken}`  // ✅ Always required
   },
@@ -71,7 +71,7 @@ const response = await fetch('/trpc/ai.executeAIRequest', {
 
 ### **Smart Payment Method Logic**
 ```typescript
-async function executeAIRequest({ content, systemPrompt }, { user }) {
+async function generateText({ content, systemPrompt }, { user }) {
   const userId = user!.userId; // ✅ Guaranteed to exist
   
   // Get user's payment capabilities
@@ -165,7 +165,7 @@ async function executeAIRequest({ content, systemPrompt }, { user }) {
 ## 🔄 **Implementation Status**
 
 ### **✅ Completed**
-- [x] Changed executeAIRequest to protectedProcedure
+- [x] Changed generateText to protectedProcedure
 - [x] Removed public API key parameters
 - [x] Added secure BYOK configuration endpoints
 - [x] Implemented server-side payment method selection

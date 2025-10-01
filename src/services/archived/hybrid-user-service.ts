@@ -459,7 +459,7 @@ export class HybridUserService {
         outputTokens: Math.floor(tokensNeeded * 0.6),
         totalTokens: tokensNeeded,
         requestId,
-        method: 'executeAIRequest'
+        method: 'generateText'
       });
 
       await client.query('COMMIT');

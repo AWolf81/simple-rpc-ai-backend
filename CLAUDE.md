@@ -51,7 +51,7 @@ const client = createTypedAIClient({
   links: [httpBatchLink({ url: 'http://localhost:8000/trpc', headers: { authorization: `Bearer ${token}` } })]
 });
 
-await client.ai.executeAIRequest.mutate({ content, systemPrompt });
+await client.ai.generateText.mutate({ content, systemPrompt });
 ```
 
 ### Custom MCP Tools
@@ -71,7 +71,7 @@ const server = createRpcAiServer({ customRouters: { math: mathRouter } });
 
 ## Key Methods
 
-**AI**: `executeAIRequest` (AI with system prompts), `health`
+**AI**: `ai.generateText` (AI with system prompts), `health`
 **Auth**: `initializeSession`, `upgradeToOAuth`, `getAuthStatus`
 **BYOK**: `storeUserKey`, `getUserKey`, `validateUserKey`, `rotateUserKey`, `deleteUserKey` (email-based identifiers)
 
@@ -82,9 +82,17 @@ const server = createRpcAiServer({ customRouters: { math: mathRouter } });
 - **OpenRPC Playground**: `http://localhost:3000` - JSON-RPC testing
 
 ### MCP Development Workflow
-1. Add `meta({ mcp: {...} })` to tRPC procedure
-2. Visit `http://localhost:8080/mcp` for auto-discovery
-3. Test with `tools/list` and `tools/call`
+1. Add `meta({ mcp: {...} })` to tRPC procedure for tools
+2. Add `meta(createMCPPrompt({...}))` to tRPC procedure for prompts
+3. Visit `http://localhost:8080/mcp` for auto-discovery
+4. Test with `tools/list`, `tools/call`, `prompts/list`, and `prompts/get`
+
+### MCP Prompt Access Tools (Example Implementation)
+The core library provides MCP prompts via `prompts/list` and `prompts/get` protocol methods. For programmatic access via tRPC/JSON-RPC, see the reference implementation in `examples/02-mcp-server/methods/prompt-access.js`:
+- `getPrompts` - List all MCP prompts with metadata
+- `getPromptTemplate` - Execute a prompt and get populated text
+
+These are intentionally example-only to remain less opinionated. Copy to your custom routers as needed.
 
 ### tRPC Playground Zod Type Support
 The playground automatically generates proper default values for all Zod types via `trpc-playground-fix.js`:
@@ -491,6 +499,10 @@ app.post('/mcp', handleMCP);         // Model Context Protocol
 **Tool Execution Fails**: Check server logs for Zod validation errors, test via tRPC directly.
 
 **Testing**: Use dev panel at `http://localhost:8080/mcp` or direct curl to `/mcp` endpoint.
+
+## tRPC Playground Troubleshooting
+
+**`SyntaxError: Unexpected token ')'`**: The tRPC Playground's execute button (▶️ Play) doesn't strip JavaScript comments before evaluation. **Workarounds**: (1) Add a blank line at the end of your code, (2) Use block comments `/* */` instead of line comments `//`, (3) Remove all comments, or (4) use the form inputs instead. This is a limitation of the third-party `trpc-playground` package.
 
 ## Core Reminders
 - **System Prompt Protection**: Non-negotiable, corporate-friendly architecture

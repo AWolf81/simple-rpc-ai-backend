@@ -152,6 +152,35 @@ export class MCPProtocolHandler {
     });
   }
 
+  private buildPromptVariableDefinitions(config: {
+    arguments?: Array<{ name: string; description?: string; required?: boolean; type?: string; options?: Array<string | number | boolean>; default?: unknown; example?: unknown }>;
+    variables?: Record<string, any>;
+  }): Record<string, any> {
+    const variables: Record<string, any> = {};
+
+    if (config.variables) {
+      for (const [key, value] of Object.entries(config.variables)) {
+        variables[key] = { ...value };
+      }
+    }
+
+    if (config.arguments) {
+      for (const arg of config.arguments) {
+        const current = variables[arg.name] || {};
+        variables[arg.name] = {
+          type: current.type || arg.type || 'string',
+          description: current.description || arg.description,
+          required: current.required ?? arg.required ?? false,
+          options: current.options || arg.options,
+          default: current.default ?? arg.default,
+          example: current.example ?? arg.example,
+        };
+      }
+    }
+
+    return variables;
+  }
+
   /**
    * Determine if a tool should be public based on hybrid configuration
    */
@@ -548,6 +577,70 @@ export class MCPProtocolHandler {
     return filteredTools;
   }
 
+  /**
+   * Extract MCP prompts from tRPC procedures with mcpPrompt metadata
+   * Prompts are user-facing templates, distinct from internal system prompts
+   */
+  private extractMCPPromptsFromTRPC(): Array<{
+    name: string;
+    description: string;
+    arguments?: Array<{ name: string; description?: string; required?: boolean; type?: string; options?: Array<string | number | boolean>; default?: unknown; example?: unknown }>;
+    template?: string;
+    variables?: Record<string, any>;
+    procedure: any;
+    category?: string;
+    public?: boolean;
+    scopes?: any;
+  }> {
+    const prompts: Array<{
+      name: string;
+      description: string;
+      arguments?: Array<{ name: string; description?: string; required?: boolean; type?: string; options?: Array<string | number | boolean>; default?: unknown; example?: unknown }>;
+      template?: string;
+      variables?: Record<string, any>;
+      procedure: any;
+      category?: string;
+      public?: boolean;
+      scopes?: any;
+    }> = [];
+
+    try {
+      const allProcedures = this.appRouter?._def?.procedures;
+
+      if (!allProcedures) {
+        return prompts;
+      }
+
+      for (const [fullName, procedure] of Object.entries(allProcedures)) {
+        const procedureAny = procedure as any;
+        const meta = procedureAny?._def?.meta;
+
+        if (meta?.mcpPrompt) {
+          const config = meta.mcpPrompt;
+          const sanitizedDescription = this.sanitizeDescription(
+            config.description || `Prompt: ${config.name}`
+          );
+
+          prompts.push({
+            name: config.name,
+            description: sanitizedDescription,
+            arguments: config.arguments || [],
+            template: config.template,
+            variables: config.variables,
+            procedure: procedureAny,
+            category: config.category,
+            public: config.public,
+            scopes: config.scopes
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error extracting MCP prompts from tRPC:', error);
+    }
+
+    return prompts;
+  }
+
   private extractInputSchema(procedure: any): any {
     try {
       const inputParser = procedure._def?.inputs?.[0];
@@ -719,8 +812,8 @@ export class MCPProtocolHandler {
       const userScopes = this.extractUserScopes(req);
       const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
 
-      // Debug log to understand duplicate calls
-      logger.debug(`MCP tools/call: ${name} with args:`, JSON.stringify(args));
+      // Privacy: Don't log user input - only log tool name and arg count
+      logger.debug(`MCP tools/call: ${name} (${Object.keys(args || {}).length} args)`);
 
       // Find the requested tool
       const mcpTools = this.extractMCPToolsFromTRPC();
@@ -818,10 +911,12 @@ export class MCPProtocolHandler {
       // Create execution context
       const ctx = {
         user: req?.user,
-        type: procedure._def?.type || 'mutation'
+        type: procedure._def?.type || 'mutation',
+        appRouter: this.appRouter // Add appRouter for tools that need to discover procedures
       };
 
-      logger.debug(`Executing tool ${name} with input:`, validatedInput);
+      // Privacy: Don't log user input - only log tool name
+      logger.debug(`Executing tool ${name}`);
 
       // Execute the procedure resolver
       const result = await procedure._def.resolver({
@@ -886,9 +981,308 @@ export class MCPProtocolHandler {
         );
       }
 
+      // Extract prompts from tRPC procedures with mcpPrompt metadata
+      const mcpPrompts = this.extractMCPPromptsFromTRPC();
+
+      // Extract user info for permission checks
+      const userInfo = this.extractUserInfo(req);
+      const userScopes = this.extractUserScopes(req);
+      const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
+
+      // Filter prompts based on auth and permissions
+      const prompts = mcpPrompts
+        .filter(prompt => {
+          // Check if prompt is public
+          const isPublic = prompt.public === true;
+
+          // Admin users bypass all restrictions
+          if (isAdmin) return true;
+
+          // Public prompts are always accessible
+          if (isPublic) return true;
+
+          // Check if user is authenticated
+          if (!req?.user) return false;
+
+          // Check scope requirements if defined
+          if (prompt.scopes) {
+            const hasRequiredScopes = ScopeValidator.hasScope(userScopes, prompt.scopes, userInfo);
+            return hasRequiredScopes;
+          }
+
+          // Default to allowing if no specific restrictions
+          return true;
+        })
+        .map(prompt => ({
+          name: prompt.name,
+          description: prompt.description,
+          arguments: prompt.arguments || [],
+          template: prompt.template || null,
+          variables: this.buildPromptVariableDefinitions(prompt),
+          category: prompt.category || 'general'
+        }));
+
+      // Track names to avoid duplicates (prefer MCP prompts over legacy)
+      const promptNames = new Set(prompts.map(p => p.name));
+
+      // Add legacy extension-based prompts if configured (skip duplicates)
+      if (this.extensionsConfig?.prompts?.customPrompts) {
+        for (const prompt of this.extensionsConfig.prompts.customPrompts) {
+          if (!promptNames.has(prompt.name)) {
+            prompts.push({
+              name: prompt.name,
+              description: prompt.description || `Custom prompt: ${prompt.name}`,
+              arguments: prompt.arguments || [],
+              template: prompt.template || null,
+              variables: this.buildPromptVariableDefinitions({
+                arguments: prompt.arguments,
+                variables: prompt.variables
+              }),
+              category: prompt.category || 'general'
+            });
+            promptNames.add(prompt.name);
+          }
+        }
+      }
+
+      logger.debug(`MCP prompts/list: ${prompts.length} prompts available`);
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          prompts
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Error in handlePromptsList:', error);
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        'Failed to list prompts',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  private async handlePromptsGet(request: any, req?: AuthenticatedRequest): Promise<any> {
+    try {
+      const { name, arguments: args } = request.params || {};
+
+      if (!name) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidParams,
+          'Prompt name is required'
+        );
+      }
+
+      // Check auth requirements for prompts/get
+      const requireAuth = this.authConfig.requireAuthForToolsCall;
+      if (requireAuth && !req?.user) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InternalError,
+          'Authentication required for prompts/get'
+        );
+      }
+
+      // Extract user info
+      const userInfo = this.extractUserInfo(req);
+      const userScopes = this.extractUserScopes(req);
+      const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
+
+      logger.debug(`MCP prompts/get: ${name} (${Object.keys(args || {}).length} args)`);
+
+      // Find the requested prompt from MCP prompts
+      const mcpPrompts = this.extractMCPPromptsFromTRPC();
+      let prompt = mcpPrompts.find(p => p.name === name);
+
+      // Check if it's a legacy prompt from extensions
+      let isLegacyPrompt = false;
+      let legacyPrompt: any = null;
+      if (!prompt && this.extensionsConfig?.prompts?.customPrompts) {
+        legacyPrompt = this.extensionsConfig.prompts.customPrompts.find((p: any) => p.name === name);
+        if (legacyPrompt) {
+          isLegacyPrompt = true;
+        }
+      }
+
+      if (!prompt && !legacyPrompt) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidParams,
+          `Prompt '${name}' not found`
+        );
+      }
+
+      // Handle legacy prompts - return a message directing to the new system
+      if (isLegacyPrompt && legacyPrompt) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidRequest,
+          `Prompt '${name}' is a legacy extension prompt. Please migrate to tRPC-based MCP prompts using createMCPPrompt().`,
+          {
+            promptName: name,
+            legacyInfo: {
+              description: legacyPrompt.description,
+              arguments: legacyPrompt.arguments || []
+            },
+            migrationHelp: 'See: createMCPPrompt() in src/auth/scopes.ts'
+          }
+        );
+      }
+
+      // Check if prompt is accessible to user
+      const isPublic = prompt!.public === true;
+
+      // At this point, prompt is guaranteed to be non-null (legacy returned early)
+      const mcpPrompt = prompt!;
+
+      // Check scope requirements if defined
+      let hasRequiredScopes = true;
+      let missingScopeInfo: { missing: string[]; type: 'required' | 'anyOf' | 'none' } = {
+        missing: [],
+        type: 'none'
+      };
+
+      if (mcpPrompt.scopes) {
+        hasRequiredScopes = ScopeValidator.hasScope(userScopes, mcpPrompt.scopes, userInfo);
+        if (!hasRequiredScopes) {
+          missingScopeInfo = ScopeValidator.getMissingScopes(userScopes, mcpPrompt.scopes);
+        }
+      }
+
+      // Authorization check
+      if (!isPublic && !isAdmin && (!req?.user || !hasRequiredScopes)) {
+        const responseMessage = !req?.user
+          ? `Authentication required for prompt '${name}'`
+          : missingScopeInfo.missing.length > 0
+            ? `Missing required permissions for prompt '${name}': ${missingScopeInfo.missing.join(', ')}`
+            : `Missing required permissions for prompt '${name}'`;
+
+        const errorData = {
+          reason: !req?.user ? 'authentication_required' : 'insufficient_scopes',
+          user: userInfo?.email || userInfo?.id || 'anonymous',
+          ...(missingScopeInfo.type !== 'none'
+            ? {
+                missingScopes: missingScopeInfo.missing,
+                missingType: missingScopeInfo.type
+              }
+            : {})
+        };
+
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InvalidRequest,
+          responseMessage,
+          errorData
+        );
+      }
+
+      // Execute the tRPC procedure to get the prompt text
+      const procedure = mcpPrompt.procedure;
+      const inputParser = procedure._def?.inputs?.[0];
+
+      // Validate input if parser exists
+      let validatedInput = args || {};
+      if (inputParser) {
+        try {
+          validatedInput = inputParser.parse(args || {});
+        } catch (zodError: any) {
+          return this.createErrorResponse(
+            request.id,
+            ErrorCode.InvalidParams,
+            'Invalid prompt arguments',
+            {
+              validationErrors: zodError.errors || zodError.message,
+              received: args
+            }
+          );
+        }
+      }
+
+      // Create context for procedure execution
+      const ctx = {
+        user: req?.user,
+        session: (req as any)?.session,
+        req,
+        type: procedure._def?.type || 'query'
+      };
+
+      logger.debug(`Executing prompt ${name}`);
+
+      const variableDefinitions = this.buildPromptVariableDefinitions(mcpPrompt);
+
+      // Execute the procedure resolver
+      const result = await procedure._def.resolver({
+        input: validatedInput,
+        ctx,
+        type: procedure._def?.type || 'query',
+        path: name,
+        getRawInput: () => validatedInput
+      });
+
+      logger.debug(`Prompt ${name} executed successfully`);
+
+      // Result should be the prompt text/messages
+      const promptText = typeof result === 'string' ? result : result.text || JSON.stringify(result);
+
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          description: mcpPrompt.description,
+          category: mcpPrompt.category || 'general',
+          template: mcpPrompt.template || null,
+          variables: variableDefinitions,
+          arguments: mcpPrompt.arguments || [],
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: promptText
+              }
+            }
+          ]
+        }
+      };
+
+    } catch (error) {
+      logger.error(`Error executing prompt ${request.params?.name}:`, error);
+
+      if (error instanceof TRPCError) {
+        const errorCode = error.code === 'FORBIDDEN'
+          ? ErrorCode.InvalidRequest
+          : ErrorCode.InternalError;
+
+        return this.createErrorResponse(
+          request.id,
+          errorCode,
+          error.message || 'Prompt execution failed',
+          {
+            reason: error.code,
+            ...(error.cause ? { cause: String(error.cause) } : {})
+          }
+        );
+      }
+
+      return this.createErrorResponse(
+        request.id,
+        ErrorCode.InternalError,
+        'Failed to execute prompt',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  private async handleLegacyPromptsList(request: any, req?: AuthenticatedRequest): Promise<any> {
+    // Legacy implementation for extension-based prompts
+    try {
       const prompts = [];
 
-      // Add default MCP prompts if extensions are configured
       if (this.extensionsConfig?.prompts) {
         const promptsConfig = this.extensionsConfig.prompts;
 
@@ -943,7 +1337,7 @@ export class MCPProtocolHandler {
         }
       }
 
-      logger.debug(`MCP prompts/list: ${prompts.length} prompts available`);
+      logger.debug(`MCP prompts/list (legacy): ${prompts.length} prompts available`);
 
       return {
         jsonrpc: '2.0',
@@ -954,7 +1348,7 @@ export class MCPProtocolHandler {
       };
 
     } catch (error) {
-      console.error('❌ Error in handlePromptsList:', error);
+      console.error('❌ Error in handleLegacyPromptsList:', error);
       return this.createErrorResponse(
         request.id,
         ErrorCode.InternalError,
@@ -962,11 +1356,6 @@ export class MCPProtocolHandler {
         error instanceof Error ? error.message : String(error)
       );
     }
-  }
-
-  private async handlePromptsGet(request: any, req?: AuthenticatedRequest): Promise<any> {
-    // Implementation would go here
-    return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Not yet implemented');
   }
 
   private async handleResourcesList(request: any, req?: AuthenticatedRequest): Promise<any> {

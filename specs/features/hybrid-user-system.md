@@ -179,7 +179,7 @@ const plan = await rpc.ai.planConsumption({
 ### AI Request Execution
 ```typescript
 // Execute AI request with smart consumption
-const result = await rpc.ai.executeAIRequest({
+const result = await rpc.ai.generateText({
   content: "Write a function",
   systemPrompt: "You are a helpful programmer",
   apiKey: "sk-ant-..." // For BYOK fallback

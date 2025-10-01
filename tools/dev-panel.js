@@ -830,15 +830,14 @@ app.use(express.static('public'));
 
 // Generate playground URL with pre-filled data
 function generatePlaygroundURL(procedureName, inputSchema) {
-  const sampleInput = generateSampleInput(inputSchema);
-  const inputObj = JSON.parse(sampleInput);
-  
+  const inputObj = generateSampleInputObject(inputSchema);
+
   // Create playground state with pre-filled data
   const playgroundState = {
     method: procedureName,
     input: inputObj
   };
-  
+
   // Encode the state for URL
   // not working
   //const encodedState = encodeURIComponent(JSON.stringify(playgroundState));
@@ -851,7 +850,7 @@ function generateTRPCCall(procedureName, procedureType, inputSchema) {
   const hasInput = sampleInput !== null;
 
   const inputCode = hasInput ? `(${sampleInput})` : '()';
-  const methodCall = procedureType === 'query' ? 'query' : 'mutation';
+  const methodCall = procedureType === 'query' ? 'query' : 'mutate';
 
   return `await trpc.${procedureName}.${methodCall}${inputCode}`;
 }
@@ -1060,10 +1059,13 @@ function generateProcedureHTML(name, procedure, anchorRegistry, options = {}) {
           <button
             class="playground-copy-btn"
             onclick="copyAndOpenPlayground('trpc-${name.replace(/\./g, '-')}', '${generatePlaygroundURL(name, input)}')"
-            title="Copy tRPC call to clipboard and open playground. Paste the copied call to test this method."
+            title="Copy tRPC call to clipboard and open playground. IMPORTANT: Remove any commented lines (//) before executing in the playground."
           >
             📋🚀 Copy & Open Playground
           </button>
+          <div style="margin-top: 8px; padding: 8px; background: #e7f3ff; border-left: 3px solid #2196F3; font-size: 12px; color: #0d47a1;">
+            <strong>💡 Playground Tips:</strong> If you get a syntax error like <code>[SyntaxError: Unexpected token ')']</code> with <code>//</code> comments, try: (1) Add a blank line at the end, (2) Use <code>/* */</code> comments instead or (3) Remove comments.
+          </div>
           <div class="trpc-call-example">
             <pre class="trpc-call" id="trpc-${name.replace(/\./g, '-')}"><code>${generateTRPCCall(name, type, input)}</code></pre>
           </div>
@@ -1073,6 +1075,39 @@ function generateProcedureHTML(name, procedure, anchorRegistry, options = {}) {
   `;
 }
 
+// Generate actual JavaScript object for playground URL
+function generateSampleInputObject(inputSchema) {
+  // Check for void/empty schemas (z.void(), no input, etc.)
+  if (!inputSchema ||
+      inputSchema.type === 'ZodVoid' ||
+      inputSchema.type === 'ZodUndefined' ||
+      (!inputSchema.properties && !inputSchema.type)) {
+    return {}; // Empty object for no parameters
+  }
+
+  if (!inputSchema.properties) {
+    return {};
+  }
+
+  const sample = {};
+  for (const [key, prop] of Object.entries(inputSchema.properties)) {
+    if (prop.type === 'ZodString') {
+      sample[key] = 'example';
+    } else if (prop.type === 'ZodNumber') {
+      sample[key] = 123;
+    } else if (prop.type === 'ZodBoolean') {
+      sample[key] = true;
+    } else if (prop.type === 'ZodEnum' && prop.enum && prop.enum.length > 0) {
+      sample[key] = prop.enum[0];
+    } else {
+      sample[key] = 'value';
+    }
+  }
+
+  return sample;
+}
+
+// Generate JavaScript code string for display
 function generateSampleInput(inputSchema) {
   // Check for void/empty schemas (z.void(), no input, etc.)
   if (!inputSchema ||
@@ -1086,23 +1121,27 @@ function generateSampleInput(inputSchema) {
     return '{}';
   }
 
-  const sample = {};
+  // Generate JavaScript object literal (not JSON) for proper syntax
+  const entries = [];
   for (const [key, prop] of Object.entries(inputSchema.properties)) {
+    let value;
     if (prop.type === 'ZodString') {
-      sample[key] = 'example';
+      value = "'example'";
     } else if (prop.type === 'ZodNumber') {
-      sample[key] = 123;
+      value = '123';
     } else if (prop.type === 'ZodBoolean') {
-      sample[key] = true;
+      value = 'true';
     } else if (prop.type === 'ZodEnum' && prop.enum && prop.enum.length > 0) {
       // Use the first enum value for realistic examples
-      sample[key] = prop.enum[0];
+      const enumVal = prop.enum[0];
+      value = typeof enumVal === 'string' ? `'${enumVal}'` : enumVal;
     } else {
-      sample[key] = 'value';
+      value = "'value'";
     }
+    entries.push(`  ${key}: ${value}`);
   }
 
-  return JSON.stringify(sample, null, 2);
+  return `{\n${entries.join(',\n')}\n}`;
 }
 
 // Helper function to find tRPC router files with flexible discovery
@@ -1340,7 +1379,9 @@ async function setupTRPCPlayground() {
         
         // Forward the request to the actual tRPC server
         const targetUrl = `${config.endpoints.tRpc}${req.url}`;
-        console.log(`🔗 Proxying tRPC request to: ${targetUrl}`);
+        // Privacy: Don't log full URL as it may contain user input in query params
+        const urlPath = new URL(targetUrl, config.baseUrl).pathname;
+        console.log(`🔗 Proxying tRPC request to: ${urlPath}`);
         
         // Prepare request body
         let body = undefined;
@@ -1438,7 +1479,7 @@ async function setupTRPCPlayground() {
 
 
 function generateJsonRpcExample(procedureName, procedureType, inputSchema) {
-  const sampleInput = generateSampleInput(inputSchema);
+  const sampleInputObj = generateSampleInputObject(inputSchema);
 
   // Use full procedure name as JSON-RPC method name (preserve namespace)
   // ai.generateText -> ai.generateText, mcp.greeting -> mcp.greeting
@@ -1451,8 +1492,8 @@ function generateJsonRpcExample(procedureName, procedureType, inputSchema) {
   };
 
   // Only add params if there are actual parameters (not void)
-  if (sampleInput !== null) {
-    jsonRpcRequest.params = JSON.parse(sampleInput);
+  if (sampleInputObj && Object.keys(sampleInputObj).length > 0) {
+    jsonRpcRequest.params = sampleInputObj;
   }
 
   return `curl -X POST ${getServerConfig().endpoints.jsonRpc} \\
@@ -1530,7 +1571,7 @@ app.get('/', async (req, res) => {
       return {
         color: '#059669',
         icon: '✅',
-        text: `Connected at ${config.baseUrl}`,
+        text: `Connected at <a href="${config.baseUrl}" target="_blank" style="color: inherit; text-decoration: underline;">${config.baseUrl}</a>`,
         detail: null
       };
     }

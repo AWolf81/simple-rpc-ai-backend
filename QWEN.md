@@ -141,7 +141,7 @@ src/
 ```typescript
 import { RPCClient } from 'simple-rpc-ai-backend';
 const client = new RPCClient('http://localhost:8000');
-const result = await client.request('executeAIRequest', { content, systemPrompt });
+const result = await client.request('ai.generateText', { content, systemPrompt });
 ```
 
 ### Enhanced Client with Authentication
@@ -152,7 +152,7 @@ const client = new AIClient(
   deviceInfo
 );
 await client.initialize();
-const result = await client.executeAIRequest(content, systemPrompt);
+const result = await client.generateText(content, systemPrompt);
 ```
 
 ### tRPC Client Development (Recommended for TypeScript)
@@ -171,7 +171,7 @@ const client = createTypedAIClient({
 
 // Full type safety - no 'as any' casts needed
 await client.ai.health.query();
-await client.ai.executeAIRequest.mutate({ content, systemPrompt });
+await client.ai.generateText.mutate({ content, systemPrompt });
 await client.ai.configureBYOK.mutate({ provider, apiKey });
 ```
 
@@ -261,7 +261,7 @@ const server = await createServerWithDevPanel({
 The package provides these JSON-RPC methods:
 
 ### Core AI Methods
-1. **`executeAIRequest`** - Execute AI request with system prompt protection
+1. **`ai.generateText`** - Execute AI request with system prompt protection
 2. **`health`** - Check server health and availability
 
 ### Authentication Methods
@@ -330,7 +330,7 @@ pnpm docs:playground      # Start local OpenRPC playground (port 3000)
 
 **Supported Procedure Types**:
 - ✅ **Queries**: `ai.health`, `mcp.listTools`, `ai.listProviders` (23 total)
-- ✅ **Mutations**: `ai.executeAIRequest`, `mcp.echo`, `ai.configureBYOK` (14 total)
+- ✅ **Mutations**: `ai.generateText`, `mcp.echo`, `ai.configureBYOK` (14 total)
 - ✅ **MCP Tools**: Auto-discovered from `meta({ mcp: {...} })` decorators
 
 ### 🔍 **OpenRPC Playground Integration**

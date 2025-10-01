@@ -232,21 +232,19 @@ export class TemplateBuilder {
       return context;
     }
 
-    const result: any = { ...context };
-
-    // Check if context is empty/null and there are required parameters
-    // If so, return a special flag to trigger help text instead of throwing error
-    const hasAnyRequiredParams = Object.values(this.config.parameters).some(param => param.required);
-
     // Ignore system metadata properties when checking if context is empty
     const systemProperties = ['user', 'timestamp', 'auth', 'session'];
     const userProvidedKeys = context ? Object.keys(context).filter(key => !systemProperties.includes(key)) : [];
     const hasNoUserContext = userProvidedKeys.length === 0;
 
+    // Check if we should show help text (no user parameters + has required params)
+    const hasAnyRequiredParams = Object.values(this.config.parameters).some(param => param.required);
     if (hasAnyRequiredParams && hasNoUserContext) {
       // Return special marker that triggers help text generation
       return { __showHelpText: true };
     }
+
+    const result: any = { ...context };
 
     for (const [name, param] of Object.entries(this.config.parameters!)) {
       const value = context[name];
@@ -259,7 +257,8 @@ export class TemplateBuilder {
 
       // Check required
       if (param.required && (value === undefined || value === null)) {
-        throw new Error(`Required parameter missing: ${name}`);
+        // Return help text instead of throwing error
+        return { __showHelpText: true };
       }
 
       // Validate enum

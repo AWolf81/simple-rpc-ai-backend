@@ -65,6 +65,7 @@ export function createProviderProcedures(
 
     /**
      * List allowed models for a provider (respects model restrictions)
+     * Returns production-ready model IDs that can be used directly with AI SDKs
      */
     listAllowedModels: publicProcedure
       .input(z.object({
@@ -74,59 +75,28 @@ export function createProviderProcedures(
         const { provider } = input || {};
 
         if (provider) {
-          // Single provider - return simple format
-          const allowedModels = await aiService.getAllowedModels(provider);
-
-          // Check if restrictions are actually configured for this provider
-          const hasRestrictions = modelRestrictions &&
-            modelRestrictions[provider] &&
-            (modelRestrictions[provider].allowedModels?.length ||
-              modelRestrictions[provider].allowedPatterns?.length ||
-              modelRestrictions[provider].blockedModels?.length);
-
-          const restrictionSuffix = hasRestrictions ? ' (after applying restrictions)' : '';
+          const detailedModels = await aiService.getAvailableModelsDetailed(provider);
+          const models = detailedModels.map(model =>
+            aiService.getProductionModelId(provider, model.id)
+          );
 
           return {
             provider,
-            models: allowedModels,
-            count: allowedModels.length,
-            description: `Available models for ${provider}${restrictionSuffix}`
+            models,
+            count: models.length
           };
         } else {
-          // All providers - return structured format
-          const providerData = [];
-          let totalCount = 0;
+          // All providers
+          const allModels: Record<string, string[]> = {};
 
           for (const p of aiService.getProviders()) {
-            const providerModels = await aiService.getAllowedModels(p.name);
-
-            // Check if restrictions are configured for this provider
-            const hasRestrictions = modelRestrictions &&
-              modelRestrictions[p.name] &&
-              (modelRestrictions[p.name].allowedModels?.length ||
-                modelRestrictions[p.name].allowedPatterns?.length ||
-                modelRestrictions[p.name].blockedModels?.length);
-
-            providerData.push({
-              provider: p.name,
-              models: providerModels,
-              count: providerModels.length,
-              hasRestrictions
-            });
-
-            totalCount += providerModels.length;
+            const detailedModels = await aiService.getAvailableModelsDetailed(p.name);
+            allModels[p.name] = detailedModels.map(model =>
+              aiService.getProductionModelId(p.name, model.id)
+            );
           }
 
-          // Check if any provider has restrictions
-          const anyRestrictions = providerData.some(p => p.hasRestrictions);
-          const restrictionSuffix = anyRestrictions ? ' (after applying restrictions)' : '';
-
-          return {
-            provider: 'all',
-            providers: providerData,
-            totalCount,
-            description: `All available models across all providers${restrictionSuffix}`
-          };
+          return allModels;
         }
       }),
 

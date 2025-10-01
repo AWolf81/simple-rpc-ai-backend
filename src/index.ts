@@ -305,12 +305,15 @@ export type {
 export {
   createMCPTool,
   createAdminMCPTool,
+  createMCPPrompt,
   ScopeHelpers,
   ScopeValidator,
   DefaultScopes
 } from './auth/scopes';
 export type {
   MCPToolScope,
+  MCPPromptConfig,
+  MCPPromptArgument,
   ScopeRequirement,
   ScopePattern
 } from './auth/scopes';
