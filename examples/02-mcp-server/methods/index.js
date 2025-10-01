@@ -6,6 +6,8 @@
 
 import { router, publicProcedure, createMCPTool, defaultRootManager } from 'simple-rpc-ai-backend';
 import { z } from 'zod';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 /**
  * Custom Math Tools Router - All procedures become MCP tools automatically
@@ -258,15 +260,23 @@ export const fileOperationsRouter = router({
     }))
     .query(async ({ input }) => {
       try {
-        const { rootId, path } = input;
+        const { rootId, path: relativePath } = input;
 
-        // Get file stats using the secure defaultRootManager
-        const stats = await defaultRootManager.getFileStats(rootId, path);
+        // Get root folder configuration
+        const rootConfig = defaultRootManager.getRootConfig(rootId);
 
-        console.log(`ℹ️ File info: ${rootId}/${path}`);
+        if (!rootConfig) {
+          throw new Error(`Root '${rootId}' not found`);
+        }
+
+        // Build full path and get stats
+        const fullPath = path.join(rootConfig.path, relativePath);
+        const stats = await fs.stat(fullPath);
+
+        console.log(`ℹ️ File info: ${rootId}/${relativePath}`);
 
         return {
-          path,
+          path: relativePath,
           rootId,
           size: stats.size,
           isFile: stats.isFile(),
