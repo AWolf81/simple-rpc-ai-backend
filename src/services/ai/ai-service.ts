@@ -12,7 +12,7 @@ import { google, Google } from '@ai-sdk/google';
 import { InferenceClient } from '@huggingface/inference';
 import crypto from 'crypto';
 import { LanguageModel } from 'ai';
-import { MCPService, MCPServiceConfig } from './mcp-service';
+import { MCPService, MCPServiceConfig } from '../mcp/mcp-service';
 import { ModelRegistry } from './model-registry.js';
 import type { ModelInfo } from './model-registry.js';
 
@@ -159,7 +159,7 @@ export interface AIServiceConfig {
   
   // Model Registry Configuration
   modelRegistry?: {
-    registryConfig?: Partial<import('../config/model-safety.js').ModelSafetyConfig>;
+    registryConfig?: Partial<import('../../config/model-safety.js').ModelSafetyConfig>;
   };
   
   // Model Restrictions Configuration

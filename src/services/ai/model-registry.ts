@@ -5,10 +5,10 @@
  * caching, and fallback mechanisms for production safety.
  */
 
-import { getModelSafetyConfig, ModelValidator, type ModelSafetyConfig } from '../config/model-safety.js';
+import { getModelSafetyConfig, ModelValidator, type ModelSafetyConfig } from '../../config/model-safety.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import { logger } from '../utils/logger.js';
+import { logger } from '../../utils/logger.js';
 
 // Get the directory of this file for proper path resolution
 const __filename = fileURLToPath(import.meta.url);

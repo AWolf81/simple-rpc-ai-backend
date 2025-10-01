@@ -8,7 +8,7 @@
  */
 
 import { PostgreSQLRPCMethods } from '../../auth/PostgreSQLRPCMethods';
-import { PostgreSQLConfig } from '../../services/PostgreSQLSecretManager';
+import { PostgreSQLConfig } from '../../services/security/PostgreSQLSecretManager';
 import * as winston from 'winston';
 import dotenv from 'dotenv';
 

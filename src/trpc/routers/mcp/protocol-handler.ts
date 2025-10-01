@@ -8,7 +8,7 @@ import { MCPRateLimiter, getDefaultRateLimiter } from '../../../security/rate-li
 import { SecurityLogger, getDefaultSecurityLogger } from '../../../security/security-logger';
 import { AuthEnforcer, getDefaultAuthEnforcer } from '../../../security/auth-enforcer';
 import { MCPRouterConfig, MCPAuthConfig } from './types';
-import { mcpResourceRegistry } from '../../../services/mcp-resource-registry.js';
+import { mcpResourceRegistry } from '../../../services/resources/mcp/mcp-resource-registry.js';
 import { logger } from '../../../utils/logger.js';
 import fs from 'fs';
 import path from 'path';

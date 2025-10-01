@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { router, publicProcedure } from '@src-trpc/index';
 import { createMCPTool } from '../../../auth/scopes';
-import { WorkspaceManager, type ServerWorkspaceConfig } from '../../../services/workspace-manager';
+import { WorkspaceManager, type ServerWorkspaceConfig } from '../../../services/resources/workspace-manager';
 
 export function createSystemRouter(workspaceManager?: WorkspaceManager): ReturnType<typeof router> {
   // Use provided workspaceManager or create a default one

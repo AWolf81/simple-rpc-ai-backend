@@ -6,7 +6,7 @@
  */
 
 import { AIService, AIServiceConfig, ExecuteRequest, ExecuteResult } from './ai-service';
-import { MCPService, MCPServiceConfig, AIToolRequest, MCPToolDefinition } from './mcp-service';
+import { MCPService, MCPServiceConfig, AIToolRequest, MCPToolDefinition } from '../mcp/mcp-service';
 import { generateText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';

@@ -12,7 +12,7 @@ export { AIClient } from './client';           // Enhanced client with BYOK
 // tRPC Client Support
 export { createTypedAIClient } from './client';
 export type { TypedAIClient } from './client';
-export { AIService } from './services/ai-service';      // Direct AI service usage
+export { AIService } from './services/ai/ai-service';      // Direct AI service usage
 export { generateTRPCMethods, createAppRouter } from './trpc/root';
 export { router, publicProcedure, protectedProcedure } from './trpc/index';
 // export { createTestRouter } from './trpc/test-router';
@@ -48,12 +48,12 @@ export { AI_LIMIT_PRESETS } from './trpc/routers/ai/types';
 export type { AIRouterConfig, AIRouterType } from './trpc/routers/ai';
 
 // Model Registry (new unified registry with @anolilab/ai-model-registry integration)
-export { ModelRegistry } from './services/model-registry';
-export type { ModelInfo } from './services/model-registry';
+export { ModelRegistry } from './services/ai/model-registry';
+export type { ModelInfo } from './services/ai/model-registry';
 
 // Hybrid Model Registry (production-safe versioned model registry)
-export { HybridModelRegistry, hybridRegistry } from './services/hybrid-model-registry';
-export type { HybridModel } from './services/hybrid-model-registry';
+export { HybridModelRegistry, hybridRegistry } from './services/ai/hybrid-model-registry';
+export type { HybridModel } from './services/ai/hybrid-model-registry';
 
 // tRPC router types for client type safety
 export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root';
@@ -62,20 +62,20 @@ export type { AppRouter, RouterInputs, RouterOutputs } from './trpc/root';
 
 
 // Custom function system
-export { FunctionRegistry } from './services/function-registry';
-export { PromptManager, promptManager } from './services/prompt-manager';
+export { FunctionRegistry } from './services/ai/function-registry';
+export { PromptManager, promptManager } from './services/ai/prompt-manager';
 
 // Workspace management (replaces root folder management)
-export { WorkspaceManager, defaultWorkspaceManager, createWorkspaceManager } from './services/workspace-manager';
+export { WorkspaceManager, defaultWorkspaceManager, createWorkspaceManager } from './services/resources/workspace-manager';
 
 // Legacy root folder management (deprecated - use WorkspaceManager instead)
-export { RootManager, defaultRootManager, createRootManager } from './services/root-manager';
+export { RootManager, defaultRootManager, createRootManager } from './services/resources/root-manager';
 
 // MCP (Model Context Protocol) Integration
-export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService, setDefaultMCPServiceInstance } from './services/mcp-service';
-export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp-registry';
-export { MCPAIService } from './services/mcp-ai-service';
-export { RefMCPIntegration, VSCodeRefIntegration } from './services/ref-mcp-integration';
+export { MCPService, MCPUtils, getDefaultMCPService, initializeDefaultMCPService, setDefaultMCPServiceInstance } from './services/mcp/mcp-service';
+export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp/mcp-registry';
+export { MCPAIService } from './services/ai/mcp-ai-service';
+export { RefMCPIntegration, VSCodeRefIntegration } from './services/mcp/ref-mcp-integration';
 
 // MCP Resource Registry - Flexible resource system
 export {
@@ -86,7 +86,7 @@ export {
   registerMCPProvider,
   MCPResourceHelpers,
   GlobalResourceTemplates
-} from './services/mcp-resource-registry';
+} from './services/resources/mcp/mcp-resource-registry';
 
 // MCP Template Engine - Reusable template API
 export {
@@ -94,7 +94,7 @@ export {
   QuickTemplates,
   TemplateRegistry,
   createTemplate
-} from './services/template-engine';
+} from './services/resources/template-engine';
 
 // MCP Resource Helpers - Common error handlers and utilities
 export {
@@ -103,14 +103,14 @@ export {
   generateMCPHelpText,
   createMCPResourceHandler,
   createMissingParameterError
-} from './services/mcp-resource-helpers';
+} from './services/resources/mcp/mcp-resource-helpers';
 
 // File Reader Helpers - Easy file access with root manager
 export {
   createFileReader,
   createDirectoryLister,
   FileReaderHelpers
-} from './services/file-reader-helper';
+} from './services/resources/file-reader-helper';
 
 // Authentication system exports
 export {
@@ -128,7 +128,7 @@ export type {
 
 export type {
   AIServiceConfig
-} from './services/ai-service';
+} from './services/ai/ai-service';
 
 // New progressive authentication types
 export type {
@@ -148,13 +148,13 @@ export type {
 export type {
   PromptTemplate,
   PromptContext
-} from './services/prompt-manager';
+} from './services/ai/prompt-manager';
 
 export type {
   CustomFunctionDefinition,
   CustomFunctionRequest,
   CustomFunctionResult
-} from './services/function-registry';
+} from './services/ai/function-registry';
 
 // MCP Types
 export type {
@@ -162,7 +162,7 @@ export type {
   AIToolRequest,
   AIToolResponse,
   MCPToolDefinition
-} from './services/mcp-service';
+} from './services/mcp/mcp-service';
 
 export type {
   MCPServerConfig,
@@ -170,13 +170,13 @@ export type {
   MCPServerStatus,
   MCPToolRequest,
   MCPToolResponse
-} from './services/mcp-registry';
+} from './services/mcp/mcp-registry';
 
 export type {
   MCPAIServiceConfig,
   EnhancedExecuteRequest,
   EnhancedExecuteResult
-} from './services/mcp-ai-service';
+} from './services/ai/mcp-ai-service';
 
 export type {
   RefMCPConfig,
@@ -184,14 +184,14 @@ export type {
   DocumentationSearchResult,
   URLReadRequest,
   URLReadResult
-} from './services/ref-mcp-integration';
+} from './services/mcp/ref-mcp-integration';
 
 // MCP Resource Registry Types
 export type {
   MCPResource,
   MCPResourceProvider,
   MCPResourceTemplate
-} from './services/mcp-resource-registry';
+} from './services/resources/mcp/mcp-resource-registry';
 
 // MCP Template Engine Types
 export type {
@@ -200,21 +200,21 @@ export type {
   ContentResult,
   ContentGenerator,
   FormatHandler
-} from './services/template-engine';
+} from './services/resources/template-engine';
 
 // MCP Resource Helper Types
 export type {
   MCPParameter,
   MCPResourceHelp,
   ParameterValidationResult
-} from './services/mcp-resource-helpers';
+} from './services/resources/mcp/mcp-resource-helpers';
 
 // File Reader Helper Types
 export type {
   FileReaderConfig,
   FileMetadata,
   FileContent
-} from './services/file-reader-helper';
+} from './services/resources/file-reader-helper';
 
 // Workspace Manager Types (replaces Root Manager Types)
 export type {
@@ -222,7 +222,7 @@ export type {
   ClientWorkspaceInfo,
   FileInfo as WorkspaceFileInfo,
   WorkspaceManagerConfig
-} from './services/workspace-manager';
+} from './services/resources/workspace-manager';
 
 // Legacy Root Manager Types (deprecated - use WorkspaceManager types instead)
 export type {
@@ -230,7 +230,7 @@ export type {
   ClientRootFolderInfo,
   FileInfo,
   RootManagerConfig
-} from './services/root-manager';
+} from './services/resources/root-manager';
 
 export type {
   MCPRouterConfig,

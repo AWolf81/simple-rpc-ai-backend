@@ -8,7 +8,7 @@
  * - Source of truth for user token balances
  */
 
-import { PostgreSQLAdapter } from '../database/postgres-adapter';
+import { PostgreSQLAdapter } from '../../database/postgres-adapter';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface TokenBalance {

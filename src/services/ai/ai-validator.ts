@@ -5,7 +5,7 @@
  * Supports Anthropic, OpenAI, and Google AI
  */
 
-import { AIProviderValidator, KeyValidationResult } from '../auth/key-manager';
+import { AIProviderValidator, KeyValidationResult } from '../../auth/key-manager';
 
 export interface ValidationConfig {
   timeout: number; // milliseconds

@@ -15,7 +15,7 @@ import {
 // VaultStorageAdapter removed - using simplified storage
 import { FileStorageAdapter } from './FileStorageAdapter';
 import { ClientManagedStorageAdapter } from './ClientManagedStorageAdapter';
-import { PostgreSQLConfig } from '../services/PostgreSQLSecretManager';
+import { PostgreSQLConfig } from '../services/security/PostgreSQLSecretManager';
 import * as winston from 'winston';
 import * as path from 'path';
 

@@ -12,9 +12,9 @@ import { BillingEngine } from '../billing/billing-engine';
 import { PostgreSQLAdapter } from '../database/postgres-adapter';
 
 // Import existing server components
-import { AIService } from '../services/ai-service';
-import { FunctionRegistry } from '../services/function-registry';
-import { PromptManager, promptManager } from '../services/prompt-manager';
+import { AIService } from '@services/ai/ai-service';
+import { FunctionRegistry } from '../services/ai/function-registry';
+import { PromptManager, promptManager } from '../services/ai/prompt-manager';
 
 // Import configuration
 import type { MonetizedAIServerConfig, OpenSaaSMonetizationConfig } from './opensaas-config';

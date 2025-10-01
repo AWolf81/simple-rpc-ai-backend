@@ -21,8 +21,8 @@ import type { AppRouter } from './trpc/root.js';
 import type { AIRouterConfig } from './trpc/routers/ai/types.js';
 import { JWTMiddleware } from './auth/jwt-middleware.js';
 import { PostgreSQLAdapter } from './database/postgres-adapter.js';
-import { VirtualTokenService } from './services/virtual-token-service.js';
-import { UsageAnalyticsService } from './services/usage-analytics-service.js';
+import { VirtualTokenService } from './services/billing/virtual-token-service.js';
+import { UsageAnalyticsService } from './services/billing/usage-analytics-service.js';
 import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods.js';
 import { RPC_METHODS } from './constants.js';
 import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge.js';
@@ -1164,7 +1164,7 @@ export class RpcAiServer {
 
       // Import and provide the default root manager for roots capability
       try {
-        const { defaultRootManager } = await import('./services/root-manager.js');
+        const { defaultRootManager } = await import('./services/resources/root-manager.js');
         protocolHandler.setRootManager(defaultRootManager);
         console.log('✅ MCP roots capability enabled with defaultRootManager');
       } catch (error) {
@@ -1174,7 +1174,7 @@ export class RpcAiServer {
       // Also set up workspace manager for server workspaces if configured
       if (this.config.serverWorkspaces) {
         try {
-          const { WorkspaceManager } = await import('./services/workspace-manager.js');
+          const { WorkspaceManager } = await import('./services/resources/workspace-manager.js');
           const workspaceManager = new WorkspaceManager();
 
           // Add configured server workspaces

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { protectedProcedure } from '../../../index';
-import { VirtualTokenService } from '@services/virtual-token-service';
-import { UsageAnalyticsService } from '@services/usage-analytics-service';
+import { VirtualTokenService } from '@services/billing/virtual-token-service';
+import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
 
 /**
  * User management procedures

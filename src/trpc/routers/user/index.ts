@@ -5,8 +5,8 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '@src-trpc/index';
-import { VirtualTokenService } from '@services/virtual-token-service';
-import { UsageAnalyticsService } from '@services/usage-analytics-service';
+import { VirtualTokenService } from '@services/billing/virtual-token-service';
+import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
 
 interface HybridUserService {
   getUserProfile(userId: string): Promise<any>;

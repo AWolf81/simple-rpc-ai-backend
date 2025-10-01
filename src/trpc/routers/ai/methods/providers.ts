@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { publicProcedure } from '../../../index';
-import { AIService } from '@services/ai-service';
+import { AIService } from '@services/ai/ai-service';
 
 /**
  * AI provider management procedures

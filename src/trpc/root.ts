@@ -8,7 +8,7 @@
 import { router } from '@src-trpc/index';
 import { createAIRouter } from '@src-trpc/routers/ai';
 import type { AIRouterFactoryConfig } from '@src-trpc/routers/ai/types';
-import { AIService } from '@services/ai-service';
+import { AIService } from '@services/ai/ai-service';
 import { createServiceProvidersConfig, createMCPServiceProvidersConfig } from '@src-trpc/routers/ai/types';
 import { createMCPRouter, MCPRouterConfig } from '@src-trpc/routers/mcp/index';
 import { createSystemRouter } from '@src-trpc/routers/system';
@@ -19,10 +19,10 @@ import { createAdminRouter } from '@src-trpc/routers/admin';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { PostgreSQLAdapter } from '@database/postgres-adapter';
 import type { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
-import { VirtualTokenService } from '@services/virtual-token-service';
-import { UsageAnalyticsService } from '@services/usage-analytics-service';
-import { RootManager } from '@services/root-manager';
-import { WorkspaceManager } from '@services/workspace-manager';
+import { VirtualTokenService } from '@services/billing/virtual-token-service';
+import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
+import { RootManager } from '@services/resources/root-manager';
+import { WorkspaceManager } from '@services/resources/workspace-manager';
 
 
 /**

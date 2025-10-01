@@ -5,7 +5,7 @@
  */
 
 import { handleMCPResourceParameters } from './mcp-resource-helpers.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../../../utils/logger.js';
 
 export interface MCPResource {
   /** Unique identifier for the resource */
