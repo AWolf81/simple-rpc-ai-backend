@@ -560,15 +560,17 @@ export class SecurityLogger {
               errorMessage.includes('Parameter validation failed')
             );
 
+            // Skip logging validation errors - many MCP clients send test calls with empty args
+            if (isValidationError) {
+              return; // Don't log validation errors as suspicious
+            }
+
             let eventType: SecurityEventType;
             let severity: SecuritySeverity;
 
             if (isAuthError) {
               eventType = SecurityEventType.AUTH_FAILURE;
               severity = statusCode >= 500 ? SecuritySeverity.HIGH : SecuritySeverity.MEDIUM;
-            } else if (isValidationError) {
-              eventType = SecurityEventType.SUSPICIOUS_REQUEST;
-              severity = SecuritySeverity.LOW; // Much lower severity for validation errors
             } else {
               // Generic error - treat as suspicious but not auth failure
               eventType = SecurityEventType.SUSPICIOUS_REQUEST;

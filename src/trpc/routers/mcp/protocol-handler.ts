@@ -156,48 +156,32 @@ export class MCPProtocolHandler {
    * Determine if a tool should be public based on hybrid configuration
    */
   private isToolPublic(tool: { name: string; category?: string; public?: boolean }): boolean {
-    console.log('🔍 isToolPublic check:', {
-      toolName: tool.name,
-      toolPublic: tool.public,
-      denyPublicTools: this.authConfig.denyPublicTools,
-      publicTools: this.authConfig.publicTools,
-      isDenied: this.authConfig.denyPublicTools?.includes(tool.name)
-    });
-
     // 1. Explicit deny always wins (security override)
     if (this.authConfig.denyPublicTools?.includes(tool.name)) {
-      console.log(`❌ Tool ${tool.name} is explicitly denied`);
       return false;
     }
 
     // 2. Explicit allow list (array of tool names)
     if (Array.isArray(this.authConfig.publicTools)) {
-      const allowed = this.authConfig.publicTools.includes(tool.name);
-      console.log(`📋 Tool ${tool.name} in explicit allow list: ${allowed}`);
-      return allowed;
+      return this.authConfig.publicTools.includes(tool.name);
     }
 
     // 3. 'default' means use tool metadata + category filtering
     if (this.authConfig.publicTools === 'default') {
       if (this.authConfig.publicCategories && tool.category) {
         if (!this.authConfig.publicCategories.includes(tool.category)) {
-          console.log(`🏷️ Tool ${tool.name} category ${tool.category} not in allowed categories`);
           return false;
         }
       }
-
-      console.log(`✅ Tool ${tool.name} using metadata: public=${tool.public}`);
       return tool.public === true;
     }
 
     // 4. Legacy support
     if (this.authConfig._legacyPublicTools?.includes(tool.name)) {
-      console.log(`🔄 Tool ${tool.name} in legacy publicTools`);
       return true;
     }
 
     // 5. Default: tool metadata
-    console.log(`📌 Tool ${tool.name} default to metadata: public=${tool.public}`);
     return tool.public === true;
   }
 
@@ -341,8 +325,6 @@ export class MCPProtocolHandler {
 
       const mcpRequest = req.body;
       const requestId = mcpRequest.id || 'unknown';
-      const timestamp = new Date().toISOString();
-      console.log(`📡 [${timestamp}] MCP Request ID ${requestId}:`, mcpRequest.method, mcpRequest.params?.name || '');
 
       let response;
 
@@ -394,11 +376,10 @@ export class MCPProtocolHandler {
           );
       }
 
-      console.log(`📤 [${timestamp}] MCP Response ID ${requestId}:`, response?.result ? 'SUCCESS' : 'ERROR');
       res.json(response);
 
     } catch (error) {
-      console.error('❌ MCP Error:', error);
+      logger.error('MCP Error:', error);
       const errorResponse = this.createErrorResponse(
         req.body?.id || null,
         ErrorCode.InternalError,
@@ -486,7 +467,6 @@ export class MCPProtocolHandler {
 
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      console.log('❌ Debug - No Bearer token found');
       return [];
     }
 
@@ -655,8 +635,6 @@ export class MCPProtocolHandler {
       // Get all available MCP tools from tRPC procedures
       const mcpTools = this.extractMCPToolsFromTRPC();
 
-      console.log(`🔍 Found ${mcpTools.length} MCP tools from tRPC procedures`);
-
       // Filter tools based on auth and visibility rules
       const availableTools = mcpTools
         .map(tool => {
@@ -694,7 +672,7 @@ export class MCPProtocolHandler {
           inputSchema: tool.inputSchema
         }));
 
-      console.log(`✅ Returning ${availableTools.length} available tools (user: ${userInfo?.email || 'anonymous'})`);
+      logger.debug(`MCP tools/list: ${availableTools.length} tools available (user: ${userInfo?.email || 'anonymous'})`);
 
       return {
         jsonrpc: '2.0',
@@ -741,7 +719,8 @@ export class MCPProtocolHandler {
       const userScopes = this.extractUserScopes(req);
       const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
 
-      console.log(`🔧 MCP Tool Call: ${name} (user: ${userInfo?.email || 'anonymous'})`);
+      // Debug log to understand duplicate calls
+      logger.debug(`MCP tools/call: ${name} with args:`, JSON.stringify(args));
 
       // Find the requested tool
       const mcpTools = this.extractMCPToolsFromTRPC();
@@ -819,8 +798,15 @@ export class MCPProtocolHandler {
       if (inputParser) {
         try {
           validatedInput = inputParser.parse(args || {});
-        } catch (error) {
-          console.error(`❌ Input validation failed for tool ${name}:`, error);
+        } catch (error: any) {
+          // Extract simple error summary for logging
+          const errorSummary = error?.issues
+            ? error.issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ')
+            : error instanceof Error ? error.message : String(error);
+
+          // Debug only - MCP Jam sends empty args on first call (known issue)
+          logger.debug(`Validation failed for ${name}: ${errorSummary}`);
+
           return this.createErrorResponse(
             request.id,
             ErrorCode.InvalidParams,
@@ -835,7 +821,7 @@ export class MCPProtocolHandler {
         type: procedure._def?.type || 'mutation'
       };
 
-      console.log(`⚡ Executing tool ${name} with input:`, validatedInput);
+      logger.debug(`Executing tool ${name} with input:`, validatedInput);
 
       // Execute the procedure resolver
       const result = await procedure._def.resolver({
@@ -846,7 +832,7 @@ export class MCPProtocolHandler {
         getRawInput: () => validatedInput
       });
 
-      console.log(`✅ Tool ${name} executed successfully`);
+      logger.debug(`Tool ${name} executed successfully`);
 
       return {
         jsonrpc: '2.0',
@@ -862,7 +848,7 @@ export class MCPProtocolHandler {
       };
 
     } catch (error) {
-      console.error(`❌ Error executing tool ${request.params?.name}:`, error);
+      logger.error(`Error executing tool ${request.params?.name}:`, error);
 
       if (error instanceof TRPCError) {
         const errorCode = error.code === 'FORBIDDEN'
@@ -957,7 +943,7 @@ export class MCPProtocolHandler {
         }
       }
 
-      console.log(`✅ Returning ${prompts.length} available prompts`);
+      logger.debug(`MCP prompts/list: ${prompts.length} prompts available`);
 
       return {
         jsonrpc: '2.0',
@@ -1016,7 +1002,7 @@ export class MCPProtocolHandler {
           mimeType: resource.mimeType
         }));
 
-      console.log(`✅ Returning ${accessibleResources.length} accessible resources (${allResources.length} total registered)`);
+      logger.debug(`MCP resources/list: ${accessibleResources.length} resources available (${allResources.length} total)`);
 
       return {
         jsonrpc: '2.0',
