@@ -24,7 +24,8 @@ const require = createRequire(import.meta.url);
 
 try {
   // Use absolute path resolution relative to this file
-  const openaiDataPath = path.resolve(__dirname, '../data/openai-models.json');
+  // src/services/ai/ -> ../../data/ to reach src/data/
+  const openaiDataPath = path.resolve(__dirname, '../../data/openai-models.json');
   openaiModelsData = require(openaiDataPath);
 } catch (error) {
   console.warn('OpenAI models data not found, using empty fallback');
@@ -33,7 +34,8 @@ try {
 
 try {
   // Use absolute path resolution relative to this file
-  const huggingfaceDataPath = path.resolve(__dirname, '../data/huggingface-models.json');
+  // src/services/ai/ -> ../../data/ to reach src/data/
+  const huggingfaceDataPath = path.resolve(__dirname, '../../data/huggingface-models.json');
   huggingfaceModelsData = require(huggingfaceDataPath);
 } catch (error) {
   console.warn('HuggingFace models data not found, using empty fallback');

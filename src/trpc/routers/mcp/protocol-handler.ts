@@ -804,7 +804,7 @@ export class MCPProtocolHandler {
             ? error.issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ')
             : error instanceof Error ? error.message : String(error);
 
-          // Debug only - MCP Jam sends empty args on first call (known issue)
+          // Debug only - MCP clients may send empty args on first call
           logger.debug(`Validation failed for ${name}: ${errorSummary}`);
 
           return this.createErrorResponse(
