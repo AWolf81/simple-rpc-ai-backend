@@ -10,6 +10,7 @@ import type { CreateExpressContextOptions } from '@trpc/server/adapters/express'
 import type { Request, Response } from 'express';
 import type { AppRouter } from './root';
 import { createTRPCContext, t } from './index';
+import { TimingLogger } from '../utils/timing';
 
 interface JSONRPCRequest {
   jsonrpc: '2.0';
@@ -77,18 +78,24 @@ export class TRPCToJSONRPCBridge {
    */
   createHandler() {
     return async (req: Request, res: Response): Promise<void> => {
+      const timing = new TimingLogger('RPC');  // Auto-detects nesting level
+
       try {
         const { method, params, id }: JSONRPCRequest = req.body;
+        let t1 = timing.checkpoint('Request parsed');
 
         // Create tRPC context
         const ctx = this.contextCreator
           ? await this.contextCreator({ req, res, info: {} as any })
           : await createTRPCContext({ req, res, info: {} as any });
+        let t2 = timing.checkpoint('Context created', t1);
 
         try {
           // Parse nested method path (e.g., "ai.listAllowedModels" -> caller.ai.listAllowedModels)
           // Use tRPC v11 callerFactory API
           const caller = this.callerFactory(ctx);
+          let t3 = timing.checkpoint('Caller created', t2);
+
           const methodParts = method.split('.');
 
           // Navigate to the nested procedure
@@ -101,6 +108,7 @@ export class TRPCToJSONRPCBridge {
               throw new Error(`No such procedure: ${method}`);
             }
           }
+          let t4 = timing.checkpoint('Procedure resolved', t3);
 
           // Call the procedure
           if (typeof procedure !== 'function') {
@@ -108,20 +116,26 @@ export class TRPCToJSONRPCBridge {
           }
 
           const result = await procedure(params);
-          
+          let t5 = timing.checkpoint(`Procedure ${method} executed`, t4);
+
           res.json({
             jsonrpc: '2.0',
             id,
             result
           } as JSONRPCResponse);
+
+          timing.checkpoint('Response sent', t5);
+          timing.end();
         } catch (error: any) {
+          timing.end('Error occurred');
+
           // If method not found, return proper JSON-RPC error
           if (error.message?.includes('No such procedure')) {
             res.json({
               jsonrpc: '2.0',
               id,
-              error: { 
-                code: -32601, 
+              error: {
+                code: -32601,
                 message: `Method not found: ${method}`
               }
             } as JSONRPCResponse);
@@ -137,13 +151,15 @@ export class TRPCToJSONRPCBridge {
           } as JSONRPCResponse);
         }
       } catch (error: any) {
+        timing.end('Parse error');
+
         res.json({
           jsonrpc: '2.0',
           id: (req.body as JSONRPCRequest)?.id,
-          error: { 
-            code: -32700, 
-            message: 'Parse error', 
-            data: error.message 
+          error: {
+            code: -32700,
+            message: 'Parse error',
+            data: error.message
           }
         } as JSONRPCResponse);
       }

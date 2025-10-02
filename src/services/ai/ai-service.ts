@@ -16,6 +16,7 @@ import { MCPService, MCPServiceConfig } from '../mcp/mcp-service';
 import { ModelRegistry } from './model-registry.js';
 import { hybridRegistry } from './hybrid-model-registry.js';
 import type { ModelInfo } from './model-registry.js';
+import { TimingLogger, logVerbose } from '../../utils/timing.js';
 
 /**
  * Configuration options for Hugging Face model adapter
@@ -402,6 +403,8 @@ export class AIService {
    * Execute AI request with system prompt using Vercel AI SDK
    */
   async execute(request: ExecuteRequest): Promise<ExecuteResult> {
+    const timing = new TimingLogger('SERVICE');
+
     const { content, promptId, systemPrompt: legacySystemPrompt, metadata = {}, options = {}, apiKey } = request;
 
     // Support both promptId (new) and systemPrompt (legacy) for backwards compatibility
@@ -409,6 +412,7 @@ export class AIService {
     if (!actualPromptId) {
       throw new Error('Either promptId or systemPrompt must be provided');
     }
+    let t1 = timing.checkpoint('Request validation');
 
     // Check for model deprecation warnings
     const modelToUse = metadata.model || options.model || this.config.model;
@@ -434,39 +438,41 @@ export class AIService {
     };
 
     // Debug logging (privacy-safe - no user content)
-    console.log('🔍 AI Execute Debug:');
-    console.log(`   System Prompt: ${systemPrompt ? `[${systemPrompt.length} chars]` : 'MISSING'}`);
-    console.log(`   User Content: ${content ? `[${content.length} chars]` : 'MISSING'}`);
-    console.log(`   Raw metadata:`, metadata);
-    console.log(`   Raw options.model:`, options.model);
-    console.log(`   Raw this.config.provider:`, this.config.provider);
-    console.log(`   Provider calculation: metadata.provider='${metadata.provider}' || this.config.provider='${this.config.provider}'`);
-    console.log(`   Provider: ${executionConfig.provider} ${metadata.provider ? '(from metadata)' : '(default)'}`);
-    console.log(`   executionConfig.model raw value:`, executionConfig.model);
-    console.log(`   Model: ${executionConfig.model || 'default'}`);
-    console.log(`   API Key: ${apiKey ? 'Provided' : 'None'}`);
-    console.log(`   Web Search: ${executionConfig.useWebSearch ? executionConfig.webSearchPreference : 'DISABLED'}`);
-    
+    logVerbose('🔍 AI Execute Debug:');
+    logVerbose(`   System Prompt: ${systemPrompt ? `[${systemPrompt.length} chars]` : 'MISSING'}`);
+    logVerbose(`   User Content: ${content ? `[${content.length} chars]` : 'MISSING'}`);
+    logVerbose(`   Raw metadata: ${JSON.stringify(metadata)}`);
+    logVerbose(`   Raw options.model: ${options.model}`);
+    logVerbose(`   Raw this.config.provider: ${this.config.provider}`);
+    logVerbose(`   Provider calculation: metadata.provider='${metadata.provider}' || this.config.provider='${this.config.provider}'`);
+    logVerbose(`   Provider: ${executionConfig.provider} ${metadata.provider ? '(from metadata)' : '(default)'}`);
+    logVerbose(`   executionConfig.model raw value: ${executionConfig.model}`);
+    logVerbose(`   Model: ${executionConfig.model || 'default'}`);
+    logVerbose(`   API Key: ${apiKey ? 'Provided' : 'None'}`);
+    logVerbose(`   Web Search: ${executionConfig.useWebSearch ? executionConfig.webSearchPreference : 'DISABLED'}`);
+
     // Debug model creation
-    console.log(`🔧 Model Debug: Creating model for provider=${executionConfig.provider}, model=${executionConfig.model || 'default'}`);
+    logVerbose(`🔧 Model Debug: Creating model for provider=${executionConfig.provider}, model=${executionConfig.model || 'default'}`);
 
     // Get the AI model provider (with user's API key if provided)
     const modelResult = await this.getModel(
-      executionConfig.model, 
-      apiKey, 
+      executionConfig.model,
+      apiKey,
       executionConfig.provider,
       executionConfig.useWebSearch
     );
     const model = modelResult as Parameters<typeof generateText>[0]['model'];
-    
+    let t2 = timing.checkpoint('Model retrieved', t1);
+
     // Track the resolved model name for error reporting
     const resolvedModelName = (model as any).modelId || (model as any).model || 'unknown';
-    
+
     // Prepare tools and enhanced system prompt
     const { enhancedSystemPrompt, availableTools } = await this.prepareAIExecution(
-      systemPrompt, 
+      systemPrompt,
       executionConfig
     );
+    let t3 = timing.checkpoint('Prepared AI execution', t2);
 
     // Create the user prompt from content
     const userPrompt = content;
@@ -500,12 +506,14 @@ export class AIService {
       console.log(`   Model constructor: ${model.constructor?.name}`);
       console.log(`   Generate options keys: ${Object.keys(generateOptions)}`);
       console.log(`   Max tokens: ${generateOptions.maxTokens}`);
-      
+
+      let t4 = timing.checkpoint('Calling generateText (Vercel AI SDK)', t3);
       const result = await generateText(generateOptions);
+      let t5 = timing.checkpoint('generateText completed', t4);
 
       // Handle tool calls if present (only for MCP tools, not provider-native)
       if (result.toolCalls && result.toolCalls.length > 0 && executionConfig.webSearchPreference !== 'ai-web-search') {
-        console.log(`🔧 AI requested ${result.toolCalls.length} MCP tool calls`);
+        logVerbose(`🔧 AI requested ${result.toolCalls.length} MCP tool calls`);
         
         // Execute tool calls via MCP
         const toolResults = await this.executeToolCalls(result.toolCalls);
@@ -519,6 +527,8 @@ export class AIService {
         
         return this.formatExecuteResult(finalResult, executionConfig);
       }
+
+      timing.end();
 
       return {
         content: result.text,
@@ -571,18 +581,18 @@ export class AIService {
     const provider = providerOverride || this.config.provider;
     
     // Debug logging to see what we receive
-    console.log(`🔧 getModel() called with: modelOverride='${modelOverride}', provider='${provider}'`);
-    console.log(`🔧 apiKey parameter:`, apiKey ? `provided (${apiKey.length} chars)` : 'none');
-    console.log(`🔧 Available providers:`, this.providers.map(p => ({ name: p.name, hasKey: !!p.apiKey })));
+    logVerbose(`🔧 getModel() called with: modelOverride='${modelOverride}', provider='${provider}'`);
+    logVerbose(`🔧 apiKey parameter: ${apiKey ? `provided (${apiKey.length} chars)` : 'none'}`);
+    logVerbose(`🔧 Available providers: ${JSON.stringify(this.providers.map(p => ({ name: p.name, hasKey: !!p.apiKey })))}`);
     
     // Handle 'auto' and 'default' as special cases that should trigger default model selection
     let modelName: string;
     if (!modelOverride || modelOverride === 'auto' || modelOverride === 'default') {
-      console.log(`🔧 Triggering default model selection (modelOverride was '${modelOverride}')`);
+      logVerbose(`🔧 Triggering default model selection (modelOverride was '${modelOverride}')`);
       modelName = this.config.model || await this.getDefaultModel(provider);
-      console.log(`🔧 Resolved to default model: ${modelName}`);
+      logVerbose(`🔧 Resolved to default model: ${modelName}`);
     } else {
-      console.log(`🔧 Using explicit model: ${modelOverride}`);
+      logVerbose(`🔧 Using explicit model: ${modelOverride}`);
       modelName = modelOverride;
     }
     
@@ -600,7 +610,7 @@ export class AIService {
     // Registry has "gemini-1-5-flash" but Google SDK expects "gemini-1.5-flash"
     if (provider === 'google') {
       modelName = this.normalizeGoogleModelName(modelName);
-      console.log(`🔧 Normalized Google model name: ${modelName}`);
+      logVerbose(`🔧 Normalized Google model name: ${modelName}`);
     }
     
     // For OpenRouter, modify model name to enable web search if requested
@@ -634,7 +644,7 @@ export class AIService {
     const providerApiKey = currentProvider?.apiKey;
     
     if (providerApiKey) {
-      console.log(`🔧 [FIXED VERSION] Using ${provider} API key from provider configuration (key length: ${providerApiKey.length})`);
+      logVerbose(`🔧 [FIXED VERSION] Using ${provider} API key from provider configuration (key length: ${providerApiKey.length})`);
       // Create provider instances with explicit API keys
       const modelsWithApiKey: Record<ServiceProvider['name'], (model: string) => unknown> = {
         anthropic: (name) => new Anthropic({ apiKey: providerApiKey }).messages(name),
@@ -662,11 +672,11 @@ export class AIService {
     if (provider === 'google') {
       if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GOOGLE_API_KEY) {
         process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_API_KEY;
-        console.log('🔧 Mapped GOOGLE_API_KEY to GOOGLE_GENERATIVE_AI_API_KEY for Vercel AI SDK');
+        logVerbose('🔧 Mapped GOOGLE_API_KEY to GOOGLE_GENERATIVE_AI_API_KEY for Vercel AI SDK');
       }
     }
     
-    console.log(`🔧 Using ${provider} helper function with environment variables`);
+    logVerbose(`🔧 Using ${provider} helper function with environment variables`);
     const models: Record<ServiceProvider['name'], (model: string) => unknown> = {
       anthropic: (name) => anthropic.messages(name), // Uses ANTHROPIC_API_KEY
       openai: (name) => openai.chat(name), // Uses OPENAI_API_KEY
@@ -705,7 +715,7 @@ export class AIService {
    */
   private async performMCPWebSearch(query: string): Promise<string> {
     try {
-      console.log(`🔍 Starting MCP web search with query: "${query}"`);
+      logVerbose(`🔍 Starting MCP web search with query: "${query}"`);
       console.log(`🕐 Search initiated at: ${new Date().toISOString()}`);
       
       // For now, we'll implement a simple HTTP client to the MCP server
@@ -713,11 +723,11 @@ export class AIService {
       const searchResult = await this.callMCPWebSearchServer(query);
       
       if (!searchResult || !searchResult.length) {
-        console.log('🔍 No search results found');
+        logVerbose('🔍 No search results found');
         return '';
       }
       
-      console.log(`🔍 Formatting ${searchResult.length} search results...`);
+      logVerbose(`🔍 Formatting ${searchResult.length} search results...`);
       const formattedResults = this.formatMCPSearchResults(query, searchResult);
       console.log(`✅ MCP web search completed successfully with ${formattedResults.length} characters of context`);
       return formattedResults;
@@ -759,7 +769,7 @@ export class AIService {
         return [];
       }
       
-      console.log(`🔍 Using MCP tool: ${webSearchTool.name}`);
+      logVerbose(`🔍 Using MCP tool: ${webSearchTool.name}`);
       
       // Execute the web search tool
       const toolResponse = await this.mcpService.executeToolForAI({
@@ -794,7 +804,7 @@ export class AIService {
    * Format MCP search results for AI context
    */
   private formatMCPSearchResults(query: string, results: SearchResult[]): string {
-    console.log(`🔍 Formatting ${results.length} MCP search results for query: "${query}"`);
+    logVerbose(`🔍 Formatting ${results.length} MCP search results for query: "${query}"`);
     
     let formattedResults = `Web Search Results for "${query}":\n\n`;
     
@@ -847,7 +857,7 @@ export class AIService {
         
       } else if (executionConfig.webSearchPreference === 'duckduckgo' || executionConfig.webSearchPreference === 'mcp') {
         // Use MCP web search tools
-        console.log('🔍 Using MCP web search tools');
+        logVerbose('🔍 Using MCP web search tools');
         if (this.mcpService) {
           await this.mcpService.initialize();
           const mcpTools = this.mcpService.getAvailableToolsForAI();
@@ -999,7 +1009,7 @@ The tools will be available during our conversation. Call them when needed to ga
     
     for (const toolCall of toolCalls) {
       // Privacy: Don't log user input - only log tool name
-      console.log(`🔧 Executing tool: ${toolCall.toolName}`);
+      logVerbose(`🔧 Executing tool: ${toolCall.toolName}`);
       
       try {
         let result;
@@ -1149,7 +1159,7 @@ The tools will be available during our conversation. Call them when needed to ga
     }
 
     // Fall back to using promptId as direct system prompt text
-    console.log(`📝 Using direct system prompt (${promptId.length} chars)`);
+    logVerbose(`📝 Using direct system prompt (${promptId.length} chars)`);
     return promptId;
   }
 
@@ -1274,7 +1284,7 @@ The tools will be available during our conversation. Call them when needed to ga
     // Ensure Google models have the required "models/" prefix for Vercel AI SDK
     const finalModel = modelName;
     if (!finalModel.startsWith('models/')) {
-      console.log(`🔧 Adding required "models/" prefix for Google model: ${finalModel} → models/${finalModel}`);
+      logVerbose(`🔧 Adding required "models/" prefix for Google model: ${finalModel} → models/${finalModel}`);
       return `models/${finalModel}`;
     }
     

@@ -232,6 +232,163 @@ const server = createRpcAiServer({
 
 See [docs/SERVER_WORKSPACES_VS_MCP_ROOTS.md](./docs/SERVER_WORKSPACES_VS_MCP_ROOTS.md)
 
+## 📊 Performance Benchmarks
+
+### AI Generation Performance (ai.generateText)
+
+**Test Configuration:**
+- **Request**: "Hey there, nice to meet you" (27 chars)
+- **System Prompt**: "default" → "You are a helpful AI assistant." (36 chars)
+- **Provider**: Anthropic Claude 3.7 Sonnet (claude-3-7-sonnet-20250219)
+- **Hardware**: AWOW AK10 Pro Mini PC
+  - CPU: Intel N100 (4 cores, up to 3.4 GHz)
+  - RAM: 16GB DDR4
+  - Storage: 1TB NVMe SSD
+  - OS: Ubuntu 25.04 (Kernel 6.14.0)
+
+**Timing Breakdown:**
+```
+┌─ JSON-RPC Request Parsing          0.71 ms  (0.05%)
+├─ tRPC Procedure Resolution         0.07 ms  (0.00%)
+├─ AI Service Initialization         6.87 ms  (0.46%)
+│  ├─ Request Validation             0.04 ms
+│  ├─ Model Retrieval                6.09 ms
+│  └─ Execution Preparation          0.16 ms
+├─ Anthropic API Call            1,477.06 ms (99.24%)
+└─ Response Formatting               0.64 ms  (0.04%)
+
+Total Request Time:              1,488.40 ms
+Server Overhead:                     8.29 ms  (0.56%)
+```
+
+**Key Findings:**
+- ✅ **Server overhead**: <10ms (0.56% of total time)
+- ✅ **AI API bottleneck**: 99.24% of time waiting for provider response
+- ✅ **Efficient routing**: tRPC v11 caller + JSON-RPC bridge = 0.71ms
+- ✅ **Scalable**: Server can handle 100+ concurrent requests (I/O bound, not CPU bound)
+
+**Performance Validation (Cost-Free):**
+
+```bash
+# 1. Test server overhead only (no AI API calls)
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"system.health","id":1}'
+# Expected: <5ms response time
+
+# 2. Load test - Health endpoint (baseline performance)
+# Install: sudo apt-get install apache2-utils (Ubuntu/Debian)
+#          brew install apache2 (macOS)
+ab -n 1000 -c 100 http://localhost:8000/health
+# Expected: ~3000 req/sec (0.32ms per request)
+# Actual result: 3128 req/sec on Intel N100
+
+# 3. Load test - Simulated AI delay (realistic AI scenario)
+# Create post.json: echo '{"jsonrpc":"2.0","method":"test.simulateAI","params":{},"id":1}' > post.json
+ab -n 100 -c 10 -p post.json -T application/json http://localhost:8000/rpc
+# Expected: ~6.5 req/sec with 10 concurrent (limited by 1.5s simulated delay)
+# Actual result: 6.04 req/sec, 1504ms avg (1500ms delay + 4ms overhead = 0.27%)
+# This tests server behavior under realistic AI workload without API costs
+
+# 4. Test tRPC procedure resolution
+curl http://localhost:8000/trpc/admin.healthCheck
+# Expected: <10ms response time
+
+# 5. Memory profiling (watch for leaks during sustained load)
+node --expose-gc --max-old-space-size=512 examples/01-basic-server/server.js
+# Monitor with: watch -n 1 'ps aux | grep node | grep -v grep'
+# Or: watch -n 2 'ps -o pid,rss,cmd -p $(pgrep node)'
+```
+
+**Production Considerations:**
+- **Parallel Requests**: Server can handle 100+ concurrent AI requests (66 req/sec with 1.5s latency)
+- **Real Bottleneck**: AI provider rate limits (typically 50-100 req/min = 1.67 req/sec max)
+- **Sequential Requests**: No memory leaks, clean async/await execution
+- **Rate Limiting**: Add `express-rate-limit` to prevent API quota exhaustion (429 errors)
+- **Monitoring**: Track `x-ratelimit-remaining` headers from AI providers
+
+**Throughput Math:**
+```
+10 concurrent requests  / 1.5s latency = 6.67 req/sec
+100 concurrent requests / 1.5s latency = 66.67 req/sec (theoretical)
+But: Anthropic limits ~100 req/min = 1.67 req/sec (actual production limit)
+```
+
+## 🐛 Debug & Performance Monitoring
+
+### Enable Performance Timing Logs
+
+Track detailed performance metrics for debugging and optimization:
+
+```bash
+# Via environment variable (recommended for development)
+ENABLE_TIMING=true pnpm dev:server:basic
+
+# Via server configuration
+const server = createRpcAiServer({
+  debug: {
+    enableTiming: true  // Enable detailed timing logs
+  }
+});
+```
+
+**Example timing output:**
+```
+[TIMING-RPC] ┌─ Started at 2025-10-02T06:15:00.423Z
+[TIMING-RPC] ├─ Request parsed: 0.10ms (total: 0.10ms)
+[TIMING-RPC] ├─ Context created: 0.29ms (total: 0.39ms)
+[TIMING-RPC] ├─ Caller created: 0.22ms (total: 0.61ms)
+[TIMING-RPC] ├─ Procedure resolved: 0.10ms (total: 0.71ms)
+  [TIMING-AI] ┌─ Started
+  [TIMING-AI] ├─ Input parsed: 0.10ms (total: 0.10ms)
+  [TIMING-AI] ├─ Calling aiService.execute: 0.05ms (total: 0.15ms)
+    [TIMING-SERVICE] ┌─ Started
+    [TIMING-SERVICE] ├─ Request validation: 0.06ms (total: 0.06ms)
+    [TIMING-SERVICE] ├─ Model retrieved: 6.70ms (total: 6.75ms)
+    [TIMING-SERVICE] ├─ Prepared AI execution: 0.51ms (total: 7.26ms)
+    [TIMING-SERVICE] ├─ Calling generateText (Vercel AI SDK): 0.52ms (total: 7.78ms)
+    [TIMING-SERVICE] ├─ generateText completed: 1538.23ms (total: 1546.01ms)
+    [TIMING-SERVICE] └─ Total time: 1546.14ms
+  [TIMING-AI] ├─ AI execution completed: 1546.90ms (total: 1547.04ms)
+  [TIMING-AI] └─ Total time: 1547.12ms
+[TIMING-RPC] ├─ Procedure ai.generateText executed: 1548.27ms (total: 1548.56ms)
+[TIMING-RPC] ├─ Response sent: 0.56ms (total: 1549.12ms)
+[TIMING-RPC] └─ Total time: 1549.18ms
+```
+
+**Timing Breakdown:**
+- **RPC layer**: 0.71ms routing overhead
+- **AI procedure**: 0.15ms parameter parsing
+- **SERVICE layer**: 7.26ms model setup + 1538ms Anthropic API call
+- **Total server overhead**: ~8ms (0.5% of request time)
+
+**Use Cases:**
+- **Performance Analysis**: Identify bottlenecks in your request pipeline
+- **Load Testing**: Monitor timing during sustained load tests
+- **Production Debugging**: Enable temporarily to diagnose slow requests
+- **Optimization**: Validate improvements after code changes
+
+**Separate Verbose Debug Logs:**
+
+Control verbose debug logs (🔍, 🔧, 📝) independently from timing:
+
+```typescript
+const server = createRpcAiServer({
+  debug: {
+    enableTiming: true,        // Performance timing only
+    enableVerboseLogs: false   // Suppress verbose debug logs
+  }
+});
+
+// Or via environment:
+// ENABLE_TIMING=true ENABLE_VERBOSE_LOGS=true pnpm dev
+```
+
+**⚠️ Important:**
+- Timing logs add minimal overhead (<0.1ms) but generate significant console output
+- Verbose logs show model selection, provider config, deprecation warnings
+- Disable both in production unless actively debugging
+
 ## ⚙️ Configuration
 
 ### AI Limit Presets

@@ -5,6 +5,7 @@ import { AIService } from '@services/ai/ai-service';
 import { VirtualTokenService } from '@services/billing/virtual-token-service';
 import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
 import type { DEFAULT_CONFIG } from '../types';
+import { TimingLogger } from '../../../../utils/timing';
 
 /**
  * AI text generation procedures
@@ -50,10 +51,13 @@ export function createGenerationProcedures(
     generateText: publicProcedure
       .input(generateTextSchema)
       .mutation(async ({ input, ctx }) => {
+        const timing = new TimingLogger('AI');
+
         const { content, systemPrompt, provider, metadata, options } = input;
         const { user } = ctx;
         const userId = user?.userId;
         const apiKey = input.apiKey || ctx.apiKey;
+        let t1 = timing.checkpoint('Input parsed');
 
         // Determine user type and execution path
         if (userId && usageAnalyticsService) {
@@ -184,6 +188,8 @@ export function createGenerationProcedures(
           }
 
           try {
+            let t2 = timing.checkpoint('Calling aiService.execute (public/BYOK)', t1);
+
             const result = await aiService.execute({
               content,
               systemPrompt,
@@ -191,6 +197,9 @@ export function createGenerationProcedures(
               options,
               apiKey,
             });
+
+            timing.checkpoint('AI execution completed', t2);
+            timing.end();
 
             return {
               success: true,

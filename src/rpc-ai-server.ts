@@ -32,6 +32,7 @@ import { SecurityLoggerConfig } from './security/security-logger.js';
 import { AuthEnforcementConfig } from './security/auth-enforcer.js';
 import { createOAuthServer, initializeOAuthServer, closeOAuthServer } from './auth/oauth-middleware.js';
 import { getTestSafeConfig } from './security/test-helpers.js';
+import { initializeTiming, logVerbose } from './utils/timing.js';
 
 // Built-in provider types
 export type BuiltInProvider = 'anthropic' | 'openai' | 'google';
@@ -80,6 +81,12 @@ export interface RpcAiServerConfig {
   protocols?: {
     jsonRpc?: boolean;    // Enable JSON-RPC endpoint (default: true)
     tRpc?: boolean;       // Enable tRPC endpoint (default: false)
+  };
+
+  // Debug & Performance
+  debug?: {
+    enableTiming?: boolean;      // Enable performance timing logs (default: false)
+    enableVerboseLogs?: boolean; // Enable verbose debug logs (🔍, 🔧, 📝) (default: false)
   };
   
   // Token tracking & monetization
@@ -352,13 +359,17 @@ export class RpcAiServer {
   constructor(config: RpcAiServerConfig = {}) {
     // Apply test-safe configuration if in test environment
     config = getTestSafeConfig(config);
-    
+
+    // Initialize timing/debug configuration
+    initializeTiming(config.debug);
+
     // Opinionated protocol defaults
     const protocols = this.getOpinionatedProtocols(config.protocols);
     
     // Set smart defaults
     this.config = {
       port: 8000,
+      debug: config.debug || {},
       aiLimits: {},
       serverProviders: ['anthropic'],  // Default: Anthropic only for easier onboarding
       byokProviders: ['anthropic'],    // Default: Anthropic BYOK only
@@ -484,7 +495,7 @@ export class RpcAiServer {
         ? `${resourcesInfo.customResources.length} custom resources`
         : resourcesInfo ? 'extensions configured' : 'none';
 
-      console.log(`🔍 MCP enabled – prompts: ${promptsSummary}, resources: ${resourcesSummary}`);
+      logVerbose(`🔍 MCP enabled – prompts: ${promptsSummary}, resources: ${resourcesSummary}`);
     }
 
     if ((config as any).providers) {
@@ -547,7 +558,7 @@ export class RpcAiServer {
     // Enable trust proxy if configured (for reverse proxies like ngrok, cloudflare, etc.)
     if (this.config.trustProxy) {
       this.app.set('trust proxy', 1);
-      console.log(`🔧 Trust proxy enabled for reverse proxy support`);
+      logVerbose(`🔧 Trust proxy enabled for reverse proxy support`);
     }
     
     this.setupMiddleware();
