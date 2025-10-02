@@ -48,6 +48,9 @@ const server = createRpcAiServer({
     jsonRpc: true,  // Keep JSON-RPC for compatibility
     tRpc: true      // Enable tRPC for development panel
   },
+  mcp: {
+    enabled: false  // Basic server doesn't use MCP (example 02 does)
+  },
   debug: {
     enableTiming: process.env.ENABLE_TIMING === 'true'  // Enable via env var
   },

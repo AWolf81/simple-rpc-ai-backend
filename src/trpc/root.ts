@@ -23,6 +23,7 @@ import { VirtualTokenService } from '@services/billing/virtual-token-service';
 import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
 import { RootManager } from '@services/resources/root-manager';
 import { WorkspaceManager } from '@services/resources/workspace-manager';
+import { logger } from '../utils/logger.js';
 
 
 /**
@@ -139,13 +140,7 @@ export function createAppRouter(
       })()
     : null;
 
-  // Create MCP router with only essential/non-opinionated tools
-  const mcpRouter = createMCPRouter({
-    auth: mcpConfig?.auth,
-    ai: mcpConfig?.ai,
-    aiService: sharedAIService,
-    namespaceWhitelist: mcpConfig?.namespaceWhitelist
-  });
+  // Create routers
   const systemRouter = createSystemRouter(workspaceManager);
   const userRouter = createUserRouter(virtualTokenService, usageAnalyticsService, hybridUserService, byokProviders);
   const billingRouter = createBillingRouter(virtualTokenService, usageAnalyticsService, hybridUserService);
@@ -157,12 +152,6 @@ export function createAppRouter(
     virtualTokenService
   });
 
-  // Only log MCP config if MCP is enabled
-  if (mcpConfig?.enableMCP) {
-    console.log("MCP enabled:", mcpConfig.enableMCP);
-  }
-
-  // Create the main app router with proper namespace structure and custom routers
   const aiRouter = createAIRouter({
     config: aiConfig,
     tokenTrackingEnabled,
@@ -173,15 +162,29 @@ export function createAppRouter(
     modelRestrictions
   } as any);
 
-  const baseRouters = {
+  // Build base routers object
+  const baseRouters: Record<string, any> = {
     ai: aiRouter,
-    mcp: mcpRouter,
     system: systemRouter,
     user: userRouter,
     billing: billingRouter,
     auth: authRouter,
     admin: adminRouter
   };
+
+  // Only include MCP router if enabled
+  if (mcpConfig?.enabled !== false) {
+    const mcpRouter = createMCPRouter({
+      auth: mcpConfig?.auth,
+      ai: mcpConfig?.ai,
+      aiService: sharedAIService,
+      namespaceWhitelist: mcpConfig?.namespaceWhitelist
+    });
+    baseRouters.mcp = mcpRouter;
+    logger.debug(`🔧 MCP router included`);
+  } else {
+    logger.debug(`🔧 MCP router excluded (disabled in config)`);
+  }
 
   // Merge custom routers if provided
   const allRouters = customRouters ? { ...baseRouters, ...customRouters } : baseRouters;

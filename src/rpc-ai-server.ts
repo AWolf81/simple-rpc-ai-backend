@@ -32,7 +32,8 @@ import { SecurityLoggerConfig } from './security/security-logger.js';
 import { AuthEnforcementConfig } from './security/auth-enforcer.js';
 import { createOAuthServer, initializeOAuthServer, closeOAuthServer } from './auth/oauth-middleware.js';
 import { getTestSafeConfig } from './security/test-helpers.js';
-import { initializeTiming, logVerbose } from './utils/timing.js';
+import { initializeTiming } from './utils/timing.js';
+import { logger } from './utils/logger.js';
 
 // Built-in provider types
 export type BuiltInProvider = 'anthropic' | 'openai' | 'google';
@@ -86,7 +87,6 @@ export interface RpcAiServerConfig {
   // Debug & Performance
   debug?: {
     enableTiming?: boolean;      // Enable performance timing logs (default: false)
-    enableVerboseLogs?: boolean; // Enable verbose debug logs (🔍, 🔧, 📝) (default: false)
   };
   
   // Token tracking & monetization
@@ -147,10 +147,9 @@ export interface RpcAiServerConfig {
     webhooks?: string;    // Default: '/webhooks/lemonsqueezy'
   };
 
-  // MCP configuration  
+  // MCP configuration
   mcp?: {
-    enabled?: boolean;
-    enableMCP?: boolean;  // Internal property - automatically set based on enabled and mcp object presence
+    enabled?: boolean;  // Enable/disable MCP server (default: true if mcp config provided)
     transports?: {
       http?: boolean;        // HTTP transport (default: true)
       stdio?: boolean;       // STDIO transport for Claude Desktop (default: false)  
@@ -409,7 +408,7 @@ export class RpcAiServer {
         ...config.paths
       },
       mcp: {
-        enableMCP: config.mcp?.enabled !== false && !!config.mcp,  // Enable MCP if mcp config object is provided and not explicitly disabled
+        enabled: config.mcp?.enabled !== false && !!config.mcp,  // Enable MCP if mcp config object is provided and not explicitly disabled
         transports: {
           http: true,    // HTTP transport enabled by default - universal compatibility
           sse: true,     // SSE transport enabled by default - real-time capabilities
@@ -485,7 +484,7 @@ export class RpcAiServer {
     }
 
     // Debug: log MCP config only if MCP is enabled
-    if (this.config.mcp?.enableMCP) {
+    if (this.config.mcp?.enabled) {
       const promptsInfo = this.config.mcp.extensions?.prompts;
       const resourcesInfo = this.config.mcp.extensions?.resources;
       const promptsSummary = promptsInfo?.customPrompts?.length
@@ -495,7 +494,7 @@ export class RpcAiServer {
         ? `${resourcesInfo.customResources.length} custom resources`
         : resourcesInfo ? 'extensions configured' : 'none';
 
-      logVerbose(`🔍 MCP enabled – prompts: ${promptsSummary}, resources: ${resourcesSummary}`);
+      logger.debug(`🔍 MCP enabled – prompts: ${promptsSummary}, resources: ${resourcesSummary}`);
     }
 
     if ((config as any).providers) {
@@ -558,7 +557,7 @@ export class RpcAiServer {
     // Enable trust proxy if configured (for reverse proxies like ngrok, cloudflare, etc.)
     if (this.config.trustProxy) {
       this.app.set('trust proxy', 1);
-      logVerbose(`🔧 Trust proxy enabled for reverse proxy support`);
+      logger.debug(`🔧 Trust proxy enabled for reverse proxy support`);
     }
     
     this.setupMiddleware();
@@ -668,12 +667,12 @@ export class RpcAiServer {
           health: `http://localhost:${this.config.port}${this.config.paths.health}`,
           jsonRpc: this.config.protocols.jsonRpc ? `http://localhost:${this.config.port}${this.config.paths.jsonRpc}` : null,
           tRpc: this.config.protocols.tRpc ? `http://localhost:${this.config.port}${this.config.paths.tRpc}` : null,
-          mcp: this.config.mcp?.enableMCP ? `http://localhost:${this.config.port}/mcp` : null,
+          mcp: this.config.mcp?.enabled ? `http://localhost:${this.config.port}/mcp` : null,
         },
         protocols: {
           jsonRpc: this.config.protocols.jsonRpc,
           tRpc: this.config.protocols.tRpc,
-          mcp: this.config.mcp?.enableMCP || false,
+          mcp: this.config.mcp?.enabled || false,
         },
         timestamp: new Date().toISOString()
       });
@@ -945,7 +944,13 @@ export class RpcAiServer {
           router: this.router,
           createContext: this.createContext(this.providerApiKeys),
           onError: ({ path, error }) => {
-            console.error(`❌ tRPC failed on ${path ?? "<no-path>"}:`, error);
+            // In production, log only essential info without stack traces
+            if (process.env.NODE_ENV === 'production') {
+              logger.error(`❌ tRPC failed on ${path ?? "<no-path>"}: ${error.code} - ${error.message}`);
+            } else {
+              // In development, log full error for debugging
+              console.error(`❌ tRPC failed on ${path ?? "<no-path>"}:`, error);
+            }
           },
         })
       );
@@ -1044,7 +1049,9 @@ export class RpcAiServer {
           ...(this.config.protocols.tRpc && {
             tRpc: this.config.paths.tRpc + '/*'
           }),
-          mcp: '/mcp',
+          ...(this.config.mcp?.enabled && {
+            mcp: '/mcp'
+          }),
           custom: routes
         },
         configuration: {
@@ -1157,7 +1164,7 @@ export class RpcAiServer {
     await this.setupRoutes();
 
     // Setup MCP endpoint if enabled
-    if (this.config.mcp?.enableMCP) {
+    if (this.config.mcp?.enabled) {
       console.log('🚀 Setting up MCP server...');
       // Import and create the protocol handler
       const { MCPProtocolHandler } = await import('./trpc/routers/mcp/protocol-handler.js');

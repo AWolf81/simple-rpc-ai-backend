@@ -69,7 +69,7 @@ async function startServer() {
 
       // MCP Configuration - Focus on task management tools
       mcp: {
-        enableMCP: true,
+        enabled: true,
         auth: {
           requireAuthForToolsList: false,
           requireAuthForToolsCall: false,

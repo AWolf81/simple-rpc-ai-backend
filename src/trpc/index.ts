@@ -134,6 +134,15 @@ const t = initTRPC
   .create({
     transformer: superjson,
     errorFormatter({ shape }) {
+      // In production, strip stack traces and internal details
+      if (process.env.NODE_ENV === 'production') {
+        const { stack, path, ...cleanData } = shape.data;
+        return {
+          ...shape,
+          data: cleanData,
+        };
+      }
+      // In development, return full error details for debugging
       return shape;
     },
 });

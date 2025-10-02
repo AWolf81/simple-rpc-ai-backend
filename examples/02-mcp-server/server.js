@@ -122,7 +122,7 @@ async function startServer() {
 
       // MCP Configuration with all capabilities
       mcp: {
-        enableMCP: true,
+        enabled: true,
         auth: {
           requireAuthForToolsList: false,
           requireAuthForToolsCall: false,

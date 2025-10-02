@@ -180,7 +180,7 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
 
   // Create MCP configuration for router creation
   const mcpConfig = includeMCP ? {
-    enableMCP: true,
+    enabled: true,
     ai: {
       enabled: generationConfig.mcp?.ai?.enabled ?? true,
       useServerConfig: true,
@@ -188,7 +188,7 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
       allowByokOverride: false
     }
   } : {
-    enableMCP: false,
+    enabled: false,
     ai: {
       enabled: false
     }
@@ -275,38 +275,40 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
     });
   }
 
-  // Check for custom routers from consumer projects
-  // Look for common patterns: getCustomRouters() export from router files
+  // Check for custom routers from consumer projects or examples
+  // Only load custom routers if TRPC_GEN_CUSTOM_ROUTERS is set
   let customRouters = {};
 
-  try {
-    // Try to find consumer's custom routers
-    // When running from dist/trpc/, we need to adjust paths accordingly
-    const consumerPaths = [
-      // Relative to the dist/trpc/ directory where this code runs during generation
-      '../../examples/02-mcp-server/methods/index.js', // For this repo's example
-      '../../../methods/index.js',                       // Consumer project methods/
-      '../../../src/methods/index.js',                   // Consumer project src/methods/
-      '../../methods/index.js',                          // Another consumer pattern
-      './methods/index.js',                              // Local methods if any
-      '../methods/index.js',                             // Parent methods
-    ];
+  // Allow explicit path via environment variable
+  const customRoutersPath = process.env.TRPC_GEN_CUSTOM_ROUTERS;
 
-    for (const consumerPath of consumerPaths) {
-      try {
-        const consumerModule = await import(consumerPath);
-        if (consumerModule.getCustomRouters && typeof consumerModule.getCustomRouters === 'function') {
-          customRouters = consumerModule.getCustomRouters();
-          console.log(`✅ Found custom routers: ${Object.keys(customRouters).join(', ')}`);
-          break;
-        }
-      } catch (e) {
-        // Continue searching - most paths will fail which is expected
+  if (customRoutersPath) {
+    try {
+      // Convert to absolute path if relative
+      const { resolve } = await import('path');
+      const { fileURLToPath } = await import('url');
+      const absolutePath = customRoutersPath.startsWith('/') || customRoutersPath.startsWith('file://')
+        ? customRoutersPath
+        : resolve(process.cwd(), customRoutersPath);
+
+      // Try to load from explicit path
+      const consumerModule = await import(absolutePath);
+      if (consumerModule.getCustomRouters && typeof consumerModule.getCustomRouters === 'function') {
+        customRouters = consumerModule.getCustomRouters();
+        console.log(`✅ Found custom routers: ${Object.keys(customRouters).join(', ')}`);
+      } else {
+        // Not an error - server files don't export getCustomRouters()
+        // They're only used for config extraction in generate-trpc-methods.js
+        console.log(`ℹ️  Path provided for config extraction (no custom routers exported): ${customRoutersPath}`);
       }
+    } catch (error) {
+      // Only warn if it looks like a custom routers module (has getCustomRouters in the file)
+      console.log(`ℹ️  Could not import custom routers from ${customRoutersPath} (this is normal for server config files)`);
     }
-  } catch (error) {
-    // No custom routers found - this is fine
-    console.log(`ℹ️ No custom routers detected: ${error.message}`);
+  } else {
+    // Base build mode - no custom routers
+    // This ensures the package only includes core routers
+    console.log(`ℹ️  Base build mode - no custom routers (set TRPC_GEN_CUSTOM_ROUTERS to include examples)`);
   }
 
   // Merge base routers with custom routers

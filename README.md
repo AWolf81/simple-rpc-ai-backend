@@ -44,6 +44,38 @@ npm install simple-rpc-ai-backend
 pnpm add simple-rpc-ai-backend
 ```
 
+### Base Package Routers
+
+The installed package includes these core routers (50 procedures, 19 MCP tools):
+
+- **ai.*** - AI generation, model management, providers
+- **mcp.*** - Model Context Protocol tools and resources
+- **system.*** - File operations, workspace management
+- **admin.*** - Server status, health checks, configuration
+- **auth.*** - Authentication and session management
+- **billing.*** - Usage analytics, virtual tokens
+- **user.*** - User management, API keys (BYOK)
+
+### Custom Routers (Examples Only)
+
+Custom routers like `math.*`, `utility.*`, `file.*`, and `prompts.*` are provided as **examples** in the `examples/` directory. Copy them to your project or create your own:
+
+```typescript
+import { router, publicProcedure } from 'simple-rpc-ai-backend';
+
+const mathRouter = router({
+  add: publicProcedure
+    .input(z.object({ a: z.number(), b: z.number() }))
+    .mutation(({ input }) => ({ result: input.a + input.b }))
+});
+
+const server = createRpcAiServer({
+  customRouters: { math: mathRouter }
+});
+```
+
+See `examples/02-mcp-server/methods/` for reference implementations.
+
 ## 🎯 Usage Examples
 
 ### Server Setup
@@ -368,20 +400,27 @@ const server = createRpcAiServer({
 - **Production Debugging**: Enable temporarily to diagnose slow requests
 - **Optimization**: Validate improvements after code changes
 
-**Separate Verbose Debug Logs:**
+**Verbose Debug Logs:**
 
-Control verbose debug logs (🔍, 🔧, 📝) independently from timing:
+Control verbose debug logs (🔍, 🔧, 📝) via LOG_LEVEL environment variable:
+
+```bash
+# Show all debug logs (verbose)
+LOG_LEVEL=debug pnpm dev
+
+# Show only info and above (production default)
+LOG_LEVEL=info pnpm dev
+
+# Show only warnings and errors
+LOG_LEVEL=warn pnpm dev
+```
 
 ```typescript
 const server = createRpcAiServer({
   debug: {
-    enableTiming: true,        // Performance timing only
-    enableVerboseLogs: false   // Suppress verbose debug logs
+    enableTiming: true        // Performance timing only
   }
 });
-
-// Or via environment:
-// ENABLE_TIMING=true ENABLE_VERBOSE_LOGS=true pnpm dev
 ```
 
 **⚠️ Important:**
@@ -424,9 +463,27 @@ TRPC_GEN_MCP_ENABLED=true         # Include MCP methods
 
 ## 🛠️ Development
 
+### Build Commands
+
+```bash
+pnpm build                 # Base build (50 procedures, no custom routers)
+pnpm build:mcp            # Build with example 02 custom routers (61 procedures)
+pnpm build:basic          # Build with example 01 routers (minimal)
+```
+
+**What gets built:**
+- **Base** (`pnpm build`): Only core package routers (ai, mcp, system, admin, auth, billing, user)
+- **MCP** (`pnpm build:mcp`): Base + custom example routers (math, utility, file, prompts)
+- **Basic** (`pnpm build:basic`): Base + test router only
+
+This ensures the package distribution (`npm install`) only includes base routers, while contributors can build with examples for testing.
+
+### Development Servers
+
 ```bash
 pnpm dev:docs              # Start server + dev panel
-pnpm build                 # Build TypeScript
+pnpm dev:server:basic      # Basic AI server (port 8000)
+pnpm dev:server            # Full MCP server (port 8001)
 pnpm test:coverage         # Run tests (80% threshold)
 ```
 

@@ -73,6 +73,11 @@ class Logger {
     }
   }
 
+  // Alias for verbose logging (same as debug)
+  verbose(...args: any[]): void {
+    this.debug(...args);
+  }
+
   // Convenience method for startup logs (always shown unless silent)
   startup(...args: any[]): void {
     if (this.level > LogLevel.SILENT) {

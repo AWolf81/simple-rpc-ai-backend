@@ -161,7 +161,7 @@ templateRegistry.applyTo(mcpResourceRegistry);
 const server = createRpcAiServer({
   port: 8005,
   mcp: {
-    enableMCP: true,
+    enabled: true,
     extensions: {
       resources: {
         // No includeDefaults option - resources are added via templateRegistry.applyTo()

@@ -413,7 +413,10 @@ export class MCPProtocolHandler {
         req.body?.id || null,
         ErrorCode.InternalError,
         'Internal error',
-        error instanceof Error ? error.message : String(error)
+        // In production, don't expose error details
+        process.env.NODE_ENV === 'production'
+          ? undefined
+          : (error instanceof Error ? error.message : String(error))
       );
       res.status(500).json(errorResponse);
     }

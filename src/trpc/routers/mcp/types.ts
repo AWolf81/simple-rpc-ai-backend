@@ -37,7 +37,7 @@ export interface MCPAuthConfig {
 }
 
 export interface MCPRouterConfig {
-  enableMCP?: boolean;
+  enabled?: boolean;
   mcpService?: any;
   refIntegration?: any;
   defaultConfig?: any;

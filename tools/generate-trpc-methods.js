@@ -35,8 +35,39 @@ async function extractTRPCMethods() {
     // Import the router configuration after TypeScript compilation
     const { createRouterForGeneration, loadTRPCGenerationConfig } = await import('../dist/trpc/router-config.js');
 
-    // Load configuration from environment variables
-    const config = loadTRPCGenerationConfig();
+    // Load base configuration from environment variables
+    let config = loadTRPCGenerationConfig();
+
+    // If a custom server file is specified, extract its actual config
+    const customServerPath = process.env.TRPC_GEN_CUSTOM_ROUTERS;
+    if (customServerPath) {
+      try {
+        const serverModule = await import(resolve(customServerPath));
+
+        // Try to extract server config if available (look for createRpcAiServer call)
+        // Read the file to parse the config (since it's not exported)
+        const serverFileContent = readFileSync(resolve(customServerPath), 'utf8');
+
+        // Extract MCP config from the file content
+        const mcpEnabledMatch = serverFileContent.match(/mcp:\s*\{[^}]*enabled:\s*(true|false)/);
+        if (mcpEnabledMatch) {
+          const mcpEnabled = mcpEnabledMatch[1] === 'true';
+          console.log(`📄 Extracted from ${customServerPath}: mcp.enabled = ${mcpEnabled}`);
+
+          // Override config with actual server settings
+          config = {
+            ...config,
+            mcp: {
+              ...config.mcp,
+              enabled: mcpEnabled,
+              includeInGeneration: mcpEnabled
+            }
+          };
+        }
+      } catch (error) {
+        console.warn(`⚠️  Could not extract config from ${customServerPath}, using environment config:`, error.message);
+      }
+    }
 
     // Create router with configuration filtering
     const router = await createRouterForGeneration(config);
@@ -573,11 +604,18 @@ async function extractTRPCMethods() {
       }
     }
 
+    // Filter out MCP namespace if MCP is disabled
+    const includeMCPMethods = generationConfig.mcp?.enabled && generationConfig.mcp?.includeInGeneration;
+
+    if (!includeMCPMethods) {
+      // Remove all mcp.* procedures
+      const mcpProcedureNames = Object.keys(methods).filter(name => name.startsWith('mcp.'));
+      mcpProcedureNames.forEach(name => delete methods[name]);
+      console.log(`🚫 MCP disabled - filtered out ${mcpProcedureNames.length} mcp.* procedures`);
+    }
+
     const mcpMethods = {};
     const mcpToolIndex = {};
-
-    // Only include MCP methods if MCP is enabled in configuration
-    const includeMCPMethods = generationConfig.mcp?.enabled && generationConfig.mcp?.includeInGeneration;
     const includeAITools = generationConfig.mcp?.ai?.enabled && generationConfig.mcp?.ai?.includeAIToolsInGeneration;
 
     // Log namespace whitelist if configured
@@ -714,6 +752,10 @@ async function extractTRPCMethods() {
       }
       return args;
     }
+
+    // Note: We include all base procedures in the build (ai, mcp, system, etc.)
+    // Consumers can choose which routers to enable at server runtime via config
+    // This ensures the package distribution has all features available
 
     const documentation = {
       generated: new Date().toISOString(),

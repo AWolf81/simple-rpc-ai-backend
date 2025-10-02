@@ -5,29 +5,22 @@
  * Controlled via server config or environment variable.
  */
 
+import { logger } from './logger.js';
+
 let timingEnabled = false;
-let verboseLogsEnabled = false;
 
 /**
  * Initialize timing based on config and environment
  */
-export function initializeTiming(config?: { enableTiming?: boolean; enableVerboseLogs?: boolean }): void {
+export function initializeTiming(config?: { enableTiming?: boolean }): void {
   // Environment variable takes precedence
   const envTiming = process.env.ENABLE_TIMING === 'true';
   const configTiming = config?.enableTiming ?? false;
 
   timingEnabled = envTiming || configTiming;
 
-  const envVerbose = process.env.ENABLE_VERBOSE_LOGS === 'true';
-  const configVerbose = config?.enableVerboseLogs ?? false;
-
-  verboseLogsEnabled = envVerbose || configVerbose;
-
   if (timingEnabled) {
     console.log('⏱️  Performance timing enabled');
-  }
-  if (verboseLogsEnabled) {
-    console.log('🔍 Verbose debug logs enabled');
   }
 }
 
@@ -39,26 +32,10 @@ export function isTimingEnabled(): boolean {
 }
 
 /**
- * Check if verbose logs are enabled
- */
-export function isVerboseLogsEnabled(): boolean {
-  return verboseLogsEnabled;
-}
-
-/**
  * Log timing information (only if enabled)
  */
 export function logTiming(message: string): void {
   if (timingEnabled) {
-    console.log(message);
-  }
-}
-
-/**
- * Log verbose debug information (only if enabled)
- */
-export function logVerbose(message: string): void {
-  if (verboseLogsEnabled) {
     console.log(message);
   }
 }

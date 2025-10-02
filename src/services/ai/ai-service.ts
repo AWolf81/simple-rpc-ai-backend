@@ -16,7 +16,8 @@ import { MCPService, MCPServiceConfig } from '../mcp/mcp-service';
 import { ModelRegistry } from './model-registry.js';
 import { hybridRegistry } from './hybrid-model-registry.js';
 import type { ModelInfo } from './model-registry.js';
-import { TimingLogger, logVerbose } from '../../utils/timing.js';
+import { TimingLogger } from '../../utils/timing.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Configuration options for Hugging Face model adapter
@@ -438,21 +439,21 @@ export class AIService {
     };
 
     // Debug logging (privacy-safe - no user content)
-    logVerbose('🔍 AI Execute Debug:');
-    logVerbose(`   System Prompt: ${systemPrompt ? `[${systemPrompt.length} chars]` : 'MISSING'}`);
-    logVerbose(`   User Content: ${content ? `[${content.length} chars]` : 'MISSING'}`);
-    logVerbose(`   Raw metadata: ${JSON.stringify(metadata)}`);
-    logVerbose(`   Raw options.model: ${options.model}`);
-    logVerbose(`   Raw this.config.provider: ${this.config.provider}`);
-    logVerbose(`   Provider calculation: metadata.provider='${metadata.provider}' || this.config.provider='${this.config.provider}'`);
-    logVerbose(`   Provider: ${executionConfig.provider} ${metadata.provider ? '(from metadata)' : '(default)'}`);
-    logVerbose(`   executionConfig.model raw value: ${executionConfig.model}`);
-    logVerbose(`   Model: ${executionConfig.model || 'default'}`);
-    logVerbose(`   API Key: ${apiKey ? 'Provided' : 'None'}`);
-    logVerbose(`   Web Search: ${executionConfig.useWebSearch ? executionConfig.webSearchPreference : 'DISABLED'}`);
+    logger.debug('🔍 AI Execute Debug:');
+    logger.debug(`   System Prompt: ${systemPrompt ? `[${systemPrompt.length} chars]` : 'MISSING'}`);
+    logger.debug(`   User Content: ${content ? `[${content.length} chars]` : 'MISSING'}`);
+    logger.debug(`   Raw metadata: ${JSON.stringify(metadata)}`);
+    logger.debug(`   Raw options.model: ${options.model}`);
+    logger.debug(`   Raw this.config.provider: ${this.config.provider}`);
+    logger.debug(`   Provider calculation: metadata.provider='${metadata.provider}' || this.config.provider='${this.config.provider}'`);
+    logger.debug(`   Provider: ${executionConfig.provider} ${metadata.provider ? '(from metadata)' : '(default)'}`);
+    logger.debug(`   executionConfig.model raw value: ${executionConfig.model}`);
+    logger.debug(`   Model: ${executionConfig.model || 'default'}`);
+    logger.debug(`   API Key: ${apiKey ? 'Provided' : 'None'}`);
+    logger.debug(`   Web Search: ${executionConfig.useWebSearch ? executionConfig.webSearchPreference : 'DISABLED'}`);
 
     // Debug model creation
-    logVerbose(`🔧 Model Debug: Creating model for provider=${executionConfig.provider}, model=${executionConfig.model || 'default'}`);
+    logger.debug(`🔧 Model Debug: Creating model for provider=${executionConfig.provider}, model=${executionConfig.model || 'default'}`);
 
     // Get the AI model provider (with user's API key if provided)
     const modelResult = await this.getModel(
@@ -513,7 +514,7 @@ export class AIService {
 
       // Handle tool calls if present (only for MCP tools, not provider-native)
       if (result.toolCalls && result.toolCalls.length > 0 && executionConfig.webSearchPreference !== 'ai-web-search') {
-        logVerbose(`🔧 AI requested ${result.toolCalls.length} MCP tool calls`);
+        logger.debug(`🔧 AI requested ${result.toolCalls.length} MCP tool calls`);
         
         // Execute tool calls via MCP
         const toolResults = await this.executeToolCalls(result.toolCalls);
@@ -579,20 +580,20 @@ export class AIService {
 
   private async getModel(modelOverride?: string, apiKey?: string, providerOverride?: string, enableWebSearch?: boolean) {
     const provider = providerOverride || this.config.provider;
-    
+
     // Debug logging to see what we receive
-    logVerbose(`🔧 getModel() called with: modelOverride='${modelOverride}', provider='${provider}'`);
-    logVerbose(`🔧 apiKey parameter: ${apiKey ? `provided (${apiKey.length} chars)` : 'none'}`);
-    logVerbose(`🔧 Available providers: ${JSON.stringify(this.providers.map(p => ({ name: p.name, hasKey: !!p.apiKey })))}`);
-    
+    logger.debug(`🔧 getModel() called with: modelOverride='${modelOverride}', provider='${provider}'`);
+    logger.debug(`🔧 apiKey parameter: ${apiKey ? `provided (${apiKey.length} chars)` : 'none'}`);
+    logger.debug(`🔧 Available providers: ${JSON.stringify(this.providers.map(p => ({ name: p.name, hasKey: !!p.apiKey })))}`);
+
     // Handle 'auto' and 'default' as special cases that should trigger default model selection
     let modelName: string;
     if (!modelOverride || modelOverride === 'auto' || modelOverride === 'default') {
-      logVerbose(`🔧 Triggering default model selection (modelOverride was '${modelOverride}')`);
+      logger.debug(`🔧 Triggering default model selection (modelOverride was '${modelOverride}')`);
       modelName = this.config.model || await this.getDefaultModel(provider);
-      logVerbose(`🔧 Resolved to default model: ${modelName}`);
+      logger.debug(`🔧 Resolved to default model: ${modelName}`);
     } else {
-      logVerbose(`🔧 Using explicit model: ${modelOverride}`);
+      logger.debug(`🔧 Using explicit model: ${modelOverride}`);
       modelName = modelOverride;
     }
     
@@ -610,7 +611,7 @@ export class AIService {
     // Registry has "gemini-1-5-flash" but Google SDK expects "gemini-1.5-flash"
     if (provider === 'google') {
       modelName = this.normalizeGoogleModelName(modelName);
-      logVerbose(`🔧 Normalized Google model name: ${modelName}`);
+      logger.debug(`🔧 Normalized Google model name: ${modelName}`);
     }
     
     // For OpenRouter, modify model name to enable web search if requested
@@ -642,9 +643,9 @@ export class AIService {
     // For ALL providers, check if we have API keys from provider config first
     const currentProvider = this.providers.find(p => p.name === provider);
     const providerApiKey = currentProvider?.apiKey;
-    
+
     if (providerApiKey) {
-      logVerbose(`🔧 [FIXED VERSION] Using ${provider} API key from provider configuration (key length: ${providerApiKey.length})`);
+      logger.debug(`🔧 [FIXED VERSION] Using ${provider} API key from provider configuration (key length: ${providerApiKey.length})`);
       // Create provider instances with explicit API keys
       const modelsWithApiKey: Record<ServiceProvider['name'], (model: string) => unknown> = {
         anthropic: (name) => new Anthropic({ apiKey: providerApiKey }).messages(name),
@@ -672,11 +673,11 @@ export class AIService {
     if (provider === 'google') {
       if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GOOGLE_API_KEY) {
         process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_API_KEY;
-        logVerbose('🔧 Mapped GOOGLE_API_KEY to GOOGLE_GENERATIVE_AI_API_KEY for Vercel AI SDK');
+        logger.debug('🔧 Mapped GOOGLE_API_KEY to GOOGLE_GENERATIVE_AI_API_KEY for Vercel AI SDK');
       }
     }
-    
-    logVerbose(`🔧 Using ${provider} helper function with environment variables`);
+
+    logger.debug(`🔧 Using ${provider} helper function with environment variables`);
     const models: Record<ServiceProvider['name'], (model: string) => unknown> = {
       anthropic: (name) => anthropic.messages(name), // Uses ANTHROPIC_API_KEY
       openai: (name) => openai.chat(name), // Uses OPENAI_API_KEY
@@ -715,19 +716,19 @@ export class AIService {
    */
   private async performMCPWebSearch(query: string): Promise<string> {
     try {
-      logVerbose(`🔍 Starting MCP web search with query: "${query}"`);
+      logger.debug(`🔍 Starting MCP web search with query: "${query}"`);
       console.log(`🕐 Search initiated at: ${new Date().toISOString()}`);
-      
+
       // For now, we'll implement a simple HTTP client to the MCP server
       // Later this can be integrated with the MCP service directly
       const searchResult = await this.callMCPWebSearchServer(query);
-      
+
       if (!searchResult || !searchResult.length) {
-        logVerbose('🔍 No search results found');
+        logger.debug('🔍 No search results found');
         return '';
       }
-      
-      logVerbose(`🔍 Formatting ${searchResult.length} search results...`);
+
+      logger.debug(`🔍 Formatting ${searchResult.length} search results...`);
       const formattedResults = this.formatMCPSearchResults(query, searchResult);
       console.log(`✅ MCP web search completed successfully with ${formattedResults.length} characters of context`);
       return formattedResults;
@@ -763,13 +764,13 @@ export class AIService {
         tool.name.includes('web') ||
         tool.name.toLowerCase().includes('query')
       );
-      
+
       if (!webSearchTool) {
         console.warn('No web search tool found in MCP servers');
         return [];
       }
-      
-      logVerbose(`🔍 Using MCP tool: ${webSearchTool.name}`);
+
+      logger.debug(`🔍 Using MCP tool: ${webSearchTool.name}`);
       
       // Execute the web search tool
       const toolResponse = await this.mcpService.executeToolForAI({
@@ -804,7 +805,7 @@ export class AIService {
    * Format MCP search results for AI context
    */
   private formatMCPSearchResults(query: string, results: SearchResult[]): string {
-    logVerbose(`🔍 Formatting ${results.length} MCP search results for query: "${query}"`);
+    logger.debug(`🔍 Formatting ${results.length} MCP search results for query: "${query}"`);
     
     let formattedResults = `Web Search Results for "${query}":\n\n`;
     
@@ -857,7 +858,7 @@ export class AIService {
         
       } else if (executionConfig.webSearchPreference === 'duckduckgo' || executionConfig.webSearchPreference === 'mcp') {
         // Use MCP web search tools
-        logVerbose('🔍 Using MCP web search tools');
+        logger.debug('🔍 Using MCP web search tools');
         if (this.mcpService) {
           await this.mcpService.initialize();
           const mcpTools = this.mcpService.getAvailableToolsForAI();
@@ -1009,7 +1010,7 @@ The tools will be available during our conversation. Call them when needed to ga
     
     for (const toolCall of toolCalls) {
       // Privacy: Don't log user input - only log tool name
-      logVerbose(`🔧 Executing tool: ${toolCall.toolName}`);
+      logger.debug(`🔧 Executing tool: ${toolCall.toolName}`);
       
       try {
         let result;
@@ -1159,7 +1160,7 @@ The tools will be available during our conversation. Call them when needed to ga
     }
 
     // Fall back to using promptId as direct system prompt text
-    logVerbose(`📝 Using direct system prompt (${promptId.length} chars)`);
+    logger.debug(`📝 Using direct system prompt (${promptId.length} chars)`);
     return promptId;
   }
 
@@ -1284,10 +1285,10 @@ The tools will be available during our conversation. Call them when needed to ga
     // Ensure Google models have the required "models/" prefix for Vercel AI SDK
     const finalModel = modelName;
     if (!finalModel.startsWith('models/')) {
-      logVerbose(`🔧 Adding required "models/" prefix for Google model: ${finalModel} → models/${finalModel}`);
+      logger.debug(`🔧 Adding required "models/" prefix for Google model: ${finalModel} → models/${finalModel}`);
       return `models/${finalModel}`;
     }
-    
+
     return finalModel;
   }
 

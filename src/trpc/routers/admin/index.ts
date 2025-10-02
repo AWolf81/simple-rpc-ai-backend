@@ -29,10 +29,20 @@ export function createAdminRouter(config: AdminConfig = {}): ReturnType<typeof r
       return;
     }
 
-    const userEmail = ctx?.user?.email || '';
-    const userId = ctx?.user?.id;
-    if (!ctx?.user || !adminUsers.includes(userEmail)) {
-      const actor = userEmail || userId || 'anonymous';
+    // First check: User must be authenticated
+    if (!ctx?.user) {
+      console.warn(`🚫 Admin access denied for ${procedureName} (unauthenticated request)`);
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required'
+      });
+    }
+
+    // Second check: Authenticated user must be in admin list
+    const userEmail = ctx.user.email || '';
+    const userId = ctx.user.id;
+    if (!adminUsers.includes(userEmail)) {
+      const actor = userEmail || userId || 'unknown';
       console.warn(`🚫 Admin access denied for ${procedureName} (user: ${actor})`);
       throw new TRPCError({
         code: 'FORBIDDEN',

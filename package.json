@@ -78,7 +78,10 @@
     }
   },
   "scripts": {
-    "build": "npm run copy-assets && tsc && tsc-alias && npm run build:trpc-methods",
+    "build": "npm run copy-assets && tsc && tsc-alias && npm run build:base",
+    "build:base": "node tools/generate-trpc-methods.js",
+    "build:mcp": "npm run copy-assets && tsc && tsc-alias && TRPC_GEN_CUSTOM_ROUTERS=examples/02-mcp-server/methods/index.js node tools/generate-trpc-methods.js",
+    "build:basic": "npm run copy-assets && tsc && tsc-alias && TRPC_GEN_CUSTOM_ROUTERS=examples/01-basic-server/server.js node tools/generate-trpc-methods.js",
     "build:prod": "npm run build",
     "postinstall": "node scripts/safe-build.js || npm run build",
     "prepare": "node scripts/safe-build.js || npm run build",
