@@ -21,7 +21,6 @@ import type { PostgreSQLAdapter } from '@database/postgres-adapter';
 import type { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
 import { VirtualTokenService } from '@services/billing/virtual-token-service';
 import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
-import { RootManager } from '@services/resources/root-manager';
 import { WorkspaceManager } from '@services/resources/workspace-manager';
 import { logger } from '../utils/logger.js';
 
@@ -43,7 +42,35 @@ export function createAppRouter(
     allowedPatterns?: string[];
     blockedModels?: string[];
   }>,
-  rootFolders?: any,
+  serverWorkspaces?: {
+    enabled?: boolean;
+    defaultWorkspace?: {
+      path?: string;
+      readOnly?: boolean;
+      allowedExtensions?: string[];
+      blockedExtensions?: string[];
+      maxFileSize?: number;
+      allowedPaths?: string[];
+      blockedPaths?: string[];
+      followSymlinks?: boolean;
+      enableWatching?: boolean;
+      watchIgnore?: string[];
+    };
+    additionalWorkspaces?: Record<string, {
+      path: string;
+      name?: string;
+      description?: string;
+      readOnly?: boolean;
+      allowedExtensions?: string[];
+      blockedExtensions?: string[];
+      maxFileSize?: number;
+      allowedPaths?: string[];
+      blockedPaths?: string[];
+      followSymlinks?: boolean;
+      enableWatching?: boolean;
+      watchIgnore?: string[];
+    }>;
+  },
   customRouters?: { [namespace: string]: any }
 ): ReturnType<typeof router> {
   // Initialize services if database is available
@@ -61,57 +88,23 @@ export function createAppRouter(
 
   // Initialize WorkspaceManager for server workspaces
   let workspaceManager: WorkspaceManager | undefined;
-  if (rootFolders?.enableAPI !== false && (rootFolders as any)?.additionalRoots) {
-    // Create workspace manager from serverWorkspaces config
-    workspaceManager = new WorkspaceManager();
+  if (serverWorkspaces?.enabled) {
+    const hasDefault = typeof serverWorkspaces.defaultWorkspace?.path === 'string' && serverWorkspaces.defaultWorkspace.path.trim().length > 0;
+    const hasAdditional = !!serverWorkspaces.additionalWorkspaces && Object.keys(serverWorkspaces.additionalWorkspaces).length > 0;
 
-    // Add workspaces from additionalRoots (which maps to serverWorkspaces in server config)
-    const serverWorkspaces = (rootFolders as any).additionalRoots;
-    if (serverWorkspaces) {
-      for (const [workspaceId, config] of Object.entries(serverWorkspaces)) {
-        try {
-          workspaceManager.addWorkspace(workspaceId, config as any);
-        } catch (error) {
-          console.warn(`Failed to add workspace ${workspaceId}:`, error);
-        }
+    if (hasDefault || hasAdditional) {
+      try {
+        const workspaceManagerConfig = {
+          defaultWorkspace: serverWorkspaces.defaultWorkspace,
+          serverWorkspaces: serverWorkspaces.additionalWorkspaces
+        };
+        workspaceManager = new WorkspaceManager(workspaceManagerConfig);
+      } catch (error) {
+        logger.warn('⚠️  Failed to initialize server workspace manager:', error instanceof Error ? error.message : error);
       }
+    } else {
+      logger.warn('⚠️  serverWorkspaces.enabled is true but no workspace paths are configured. Skipping workspace manager initialization.');
     }
-  }
-
-  // Initialize RootManager for MCP client roots
-  let rootManager: RootManager | undefined;
-  if (rootFolders?.enableAPI !== false) {
-    // Create basic root manager configuration
-    const rootManagerConfig = {
-      defaultRoot: rootFolders?.defaultRoot ? {
-        path: (rootFolders.defaultRoot as any).path || process.cwd(),
-        name: 'Project Root',
-        description: 'Default project root folder',
-        readOnly: (rootFolders.defaultRoot as any).readOnly ?? false,
-        allowedExtensions: (rootFolders.defaultRoot as any).allowedExtensions || ['ts', 'js', 'json', 'md', 'txt', 'yml', 'yaml'],
-        blockedExtensions: ['exe', 'bin', 'so', 'dll'],
-        maxFileSize: 10 * 1024 * 1024,
-        followSymlinks: false,
-        enableWatching: false
-      } : undefined,
-      roots: rootFolders?.additionalRoots ? Object.fromEntries(
-        Object.entries(rootFolders.additionalRoots).map(([id, config]) => [
-          id,
-          {
-            path: (config as any).path,
-            name: (config as any).name || id,
-            description: (config as any).description,
-            readOnly: (config as any).readOnly ?? false,
-            allowedExtensions: (config as any).allowedExtensions,
-            blockedExtensions: (config as any).blockedExtensions || ['exe', 'bin', 'so', 'dll'],
-            maxFileSize: (config as any).maxFileSize || 10 * 1024 * 1024,
-            followSymlinks: false,
-            enableWatching: false
-          }
-        ])
-      ) : undefined
-    };
-    rootManager = new RootManager(rootManagerConfig);
   }
 
   // Create shared AI service instance only if MCP AI is enabled

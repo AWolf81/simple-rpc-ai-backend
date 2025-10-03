@@ -806,6 +806,20 @@ async function extractTRPCMethods() {
       version: '1.0.0',
       description: 'Failed to extract tRPC methods - fallback structure',
       error: error.message,
+      configuration: {
+        ai: {
+          enabled: false,
+          includedInGeneration: false
+        },
+        mcp: {
+          enabled: false,
+          includedInGeneration: false,
+          ai: {
+            enabled: false,
+            includedInGeneration: false
+          }
+        }
+      },
       procedures: {},
       stats: {
         totalProcedures: 0,
@@ -834,14 +848,19 @@ async function main() {
   console.log(`   - ${documentation.stats.subscriptions} subscriptions`);
 
   // Show configuration status
-  console.log(`⚙️  Generation Configuration:`);
-  console.log(`   - AI: ${documentation.configuration.ai.enabled ? '✅ Enabled' : '❌ Disabled'}`);
-  console.log(`   - MCP: ${documentation.configuration.mcp.enabled ? '✅ Enabled' : '❌ Disabled'}`);
-  if (documentation.configuration.mcp.enabled) {
-    console.log(`   - MCP AI Tools: ${documentation.configuration.mcp.ai.enabled ? '✅ Enabled' : '❌ Disabled'}`);
+  if (documentation.configuration) {
+    console.log(`⚙️  Generation Configuration:`);
+    const aiEnabled = documentation.configuration.ai?.enabled ?? false;
+    const mcpEnabled = documentation.configuration.mcp?.enabled ?? false;
+    const mcpAiEnabled = documentation.configuration.mcp?.ai?.enabled ?? false;
+    console.log(`   - AI: ${aiEnabled ? '✅ Enabled' : '❌ Disabled'}`);
+    console.log(`   - MCP: ${mcpEnabled ? '✅ Enabled' : '❌ Disabled'}`);
+    if (mcpEnabled) {
+      console.log(`   - MCP AI Tools: ${mcpAiEnabled ? '✅ Enabled' : '❌ Disabled'}`);
+    }
   }
 
-  if (documentation.mcp.enabled && documentation.mcp.available) {
+  if (documentation.mcp?.enabled && documentation.mcp.available) {
     console.log(`🔧 MCP Integration:`);
     console.log(`   - ${documentation.stats.mcpMethods} MCP tools available`);
     console.log(`   - Endpoint: ${documentation.mcp.endpoint}`);
@@ -857,7 +876,7 @@ async function main() {
         console.log(`      🔹 JSON-RPC: POST ${tool.calling.jsonRpc.endpoint} (method: ${tool.calling.jsonRpc.method})`);
       }
     }
-  } else if (documentation.configuration.mcp.enabled) {
+  } else if (documentation.configuration?.mcp?.enabled) {
     console.log(`🔧 MCP Integration: Enabled but no tools found (add .meta({ mcp: {...} }) to procedures)`);
   } else {
     console.log(`🔧 MCP Integration: ❌ Disabled in configuration`);

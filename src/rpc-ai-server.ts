@@ -7,7 +7,7 @@
 
 import 'dotenv/config';
 import express from 'express';
-import type { Express, Request, Response, Application } from 'express';
+import type { Express, Request, Response, Application, NextFunction } from 'express';
 import crypto from 'crypto';
 import type { Server } from 'http';
 import cors from 'cors';
@@ -20,6 +20,8 @@ import type { AnyRouter } from '@trpc/server';
 import type { AppRouter } from './trpc/root.js';
 import type { AIRouterConfig } from './trpc/routers/ai/types.js';
 import { JWTMiddleware } from './auth/jwt-middleware.js';
+import type { AuthenticatedRequest, OpenSaaSJWTPayload } from './auth/jwt-middleware.js';
+import type { SessionStorage } from './auth/session-storage.js';
 import { PostgreSQLAdapter } from './database/postgres-adapter.js';
 import { VirtualTokenService } from './services/billing/virtual-token-service.js';
 import { UsageAnalyticsService } from './services/billing/usage-analytics-service.js';
@@ -213,14 +215,31 @@ export interface RpcAiServerConfig {
    * MCP roots are managed by the client and advertised via roots/list.
    */
   serverWorkspaces?: {
+    /** Enable server-managed file operations via tRPC/MCP (default: false) */
+    enabled?: boolean;
+
     /** Default workspace folder configuration */
     defaultWorkspace?: {
-      /** Path to default workspace folder (defaults to current working directory) */
+      /** Absolute path to default workspace folder */
       path?: string;
       /** Whether default workspace is read-only */
       readOnly?: boolean;
       /** Allowed file extensions */
       allowedExtensions?: string[];
+      /** Blocked file extensions */
+      blockedExtensions?: string[];
+      /** Maximum file size in bytes */
+      maxFileSize?: number;
+      /** Allowed path globs */
+      allowedPaths?: string[];
+      /** Blocked path globs */
+      blockedPaths?: string[];
+      /** Follow symbolic links */
+      followSymlinks?: boolean;
+      /** Enable file watching */
+      enableWatching?: boolean;
+      /** Watch ignore patterns */
+      watchIgnore?: string[];
     };
 
     /** Additional named workspace folders */
@@ -239,47 +258,17 @@ export interface RpcAiServerConfig {
       blockedExtensions?: string[];
       /** Maximum file size in bytes */
       maxFileSize?: number;
+      /** Allowed path globs */
+      allowedPaths?: string[];
+      /** Blocked path globs */
+      blockedPaths?: string[];
+      /** Follow symbolic links */
+      followSymlinks?: boolean;
+      /** Enable file watching */
+      enableWatching?: boolean;
+      /** Watch ignore patterns */
+      watchIgnore?: string[];
     }>;
-
-    /** Enable file operations via tRPC/MCP */
-    enableAPI?: boolean;
-  };
-
-  /**
-   * @deprecated Use serverWorkspaces instead. This will be removed in a future version.
-   * Root folder management configuration (legacy)
-   */
-  rootFolders?: {
-    /** Default root folder configuration */
-    defaultRoot?: {
-      /** Path to default root folder (defaults to current working directory) */
-      path?: string;
-      /** Whether default root is read-only */
-      readOnly?: boolean;
-      /** Allowed file extensions */
-      allowedExtensions?: string[];
-    };
-
-    /** Additional named root folders */
-    additionalRoots?: Record<string, {
-      /** Absolute path to the root folder */
-      path: string;
-      /** Display name */
-      name?: string;
-      /** Description */
-      description?: string;
-      /** Whether read-only */
-      readOnly?: boolean;
-      /** Allowed file extensions */
-      allowedExtensions?: string[];
-      /** Blocked file extensions */
-      blockedExtensions?: string[];
-      /** Maximum file size in bytes */
-      maxFileSize?: number;
-    }>;
-
-    /** Enable file operations via tRPC/MCP */
-    enableAPI?: boolean;
   };
 
   /**
@@ -392,7 +381,7 @@ export class RpcAiServer {
   private postgresRPCMethods?: PostgreSQLRPCMethods;
   private jsonRpcBridge?: ReturnType<typeof createTRPCToJSONRPCBridge>;
   private oauthServer?: ReturnType<typeof createOAuthServer>['oauth'];
-  private oauthStorage?: ReturnType<typeof createOAuthServer>['storage'];
+  private oauthStorage?: SessionStorage;
   private remoteMcpManager?: any; // RemoteMCPManager type
 
   /**
@@ -513,17 +502,13 @@ export class RpcAiServer {
       },
       modelRestrictions: config.modelRestrictions || {},  // Default: no model restrictions
 
-      // Server workspace configuration (preferred)
-      serverWorkspaces: {
-        enableAPI: true,
-        ...config.serverWorkspaces
-      },
-
-      // Legacy root folders configuration (for backward compatibility)
-      rootFolders: {
-        enableAPI: true,
-        ...config.rootFolders
-      },
+      // Server workspace configuration (disabled by default)
+      serverWorkspaces: config.serverWorkspaces
+        ? {
+            ...config.serverWorkspaces,
+            enabled: config.serverWorkspaces.enabled ?? false,
+          }
+        : undefined,
 
       // Remote MCP servers configuration
       remoteMcpServers: {
@@ -609,8 +594,15 @@ export class RpcAiServer {
     }
 
     // Create router with AI configuration and token tracking
-    // Create workspace configuration with fallback to rootFolders for backward compatibility
-    const workspaceConfig = this.config.serverWorkspaces || this.config.rootFolders;
+    // Normalize server workspace configuration (requires explicit workspace definitions)
+    const workspaceConfig = (this.config.serverWorkspaces && this.config.serverWorkspaces.enabled &&
+      this.hasWorkspaceDefinitions(this.config.serverWorkspaces))
+      ? this.config.serverWorkspaces
+      : undefined;
+
+    if (this.config.serverWorkspaces?.enabled && !workspaceConfig) {
+      console.warn('⚠️  serverWorkspaces.enabled is true but no workspace paths are configured. Skipping workspace API initialization.');
+    }
 
     this.router = createAppRouter(
       undefined, // aiConfig - handled by separate params below
@@ -621,7 +613,7 @@ export class RpcAiServer {
       this.postgresRPCMethods,
       this.config.mcp,
       this.config.modelRestrictions,
-      workspaceConfig, // Pass serverWorkspaces (preferred) or rootFolders (fallback)
+      workspaceConfig,
       this.config.customRouters
     );
 
@@ -717,6 +709,20 @@ export class RpcAiServer {
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+    if (this.oauthStorage) {
+      this.app.use(async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          await this.attachOAuthUserFromAccessToken(req as AuthenticatedRequest);
+          next();
+        } catch (error) {
+          logger.warn('⚠️ OAuth access token resolution failed', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+          next();
+        }
+      });
+    }
+
     // JWT Authentication (if enabled)
     if (this.jwtMiddleware) {
       this.app.use(this.jwtMiddleware.authenticate);
@@ -735,6 +741,128 @@ export class RpcAiServer {
         legacyHeaders: false,
       }));
     }
+  }
+
+  private async attachOAuthUserFromAccessToken(req: AuthenticatedRequest): Promise<void> {
+    if (!this.oauthStorage) {
+      return;
+    }
+
+    // Skip if user already resolved
+    if (req.user) {
+      return;
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return;
+    }
+
+    const accessToken = authHeader.substring(7).trim();
+    if (!accessToken) {
+      return;
+    }
+
+    const tokenRecord = await this.oauthStorage.getToken(accessToken);
+    if (!tokenRecord) {
+      return;
+    }
+
+    const expiresAtRaw = tokenRecord.accessTokenExpiresAt ?? (tokenRecord as any).expiresAt;
+    const expiresAt = expiresAtRaw instanceof Date ? expiresAtRaw : expiresAtRaw ? new Date(expiresAtRaw) : undefined;
+    if (expiresAt && expiresAt.getTime() <= Date.now()) {
+      // Token expired - ignore so downstream auth will fail naturally
+      return;
+    }
+
+    const oauthUser = (tokenRecord.user || {}) as Record<string, any>;
+    const provider = oauthUser.provider || tokenRecord.client?.id;
+    const scopeList = this.normalizeOAuthScopes(tokenRecord.scope);
+    const featureSet = new Set<string>(scopeList);
+    featureSet.add('mcp');
+    featureSet.add('oauth');
+    const features = Array.from(featureSet);
+
+    const derivedUserId = (oauthUser.id || oauthUser.userId || oauthUser.email || oauthUser.username || `oauth-${accessToken.slice(0, 8)}`).toString();
+    const email = (oauthUser.email || (oauthUser.username ? `${oauthUser.username}@oauth.local` : `${derivedUserId}@oauth.local`)).toString();
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expSeconds = expiresAt ? Math.floor(expiresAt.getTime() / 1000) : nowSeconds + 3600;
+
+    const payload: OpenSaaSJWTPayload = {
+      userId: derivedUserId,
+      email,
+      subscriptionTier: 'oauth',
+      monthlyTokenQuota: Number.MAX_SAFE_INTEGER,
+      rpmLimit: 1000,
+      tpmLimit: 60000,
+      features,
+      iat: nowSeconds,
+      exp: expSeconds,
+      iss: provider ? `oauth:${provider}` : 'oauth',
+      aud: 'mcp',
+    };
+
+    req.user = payload;
+    req.authContext = {
+      type: 'oauth',
+      userId: payload.userId,
+      email: payload.email,
+      provider,
+      scopes: scopeList,
+      subscriptionTier: payload.subscriptionTier,
+      quotaInfo: {
+        monthlyTokenQuota: payload.monthlyTokenQuota,
+        rpmLimit: payload.rpmLimit,
+        tpmLimit: payload.tpmLimit,
+      },
+      features,
+    };
+  }
+
+  private normalizeOAuthScopes(scope: unknown): string[] {
+    if (!scope) {
+      return [];
+    }
+
+    if (Array.isArray(scope)) {
+      return scope.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
+    }
+
+    if (typeof scope === 'string') {
+      return scope
+        .split(/[\s,]+/)
+        .map(entry => entry.trim())
+        .filter(entry => entry.length > 0);
+    }
+
+    if (typeof scope === 'object') {
+      const collected: string[] = [];
+      for (const value of Object.values(scope as Record<string, unknown>)) {
+        if (typeof value === 'string' && value.trim().length > 0) {
+          collected.push(value.trim());
+        } else if (Array.isArray(value)) {
+          for (const nested of value) {
+            if (typeof nested === 'string' && nested.trim().length > 0) {
+              collected.push(nested.trim());
+            }
+          }
+        }
+      }
+      return collected;
+    }
+
+    return [];
+  }
+
+  private hasWorkspaceDefinitions(config?: RpcAiServerConfig['serverWorkspaces']): boolean {
+    if (!config) {
+      return false;
+    }
+
+    const hasDefault = typeof config.defaultWorkspace?.path === 'string' && config.defaultWorkspace.path.trim().length > 0;
+    const hasAdditional = !!config.additionalWorkspaces && Object.keys(config.additionalWorkspaces).length > 0;
+
+    return hasDefault || hasAdditional;
   }
 
   private async setupRoutes() {
@@ -1441,38 +1569,30 @@ export class RpcAiServer {
         this.config.mcp
       );
 
-      // Import and provide the default root manager for roots capability
-      try {
-        const { defaultRootManager } = await import('./services/resources/root-manager.js');
-        protocolHandler.setRootManager(defaultRootManager);
-        console.log('✅ MCP roots capability enabled with defaultRootManager');
-      } catch (error) {
-        console.warn('⚠️ Could not initialize MCP roots capability:', error instanceof Error ? error.message : String(error));
+      const mcpWorkspaceConfig = (this.config.serverWorkspaces && this.config.serverWorkspaces.enabled &&
+        this.hasWorkspaceDefinitions(this.config.serverWorkspaces))
+        ? this.config.serverWorkspaces
+        : undefined;
+
+      if (this.config.serverWorkspaces?.enabled && !mcpWorkspaceConfig) {
+        console.warn('⚠️  Server workspace API enabled for MCP, but no workspace paths configured. Skipping workspace manager initialization.');
       }
 
-      // Also set up workspace manager for server workspaces if configured
-      if (this.config.serverWorkspaces) {
+      if (mcpWorkspaceConfig) {
         try {
-          const { WorkspaceManager } = await import('./services/resources/workspace-manager.js');
-          const workspaceManager = new WorkspaceManager();
+          const { createRootManager } = await import('./services/resources/root-manager.js');
 
-          // Add configured server workspaces
-          for (const [workspaceId, config] of Object.entries(this.config.serverWorkspaces)) {
-            if (workspaceId !== 'enableAPI' && config && typeof config === 'object') {
-              try {
-                workspaceManager.addWorkspace(workspaceId, config as any);
-                console.log(`✅ Added server workspace: ${workspaceId} at ${config.path}`);
-              } catch (error) {
-                console.warn(`⚠️ Failed to add workspace ${workspaceId}:`, error instanceof Error ? error.message : String(error));
-              }
-            }
-          }
+          const rootManagerConfig = {
+            defaultRoot: mcpWorkspaceConfig.defaultWorkspace,
+            roots: mcpWorkspaceConfig.additionalWorkspaces
+          };
 
-          // Set the workspace manager on the protocol handler
-          protocolHandler.setWorkspaceManager(workspaceManager);
-          console.log('✅ MCP server workspace manager configured');
+          const rootManager = createRootManager(rootManagerConfig);
+
+          protocolHandler.setRootManager(rootManager);
+          console.log('✅ MCP root manager configured for server workspaces');
         } catch (error) {
-          console.warn('⚠️ Could not initialize server workspace manager:', error instanceof Error ? error.message : String(error));
+          console.warn('⚠️ Could not initialize MCP root manager:', error instanceof Error ? error.message : String(error));
         }
       }
 

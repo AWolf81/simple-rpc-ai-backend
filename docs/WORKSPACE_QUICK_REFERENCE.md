@@ -23,7 +23,7 @@
 ```typescript
 const server = createRpcAiServer({
   serverWorkspaces: {
-    enableAPI: true,  // Default: true
+    enabled: true,  // Default: false
 
     templates: {
       path: '/opt/templates',
@@ -120,7 +120,7 @@ serverWorkspaces: {
 ### Development Environment
 ```typescript
 serverWorkspaces: {
-  enableAPI: true,
+  enabled: true,
   examples: { path: './examples', readOnly: true },
   playground: { path: './playground', readOnly: false }
 }

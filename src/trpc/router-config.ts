@@ -5,6 +5,9 @@
  * are included in the generated tRPC methods documentation.
  */
 
+import { WorkspaceManager } from '../services/resources/workspace-manager';
+import type { WorkspaceManagerConfig, ServerWorkspaceConfig } from '../services/resources/workspace-manager';
+
 export interface TRPCGenerationConfig {
   /**
    * AI router configuration
@@ -55,13 +58,46 @@ export interface TRPCGenerationConfig {
   admin?: {
     enabled: boolean;
     includeInGeneration?: boolean;
-  };
+  };  
 
   /**
    * Namespace whitelist for filtering tools/methods
    * If specified, only tools from these namespaces will be included
    */
   namespaceWhitelist?: string[];
+
+  /**
+   * Optional server workspace configuration for generation
+   */
+  serverWorkspaces?: {
+    enabled?: boolean;
+    defaultWorkspace?: {
+      path?: string;
+      readOnly?: boolean;
+      allowedExtensions?: string[];
+      blockedExtensions?: string[];
+      maxFileSize?: number;
+      allowedPaths?: string[];
+      blockedPaths?: string[];
+      followSymlinks?: boolean;
+      enableWatching?: boolean;
+      watchIgnore?: string[];
+    };
+    additionalWorkspaces?: Record<string, {
+      path: string;
+      name?: string;
+      description?: string;
+      readOnly?: boolean;
+      allowedExtensions?: string[];
+      blockedExtensions?: string[];
+      maxFileSize?: number;
+      allowedPaths?: string[];
+      blockedPaths?: string[];
+      followSymlinks?: boolean;
+      enableWatching?: boolean;
+      watchIgnore?: string[];
+    }>;
+  };
 }
 
 /**
@@ -159,6 +195,15 @@ export function loadTRPCGenerationConfig(): TRPCGenerationConfig {
     config.namespaceWhitelist = whitelist;
   }
 
+  if (process.env.TRPC_GEN_SERVER_WORKSPACES) {
+    try {
+      const parsed = JSON.parse(process.env.TRPC_GEN_SERVER_WORKSPACES);
+      config.serverWorkspaces = parsed;
+    } catch (error) {
+      console.warn('⚠️  Failed to parse TRPC_GEN_SERVER_WORKSPACES. Expected valid JSON.', error);
+    }
+  }
+
   return config;
 }
 
@@ -248,9 +293,57 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
     });
   }
 
+  let workspaceManager: WorkspaceManager | undefined;
+  if (generationConfig.serverWorkspaces?.enabled) {
+    const { defaultWorkspace, additionalWorkspaces } = generationConfig.serverWorkspaces;
+    const workspaceManagerConfig: WorkspaceManagerConfig = {};
+
+    if (defaultWorkspace?.path && defaultWorkspace.path.trim().length > 0) {
+      const normalizedDefault: ServerWorkspaceConfig = {
+        ...defaultWorkspace,
+        path: defaultWorkspace.path
+      };
+      workspaceManagerConfig.defaultWorkspace = normalizedDefault;
+    } else if (defaultWorkspace) {
+      console.warn('⚠️  serverWorkspaces.defaultWorkspace is defined but missing a path. Ignoring default workspace.');
+    }
+
+    if (additionalWorkspaces) {
+      const validWorkspacesEntries = Object.entries(additionalWorkspaces)
+        .map(([workspaceId, config]) => {
+          if (!config?.path || config.path.trim().length === 0) {
+            console.warn(`⚠️  serverWorkspaces additional workspace "${workspaceId}" is missing a path and will be ignored.`);
+            return null;
+          }
+
+          const normalizedWorkspace: ServerWorkspaceConfig = {
+            ...config,
+            path: config.path
+          };
+
+          return [workspaceId, normalizedWorkspace] as const;
+        })
+        .filter((entry): entry is [string, ServerWorkspaceConfig] => Boolean(entry));
+
+      if (validWorkspacesEntries.length > 0) {
+        workspaceManagerConfig.serverWorkspaces = Object.fromEntries(validWorkspacesEntries);
+      }
+    }
+
+    if (workspaceManagerConfig.defaultWorkspace || workspaceManagerConfig.serverWorkspaces) {
+      try {
+        workspaceManager = new WorkspaceManager(workspaceManagerConfig);
+      } catch (error) {
+        console.warn('⚠️  Failed to initialize generation workspace manager:', error instanceof Error ? error.message : error);
+      }
+    } else {
+      console.warn('⚠️  serverWorkspaces.enabled is true but no valid workspace paths are configured for generation. Skipping workspace manager initialization.');
+    }
+  }
+
   // Always include system router (contains system tools needed for basic operation)
   if (generationConfig.system?.enabled && generationConfig.system?.includeInGeneration) {
-    baseRouters.system = createSystemRouter(undefined);
+    baseRouters.system = createSystemRouter(workspaceManager);
   }
 
   // Include other routers based on configuration

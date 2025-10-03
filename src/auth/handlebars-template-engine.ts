@@ -23,6 +23,10 @@ export interface HandlebarsTemplateConfig {
     secondaryColor?: string;
     backgroundColor?: string;
     textColor?: string;
+    /** Optional footer text override (set to empty string or null to hide) */
+    footerText?: string | null;
+    /** Hide the footer entirely */
+    hideFooter?: boolean;
   };
   
   /** Custom CSS to override default styles */
@@ -73,10 +77,15 @@ export class HandlebarsTemplateEngine {
         secondaryColor: '#005a99',
         backgroundColor: '#ffffff',
         textColor: '#333333',
+        footerText: 'Powered by Simple RPC AI Backend',
+        hideFooter: false,
         ...config.branding
       },
-      darkMode: false,
-      ...config
+      variables: {
+        ...(config.variables || {})
+      },
+      customCSS: config.customCSS,
+      darkMode: config.darkMode ?? false
     };
     
     // Initialize Handlebars with custom helpers
@@ -137,6 +146,14 @@ export class HandlebarsTemplateEngine {
     const viewsDir = path.join(__dirname, '../views');
     const templatePath = path.join(viewsDir, `${templateName}.hbs`);
     
+    const brandingFooterText = this.config.branding?.hideFooter
+      ? null
+      : (this.config.branding?.footerText ?? 'Powered by Simple RPC AI Backend');
+
+    const footerText = typeof brandingFooterText === 'string'
+      ? (brandingFooterText.trim().length > 0 ? brandingFooterText : null)
+      : brandingFooterText;
+
     // Prepare template data with configuration
     const templateData = {
       // Template data
@@ -150,6 +167,7 @@ export class HandlebarsTemplateEngine {
       secondaryColor: this.config.branding?.secondaryColor,
       backgroundColor: this.config.branding?.backgroundColor,
       textColor: this.config.branding?.textColor,
+      footerText,
       
       // Styling
       customCSS: this.config.customCSS || '',
@@ -169,7 +187,26 @@ export class HandlebarsTemplateEngine {
    * Update configuration
    */
   updateConfig(config: HandlebarsTemplateConfig) {
-    this.config = { ...this.config, ...config };
+    this.config = {
+      ...this.config,
+      ...config,
+      branding: {
+        ...this.config.branding,
+        ...config.branding
+      },
+      variables: {
+        ...(this.config.variables || {}),
+        ...(config.variables || {})
+      }
+    };
+
+    // Ensure default footer text is preserved when not explicitly overridden
+    if (this.config.branding && typeof this.config.branding.footerText === 'undefined') {
+      this.config.branding.footerText = 'Powered by Simple RPC AI Backend';
+    }
+    if (this.config.branding && typeof this.config.branding.hideFooter === 'undefined') {
+      this.config.branding.hideFooter = false;
+    }
   }
   
   /**

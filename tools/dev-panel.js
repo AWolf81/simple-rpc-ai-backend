@@ -1289,7 +1289,7 @@ async function setupTRPCPlayground() {
 
           // Create router with custom routers if available
           if (customRouters && Object.keys(customRouters).length > 0) {
-            // Pass customRouters as 10th parameter: createAppRouter(aiConfig, tokenTracking, db, serverProviders, byokProviders, postgresRPC, mcpConfig, modelRestrictions, rootFolders, customRouters)
+            // Pass customRouters as final parameter: createAppRouter(aiConfig, tokenTracking, db, serverProviders, byokProviders, postgresRPC, mcpConfig, modelRestrictions, serverWorkspaces, customRouters)
             schemaRouter = routerModule.createAppRouter(
               undefined,  // aiConfig
               false,      // tokenTrackingEnabled
@@ -1299,7 +1299,7 @@ async function setupTRPCPlayground() {
               undefined,  // postgresRPCMethods
               { enableMCP: true },  // mcpConfig
               undefined,  // modelRestrictions
-              {},         // rootFolders
+              undefined,  // serverWorkspaces
               customRouters  // customRouters (10th parameter)
             );
             console.log('✅ Router loaded via createAppRouter with custom routers:', Object.keys(customRouters));
