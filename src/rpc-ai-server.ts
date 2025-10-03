@@ -281,6 +281,84 @@ export interface RpcAiServerConfig {
     /** Enable file operations via tRPC/MCP */
     enableAPI?: boolean;
   };
+
+  /**
+   * Remote MCP Server Configuration
+   *
+   * Configure external MCP servers to connect to via different transports.
+   * Supports uvx (Python), npx (Node.js), docker, and HTTP/HTTPS.
+   */
+  remoteMcpServers?: {
+    /** Enable remote MCP server connections */
+    enabled?: boolean;
+
+    /** List of remote servers to connect to */
+    servers?: Array<{
+      /** Unique identifier for this server */
+      name: string;
+
+      /** Transport method */
+      transport: 'uvx' | 'npx' | 'docker' | 'http' | 'https';
+
+      /** For uvx/npx: package name to run */
+      command?: string;
+
+      /** For uvx/npx: additional command line arguments */
+      args?: string[];
+
+      /** For uvx/npx/docker: environment variables */
+      env?: Record<string, string>;
+
+      /** For docker: docker image name */
+      image?: string;
+
+      /** For docker: additional container arguments */
+      containerArgs?: string[];
+
+      /** For http/https: remote server URL */
+      url?: string;
+
+      /** For http/https: custom headers */
+      headers?: Record<string, string>;
+
+      /** Authentication configuration */
+      auth?: {
+        type: 'bearer' | 'basic' | 'none';
+        token?: string;
+        username?: string;
+        password?: string;
+      };
+
+      /** Auto-start on server initialization */
+      autoStart?: boolean;
+
+      /** Request timeout in milliseconds */
+      timeout?: number;
+
+      /** Number of retries on connection failure */
+      retries?: number;
+    }>;
+
+    /** Security scanning configuration */
+    security?: {
+      /** Enable security scanning on startup (default: true) */
+      enableStartupScan?: boolean;
+
+      /** Block server start if high-risk packages detected (default: false) */
+      blockOnHighRisk?: boolean;
+
+      /** Downgrade security level for official Anthropic servers (default: true) */
+      trustAnthropicServers?: boolean;
+
+      /** Custom package security overrides */
+      packageOverrides?: Record<string, 'GREEN' | 'YELLOW' | 'RED' | 'SKIP'>;
+    };
+
+    /** Auto-reconnect settings */
+    autoReconnect?: boolean;
+    reconnectDelay?: number;
+    maxReconnectAttempts?: number;
+  };
 }
 
 /**
@@ -315,6 +393,7 @@ export class RpcAiServer {
   private jsonRpcBridge?: ReturnType<typeof createTRPCToJSONRPCBridge>;
   private oauthServer?: ReturnType<typeof createOAuthServer>['oauth'];
   private oauthStorage?: ReturnType<typeof createOAuthServer>['storage'];
+  private remoteMcpManager?: any; // RemoteMCPManager type
 
   /**
    * Opinionated protocol configuration:
@@ -444,6 +523,21 @@ export class RpcAiServer {
       rootFolders: {
         enableAPI: true,
         ...config.rootFolders
+      },
+
+      // Remote MCP servers configuration
+      remoteMcpServers: {
+        enabled: false,
+        servers: [],
+        security: {
+          enableStartupScan: true,
+          blockOnHighRisk: false,
+          trustAnthropicServers: true,
+        },
+        autoReconnect: true,
+        reconnectDelay: 5000,
+        maxReconnectAttempts: 3,
+        ...config.remoteMcpServers
       },
 
       customRouters: config.customRouters || {},  // Default: no custom routers
@@ -1154,12 +1248,186 @@ export class RpcAiServer {
 
 
 
+  /**
+   * Initialize remote MCP servers with security scanning
+   */
+  private async initializeRemoteMcpServers(): Promise<void> {
+    const config = this.config.remoteMcpServers;
+    if (!config || !config.servers || config.servers.length === 0) {
+      return;
+    }
+
+    console.log('🔐 Initializing remote MCP servers...');
+
+    // Security scanning if enabled (default: true)
+    const securityConfig = config.security || {};
+    const enableStartupScan = securityConfig.enableStartupScan !== false; // Default: true
+    const blockOnHighRisk = securityConfig.blockOnHighRisk || false; // Default: false
+    const trustAnthropicServers = securityConfig.trustAnthropicServers !== false; // Default: true
+
+    if (enableStartupScan) {
+      console.log('🔍 Scanning remote MCP packages for security risks...');
+
+      try {
+        const { scanMCPServerPackage } = await import('./security/mcp-server-scanner.js');
+
+        const scanResults = new Map<string, any>();
+        let hasHighRisk = false;
+        let hasErrors = false;
+
+        // Scan each server package
+        for (const server of config.servers) {
+          // Only scan uvx and npx packages (not docker or HTTP)
+          if (server.transport !== 'uvx' && server.transport !== 'npx') {
+            continue;
+          }
+
+          if (!server.command) {
+            console.warn(`⚠️ Server ${server.name}: No command specified, skipping scan`);
+            continue;
+          }
+
+          // Check for custom override
+          if (securityConfig.packageOverrides?.[server.command] === 'SKIP') {
+            console.log(`⏭️ Server ${server.name}: Skipping scan (configured override)`);
+            continue;
+          }
+
+          try {
+            console.log(`   Scanning ${server.name} (${server.transport}:${server.command})...`);
+            const result = await scanMCPServerPackage(server.command, server.transport);
+            scanResults.set(server.name, result);
+
+            // Calculate total issues
+            const totalIssues = result.redFlags.length + result.yellowFlags.length;
+
+            // Apply custom overrides
+            let finalLevel: 'GREEN' | 'YELLOW' | 'RED' = result.level;
+            const override = securityConfig.packageOverrides?.[server.command];
+            if (override && override !== 'SKIP') {
+              finalLevel = override;
+              console.log(`   📋 Applied security override: ${result.level} → ${finalLevel}`);
+            }
+
+            // Apply Anthropic trust policy
+            const isAnthropicOfficial = result.metadata.name.startsWith('@modelcontextprotocol/') ||
+                                       result.metadata.name.startsWith('anthropic-');
+            if (trustAnthropicServers && isAnthropicOfficial) {
+              if (finalLevel === 'RED') {
+                finalLevel = 'YELLOW';
+                console.log(`   ✅ Downgraded security level: RED → YELLOW (official Anthropic package)`);
+              }
+            }
+
+            // Display result
+            const icon = finalLevel === 'GREEN' ? '✅' : finalLevel === 'YELLOW' ? '⚠️' : '🚨';
+            console.log(`   ${icon} ${server.name}: ${finalLevel} (${result.scannedFiles} files, ${totalIssues} issues)`);
+
+            if (finalLevel === 'RED') {
+              hasHighRisk = true;
+              if (result.redFlags.length > 0) {
+                console.log(`      High-risk patterns detected:`);
+                result.redFlags.slice(0, 3).forEach((flag: any) => {
+                  console.log(`      - ${flag.description} (${flag.file}:${flag.line})`);
+                });
+                if (result.redFlags.length > 3) {
+                  console.log(`      ... and ${result.redFlags.length - 3} more`);
+                }
+              }
+            }
+          } catch (error) {
+            hasErrors = true;
+            console.error(`   ❌ Failed to scan ${server.name}:`, error instanceof Error ? error.message : String(error));
+          }
+        }
+
+        // Check if we should block startup
+        if (hasHighRisk && blockOnHighRisk) {
+          throw new Error(
+            'Server startup blocked: High-risk MCP packages detected. ' +
+            'Set remoteMcpServers.security.blockOnHighRisk=false to bypass this check.'
+          );
+        }
+
+        if (hasHighRisk) {
+          console.warn('⚠️ Warning: One or more high-risk MCP packages detected. Review security scan results above.');
+        } else if (hasErrors) {
+          console.warn('⚠️ Warning: Some packages could not be scanned. They will still be initialized.');
+        } else {
+          console.log('✅ All MCP packages passed security scan');
+        }
+
+      } catch (error) {
+        if (blockOnHighRisk) {
+          throw error; // Re-throw if we're blocking on errors
+        }
+        console.error('❌ MCP security scanning failed:', error instanceof Error ? error.message : String(error));
+        console.warn('⚠️ Continuing with server initialization despite scan failure');
+      }
+    }
+
+    // Initialize RemoteMCPManager
+    try {
+      const { RemoteMCPManager } = await import('./mcp/remote-mcp-manager.js');
+
+      this.remoteMcpManager = new RemoteMCPManager({
+        servers: config.servers.map(server => ({
+          name: server.name,
+          transport: server.transport,
+          command: server.command,
+          args: server.args,
+          env: server.env,
+          image: server.image,
+          containerArgs: server.containerArgs,
+          url: server.url,
+          headers: server.headers,
+          auth: server.auth,
+          autoStart: server.autoStart,
+          timeout: server.timeout,
+          retries: server.retries
+        })),
+        autoConnect: true, // Auto-connect on init
+        retryOnFailure: config.autoReconnect !== false,
+        retryDelay: config.reconnectDelay || 5000,
+        maxRetries: config.maxReconnectAttempts || 3
+      });
+
+      // Setup event handlers
+      this.remoteMcpManager.on('serverConnected', (name: string) => {
+        console.log(`✅ Remote MCP server connected: ${name}`);
+      });
+
+      this.remoteMcpManager.on('serverDisconnected', ({ name, code }: { name: string; code?: number }) => {
+        console.warn(`⚠️ Remote MCP server disconnected: ${name}${code ? ` (exit code: ${code})` : ''}`);
+      });
+
+      this.remoteMcpManager.on('serverError', ({ server, error }: { server: string; error: any }) => {
+        console.error(`❌ Remote MCP server error (${server}):`, error instanceof Error ? error.message : String(error));
+      });
+
+      // Initialize connections
+      await this.remoteMcpManager.initialize();
+
+      const connectedServers = this.remoteMcpManager.getConnectedServers();
+      console.log(`✅ Remote MCP: ${connectedServers.length}/${config.servers.length} servers connected`);
+
+    } catch (error) {
+      console.error('❌ Failed to initialize remote MCP manager:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
   public async start(setupRoutes?: (app: Application) => void): Promise<void> {
     // Initialize OAuth server session storage (if enabled)
     if (this.config.oauth.enabled) {
       await initializeOAuthServer();
     }
-    
+
+    // Initialize remote MCP servers with security scanning
+    if (this.config.remoteMcpServers?.enabled && this.config.remoteMcpServers.servers?.length) {
+      await this.initializeRemoteMcpServers();
+    }
+
     // Setup routes (including OAuth routes)
     await this.setupRoutes();
 

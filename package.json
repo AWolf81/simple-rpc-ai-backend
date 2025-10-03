@@ -53,7 +53,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "simple-rpc-dev-panel": "./dist/tools/dev-panel.js"
+    "simple-rpc-dev-panel": "./dist/tools/dev-panel.js",
+    "check-mcp-security": "./dist/tools/check-mcp-security.js"
   },
   "exports": {
     ".": {
@@ -86,11 +87,13 @@
     "postinstall": "node scripts/safe-build.js || npm run build",
     "prepare": "node scripts/safe-build.js || npm run build",
     "build:trpc-methods": "node tools/generate-trpc-methods.js",
-    "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data dist/tools && cp -r docker/* dist/docker/ 2>/dev/null || true && cp docker-compose.postgres.yml dist/ 2>/dev/null || true && cp .env.postgres.example dist/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true && cp -r src/views/* dist/views/ 2>/dev/null || true && cp -r src/data/* dist/data/ 2>/dev/null || true && cp tools/dev-panel.js dist/tools/dev-panel.js 2>/dev/null || true && cp tools/trpc-playground-fix.js dist/tools/trpc-playground-fix.js 2>/dev/null || true && chmod +x dist/tools/dev-panel.js 2>/dev/null || true",
+    "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data dist/tools && cp -r docker/* dist/docker/ 2>/dev/null || true && cp docker-compose.postgres.yml dist/ 2>/dev/null || true && cp .env.postgres.example dist/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true && cp -r src/views/* dist/views/ 2>/dev/null || true && cp -r src/data/* dist/data/ 2>/dev/null || true && cp tools/dev-panel.js dist/tools/dev-panel.js 2>/dev/null || true && cp tools/trpc-playground-fix.js dist/tools/trpc-playground-fix.js 2>/dev/null || true && chmod +x dist/tools/dev-panel.js dist/tools/check-mcp-security.js 2>/dev/null || true",
     "registry:health": "node tools/registry-health-check.js",
     "models:check": "node tools/registry-update-checker.js",
     "models:review": "echo 'Model review interface coming soon'",
     "models:apply": "echo 'Model apply interface coming soon'",
+    "mcp:check": "tsx src/tools/check-mcp-security.ts",
+    "mcp:scan": "tsx src/tools/check-mcp-security.ts",
     "dev": "tsc --watch",
     "dev:tsx": "tsx --watch src/index.ts",
     "dev:server": "tsx --watch examples/02-mcp-server/server.js",

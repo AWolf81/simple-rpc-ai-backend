@@ -6,7 +6,7 @@
  */
 
 import express from 'express';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, statSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -1661,6 +1661,9 @@ npx simple-rpc-dev-panel</code></pre>
     ])
   );
   const serializedMcpToolIndex = JSON.stringify(mcpToolIndex).replace(/</g, '\\u003c');
+  const serializedMcpToolIndexScript = serializedMcpToolIndex
+    .replace(/`/g, '\\`')
+    .replace(/\$\{/g, '\\${');
 
   // Generate server setup status HTML
   const routerPath = findTrpcRouterFile();
@@ -2494,6 +2497,41 @@ npx simple-rpc-dev-panel</code></pre>
       </div>
 
       <div class="tools-card">
+        <h3>🔐 MCP Security Scanner</h3>
+        <p><small>Scan MCP server packages for security risks before installation</small></p>
+
+        <div style="margin: 1rem 0;">
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input
+              type="text"
+              id="mcp-package-name"
+              placeholder="Package name (e.g., mcp-server-time)"
+              style="flex: 1; padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; font-family: monospace;"
+            />
+            <select
+              id="mcp-package-type"
+              style="padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px;"
+            >
+              <option value="uvx">uvx (Python)</option>
+              <option value="npx">npx (Node.js)</option>
+            </select>
+          </div>
+          <button
+            onclick="scanMCPPackage()"
+            class="copy-btn"
+            style="background: #4299e1; width: 100%;"
+            id="scan-button"
+          >
+            🔍 Scan Package
+          </button>
+        </div>
+
+        <div id="scan-results" style="margin-top: 1rem; display: none;">
+          <!-- Results will be inserted here -->
+        </div>
+      </div>
+
+      <div class="tools-card">
         <h3>ℹ️ Build Info</h3>
         <p><small>Generated from <code>dist/trpc-methods.json</code><br>
         ${new Date(generated).toLocaleString()}</small></p>
@@ -2504,7 +2542,7 @@ npx simple-rpc-dev-panel</code></pre>
   <div class="procedures">
     ${accordionHTML}
   </div>
-  
+
   <script>
     // Configuration from server
     const serverConfig = {
@@ -2515,7 +2553,7 @@ npx simple-rpc-dev-panel</code></pre>
         jsonRpc: '${config.endpoints.jsonRpc}'
       }
     };
-    const mcpToolIndex = ${serializedMcpToolIndex};
+    const mcpToolIndex = ${serializedMcpToolIndexScript};
     const mcpToolIndexLower = Object.fromEntries(Object.entries(mcpToolIndex).map(([key, value]) => [key.toLowerCase(), value]));
 
     function copyToClipboard(elementId) {
@@ -2839,6 +2877,203 @@ npx simple-rpc-dev-panel</code></pre>
     });
 
     window.addEventListener('hashchange', () => handleHashNavigation());
+
+    window.openExtractionInVSCode = async function(targetPath) {
+      const extractionPath = (targetPath || '').trim();
+
+      if (!extractionPath) {
+        alert('Extraction path not available. Try running the scan again.');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/open-in-vscode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: extractionPath })
+        });
+
+        if (!response.ok) {
+          const details = await response.json().catch(() => ({}));
+          throw new Error(details.error || \`Request failed (\${response.status})\`);
+        }
+
+        console.log('VS Code open requested for extraction path:', extractionPath);
+      } catch (error) {
+        console.error('Failed to open extraction path in VS Code:', error);
+        alert(\`Failed to open in VS Code: \${error.message}\`);
+      }
+    };
+
+    // MCP Security Scanner Function - make it globally accessible
+    window.scanMCPPackage = async function() {
+      const packageName = document.getElementById('mcp-package-name').value.trim();
+      const packageType = document.getElementById('mcp-package-type').value;
+      const scanButton = document.getElementById('scan-button');
+      const resultsDiv = document.getElementById('scan-results');
+
+      if (!packageName) {
+        alert('Please enter a package name');
+        return;
+      }
+
+      // Show loading state with animated spinner
+      scanButton.disabled = true;
+      scanButton.textContent = '🔄 Scanning...';
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = \`
+        <div style="text-align: center; padding: 2rem;">
+          <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid #4299e1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+          <p style="color: #718096; margin-top: 1rem;">Downloading and scanning package...</p>
+          <p style="color: #a0aec0; font-size: 0.75rem; margin-top: 0.5rem;">This may take 10-30 seconds</p>
+        </div>
+        <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
+      \`;
+
+      console.log('🔍 Starting MCP security scan:', { packageName, packageType });
+
+      try {
+        const response = await fetch('/api/scan-mcp-package', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ packageName, packageType })
+        });
+
+        console.log('📥 Scan response received:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Scan failed:', errorText);
+          throw new Error(\`Scan failed: \${response.status} \${response.statusText}\`);
+        }
+
+        const result = await response.json();
+        console.log('✅ Scan completed:', result);
+
+        const escapeAttr = (value) => String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        // Format the results
+        const levelColors = {
+          GREEN: { bg: '#d1fae5', border: '#10b981', text: '#065f46', emoji: '✅' },
+          YELLOW: { bg: '#fef3c7', border: '#f59e0b', text: '#78350f', emoji: '⚠️' },
+          RED: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', emoji: '🚨' }
+        };
+
+        const colors = levelColors[result.level] || levelColors.RED;
+
+        let html = \`
+          <div style="background: \${colors.bg}; padding: 1rem; border-radius: 4px; border-left: 4px solid \${colors.border}; color: \${colors.text};">
+            <h4 style="margin: 0 0 0.5rem 0; color: \${colors.text};">\${colors.emoji} \${result.level} - \${result.metadata?.name || packageName}</h4>
+            <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem;">
+              <strong>Version:</strong> \${result.metadata?.version || 'Unknown'}<br>
+              <strong>Language:</strong> \${result.metadata?.language || packageType === 'uvx' ? 'Python' : 'JavaScript'}<br>
+              <strong>Files Scanned:</strong> \${result.scannedFiles || 0}
+            </p>
+        \`;
+
+        if (result.reasons && result.reasons.length > 0) {
+          html += '<ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.875rem;">';
+          result.reasons.forEach(reason => {
+            html += \`<li>\${reason}</li>\`;
+          });
+          html += '</ul>';
+        }
+
+        if (result.redFlags && result.redFlags.length > 0) {
+          html += \`
+            <details style="margin-top: 0.5rem;">
+              <summary style="cursor: pointer; font-weight: bold; font-size: 0.875rem;">🚨 High-Risk Issues (\${result.redFlags.length})</summary>
+              <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.75rem;">
+          \`;
+          result.redFlags.slice(0, 10).forEach(flag => {
+            html += \`<li><code>\${flag.file}:\${flag.line || '?'}</code> - \${flag.description}</li>\`;
+          });
+          if (result.redFlags.length > 10) {
+            html += \`<li><em>... and \${result.redFlags.length - 10} more</em></li>\`;
+          }
+          html += '</ul></details>';
+        }
+
+        if (result.yellowFlags && result.yellowFlags.length > 0 && result.level !== 'RED') {
+          html += \`
+            <details style="margin-top: 0.5rem;">
+              <summary style="cursor: pointer; font-weight: bold; font-size: 0.875rem;">⚠️ Suspicious Patterns (\${result.yellowFlags.length})</summary>
+              <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.75rem;">
+          \`;
+          result.yellowFlags.slice(0, 10).forEach(flag => {
+            html += \`<li><code>\${flag.file}:\${flag.line || '?'}</code> - \${flag.description}</li>\`;
+          });
+          if (result.yellowFlags.length > 10) {
+            html += \`<li><em>... and \${result.yellowFlags.length - 10} more</em></li>\`;
+          }
+          html += '</ul></details>';
+        }
+
+        // Add links to package info and source
+        if (result.metadata) {
+          html += '<p style="margin-top: 0.5rem; font-size: 0.75rem;">';
+
+          // Package registry link
+          if (result.metadata.language === 'python') {
+            html += \`<a href="https://pypi.org/project/\${result.metadata.name}/" target="_blank" style="color: \${colors.text}; margin-right: 1rem;">📦 PyPI Page</a>\`;
+          } else {
+            html += \`<a href="https://www.npmjs.com/package/\${result.metadata.name}" target="_blank" style="color: \${colors.text}; margin-right: 1rem;">📦 npm Page</a>\`;
+          }
+
+          // Local source code link (extracted package)
+          if (result.extractionPath) {
+            const escapedPath = escapeAttr(result.extractionPath);
+            html += \`<button type="button" class="copy-btn" style="background: transparent; color: \${colors.text}; border: 1px solid \${colors.text}; margin-left: 0;" data-path="\${escapedPath}" onclick="openExtractionInVSCode(this.dataset.path)">💻 Open in VS Code</button>\`;
+          }
+
+          html += '</p>';
+        }
+
+        html += '</div>';
+
+        resultsDiv.innerHTML = html;
+
+      } catch (error) {
+        console.error('❌ Scan error:', error);
+        resultsDiv.innerHTML = \`
+          <div style="background: #fee2e2; padding: 1rem; border-radius: 4px; border-left: 4px solid #ef4444; color: #991b1b;">
+            <h4 style="margin: 0 0 0.5rem 0;">❌ Scan Failed</h4>
+            <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem;">\${error.message || 'Unknown error occurred'}</p>
+            <details style="margin-top: 0.5rem; font-size: 0.75rem;">
+              <summary style="cursor: pointer;">Debug Information</summary>
+              <pre style="margin-top: 0.5rem; padding: 0.5rem; background: #fef2f2; border-radius: 2px; overflow-x: auto;">\${JSON.stringify({
+                packageName,
+                packageType,
+                error: error.stack || error.toString()
+              }, null, 2)}</pre>
+            </details>
+            <p style="margin-top: 0.5rem; font-size: 0.75rem;">
+              💡 Check the browser console (F12) for more details
+            </p>
+          </div>
+        \`;
+      } finally {
+        scanButton.disabled = false;
+        scanButton.textContent = '🔍 Scan Package';
+      }
+    }
+
+    // Allow Enter key to trigger scan
+    document.getElementById('mcp-package-name').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        scanMCPPackage();
+      }
+    });
   </script>
 </body>
 </html>
@@ -2873,6 +3108,100 @@ app.get('/ready', (_, res) => {
       status: 'not_ready',
       message: 'Services are still starting up',
       timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// MCP Security Scanner API endpoint
+app.post('/api/open-in-vscode', express.json(), async (req, res) => {
+  try {
+    const targetPath = (req.body && req.body.path) ? String(req.body.path) : '';
+
+    if (!targetPath) {
+      return res.status(400).json({ error: 'Path is required' });
+    }
+
+    const resolvedPath = path.resolve(targetPath);
+
+    if (!existsSync(resolvedPath)) {
+      return res.status(404).json({ error: 'Path not found' });
+    }
+
+    const stats = statSync(resolvedPath);
+    if (!stats.isDirectory()) {
+      return res.status(400).json({ error: 'Path must be a directory' });
+    }
+
+    await new Promise((resolve, reject) => {
+      try {
+        const vscodeProcess = spawn('code', ['--new-window', resolvedPath], {
+          detached: true,
+          stdio: 'ignore'
+        });
+
+        vscodeProcess.once('error', reject);
+        vscodeProcess.once('spawn', () => {
+          vscodeProcess.unref();
+          resolve();
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    console.log(`🆕 Opened VS Code for scanned package at ${resolvedPath}`);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Failed to open extraction path in VS Code:', error);
+    return res.status(500).json({ error: error.message || 'Failed to launch VS Code' });
+  }
+});
+
+app.post('/api/scan-mcp-package', express.json(), async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { packageName, packageType } = req.body;
+
+    console.log(`🔍 [MCP Scan] Starting scan: ${packageName} (${packageType})`);
+
+    if (!packageName || !packageType) {
+      console.warn('⚠️  [MCP Scan] Missing required fields');
+      return res.status(400).json({ error: 'packageName and packageType are required' });
+    }
+
+    if (!['npx', 'uvx'].includes(packageType)) {
+      console.warn(`⚠️  [MCP Scan] Invalid package type: ${packageType}`);
+      return res.status(400).json({ error: 'packageType must be "npx" or "uvx"' });
+    }
+
+    console.log(`📥 [MCP Scan] Importing scanner module...`);
+    // Import the scanner
+    const { scanMCPServerPackage } = await import('../dist/security/mcp-server-scanner.js');
+
+    console.log(`📦 [MCP Scan] Downloading and scanning package...`);
+    // Scan the package
+    const result = await scanMCPServerPackage(packageName, packageType);
+
+    const duration = Date.now() - startTime;
+    console.log(`✅ [MCP Scan] Completed in ${duration}ms: ${result.level} - ${result.scannedFiles} files scanned`);
+
+    res.json(result);
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`❌ [MCP Scan] Failed after ${duration}ms:`, error.message);
+    console.error('Stack trace:', error.stack);
+
+    res.status(500).json({
+      error: error.message || 'Failed to scan package',
+      level: 'RED',
+      reasons: [error.message || 'Unknown error occurred'],
+      redFlags: [],
+      yellowFlags: [],
+      scannedFiles: 0,
+      metadata: {
+        name: req.body.packageName,
+        language: req.body.packageType === 'uvx' ? 'python' : 'javascript'
+      }
     });
   }
 });

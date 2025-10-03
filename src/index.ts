@@ -77,6 +77,16 @@ export { MCPRegistryService, PREDEFINED_MCP_SERVERS } from './services/mcp/mcp-r
 export { MCPAIService } from './services/ai/mcp-ai-service';
 export { RefMCPIntegration, VSCodeRefIntegration } from './services/mcp/ref-mcp-integration';
 
+// Remote MCP Client & Manager - Connect to external MCP servers
+export { RemoteMCPClient, createRemoteMCPClient } from './mcp/remote-mcp-client';
+export { RemoteMCPManager, createRemoteMCPManager } from './mcp/remote-mcp-manager';
+export type { RemoteMCPServerConfig, RemoteMCPTransport, MCPMessage } from './mcp/remote-mcp-client';
+export type { RemoteMCPManagerConfig, RemoteServerStatus } from './mcp/remote-mcp-manager';
+
+// MCP Security Scanner - Scan MCP packages for security risks
+export { scanMCPServerPackage } from './security/mcp-server-scanner';
+export type { SecurityScanResult, SecurityMatch, PackageMetadata } from './security/mcp-server-scanner';
+
 // MCP Resource Registry - Flexible resource system
 export {
   MCPResourceRegistry,
@@ -296,6 +306,19 @@ export type {
 export type {
   MonetizedServerInstance
 } from './monetization/opensaas-server';
+
+// OAuth helpers and template configuration
+export {
+  ExpressOAuthServer,
+  getIdentityProviders,
+  configureOAuthTemplates,
+  createOAuthModel,
+  normalizeUserProfile
+} from './auth/oauth-middleware';
+export type {
+  HandlebarsTemplateConfig,
+  HandlebarsTemplateData
+} from './auth/oauth-middleware';
 
 // Development tools (legacy - use the new dev-panel-api for easier integration)
 // export { startDevPanel, createServerWithDevPanel, checkDevPanelRunning } from './dev-panel';
