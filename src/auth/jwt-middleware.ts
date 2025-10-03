@@ -43,6 +43,7 @@ export type AuthContext =
         tpmLimit: number;
       };
       features: string[];
+      organizationId?: string;
     };
 
 export interface AuthenticatedRequest extends Request {

@@ -32,6 +32,7 @@ import { MCPExtensionConfig } from './mcp/mcp-config.js';
 import { MCPRateLimitConfig } from './security/rate-limiter.js';
 import { SecurityLoggerConfig } from './security/security-logger.js';
 import { AuthEnforcementConfig } from './security/auth-enforcer.js';
+import type { RootManagerConfig, RootFolderConfig } from './services/resources/root-manager.js';
 import { createOAuthServer, initializeOAuthServer, closeOAuthServer } from './auth/oauth-middleware.js';
 import { getTestSafeConfig } from './security/test-helpers.js';
 import { initializeTiming } from './utils/timing.js';
@@ -816,6 +817,7 @@ export class RpcAiServer {
         tpmLimit: payload.tpmLimit,
       },
       features,
+      organizationId: oauthUser.organizationId || undefined,
     };
   }
 
@@ -1582,10 +1584,45 @@ export class RpcAiServer {
         try {
           const { createRootManager } = await import('./services/resources/root-manager.js');
 
-          const rootManagerConfig = {
-            defaultRoot: mcpWorkspaceConfig.defaultWorkspace,
-            roots: mcpWorkspaceConfig.additionalWorkspaces
-          };
+          const rootManagerConfig: RootManagerConfig = {};
+
+          if (mcpWorkspaceConfig.defaultWorkspace?.path && mcpWorkspaceConfig.defaultWorkspace.path.trim().length > 0) {
+            const normalizedDefault: RootFolderConfig = {
+              ...mcpWorkspaceConfig.defaultWorkspace,
+              path: mcpWorkspaceConfig.defaultWorkspace.path.trim()
+            };
+            rootManagerConfig.defaultRoot = normalizedDefault;
+          } else if (mcpWorkspaceConfig.defaultWorkspace) {
+            console.warn('⚠️  MCP root manager default workspace is defined but missing a path. Ignoring default root.');
+          }
+
+          if (mcpWorkspaceConfig.additionalWorkspaces) {
+            const normalizedRoots = Object.fromEntries(
+              Object.entries(mcpWorkspaceConfig.additionalWorkspaces)
+                .map(([rootId, config]) => {
+                  if (!config?.path || config.path.trim().length === 0) {
+                    console.warn(`⚠️  MCP root manager additional workspace "${rootId}" is missing a path and will be ignored.`);
+                    return null;
+                  }
+
+                  const normalizedRoot: RootFolderConfig = {
+                    ...config,
+                    path: config.path.trim()
+                  };
+
+                  return [rootId, normalizedRoot] as const;
+                })
+                .filter((entry): entry is [string, RootFolderConfig] => Boolean(entry))
+            );
+
+            if (Object.keys(normalizedRoots).length > 0) {
+              rootManagerConfig.roots = normalizedRoots;
+            }
+          }
+
+          if (!rootManagerConfig.defaultRoot && !rootManagerConfig.roots) {
+            throw new Error('No valid workspace paths provided for MCP root manager');
+          }
 
           const rootManager = createRootManager(rootManagerConfig);
 

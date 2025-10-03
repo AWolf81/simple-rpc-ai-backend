@@ -22,6 +22,7 @@ import type { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
 import { VirtualTokenService } from '@services/billing/virtual-token-service';
 import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
 import { WorkspaceManager } from '@services/resources/workspace-manager';
+import type { WorkspaceManagerConfig, ServerWorkspaceConfig } from '@services/resources/workspace-manager';
 import { logger } from '../utils/logger.js';
 
 
@@ -94,10 +95,38 @@ export function createAppRouter(
 
     if (hasDefault || hasAdditional) {
       try {
-        const workspaceManagerConfig = {
-          defaultWorkspace: serverWorkspaces.defaultWorkspace,
-          serverWorkspaces: serverWorkspaces.additionalWorkspaces
-        };
+        const workspaceManagerConfig: WorkspaceManagerConfig = {};
+
+        if (hasDefault && serverWorkspaces.defaultWorkspace) {
+          const normalizedDefault: ServerWorkspaceConfig = {
+            ...serverWorkspaces.defaultWorkspace,
+            path: serverWorkspaces.defaultWorkspace.path!.trim()
+          };
+          workspaceManagerConfig.defaultWorkspace = normalizedDefault;
+        }
+
+        if (hasAdditional && serverWorkspaces.additionalWorkspaces) {
+          const normalizedAdditional = Object.fromEntries(
+            Object.entries(serverWorkspaces.additionalWorkspaces)
+              .filter(([, config]) => typeof config?.path === 'string' && config.path.trim().length > 0)
+              .map(([workspaceId, config]) => [
+                workspaceId,
+                {
+                  ...config,
+                  path: config.path.trim()
+                } as ServerWorkspaceConfig
+              ])
+          );
+
+          if (Object.keys(normalizedAdditional).length > 0) {
+            workspaceManagerConfig.serverWorkspaces = normalizedAdditional;
+          }
+        }
+
+        if (!workspaceManagerConfig.defaultWorkspace && !workspaceManagerConfig.serverWorkspaces) {
+          throw new Error('No valid workspace paths provided');
+        }
+
         workspaceManager = new WorkspaceManager(workspaceManagerConfig);
       } catch (error) {
         logger.warn('⚠️  Failed to initialize server workspace manager:', error instanceof Error ? error.message : error);
