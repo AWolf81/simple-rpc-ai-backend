@@ -8,6 +8,7 @@
 import * as winston from 'winston';
 import { Client } from 'pg';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { redactEmail } from '../../utils/redact';
 
 export interface PostgreSQLConfig {
   host: string;
@@ -101,7 +102,7 @@ export class PostgreSQLSecretManager {
       const result = await this.client.query(query, [userId, secretKey, encryptedValue, provider, email]);
       const secretId = result.rows[0].id;
 
-      this.logger.info('User API key stored successfully', { userId, provider, secretId });
+      this.logger.info('User API key stored successfully', { userId: redactEmail(email), provider, secretId });
       await this.logSecretAccess(email, 'STORE_KEY', true, provider);
 
       return {
@@ -146,7 +147,7 @@ export class PostgreSQLSecretManager {
       // Decrypt the API key
       const apiKey = await this.decrypt(result.rows[0].encrypted_value);
 
-      this.logger.info('User API key retrieved successfully', { userId, provider });
+      this.logger.info('User API key retrieved successfully', { userId: redactEmail(email), provider });
       await this.logSecretAccess(email, 'RETRIEVE_KEY', true, provider);
 
       return {
@@ -180,7 +181,7 @@ export class PostgreSQLSecretManager {
       const result = await this.client.query(query, [userId]);
       const providers = result.rows.map(row => row.provider);
 
-      this.logger.info('User providers retrieved', { userId, providers });
+      this.logger.info('User providers retrieved', { userId: redactEmail(email), providers });
       await this.logSecretAccess(email, 'LIST_PROVIDERS', true);
 
       return {
@@ -223,7 +224,7 @@ export class PostgreSQLSecretManager {
         };
       }
 
-      this.logger.info('User API key deleted successfully', { userId, provider });
+      this.logger.info('User API key deleted successfully', { userId: redactEmail(email), provider });
       await this.logSecretAccess(email, 'DELETE_KEY', true, provider);
 
       return {
@@ -273,7 +274,7 @@ export class PostgreSQLSecretManager {
           break;
       }
 
-      this.logger.info('User API key validation complete', { email, provider, valid: isValidFormat });
+      this.logger.info('User API key validation complete', { email: redactEmail(email), provider, valid: isValidFormat });
       await this.logSecretAccess(email, 'VALIDATE_KEY', true, provider);
 
       return {

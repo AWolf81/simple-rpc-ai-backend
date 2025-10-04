@@ -8,7 +8,22 @@
  */
 
 import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { join, resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Load RC configuration file if present
+const isInDist = dirname(fileURLToPath(import.meta.url)).includes('/dist/tools');
+const rcConfigPath = isInDist
+  ? '../config/rc-loader.js'  // From dist/tools/ -> dist/config/
+  : '../dist/config/rc-loader.js';  // From tools/ -> dist/config/
+
+try {
+  const { loadRCConfig, applyToEnv } = await import(rcConfigPath);
+  const rcConfig = loadRCConfig();
+  applyToEnv(rcConfig);
+} catch (error) {
+  // RC config is optional - silently ignore if not available
+}
 
 // Configure base URL for generated endpoints
 const baseUrl = `http://localhost:${process.env.AI_SERVER_PORT || 8000}`;
@@ -30,10 +45,19 @@ function zWithSource(schema, filePath, lineNumber) {
 
 console.log('🔨 Generating tRPC methods documentation...');
 
+// Check if we're in the source tree (has src/trpc/routers)
+const isInSourceTree = existsSync('src/trpc/routers');
+
 async function extractTRPCMethods() {
   try {
     // Import the router configuration after TypeScript compilation
-    const { createRouterForGeneration, loadTRPCGenerationConfig } = await import('../dist/trpc/router-config.js');
+    // If running from dist/tools/, go up one level. If from tools/, go up one then into dist
+    const isInDist = dirname(fileURLToPath(import.meta.url)).includes('/dist/tools');
+    const configPath = isInDist
+      ? '../trpc/router-config.js'  // From dist/tools/ -> dist/trpc/
+      : '../dist/trpc/router-config.js';  // From tools/ -> dist/trpc/
+
+    const { createRouterForGeneration, loadTRPCGenerationConfig } = await import(configPath);
 
     // Load base configuration from environment variables
     let config = loadTRPCGenerationConfig();
@@ -42,11 +66,16 @@ async function extractTRPCMethods() {
     const customServerPath = process.env.TRPC_GEN_CUSTOM_ROUTERS;
     if (customServerPath) {
       try {
-        const serverModule = await import(resolve(customServerPath));
+        // Resolve path from current working directory
+        const resolvedPath = customServerPath.startsWith('/') || customServerPath.startsWith('file://')
+          ? customServerPath
+          : resolve(process.cwd(), customServerPath);
+
+        const serverModule = await import(resolvedPath);
 
         // Try to extract server config if available (look for createRpcAiServer call)
         // Read the file to parse the config (since it's not exported)
-        const serverFileContent = readFileSync(resolve(customServerPath), 'utf8');
+        const serverFileContent = readFileSync(resolvedPath, 'utf8');
 
         // Extract MCP config from the file content
         const mcpEnabledMatch = serverFileContent.match(/mcp:\s*\{[^}]*enabled:\s*(true|false)/);
@@ -156,7 +185,10 @@ async function extractTRPCMethods() {
           }
         }
       } catch (e) {
-        console.log(`Could not find line number for ${procedureName} in ${sourceFile}:`, e.message);
+        // Only log if we're in the source tree
+        if (isInSourceTree) {
+          console.log(`Could not find line number for ${procedureName} in ${sourceFile}:`, e.message);
+        }
       }
       
       return null; // Line not found
@@ -298,7 +330,10 @@ async function extractTRPCMethods() {
           }
         }
       } catch (e) {
-        console.log(`Could not find ${schemaType} line number for ${procedureName} in ${fileToSearch}:`, e.message);
+        // Only log if we're in the source tree
+        if (isInSourceTree) {
+          console.log(`Could not find ${schemaType} line number for ${procedureName} in ${fileToSearch}:`, e.message);
+        }
       }
       
       return null; // Line not found

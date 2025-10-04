@@ -10,6 +10,7 @@ import { AuthEnforcer, getDefaultAuthEnforcer } from '../../../security/auth-enf
 import { MCPRouterConfig, MCPAuthConfig } from './types';
 import { mcpResourceRegistry } from '../../../services/resources/mcp/mcp-resource-registry.js';
 import { logger } from '../../../utils/logger.js';
+import { redactEmail } from '../../../utils/redact.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -768,7 +769,7 @@ export class MCPProtocolHandler {
           inputSchema: tool.inputSchema
         }));
 
-      logger.debug(`MCP tools/list: ${availableTools.length} tools available (user: ${userInfo?.email || 'anonymous'})`);
+      logger.debug(`MCP tools/list: ${availableTools.length} tools available (user: ${redactEmail(userInfo?.email)})`);
 
       return {
         jsonrpc: '2.0',
@@ -1437,7 +1438,7 @@ export class MCPProtocolHandler {
         );
       }
 
-      console.log(`📖 MCP Resource Read: ${uri} (user: ${req?.user?.email || 'anonymous'})`);
+      console.log(`📖 MCP Resource Read: ${uri} (user: ${redactEmail(req?.user?.email)})`);
 
       // Extract user info for permission checks
       const userInfo = this.extractUserInfo(req);
@@ -1745,7 +1746,7 @@ export class MCPProtocolHandler {
         });
       }
 
-      console.log(`📋 MCP resources/templates/list: Found ${templateList.length} accessible templates (user: ${userInfo?.email || 'anonymous'})`);
+      console.log(`📋 MCP resources/templates/list: Found ${templateList.length} accessible templates (user: ${redactEmail(userInfo?.email)})`);
 
       return {
         jsonrpc: '2.0',

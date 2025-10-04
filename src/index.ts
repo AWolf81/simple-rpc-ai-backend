@@ -87,6 +87,14 @@ export type { RemoteMCPManagerConfig, RemoteServerStatus } from './mcp/remote-mc
 export { scanMCPServerPackage } from './security/mcp-server-scanner';
 export type { SecurityScanResult, SecurityMatch, PackageMetadata } from './security/mcp-server-scanner';
 
+// Extension OAuth - Simplified OAuth for browser/VS Code extensions
+export {
+  createExtensionOAuthHandler,
+  encodeOAuthState,
+  decodeOAuthState,
+} from './auth/extension-oauth';
+export type { ExtensionOAuthConfig } from './auth/extension-oauth';
+
 // MCP Resource Registry - Flexible resource system
 export {
   MCPResourceRegistry,

@@ -7,16 +7,146 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 
-Secure, platform-agnostic AI backend with **system prompt protection** for enterprise environments. Works behind corporate firewalls with zero client-side configuration.
+Secure, platform-agnostic AI backend with **system prompt protection** for enterprise environments.
+
+**🏷️ Status: Early Access (v0.1.0)** - Core features are functional and tested, but the API may evolve based on user feedback. Production use is possible but recommended with thorough testing in your environment first.
 
 **Key Features:**
 - 🔐 Server-side system prompts (no client exposure)
 - 🌐 Multi-protocol: JSON-RPC, tRPC, MCP (Model Context Protocol)
 - 🔑 Encrypted API key storage (AES-256-GCM)
-- 🚀 Progressive authentication (anonymous → OAuth → Pro)
-- 🏢 Corporate proxy bypass
+- 🔒 OAuth authentication (Google, GitHub) for extensions and MCP
+- 🏢 Corporate proxy bypass for client side apps
 - 🤖 1,700+ AI models from 33+ providers
 - 🧩 Custom router extensions with MCP auto-discovery
+
+## 💡 Why This Package?
+
+**Problem**: Client-side AI exposes system prompts through network inspection, proxies, or browser DevTools
+**Solution**: Server-side AI backend keeps prompts secure + works with any network environment
+**Use Cases**: VS Code extensions, web apps, CLI tools, MCP servers
+
+## 🛠️ Consumer Tools
+
+The package includes these binaries for development and deployment:
+
+### `simple-rpc-dev-panel`
+**Interactive API explorer with live testing**
+- 📊 Visual interface for all tRPC procedures
+- 🎮 Live tRPC playground with IntelliSense
+- 🔍 MCP scanner for security analysis (Alpha - experimental)
+- 📝 Auto-generated API documentation
+
+```bash
+npx simple-rpc-dev-panel
+# Opens at http://localhost:8080
+```
+
+Config via `.simplerpcaibackendrc`:
+```json
+{
+  "devPanel": {
+    "port": 8080,
+    "autoOpenBrowser": true
+  }
+}
+```
+
+### `simple-rpc-gen-methods`
+**Generate tRPC method documentation**
+- 🔧 Configurable router filtering
+- 📄 Generates `dist/trpc-methods.json` for dev panel
+- 🎯 Smart defaults (AI + MCP enabled)
+
+```bash
+npx simple-rpc-gen-methods
+```
+
+Config via `.simplerpcaibackendrc`:
+```json
+{
+  "trpcMethodGen": {
+    "customRoutersPath": "./methods/index.js",
+    "enableAI": true,
+    "enableMCP": true,
+    "enableSystem": false
+  }
+}
+```
+
+### `check-mcp-security` (Experimental)
+**Scan MCP servers for security issues**
+- 🔒 Detects unsafe tool configurations
+- ⚠️ Identifies potential data leaks
+- 📋 Generates security reports
+
+```bash
+npx check-mcp-security --url http://localhost:8000/mcp
+```
+
+**Status:** Experimental - Not recommended for production use yet. Use dev panel MCP scanner (Alpha) for interactive testing.
+
+### Screenshots
+
+**Dev Panel - API Explorer**
+![Dev Panel Screenshot](docs/images/dev_panel_screenshot_2025-10-04%2023-07-11.png)
+*Interactive API explorer with live testing and auto-generated documentation*
+
+**tRPC Playground**
+![tRPC Playground Screenshot](docs/images/trpc_playground_screenshot_2025-10-04%2023-11-12.png)
+*Type-safe tRPC testing with IntelliSense and full custom router support*
+→ [sachinraja/trpc-playground](https://github.com/sachinraja/trpc-playground)
+
+**MCP Inspector (MCP Jam)**
+![MCP Jam Screenshot](docs/images/mcp_jam_screenshot_2025-10-04%2023-09-28.png)
+*Live MCP tool discovery and testing with protocol compliance verification*
+→ [MCPJam/inspector](https://github.com/MCPJam/inspector)
+
+---
+
+## 🎯 Reference Projects
+
+### MCP Browser Playground *(Coming Soon)*
+**Live browser preview with AI chat integration**
+
+An MCP server that bridges AI chat clients with CodeSandbox, providing live browser previews directly in your development workflow.
+
+**Features:**
+- 🌐 Connect any AI chat client to CodeSandbox via MCP
+- 👀 Live browser preview in a browser extension
+- 🔧 Real-time code editing with instant feedback
+- 🤖 AI-powered development workflow
+
+**Repository:** *(Link will be added soon)*
+
+Built with `simple-rpc-ai-backend` to demonstrate:
+- Custom MCP server implementation
+- Browser extension integration
+- Real-time collaboration features
+- AI-powered development tools
+
+---
+
+## 📋 TODOS
+- [x] JSON-RPC server
+- [x] tRPC methods
+- [x] AI service integration
+- [x] Dev panel + playgrounds (OpenRPC + tRPC playground)
+- [x] MCP protocol implementation
+- [x] MCP OAuth authentication
+- [x] Extension OAuth (generic OAuth callback handler)
+- [x] `.simplerpcaibackendrc` configuration file
+- [x] Consumer-friendly defaults and tooling
+- [ ] Progressive authentication (anonymous → OAuth → Pro) for VS Code extensions
+- [ ] Bring-your-own key testing (CRUD and usage)
+- [ ] MCP remote servers support
+- [ ] Billing & token tracking system
+- [ ] OpenSaaS JWT handling for user auth
+- [ ] PostgreSQL for billing persistence
+- [ ] MCP security scanner improvements (dev panel + bin tool)
+- [ ] Test examples 03 to 07 - mainly worked with example 02-mcp-server
+- [ ] Test coverage increase (→ 60% - 80%+)
+- [ ] API stability for 1.0.0 release
 
 ## 🚀 Quick Start
 
@@ -34,6 +164,43 @@ const server = createRpcAiServer({
 });
 await server.start();
 // Server running at http://localhost:8000
+```
+
+**Try it with curl:**
+
+```bash
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "ai.generateText",
+    "params": {
+      "content": "Explain quantum computing in simple terms",
+      "provider": "anthropic",
+      "model": "claude-3-5-sonnet-20241022"
+    },
+    "id": 1
+  }'
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "text": "Quantum computing is a new type of computing that uses the principles of quantum mechanics...",
+    "usage": {
+      "inputTokens": 12,
+      "outputTokens": 156,
+      "totalTokens": 168
+    },
+    "model": "claude-3-5-sonnet-20241022",
+    "provider": "anthropic",
+    "finishReason": "stop"
+  },
+  "id": 1
+}
 ```
 
 ## 📋 Installation
@@ -93,7 +260,7 @@ const server = createRpcAiServer({
   },
   aiLimits: AI_LIMIT_PRESETS.standard,
   mcp: {
-    enableMCP: true,
+    enabled: true,
     ai: { enabled: true, useServerConfig: true }
   }
 });
@@ -244,19 +411,38 @@ greet: publicProcedure
 ```typescript
 const server = createRpcAiServer({
   mcp: {
-    enableMCP: true,
+    enabled: true,                       // Enable MCP server
     auth: {
       requireAuthForToolsList: false,    // Public discovery
       requireAuthForToolsCall: true      // Protected execution
     },
     ai: {
-      enabled: true,                     // AI-powered tools
-      useServerConfig: true,             // Inherit AI config
-      restrictToSampling: true           // Security: sampling only
+      // AI-Powered MCP Tools Configuration
+      enabled: false,                    // Default: false - explicit opt-in required
+      useServerConfig: true,             // Default: true - use same AI providers as ai.generateText
+      restrictToSampling: true,          // Default: true - only MCP sampling tools can use AI
+      allowByokOverride: false           // Default: false - server API keys only (secure)
     }
   }
 });
 ```
+
+**MCP AI Tools - What They Do:**
+- **When `ai.enabled: false`** (default): MCP protocol works, but AI-powered tools are disabled
+  - ❌ `generateWithApproval` - Shows helpful error with config instructions
+  - ✅ `requestElicitation` - Works (no AI needed, pure workflow)
+  - ✅ All other MCP tools - Work normally
+
+- **When `ai.enabled: true`**: Enables AI content generation via MCP sampling protocol
+  - ✅ `generateWithApproval` - Real AI generation using server's configured providers
+  - `restrictToSampling: true` - Only MCP sampling tools use AI (recommended for security)
+  - `useServerConfig: true` - Uses same API keys/providers as `ai.generateText`
+  - `allowByokOverride: false` - Prevents BYOK API keys in MCP calls (secure default)
+
+**When to Use:**
+- **Most apps**: Keep `ai.enabled: false` - MCP protocol without AI-powered generation
+- **AI workflows**: Set `ai.enabled: true` - Enable MCP sampling for AI content generation
+- **Cost control**: Use `useServerConfig: false` + `mcpProviders` to set budget models for MCP
 
 **MCP Roots vs Server Workspaces:**
 - **MCP Roots**: Client-managed folders (user's workspace) - discovered via `roots/list`
@@ -534,12 +720,6 @@ pnpm build && pnpm test:coverage && pnpm typecheck
 ## 📄 License
 
 MIT - see [LICENSE](./LICENSE)
-
-## 💡 Why This Package?
-
-**Problem**: Enterprise AI needs system prompt protection + corporate proxy bypass  
-**Solution**: Server-side AI backend with encrypted keys + standard HTTPS  
-**Use Cases**: VS Code extensions, web apps, CLI tools, MCP servers
 
 ---
 

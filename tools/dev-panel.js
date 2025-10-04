@@ -2497,8 +2497,8 @@ npx simple-rpc-dev-panel</code></pre>
       </div>
 
       <div class="tools-card">
-        <h3>🔐 MCP Security Scanner</h3>
-        <p><small>Scan MCP server packages for security risks before installation</small></p>
+        <h3>🔐 MCP Security Scanner <span style="color: #ff9800; font-size: 0.8em;">(Alpha)</span></h3>
+        <p><small>Scan MCP server packages for security risks before installation - Experimental feature under active development</small></p>
 
         <div style="margin: 1rem 0;">
           <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">

@@ -126,7 +126,19 @@ export interface RpcAiServerConfig {
       };
     };
   };
-  
+
+  // Extension OAuth (Simplified OAuth for browser/VS Code extensions)
+  extensionOAuth?: {
+    enabled?: boolean;                    // Enable extension OAuth callback handler (default: false)
+    isExtensionOAuth?: (stateData: any) => boolean;  // Custom detection function (default: checks state.isExtensionAuth)
+    onUserAuthenticated?: (stateData: any, userId: string, userInfo: { email?: string; provider: string; [key: string]: any }) => void | Promise<void>;
+    tokenExchangeHandlers?: {             // Custom token exchange per provider
+      [provider: string]: (code: string, callbackUrl: string) => Promise<{ userId: string; email?: string; [key: string]: any }>;
+    };
+    successTemplate?: (user: any, stateData: any) => string;  // Custom success HTML
+    errorTemplate?: (error: string, stateData?: any) => string;  // Custom error HTML
+  };
+
   // Network settings
   cors?: {
     origin?: string | string[];
@@ -884,14 +896,17 @@ export class RpcAiServer {
 
     // Configuration endpoint for development tools
     this.app.get('/config', (_req: Request, res: Response) => {
+      // Use OAUTH_BASE_URL if available (e.g., for ngrok, tunneling services)
+      const baseUrl = process.env.OAUTH_BASE_URL || `http://localhost:${this.config.port}`;
+
       res.json({
         port: this.config.port,
-        baseUrl: `http://localhost:${this.config.port}`,
+        baseUrl: baseUrl,
         endpoints: {
-          health: `http://localhost:${this.config.port}${this.config.paths.health}`,
-          jsonRpc: this.config.protocols.jsonRpc ? `http://localhost:${this.config.port}${this.config.paths.jsonRpc}` : null,
-          tRpc: this.config.protocols.tRpc ? `http://localhost:${this.config.port}${this.config.paths.tRpc}` : null,
-          mcp: this.config.mcp?.enabled ? `http://localhost:${this.config.port}/mcp` : null,
+          health: `${baseUrl}${this.config.paths.health}`,
+          jsonRpc: this.config.protocols.jsonRpc ? `${baseUrl}${this.config.paths.jsonRpc}` : null,
+          tRpc: this.config.protocols.tRpc ? `${baseUrl}${this.config.paths.tRpc}` : null,
+          mcp: this.config.mcp?.enabled ? `${baseUrl}/mcp` : null,
         },
         protocols: {
           jsonRpc: this.config.protocols.jsonRpc,
@@ -1066,6 +1081,15 @@ export class RpcAiServer {
       
       // Identity provider login routes
       this.app.get('/login/:provider', handleProviderLogin);
+
+      // Extension OAuth handler (intercepts before regular callback if enabled)
+      if (this.config.extensionOAuth?.enabled) {
+        const { createExtensionOAuthHandler } = await import('./auth/extension-oauth.js');
+        const extensionOAuthHandler = createExtensionOAuthHandler(this.config.extensionOAuth);
+        this.app.get('/callback/:provider', extensionOAuthHandler);
+      }
+
+      // Regular OAuth callback (for MCP, etc.)
       this.app.get('/callback/:provider', handleProviderCallback);
       
       // OAuth Authorization Endpoint with pre-authentication check

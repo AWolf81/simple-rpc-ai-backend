@@ -7,6 +7,7 @@
 
 import { PostgreSQLSecretManager, PostgreSQLConfig } from '@services/security/PostgreSQLSecretManager';
 import * as winston from 'winston';
+import { redactEmail } from '../utils/redact';
 
 export interface VaultOperationResult {
   success: boolean;
@@ -58,13 +59,13 @@ export class PostgreSQLRPCMethods {
     try {
       const { email, provider, apiKey } = params;
       
-      this.logger.info('Storing user API key', { email, provider });
+      this.logger.info('Storing user API key', { email: redactEmail(email), provider });
 
       const result = await this.secretManager.storeUserKey(email, provider, apiKey);
 
       if (result.success) {
         this.logger.info('User API key stored successfully', {
-          email,
+          email: redactEmail(email),
           provider,
           secretId: result.secretId
         });
@@ -108,12 +109,12 @@ export class PostgreSQLRPCMethods {
     try {
       const { email, provider } = params;
       
-      this.logger.info('Retrieving user API key', { email, provider });
+      this.logger.info('Retrieving user API key', { email: redactEmail(email), provider });
 
       const result = await this.secretManager.getUserKey(email, provider);
 
       if (result.success && result.apiKey) {
-        this.logger.info('User API key retrieved successfully', { email, provider });
+        this.logger.info('User API key retrieved successfully', { email: redactEmail(email), provider });
 
         return {
           success: true,
@@ -153,12 +154,12 @@ export class PostgreSQLRPCMethods {
     try {
       const { email } = params;
       
-      this.logger.info('Getting user providers', { email });
+      this.logger.info('Getting user providers', { email: redactEmail(email) });
 
       const result = await this.secretManager.getUserProviders(email);
 
       if (result.success) {
-        this.logger.info('User providers retrieved', { email, providers: result.providers });
+        this.logger.info('User providers retrieved', { email: redactEmail(email), providers: result.providers });
 
         return {
           success: true,
@@ -197,7 +198,7 @@ export class PostgreSQLRPCMethods {
     try {
       const { email, provider } = params;
       
-      this.logger.info('Validating user API key', { email, provider });
+      this.logger.info('Validating user API key', { email: redactEmail(email), provider });
 
       const result = await this.secretManager.validateUserKey(email, provider);
 
@@ -246,12 +247,12 @@ export class PostgreSQLRPCMethods {
     try {
       const { email, provider } = params;
       
-      this.logger.info('Deleting user API key', { email, provider });
+      this.logger.info('Deleting user API key', { email: redactEmail(email), provider });
 
       const result = await this.secretManager.deleteUserKey(email, provider);
 
       if (result.success) {
-        this.logger.info('User API key deleted successfully', { email, provider });
+        this.logger.info('User API key deleted successfully', { email: redactEmail(email), provider });
 
         return {
           success: true,
@@ -323,7 +324,7 @@ export class PostgreSQLRPCMethods {
     try {
       const { email, provider, newApiKey } = params;
       
-      this.logger.info('Rotating user API key', { email, provider });
+      this.logger.info('Rotating user API key', { email: redactEmail(email), provider });
 
       // First check if key exists
       const existingResult = await this.secretManager.getUserKey(email, provider);
@@ -338,7 +339,7 @@ export class PostgreSQLRPCMethods {
       const storeResult = await this.secretManager.storeUserKey(email, provider, newApiKey);
 
       if (storeResult.success) {
-        this.logger.info('User API key rotated successfully', { email, provider });
+        this.logger.info('User API key rotated successfully', { email: redactEmail(email), provider });
 
         return {
           success: true,

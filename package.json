@@ -1,6 +1,6 @@
 {
   "name": "simple-rpc-ai-backend",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Simple RPC client and server for AI-powered VS Code extensions with secure system prompt management",
   "private": true,
   "type": "module",
@@ -54,6 +54,7 @@
   "types": "dist/index.d.ts",
   "bin": {
     "simple-rpc-dev-panel": "./dist/tools/dev-panel.js",
+    "simple-rpc-gen-methods": "./dist/tools/bin/generate-trpc-methods.js",
     "check-mcp-security": "./dist/tools/check-mcp-security.js"
   },
   "exports": {
@@ -80,14 +81,16 @@
   },
   "scripts": {
     "build": "npm run copy-assets && tsc && tsc-alias && npm run build:base",
-    "build:base": "node tools/generate-trpc-methods.js",
+    "build:base": "TRPC_GEN_SYSTEM_ENABLED=true TRPC_GEN_USER_ENABLED=true TRPC_GEN_BILLING_ENABLED=true TRPC_GEN_AUTH_ENABLED=true TRPC_GEN_ADMIN_ENABLED=true node tools/generate-trpc-methods.js",
     "build:mcp": "npm run copy-assets && tsc && tsc-alias && TRPC_GEN_CUSTOM_ROUTERS=examples/02-mcp-server/methods/index.js node tools/generate-trpc-methods.js",
     "build:basic": "npm run copy-assets && tsc && tsc-alias && TRPC_GEN_CUSTOM_ROUTERS=examples/01-basic-server/server.js node tools/generate-trpc-methods.js",
     "build:prod": "npm run build",
     "postinstall": "node scripts/safe-build.js || npm run build",
     "prepare": "node scripts/safe-build.js || npm run build",
+    "release:next": "semantic-release --branches next",
+    "release": "semantic-release",
     "build:trpc-methods": "node tools/generate-trpc-methods.js",
-    "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data dist/tools && cp -r docker/* dist/docker/ 2>/dev/null || true && cp docker-compose.postgres.yml dist/ 2>/dev/null || true && cp .env.postgres.example dist/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true && cp -r src/views/* dist/views/ 2>/dev/null || true && cp -r src/data/* dist/data/ 2>/dev/null || true && cp tools/dev-panel.js dist/tools/dev-panel.js 2>/dev/null || true && cp tools/trpc-playground-fix.js dist/tools/trpc-playground-fix.js 2>/dev/null || true && chmod +x dist/tools/dev-panel.js dist/tools/check-mcp-security.js 2>/dev/null || true",
+    "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data dist/tools dist/tools/bin && cp -r docker/* dist/docker/ 2>/dev/null || true && cp docker-compose.postgres.yml dist/ 2>/dev/null || true && cp .env.postgres.example dist/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true && cp -r src/views/* dist/views/ 2>/dev/null || true && cp -r src/data/* dist/data/ 2>/dev/null || true && cp tools/dev-panel.js dist/tools/dev-panel.js 2>/dev/null || true && cp tools/trpc-playground-fix.js dist/tools/trpc-playground-fix.js 2>/dev/null || true && cp tools/generate-trpc-methods.js dist/tools/generate-trpc-methods.js 2>/dev/null || true && cp tools/bin/generate-trpc-methods.js dist/tools/bin/generate-trpc-methods.js 2>/dev/null || true && chmod +x dist/tools/dev-panel.js dist/tools/generate-trpc-methods.js dist/tools/bin/generate-trpc-methods.js dist/tools/check-mcp-security.js 2>/dev/null || true",
     "registry:health": "node tools/registry-health-check.js",
     "models:check": "node tools/registry-update-checker.js",
     "models:review": "echo 'Model review interface coming soon'",
@@ -212,9 +215,9 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.0",
     "@types/express": "^4.17.0",
-    "@types/node-fetch": "^2.6.4",
     "@types/jsonwebtoken": "^9.0.3",
     "@types/node": "^20.0.0",
+    "@types/node-fetch": "^2.6.4",
     "@types/pg": "^8.15.5",
     "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.0",
@@ -228,6 +231,7 @@
     "node-fetch": ">=2.6.7",
     "prettier": "^3.0.0",
     "rimraf": "^5.0.0",
+    "semantic-release": "^19.0.5",
     "supertest": "^7.1.4",
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.16",

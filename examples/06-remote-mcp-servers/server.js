@@ -100,7 +100,7 @@ const server = createRpcAiServer({
   },
 
   mcp: {
-    enableMCP: true,
+    enabled: true,
     ai: {
       enabled: true,
       useServerConfig: true

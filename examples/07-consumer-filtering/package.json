@@ -1,0 +1,19 @@
+{
+  "name": "consumer-filtering-example",
+  "version": "1.0.0",
+  "description": "Example consumer app with router filtering",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "gen:methods": "npx simple-rpc-gen-methods",
+    "gen:methods:ai-only": "TRPC_GEN_MCP_ENABLED=false npx simple-rpc-gen-methods",
+    "dev-panel": "npx simple-rpc-dev-panel"
+  },
+  "dependencies": {
+    "simple-rpc-ai-backend": "^0.1.0",
+    "zod": "^3.23.0",
+    "@trpc/server": "^11.0.0"
+  }
+}

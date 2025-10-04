@@ -105,6 +105,8 @@ export interface TRPCGenerationConfig {
  */
 export function loadTRPCGenerationConfig(): TRPCGenerationConfig {
   // Start with default configuration
+  // For consuming apps: Only AI and MCP enabled by default (consumer-friendly)
+  // For base library build: Override with env vars to enable all routers
   const defaultConfig: TRPCGenerationConfig = {
     ai: {
       enabled: true,
@@ -119,24 +121,24 @@ export function loadTRPCGenerationConfig(): TRPCGenerationConfig {
       },
     },
     system: {
-      enabled: true,
-      includeInGeneration: true,
+      enabled: false,  // Disabled by default for consumers
+      includeInGeneration: false,
     },
     user: {
-      enabled: true,
-      includeInGeneration: true,
+      enabled: false,  // Disabled by default for consumers
+      includeInGeneration: false,
     },
     billing: {
-      enabled: true,
-      includeInGeneration: true,
+      enabled: false,  // Disabled by default for consumers
+      includeInGeneration: false,
     },
     auth: {
-      enabled: true,
-      includeInGeneration: true,
+      enabled: false,  // Disabled by default for consumers
+      includeInGeneration: false,
     },
     admin: {
-      enabled: true,
-      includeInGeneration: true,
+      enabled: false,  // Disabled by default for consumers
+      includeInGeneration: false,
     },
   };
 

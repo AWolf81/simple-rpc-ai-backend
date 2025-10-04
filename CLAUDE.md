@@ -16,7 +16,7 @@ LOG_LEVEL=info pnpm dev   # Quiet logs (debug/warn/error/silent)
 
 **Mission**: System prompt protection + corporate proxy bypass for enterprise AI
 **Architecture**: JSON-RPC + tRPC + MCP protocols on unified Express server
-**Security**: AES-256-GCM encryption, progressive auth, server-side prompts
+**Security**: AES-256-GCM encryption, OAuth authentication, server-side prompts
 
 
 ## Usage Patterns
@@ -35,7 +35,7 @@ const server = createRpcAiServer({
     project: { path: '/home/user/project', name: 'Project Files', readOnly: false }
   },
   mcp: {
-    enableMCP: true,
+    enabled: true,
     ai: { enabled: true, useServerConfig: true, restrictToSampling: true }
   }
 });
@@ -113,7 +113,7 @@ To use MCP without any AI interaction (automatically hides AI tools from MCP too
 ```typescript
 const server = createRpcAiServer({
   mcp: {
-    enableMCP: true,
+    enabled: true,
     ai: {
       enabled: false          // Disables AI and automatically excludes AI tools from MCP
     }
@@ -158,13 +158,13 @@ Registry tools: `pnpm registry:health`, `pnpm registry:check-updates`
 - Missing `rpc.discover` method implementation
 
 ## Platform Support
-- **VS Code**: Primary target, progressive auth, server detection
+- **VS Code**: Primary target, OAuth authentication, server detection
 - **Web**: Standard HTTP client, CORS support
 - **CLI/Node.js**: Direct integration, full auth support
 
 ## Corporate Deployment
 **Key Features**: Corporate proxy bypass, system prompt protection, zero client setup, centralized control
-**Security**: AES-256-GCM encryption, progressive auth, session isolation
+**Security**: AES-256-GCM encryption, OAuth authentication, session isolation
 
 ## MCP Integration: Dynamic tRPC Tool Exposure
 
@@ -254,7 +254,7 @@ const server = createRpcAiServer({
 
   // MCP roots are discovered dynamically via roots/list call to client
   mcp: {
-    enableMCP: true,
+    enabled: true,
     // Server will call client's roots/list to discover user workspaces
   }
 });
@@ -315,7 +315,7 @@ POST /mcp  // MCP HTTP transport
 ```typescript
 const server = createRpcAiServer({
   mcp: {
-    enableMCP: true,
+    enabled: true,
     auth: {
       requireAuthForToolsList: false,   // tools/list public by default
       requireAuthForToolsCall: true,    // tools/call requires auth
@@ -346,7 +346,7 @@ const server = createRpcAiServer({
 ```typescript
 const server = createRpcAiServer({
   mcp: {
-    enableMCP: true,
+    enabled: true,
     ai: {
       enabled: true,                    // Enable AI for MCP sampling tools (disabled by default)
       useServerConfig: true,            // Use same providers as ai.generateText
@@ -404,7 +404,7 @@ const server = createRpcAiServer({
   },
 
   mcp: {
-    enableMCP: true,
+    enabled: true,
     ai: {
       enabled: true,
       useServerConfig: false,         // Don't inherit from main server config
@@ -472,7 +472,7 @@ app.post('/mcp', handleMCP);         // Model Context Protocol
 ### 🔐 **Security Integration**
 - **System Prompt Protection**: MCP tools don't expose internal prompts
 - **Corporate Proxy Friendly**: Standard HTTPS, no special requirements
-- **Progressive Auth**: Anonymous discovery → JWT authentication for execution
+- **OAuth Authentication**: Anonymous discovery → JWT authentication for execution
 - **Input Validation**: All MCP tool calls validated against tRPC schemas
 
 ## Security & Development Guidelines
@@ -482,7 +482,7 @@ app.post('/mcp', handleMCP);         // Model Context Protocol
 **Pre-PR**: `pnpm build && pnpm test:coverage && pnpm typecheck`
 
 ## Key Principles
-**Security**: System prompt protection, progressive auth, corporate proxy bypass
+**Security**: System prompt protection, OAuth authentication, corporate proxy bypass
 **Platform**: VS Code (primary), web, CLI support
 **Architecture**: JSON-RPC compliance, MCP integration
 
@@ -494,7 +494,7 @@ app.post('/mcp', handleMCP);         // Model Context Protocol
 
 **UI Controls Not Working**: MCP clients may not send parameter changes. Avoid `.optional().default()` - make params required, handle defaults in code.
 
-**Tools Not Discovered**: Check `mcp: { enableMCP: true }`, ensure `.meta({ mcp: {...} })` present, verify build success.
+**Tools Not Discovered**: Check `mcp: { enabled: true }`, ensure `.meta({ mcp: {...} })` present, verify build success.
 
 **Tool Execution Fails**: Check server logs for Zod validation errors, test via tRPC directly.
 
