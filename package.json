@@ -56,7 +56,7 @@
     "build": "npm run copy-assets && tsc && tsc-alias && npm run build:trpc-methods",
     "build:prod": "npm run build",
     "postinstall": "node scripts/safe-build.js || npm run build",
-    "prepare": "husky install && node scripts/safe-build.js || npm run build",
+    "prepare": "husky",
     "build:trpc-methods": "node tools/generate-trpc-methods.js",
     "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data dist/tools && cp -r docker/* dist/docker/ 2>/dev/null || true && cp docker-compose.postgres.yml dist/ 2>/dev/null || true && cp .env.postgres.example dist/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true && cp -r src/views/* dist/views/ 2>/dev/null || true && cp -r src/data/* dist/data/ 2>/dev/null || true && cp tools/dev-panel.js dist/tools/dev-panel.js 2>/dev/null || true && cp tools/trpc-playground-fix.js dist/tools/trpc-playground-fix.js 2>/dev/null || true && chmod +x dist/tools/dev-panel.js 2>/dev/null || true",
     "registry:health": "node tools/registry-health-check.js",
@@ -216,10 +216,5 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/AWolf81/simple-rpc-ai-backend"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "git-branch-is -r \"^((?!master).)*$\""
-    }
   }
 }
