@@ -5,19 +5,37 @@
   "private": true,
   "type": "module",
   "pnpm": {
-    "allowedDeprecatedVersions": {
-      "core-js": "*",
-      "eslint": "*"
+    "overrides": {
+      "nanoid": "^3.3.8",
+      "esbuild": "^0.25.0",
+      "loader-utils": ">=1.4.1",
+      "json-schema": ">=0.4.0",
+      "semantic-release": ">=17.2.3",
+      "trim": ">=0.0.3",
+      "semver-regex": ">=3.1.3",
+      "marked": ">=4.0.10",
+      "node-fetch": ">=2.6.7",
+      "json5": ">=1.0.2",
+      "cross-spawn": ">=6.0.6",
+      "lodash.set": ">=4.3.3",
+      "hono": ">=4.9.6",
+      "postcss": ">=8.4.31",
+      "@octokit/request-error": ">=5.1.1",
+      "vite": "^6.3.6",
+      "@octokit/request": ">=8.4.1",
+      "@octokit/plugin-paginate-rest": ">=9.2.2",
+      "prismjs": ">=1.30.0",
+      "babel-traverse": "npm:@babel/traverse@^7.23.2",
+      "html-parse-stringify2": "npm:html-parse-stringify@^3.0.1"
     },
     "peerDependencyRules": {
       "ignoreMissing": [
-        "react",
-        "react-dom"
-      ]
-    },
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
+        "@trpc/server"
+      ],
+      "allowedVersions": {
+        "trpc-panel>@trpc/server": "11"
+      }
+    }
   },
   "engines": {
     "node": ">=22.18.0",
@@ -38,7 +56,7 @@
     "build": "npm run copy-assets && tsc && tsc-alias && npm run build:trpc-methods",
     "build:prod": "npm run build",
     "postinstall": "node scripts/safe-build.js || npm run build",
-    "prepare": "node scripts/safe-build.js || npm run build",
+    "prepare": "husky install && node scripts/safe-build.js || npm run build",
     "build:trpc-methods": "node tools/generate-trpc-methods.js",
     "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data dist/tools && cp -r docker/* dist/docker/ 2>/dev/null || true && cp docker-compose.postgres.yml dist/ 2>/dev/null || true && cp .env.postgres.example dist/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true && cp -r src/views/* dist/views/ 2>/dev/null || true && cp -r src/data/* dist/data/ 2>/dev/null || true && cp tools/dev-panel.js dist/tools/dev-panel.js 2>/dev/null || true && cp tools/trpc-playground-fix.js dist/tools/trpc-playground-fix.js 2>/dev/null || true && chmod +x dist/tools/dev-panel.js 2>/dev/null || true",
     "registry:health": "node tools/registry-health-check.js",
@@ -158,9 +176,9 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.0",
     "@types/express": "^4.17.0",
-    "@types/node-fetch": "^2.6.4",
     "@types/jsonwebtoken": "^9.0.3",
     "@types/node": "^20.0.0",
+    "@types/node-fetch": "^2.6.4",
     "@types/pg": "^8.15.5",
     "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.0",
@@ -170,6 +188,8 @@
     "cheerio": "^1.1.2",
     "concurrently": "^8.2.2",
     "eslint": "^8.0.0",
+    "git-branch-is": "^4.0.0",
+    "husky": "^9.1.7",
     "lodash": "^4.17.21",
     "node-fetch": ">=2.6.7",
     "prettier": "^3.0.0",
@@ -197,37 +217,9 @@
     "type": "git",
     "url": "https://github.com/AWolf81/simple-rpc-ai-backend"
   },
-  "pnpm": {
-    "overrides": {
-      "nanoid": "^3.3.8",
-      "esbuild": "^0.25.0",
-      "loader-utils": ">=1.4.1",
-      "json-schema": ">=0.4.0",
-      "semantic-release": ">=17.2.3",
-      "trim": ">=0.0.3",
-      "semver-regex": ">=3.1.3",
-      "marked": ">=4.0.10",
-      "node-fetch": ">=2.6.7",
-      "json5": ">=1.0.2",
-      "cross-spawn": ">=6.0.6",
-      "lodash.set": ">=4.3.3",
-      "hono": ">=4.9.6",
-      "postcss": ">=8.4.31",
-      "@octokit/request-error": ">=5.1.1",
-      "vite": "^6.3.6",
-      "@octokit/request": ">=8.4.1",
-      "@octokit/plugin-paginate-rest": ">=9.2.2",
-      "prismjs": ">=1.30.0",
-      "babel-traverse": "npm:@babel/traverse@^7.23.2",
-      "html-parse-stringify2": "npm:html-parse-stringify@^3.0.1"
-    },
-    "peerDependencyRules": {
-      "ignoreMissing": [
-        "@trpc/server"
-      ],
-      "allowedVersions": {
-        "trpc-panel>@trpc/server": "11"
-      }
+  "husky": {
+    "hooks": {
+      "pre-commit": "git-branch-is -r \"^((?!master).)*$\""
     }
   }
 }
