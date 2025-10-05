@@ -79,7 +79,7 @@ const client = createTRPCClient({
 });
 
 // Execute AI request with token tracking
-const result = await client.ai.executeAIRequest.mutate({
+const result = await client.ai.generateText.mutate({
   content: 'Explain quantum computing',
   provider: 'anthropic'
 });

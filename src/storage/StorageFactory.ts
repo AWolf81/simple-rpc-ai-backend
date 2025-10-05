@@ -9,13 +9,11 @@ import {
   StorageAdapter, 
   StorageConfig, 
   PostgreSQLStorageConfig, 
-  FileStorageConfig, 
-  ClientManagedStorageConfig 
+  FileStorageConfig
 } from './StorageAdapter';
 // VaultStorageAdapter removed - using simplified storage
 import { FileStorageAdapter } from './FileStorageAdapter';
 import { ClientManagedStorageAdapter } from './ClientManagedStorageAdapter';
-import { PostgreSQLConfig } from '../services/PostgreSQLSecretManager';
 import * as winston from 'winston';
 import * as path from 'path';
 
@@ -73,7 +71,7 @@ export class StorageFactory {
    * Create PostgreSQL storage adapter
    */
   private static createPostgreSQLStorage(
-    config: PostgreSQLStorageConfig, 
+    config: PostgreSQLStorageConfig,
     logger: winston.Logger
   ): any {
     // PostgreSQL storage adapter implementation would go here

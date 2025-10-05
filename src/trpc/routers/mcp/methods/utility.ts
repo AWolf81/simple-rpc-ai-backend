@@ -1,143 +1,77 @@
-import { publicProcedure } from "../../../index";
-import z from "zod";
+import { publicProcedure } from '../../../index';
+import { z } from 'zod';
 import { createMCPTool } from '../../../../auth/scopes';
 
 /**
  * Basic utility procedures for MCP
+ *
+ * Note: Opinionated utility tools (greeting, time, calculate) have been moved
+ * to example servers to keep core clean and focused on essential functionality.
+ *
+ * The greeting tool is kept here only for test compatibility.
  */
-export const utilityProcedures = {
-  // Greeting tool with MCP metadata - Public tool (no auth required)
+export const utilityProcedures: Record<string, any> = {
+  // Minimal greeting tool for test compatibility
   greeting: publicProcedure
-    .meta({
-      ...createMCPTool({
-        name: 'greeting',
-        description: 'Generate a friendly greeting message for a given name in multiple languages',
-        category: 'utility',
-        public: true // No authentication required
-      }),
-      openapi: {
-        method: 'GET',
-        path: '/mcp/hello',
-        tags: ['MCP', 'Greetings'],
-        summary: 'Generate greeting',
-        description: 'Generate a friendly greeting message for a given name'
-      }
-    })
-    .input(z.object({
-      name: z.string().min(1).describe('The name to greet'),
-      language: z.enum(['en', 'de', 'es']).describe('Language code for the greeting (en=English, de=German, es=Spanish)'),
+    .meta(createMCPTool({
+      name: 'greeting',
+      description: 'Generate a friendly greeting in the specified language',
+      category: 'utility'
     }))
-    .output(z.object({ greeting: z.string() }))
+    .input(z.object({
+      name: z.string().describe('Name to greet'),
+      language: z.enum(['en', 'es', 'fr', 'de']).default('en').describe('Language for the greeting')
+    }))
     .query(({ input }) => {
-      const name = input.name || 'World';
-      const lang = input.language || 'en';
-
-      let greeting: string;
-      switch (lang) {
-        case 'de':
-          greeting = `Hallo ${name}! Willkommen beim Simple RPC AI Backend.`;
-          break;
-        case 'es':
-          greeting = `¡Hola ${name}! Bienvenido al Simple RPC AI Backend.`;
-          break;
-        default:
-          greeting = `Hello ${name}! Welcome to Simple RPC AI Backend.`;
-      }
-
-      return { greeting };
+      const greetings: Record<string, string> = {
+        en: `Hello, ${input.name}!`,
+        es: `¡Hola, ${input.name}!`,
+        fr: `Bonjour, ${input.name}!`,
+        de: `Hallo, ${input.name}!`
+      };
+      return { greeting: greetings[input.language] || greetings.en };
     }),
 
-  // Current system time tool - public utility
+  // Echo tool for test compatibility
+  echo: publicProcedure
+    .meta(createMCPTool({
+      name: 'echo',
+      description: 'Echo back a message',
+      category: 'utility'
+    }))
+    .input(z.object({
+      message: z.string().describe('Message to echo back')
+    }))
+    .query(({ input }) => {
+      return { message: input.message };
+    }),
+
+  // Current system time (useful for testing and debugging)
   currentSystemTime: publicProcedure
-    .meta({
-      ...createMCPTool({
-        name: 'currentSystemTime',
-        description: 'Get the current system time in a specified timezone',
-        category: 'utility',
-        public: true
-      }),
-      openapi: {
-        method: 'GET',
-        path: '/mcp/time',
-        tags: ['MCP', 'Utility'],
-        summary: 'Get current time'
-      }
-    })
-    .input(z.object({
-      timezone: z.string().describe('Timezone identifier (e.g., "UTC", "America/New_York", "Europe/Berlin")'),
+    .meta(createMCPTool({
+      name: 'currentSystemTime',
+      description: 'Get the current system time',
+      category: 'utility'
     }))
-    .output(z.object({
-      time: z.string(),
-      timezone: z.string(),
-      timestamp: z.number()
+    .input(z.object({
+      format: z.enum(['iso', 'timestamp', 'locale']).default('iso').describe('Time format')
     }))
     .query(({ input }) => {
-      const timezone = input.timezone || 'UTC';
       const now = new Date();
+      let time: string | number;
 
-      try {
-        const time = now.toLocaleString('en-US', { timeZone: timezone });
-        return {
-          time,
-          timezone,
-          timestamp: now.getTime()
-        };
-      } catch (error) {
-        // Fallback to UTC if timezone is invalid
-        const time = now.toISOString();
-        return {
-          time,
-          timezone: 'UTC',
-          timestamp: now.getTime()
-        };
+      switch (input.format) {
+        case 'timestamp':
+          time = now.getTime();
+          break;
+        case 'locale':
+          time = now.toLocaleString();
+          break;
+        case 'iso':
+        default:
+          time = now.toISOString();
       }
-    }),
 
-  // Calculator tool with input validation
-  calculate: publicProcedure
-    .meta({
-      ...createMCPTool({
-        name: 'calculate',
-        description: 'Perform basic mathematical calculations safely',
-        category: 'utility',
-        public: true
-      }),
-      openapi: {
-        method: 'POST',
-        path: '/mcp/calculate',
-        tags: ['MCP', 'Utility'],
-        summary: 'Mathematical calculator'
-      }
+      return { time };
     })
-    .input(z.object({
-      expression: z.string().min(1).max(100).describe('Mathematical expression to evaluate (e.g., "2 + 2", "10 * 5")'),
-    }))
-    .output(z.object({
-      result: z.number(),
-      expression: z.string()
-    }))
-    .mutation(({ input }) => {
-      // Simple safe calculator - only allow basic operations
-      const safeExpression = input.expression.replace(/[^0-9+\-*/.() ]/g, '');
-
-      if (!safeExpression || safeExpression !== input.expression) {
-        throw new Error('Invalid expression. Only numbers and basic operators (+, -, *, /, parentheses) are allowed.');
-      }
-
-      try {
-        // Use Function constructor for safer evaluation than eval()
-        const result = Function(`"use strict"; return (${safeExpression})`)();
-
-        if (typeof result !== 'number' || !isFinite(result)) {
-          throw new Error('Expression resulted in an invalid number');
-        }
-
-        return {
-          result,
-          expression: input.expression
-        };
-      } catch (error) {
-        throw new Error(`Calculation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }),
 };

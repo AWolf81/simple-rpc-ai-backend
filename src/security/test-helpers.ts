@@ -128,7 +128,7 @@ export const DISABLED_SECURITY_LOGGING: SecurityLoggerConfig = {
  */
 export function createTestMCPConfig(overrides?: any) {
   return {
-    enableMCP: true,
+    enabled: true,
     transports: {
       http: true,
       stdio: false,

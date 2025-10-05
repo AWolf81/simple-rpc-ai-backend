@@ -8,7 +8,7 @@
 import { router } from '@src-trpc/index';
 import { createAIRouter } from '@src-trpc/routers/ai';
 import type { AIRouterFactoryConfig } from '@src-trpc/routers/ai/types';
-import { AIService } from '@services/ai-service';
+import { AIService } from '@services/ai/ai-service';
 import { createServiceProvidersConfig, createMCPServiceProvidersConfig } from '@src-trpc/routers/ai/types';
 import { createMCPRouter, MCPRouterConfig } from '@src-trpc/routers/mcp/index';
 import { createSystemRouter } from '@src-trpc/routers/system';
@@ -19,10 +19,11 @@ import { createAdminRouter } from '@src-trpc/routers/admin';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { PostgreSQLAdapter } from '@database/postgres-adapter';
 import type { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
-import { VirtualTokenService } from '@services/virtual-token-service';
-import { UsageAnalyticsService } from '@services/usage-analytics-service';
-import { RootManager } from '@services/root-manager';
-import { WorkspaceManager } from '@services/workspace-manager';
+import { VirtualTokenService } from '@services/billing/virtual-token-service';
+import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
+import { WorkspaceManager } from '@services/resources/workspace-manager';
+import type { WorkspaceManagerConfig, ServerWorkspaceConfig } from '@services/resources/workspace-manager';
+import { logger } from '../utils/logger.js';
 
 
 /**
@@ -42,9 +43,37 @@ export function createAppRouter(
     allowedPatterns?: string[];
     blockedModels?: string[];
   }>,
-  rootFolders?: any,
+  serverWorkspaces?: {
+    enabled?: boolean;
+    defaultWorkspace?: {
+      path?: string;
+      readOnly?: boolean;
+      allowedExtensions?: string[];
+      blockedExtensions?: string[];
+      maxFileSize?: number;
+      allowedPaths?: string[];
+      blockedPaths?: string[];
+      followSymlinks?: boolean;
+      enableWatching?: boolean;
+      watchIgnore?: string[];
+    };
+    additionalWorkspaces?: Record<string, {
+      path: string;
+      name?: string;
+      description?: string;
+      readOnly?: boolean;
+      allowedExtensions?: string[];
+      blockedExtensions?: string[];
+      maxFileSize?: number;
+      allowedPaths?: string[];
+      blockedPaths?: string[];
+      followSymlinks?: boolean;
+      enableWatching?: boolean;
+      watchIgnore?: string[];
+    }>;
+  },
   customRouters?: { [namespace: string]: any }
-) {
+): ReturnType<typeof router> {
   // Initialize services if database is available
   let virtualTokenService: VirtualTokenService | null = null;
   let usageAnalyticsService: UsageAnalyticsService | null = null;
@@ -60,57 +89,51 @@ export function createAppRouter(
 
   // Initialize WorkspaceManager for server workspaces
   let workspaceManager: WorkspaceManager | undefined;
-  if (rootFolders?.enableAPI !== false && (rootFolders as any)?.additionalRoots) {
-    // Create workspace manager from serverWorkspaces config
-    workspaceManager = new WorkspaceManager();
+  if (serverWorkspaces?.enabled) {
+    const hasDefault = typeof serverWorkspaces.defaultWorkspace?.path === 'string' && serverWorkspaces.defaultWorkspace.path.trim().length > 0;
+    const hasAdditional = !!serverWorkspaces.additionalWorkspaces && Object.keys(serverWorkspaces.additionalWorkspaces).length > 0;
 
-    // Add workspaces from additionalRoots (which maps to serverWorkspaces in server config)
-    const serverWorkspaces = (rootFolders as any).additionalRoots;
-    if (serverWorkspaces) {
-      for (const [workspaceId, config] of Object.entries(serverWorkspaces)) {
-        try {
-          workspaceManager.addWorkspace(workspaceId, config as any);
-        } catch (error) {
-          console.warn(`Failed to add workspace ${workspaceId}:`, error);
+    if (hasDefault || hasAdditional) {
+      try {
+        const workspaceManagerConfig: WorkspaceManagerConfig = {};
+
+        if (hasDefault && serverWorkspaces.defaultWorkspace) {
+          const normalizedDefault: ServerWorkspaceConfig = {
+            ...serverWorkspaces.defaultWorkspace,
+            path: serverWorkspaces.defaultWorkspace.path!.trim()
+          };
+          workspaceManagerConfig.defaultWorkspace = normalizedDefault;
         }
-      }
-    }
-  }
 
-  // Initialize RootManager for MCP client roots
-  let rootManager: RootManager | undefined;
-  if (rootFolders?.enableAPI !== false) {
-    // Create basic root manager configuration
-    const rootManagerConfig = {
-      defaultRoot: rootFolders?.defaultRoot ? {
-        path: (rootFolders.defaultRoot as any).path || process.cwd(),
-        name: 'Project Root',
-        description: 'Default project root folder',
-        readOnly: (rootFolders.defaultRoot as any).readOnly ?? false,
-        allowedExtensions: (rootFolders.defaultRoot as any).allowedExtensions || ['ts', 'js', 'json', 'md', 'txt', 'yml', 'yaml'],
-        blockedExtensions: ['exe', 'bin', 'so', 'dll'],
-        maxFileSize: 10 * 1024 * 1024,
-        followSymlinks: false,
-        enableWatching: false
-      } : undefined,
-      roots: rootFolders?.additionalRoots ? Object.fromEntries(
-        Object.entries(rootFolders.additionalRoots).map(([id, config]) => [
-          id,
-          {
-            path: (config as any).path,
-            name: (config as any).name || id,
-            description: (config as any).description,
-            readOnly: (config as any).readOnly ?? false,
-            allowedExtensions: (config as any).allowedExtensions,
-            blockedExtensions: (config as any).blockedExtensions || ['exe', 'bin', 'so', 'dll'],
-            maxFileSize: (config as any).maxFileSize || 10 * 1024 * 1024,
-            followSymlinks: false,
-            enableWatching: false
+        if (hasAdditional && serverWorkspaces.additionalWorkspaces) {
+          const normalizedAdditional = Object.fromEntries(
+            Object.entries(serverWorkspaces.additionalWorkspaces)
+              .filter(([, config]) => typeof config?.path === 'string' && config.path.trim().length > 0)
+              .map(([workspaceId, config]) => [
+                workspaceId,
+                {
+                  ...config,
+                  path: config.path.trim()
+                } as ServerWorkspaceConfig
+              ])
+          );
+
+          if (Object.keys(normalizedAdditional).length > 0) {
+            workspaceManagerConfig.serverWorkspaces = normalizedAdditional;
           }
-        ])
-      ) : undefined
-    };
-    rootManager = new RootManager(rootManagerConfig);
+        }
+
+        if (!workspaceManagerConfig.defaultWorkspace && !workspaceManagerConfig.serverWorkspaces) {
+          throw new Error('No valid workspace paths provided');
+        }
+
+        workspaceManager = new WorkspaceManager(workspaceManagerConfig);
+      } catch (error) {
+        logger.warn('⚠️  Failed to initialize server workspace manager:', error instanceof Error ? error.message : error);
+      }
+    } else {
+      logger.warn('⚠️  serverWorkspaces.enabled is true but no workspace paths are configured. Skipping workspace manager initialization.');
+    }
   }
 
   // Create shared AI service instance only if MCP AI is enabled
@@ -139,12 +162,7 @@ export function createAppRouter(
       })()
     : null;
 
-  // Create all routers
-  const mcpRouter = createMCPRouter({
-    auth: mcpConfig?.auth,
-    ai: mcpConfig?.ai,
-    aiService: sharedAIService
-  });
+  // Create routers
   const systemRouter = createSystemRouter(workspaceManager);
   const userRouter = createUserRouter(virtualTokenService, usageAnalyticsService, hybridUserService, byokProviders);
   const billingRouter = createBillingRouter(virtualTokenService, usageAnalyticsService, hybridUserService);
@@ -156,29 +174,39 @@ export function createAppRouter(
     virtualTokenService
   });
 
-  // Only log MCP config if MCP is enabled
-  if (mcpConfig?.enableMCP) {
-    console.log("MCP enabled:", mcpConfig.enableMCP);
-  }
+  const aiRouter = createAIRouter({
+    config: aiConfig,
+    tokenTrackingEnabled,
+    dbAdapter,
+    serverProviders,
+    byokProviders,
+    postgresRPCMethods,
+    modelRestrictions
+  } as any);
 
-  // Create the main app router with proper namespace structure and custom routers
-  const baseRouters = {
-    ai: createAIRouter({
-      config: aiConfig,
-      tokenTrackingEnabled,
-      dbAdapter,
-      serverProviders,
-      byokProviders,
-      postgresRPCMethods,
-      modelRestrictions
-    } as any),
-    mcp: mcpRouter,
+  // Build base routers object
+  const baseRouters: Record<string, any> = {
+    ai: aiRouter,
     system: systemRouter,
     user: userRouter,
     billing: billingRouter,
     auth: authRouter,
     admin: adminRouter
   };
+
+  // Only include MCP router if enabled
+  if (mcpConfig?.enabled !== false) {
+    const mcpRouter = createMCPRouter({
+      auth: mcpConfig?.auth,
+      ai: mcpConfig?.ai,
+      aiService: sharedAIService,
+      namespaceWhitelist: mcpConfig?.namespaceWhitelist
+    });
+    baseRouters.mcp = mcpRouter;
+    logger.debug(`🔧 MCP router included`);
+  } else {
+    logger.debug(`🔧 MCP router excluded (disabled in config)`);
+  }
 
   // Merge custom routers if provided
   const allRouters = customRouters ? { ...baseRouters, ...customRouters } : baseRouters;

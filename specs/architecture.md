@@ -120,7 +120,7 @@ Content-Type: application/json
 
 {
   "jsonrpc": "2.0",
-  "method": "executeAIRequest",
+  "method": "ai.generateText",
   "params": {
     "content": "code to analyze",
     "systemPrompt": "security_review",
@@ -137,7 +137,7 @@ Content-Type: application/json
 - **Type Safety**: End-to-end TypeScript inference
 
 ```typescript
-const result = await client.ai.executeAIRequest.mutate({
+const result = await client.ai.generateText.mutate({
   content: code,           // TypeScript knows this is required
   systemPrompt: 'review',  // Auto-complete available prompts
   options: {
@@ -182,7 +182,7 @@ export const AI_LIMIT_PRESETS = {
 import { RPCClient } from 'simple-rpc-ai-backend';
 
 const client = new RPCClient('http://localhost:8000');
-const result = await client.request('executeAIRequest', {
+const result = await client.request('ai.generateText', {
   content: 'code',
   systemPrompt: 'security_review',
   apiKey: 'user-key'

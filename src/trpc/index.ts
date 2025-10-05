@@ -9,6 +9,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import type { Request, Response } from 'express';
 import { type McpMeta } from "trpc-to-mcp";
+import type { MCPPromptConfig } from '../auth/scopes';
 
 // Extended meta type that supports both MCP and OpenAPI
 export interface ExtendedMeta extends McpMeta {
@@ -23,6 +24,7 @@ export interface ExtendedMeta extends McpMeta {
     supportsProgress?: boolean;
     supportsCancellation?: boolean;
   };
+  mcpPrompt?: MCPPromptConfig; // MCP prompt metadata
 }
 // OpenAPI removed - using custom tRPC methods extraction instead
 import type { AuthenticatedRequest, OpenSaaSJWTPayload } from '@auth/jwt-middleware';
@@ -132,6 +134,15 @@ const t = initTRPC
   .create({
     transformer: superjson,
     errorFormatter({ shape }) {
+      // In production, strip stack traces and internal details
+      if (process.env.NODE_ENV === 'production') {
+        const { stack, path, ...cleanData } = shape.data;
+        return {
+          ...shape,
+          data: cleanData,
+        };
+      }
+      // In development, return full error details for debugging
       return shape;
     },
 });
@@ -142,6 +153,12 @@ const t = initTRPC
  */
 export const router: typeof t.router = t.router;
 export const publicProcedure: typeof t.procedure = t.procedure;
+
+/**
+ * Export the tRPC instance for advanced usage like createCallerFactory
+ * Needed for server-side calls in the JSON-RPC bridge
+ */
+export { t };
 
 /**
  * Protected procedure - requires valid JWT authentication

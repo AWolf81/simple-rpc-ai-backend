@@ -16,21 +16,39 @@ export interface OpenSaaSJWTPayload {
   aud: string; // Our service identifier
 }
 
+export type AuthContext =
+  | {
+      type: 'opensaas';
+      userId: string;
+      email: string;
+      organizationId?: string;
+      subscriptionTier: string;
+      quotaInfo: {
+        monthlyTokenQuota: number;
+        rpmLimit: number;
+        tpmLimit: number;
+      };
+      features: string[];
+    }
+  | {
+      type: 'oauth';
+      userId: string;
+      email?: string;
+      provider?: string;
+      scopes?: string[];
+      subscriptionTier: string;
+      quotaInfo: {
+        monthlyTokenQuota: number;
+        rpmLimit: number;
+        tpmLimit: number;
+      };
+      features: string[];
+      organizationId?: string;
+    };
+
 export interface AuthenticatedRequest extends Request {
   user?: OpenSaaSJWTPayload;
-  authContext?: {
-    type: 'opensaas';
-    userId: string;
-    email: string;
-    organizationId?: string;
-    subscriptionTier: string;
-    quotaInfo: {
-      monthlyTokenQuota: number;
-      rpmLimit: number;
-      tpmLimit: number;
-    };
-    features: string[];
-  };
+  authContext?: AuthContext;
 }
 
 export interface SubscriptionTierConfig {
@@ -67,6 +85,11 @@ export class JWTMiddleware {
    * Express middleware to validate OpenSaaS JWT tokens
    */
   authenticate = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    // If OAuth middleware already authenticated the request, skip JWT validation
+    if (req.authContext?.type === 'oauth') {
+      return next();
+    }
+
     // Skip auth for specific methods if configured
     const rpcMethod = req.body?.method;
     if (rpcMethod && this.config.skipAuthForMethods?.includes(rpcMethod)) {

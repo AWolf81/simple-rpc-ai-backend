@@ -135,8 +135,8 @@ export class MCPConfigBuilder {
     if (!this.config.prompts) this.config.prompts = {};
     if (!this.config.resources) this.config.resources = {};
 
-    this.config.prompts.includeDefaults = includePrompts;
-    this.config.resources.includeDefaults = includeResources;
+    // includeDefaults removed - only custom prompts/resources are supported now
+    // Users should explicitly add prompts/resources they want via customPrompts/customResources
 
     return this;
   }

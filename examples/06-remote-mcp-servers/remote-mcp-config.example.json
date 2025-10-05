@@ -1,0 +1,48 @@
+{
+  "remoteMCPServers": {
+    "time-server": {
+      "name": "time-server",
+      "transport": "uvx",
+      "command": "mcp-server-time",
+      "args": ["--local-timezone=America/New_York"],
+      "autoStart": true
+    },
+    "filesystem-server": {
+      "name": "filesystem-server",
+      "transport": "npx",
+      "command": "@modelcontextprotocol/server-filesystem",
+      "args": ["/home/user/workspace"],
+      "autoStart": true
+    },
+    "docker-time-server": {
+      "name": "docker-time-server",
+      "transport": "docker",
+      "image": "mcp/time",
+      "containerArgs": ["-e", "LOCAL_TIMEZONE=Europe/London"],
+      "autoStart": false
+    },
+    "remote-http-server": {
+      "name": "remote-http-server",
+      "transport": "https",
+      "url": "https://example.com/mcp",
+      "auth": {
+        "type": "bearer",
+        "token": "your-api-token-here"
+      },
+      "autoStart": true
+    },
+    "context7-server": {
+      "name": "context7-server",
+      "transport": "https",
+      "url": "https://api.context7.com/mcp",
+      "auth": {
+        "type": "bearer",
+        "token": "your-context7-api-key"
+      },
+      "headers": {
+        "X-API-Version": "v1"
+      },
+      "autoStart": false
+    }
+  }
+}

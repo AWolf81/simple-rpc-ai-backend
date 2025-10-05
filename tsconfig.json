@@ -9,10 +9,22 @@
 
     // Project-specific settings
     "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"],
       "@services/*": ["src/services/*"],
+      "@services/ai": ["src/services/ai"],
+      "@services/ai/*": ["src/services/ai/*"],
+      "@services/resources": ["src/services/resources"],
+      "@services/resources/*": ["src/services/resources/*"],
+      "@services/mcp": ["src/services/mcp"],
+      "@services/mcp/*": ["src/services/mcp/*"],
+      "@services/billing": ["src/services/billing"],
+      "@services/billing/*": ["src/services/billing/*"],
+      "@services/security": ["src/services/security"],
+      "@services/security/*": ["src/services/security/*"],
       "@auth/*": ["src/auth/*"],
       "@src-trpc/*": ["src/trpc/*"],
       "@database/*": ["src/database/*"],
@@ -30,7 +42,7 @@
     "noImplicitAny": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tools"],
+  "exclude": ["node_modules", "dist", "tools", "src/services/archived"],
   "ts-node": {
     "esm": true
   },

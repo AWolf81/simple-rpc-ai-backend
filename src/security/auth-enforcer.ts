@@ -11,6 +11,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest, OpenSaaSJWTPayload } from '../auth/jwt-middleware';
 import { SecurityLogger, SecurityEventType, SecuritySeverity } from './security-logger';
+import { logger as appLogger } from '../utils/logger.js';
 
 // Resource types for tracking
 export enum ResourceType {
@@ -171,10 +172,10 @@ export class AuthEnforcer {
     if (this.config.enabled) {
       this.usageStats = this.initializeUsageStats();
       this.startAggregationProcess();
-      console.log('✅ Auth enforcement: Authentication enforcer and resource tracker initialized');
+      appLogger.debug('✅ Auth enforcement: Authentication enforcer and resource tracker initialized');
     } else {
       this.usageStats = this.initializeUsageStats(); // Minimal stats even when disabled
-      console.log('ℹ️  Auth enforcement: Disabled (simple mode)');
+      appLogger.debug('ℹ️  Auth enforcement: Disabled (simple mode)');
     }
   }
 
@@ -317,7 +318,7 @@ export class AuthEnforcer {
         
         next();
       } catch (error) {
-        console.error('❌ Auth enforcement: Middleware error:', error);
+        appLogger.error('❌ Auth enforcement: Middleware error:', error);
         next(); // Don't block requests on enforcement errors
       }
     };
@@ -680,7 +681,7 @@ export class AuthEnforcer {
     // Only log if there are actual entries to aggregate
     if (this.resourceUsageLog.length > 0) {
       // This could store aggregated data to database for long-term storage
-      console.log(`📊 Auth enforcement: Aggregated ${this.resourceUsageLog.length} usage entries`);
+      appLogger.debug(`📊 Auth enforcement: Aggregated ${this.resourceUsageLog.length} usage entries`);
     }
   }
 
@@ -698,7 +699,7 @@ export class AuthEnforcer {
     
     const cleaned = initialCount - this.resourceUsageLog.length;
     if (cleaned > 0) {
-      console.log(`🧹 Auth enforcement: Cleaned up ${cleaned} old usage entries`);
+      appLogger.debug(`🧹 Auth enforcement: Cleaned up ${cleaned} old usage entries`);
     }
   }
 

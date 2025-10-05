@@ -152,7 +152,7 @@ describe('RPCClient', () => {
         }
       });
 
-      const result = await client.request('generateText', {
+      const result = await client.request('ai.generateText', {
         content: 'Test user input',
         systemPrompt: 'You are a helpful assistant'
       });

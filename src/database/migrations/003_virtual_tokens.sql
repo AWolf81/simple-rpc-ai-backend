@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS token_usage_log (
   virtual_tokens_deducted INTEGER NOT NULL, -- What we charged user (includes 20% fee)
   platform_fee_tokens INTEGER NOT NULL,     -- 20% platform fee portion
   cost_per_1k_tokens DECIMAL(10,6),         -- For cost analysis
-  method VARCHAR(100),                   -- executeAIRequest, etc
+  method VARCHAR(100),                   -- generateText, etc
   timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES user_token_accounts(user_id) ON DELETE CASCADE
 );

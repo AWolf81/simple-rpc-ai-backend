@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { FunctionRegistry } from '../src/services/function-registry.js';
-import { PromptManager } from '../src/services/prompt-manager.js';
-import { AIService } from '../src/services/ai-service.js';
+import { FunctionRegistry } from '../src/services/ai/function-registry.js';
+import { PromptManager } from '../src/services/ai/prompt-manager.js';
+import { AIService } from '../src/services/ai/ai-service.js';
 
 // Mock the AI service
-vi.mock('../src/services/ai-service.js', () => ({
+vi.mock('../src/services/ai/ai-service.js', () => ({
   AIService: vi.fn().mockImplementation(() => ({
     execute: vi.fn()
   }))

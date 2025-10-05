@@ -49,7 +49,7 @@ I have successfully implemented virtual token tracking with 80/20 split and JWT 
   - `getUsageAnalytics`: Complete usage analytics for both user types
   - `getPurchaseHistory`: Both subscription and one-time purchases
   - `checkRequestEligibility`: Check if user can make requests
-  - Enhanced `executeAIRequest`: Handles both subscription and BYOK flows
+  - Enhanced `ai.generateText`: Handles both subscription and BYOK flows
 
 ### 6. LemonSqueezy Webhook Integration
 - **File**: `src/rpc-ai-server.ts` (webhook handler)
@@ -125,7 +125,7 @@ const server = createRpcAiServer({
 ### Client Usage (Subscription User)
 ```typescript
 // Authenticated request with JWT token
-const result = await rpc.ai.executeAIRequest({
+const result = await rpc.ai.generateText({
   content: "console.log('Hello');",
   systemPrompt: "Review this code",
   // No API key needed - uses platform tokens
@@ -136,7 +136,7 @@ const result = await rpc.ai.executeAIRequest({
 ### Client Usage (BYOK User)
 ```typescript
 // Authenticated request with API key
-const result = await rpc.ai.executeAIRequest({
+const result = await rpc.ai.generateText({
   content: "console.log('Hello');",
   systemPrompt: "Review this code", 
   apiKey: "user-anthropic-key" // User provides their own key

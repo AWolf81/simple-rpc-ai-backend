@@ -3,13 +3,38 @@
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { router, publicProcedure } from '@src-trpc/index';
 import { createMCPTool } from '../../../auth/scopes';
-import { WorkspaceManager, type ServerWorkspaceConfig } from '../../../services/workspace-manager';
+import { WorkspaceManager } from '../../../services/resources/workspace-manager';
 
-export function createSystemRouter(workspaceManager?: WorkspaceManager) {
-  // Use provided workspaceManager or create a default one
-  const manager = workspaceManager || new WorkspaceManager();
+export function createSystemRouter(workspaceManager?: WorkspaceManager): ReturnType<typeof router> {
+  const workspaceAPIEnabled = Boolean(workspaceManager);
+
+  const disabledWorkspaceManager: WorkspaceManager = {
+    getClientWorkspaceFolders: () => ({}),
+    listFiles: async () => [],
+    readFile: async () => Buffer.from(''),
+    writeFile: async () => undefined,
+    pathExists: async () => false,
+    getWorkspaceConfig: () => undefined,
+    getWorkspaceIds: () => [],
+    addWorkspace: () => {
+      throw new Error('Server workspace API is disabled');
+    },
+    removeWorkspace: () => false,
+  } as unknown as WorkspaceManager;
+
+  const manager = workspaceManager ?? disabledWorkspaceManager;
+
+  const ensureWorkspaceAPIEnabled = () => {
+    if (!workspaceAPIEnabled) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Server workspace API is disabled. Configure serverWorkspaces to enable file access.',
+      });
+    }
+  };
 
   // Get dynamic workspace folder IDs for enum constraints
   const getWorkspaceIds = () => {
@@ -82,6 +107,9 @@ export function createSystemRouter(workspaceManager?: WorkspaceManager) {
         }).optional()
       })))
       .query(async () => {
+        if (!workspaceAPIEnabled) {
+          return {};
+        }
         return manager.getClientWorkspaceFolders();
       }),
 
@@ -115,6 +143,7 @@ export function createSystemRouter(workspaceManager?: WorkspaceManager) {
         writable: z.boolean()
       })))
       .query(async ({ input }) => {
+        ensureWorkspaceAPIEnabled();
         return await manager.listFiles(input.workspaceId, input.path, {
           recursive: input.recursive,
           includeDirectories: input.includeDirectories
@@ -144,6 +173,7 @@ export function createSystemRouter(workspaceManager?: WorkspaceManager) {
         mimeType: z.string().optional()
       }))
       .query(async ({ input }) => {
+        ensureWorkspaceAPIEnabled();
         const content = await manager.readFile(input.workspaceId, input.path, {
           encoding: input.encoding as any
         });
@@ -193,6 +223,7 @@ export function createSystemRouter(workspaceManager?: WorkspaceManager) {
         size: z.number()
       }))
       .mutation(async ({ input }) => {
+        ensureWorkspaceAPIEnabled();
         let contentBuffer: string | Buffer = input.content;
 
         if (input.encoding === 'base64') {
@@ -230,6 +261,7 @@ export function createSystemRouter(workspaceManager?: WorkspaceManager) {
         path: z.string()
       }))
       .query(async ({ input }) => {
+        ensureWorkspaceAPIEnabled();
         const exists = await manager.pathExists(input.workspaceId, input.path);
         return {
           exists,
@@ -270,6 +302,7 @@ export function createSystemRouter(workspaceManager?: WorkspaceManager) {
         message: z.string()
       }))
       .mutation(async ({ input }) => {
+        ensureWorkspaceAPIEnabled();
         try {
           manager.addWorkspace(input.id, input.config as any);
           return {
@@ -306,6 +339,7 @@ export function createSystemRouter(workspaceManager?: WorkspaceManager) {
         message: z.string()
       }))
       .mutation(async ({ input }) => {
+        ensureWorkspaceAPIEnabled();
         const removed = manager.removeWorkspace(input.id);
         return {
           success: removed,
@@ -413,4 +447,4 @@ export function createSystemRouter(workspaceManager?: WorkspaceManager) {
   });
 }
 
-export const systemRouter = createSystemRouter();
+export const systemRouter: ReturnType<typeof createSystemRouter> = createSystemRouter();

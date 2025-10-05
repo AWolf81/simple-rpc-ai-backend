@@ -6,6 +6,8 @@
 
 import { router, publicProcedure, createMCPTool, defaultRootManager } from 'simple-rpc-ai-backend';
 import { z } from 'zod';
+import { promises as fs, constants as fsConstants } from 'fs';
+import path from 'path';
 
 /**
  * Custom Math Tools Router - All procedures become MCP tools automatically
@@ -25,7 +27,8 @@ export const customMathRouter = router({
     }))
     .mutation(async ({ input }) => {
       const result = input.a + input.b;
-      console.log(`🧮 Math: ${input.a} + ${input.b} = ${result}`);
+      // Privacy: Don't log user input or results
+      console.log(`🧮 Math: Addition completed`);
       return {
         operation: 'addition',
         operands: [input.a, input.b],
@@ -48,7 +51,8 @@ export const customMathRouter = router({
     }))
     .mutation(async ({ input }) => {
       const result = input.a * input.b;
-      console.log(`🧮 Math: ${input.a} × ${input.b} = ${result}`);
+      // Privacy: Don't log user input or results
+      console.log(`🧮 Math: Multiplication completed`);
       return {
         operation: 'multiplication',
         operands: [input.a, input.b],
@@ -75,7 +79,8 @@ export const customMathRouter = router({
         const sanitized = input.expression.replace(/[^0-9+\-*/(). ]/g, '');
         const result = eval(sanitized);
 
-        console.log(`🧮 Calculator: ${sanitized} = ${result}`);
+        // Privacy: Don't log user input or results
+        console.log(`🧮 Calculator: Expression evaluated`);
         return {
           operation: 'calculate',
           expression: sanitized,
@@ -116,7 +121,8 @@ export const customUtilityRouter = router({
       const greeting = greetings[input.language][input.formal ? 'formal' : 'casual'];
       const message = `${greeting}, ${input.name}!`;
 
-      console.log(`👋 Greeting: ${message}`);
+      // Privacy: Don't log user input
+      console.log(`👋 Greeting generated (language: ${input.language}, formal: ${input.formal})`);
       return {
         message,
         language: input.language,
@@ -125,7 +131,7 @@ export const customUtilityRouter = router({
       };
     }),
 
-  status: publicProcedure
+  serverStatus: publicProcedure
     .meta({
       ...createMCPTool({
         title: 'Server Status',
@@ -155,6 +161,86 @@ export const customUtilityRouter = router({
       }
 
       return basic;
+    }),
+
+  // Time utility tool (moved from core)
+  currentSystemTime: publicProcedure
+    .meta({
+      ...createMCPTool({
+        title: 'Current System Time',
+        description: 'Get the current system time in a specified timezone',
+        category: 'utility'
+      })
+    })
+    .input(z.object({
+      timezone: z.string().default('UTC').describe('Timezone identifier (e.g., "UTC", "America/New_York", "Europe/Berlin")'),
+    }))
+    .query(async ({ input }) => {
+      const timezone = input.timezone || 'UTC';
+      const now = new Date();
+
+      try {
+        const time = now.toLocaleString('en-US', { timeZone: timezone });
+        console.log(`🕐 Time query: ${time} (${timezone})`);
+        return {
+          time,
+          timezone,
+          timestamp: now.getTime(),
+          iso: now.toISOString()
+        };
+      } catch (error) {
+        // Fallback to UTC if timezone is invalid
+        const time = now.toISOString();
+        console.log(`🕐 Time query (fallback): ${time} (UTC)`);
+        return {
+          time,
+          timezone: 'UTC',
+          timestamp: now.getTime(),
+          iso: time
+        };
+      }
+    }),
+
+  // Enhanced calculator tool (moved from core)
+  calculator: publicProcedure
+    .meta({
+      ...createMCPTool({
+        title: 'Safe Calculator',
+        description: 'Perform basic mathematical calculations safely with input validation',
+        category: 'utility'
+      })
+    })
+    .input(z.object({
+      expression: z.string().min(1).max(100).describe('Mathematical expression to evaluate (e.g., "2 + 2", "10 * 5")'),
+    }))
+    .mutation(async ({ input }) => {
+      // Simple safe calculator - only allow basic operations
+      const safeExpression = input.expression.replace(/[^0-9+\-*/.() ]/g, '');
+
+      if (!safeExpression || safeExpression !== input.expression) {
+        throw new Error('Invalid expression. Only numbers and basic operators (+, -, *, /, parentheses) are allowed.');
+      }
+
+      try {
+        // Use Function constructor for safer evaluation than eval()
+        // In a real-world scenario, consider using a dedicated math expression parser
+        // to avoid any potential security risks. e.g. import { evaluate } from 'mathjs';
+        const result = Function(`"use strict"; return (${safeExpression})`)();
+
+        if (typeof result !== 'number' || !isFinite(result)) {
+          throw new Error('Expression resulted in an invalid number');
+        }
+
+        console.log(`🧮 Safe Calculator: ${safeExpression} = ${result}`);
+        return {
+          result,
+          expression: input.expression,
+          sanitized: safeExpression,
+          timestamp: new Date().toISOString()
+        };
+      } catch (error) {
+        throw new Error(`Calculation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     })
 });
 
@@ -175,20 +261,56 @@ export const fileOperationsRouter = router({
       })
     })
     .input(z.object({
-      rootId: z.string().describe('Root directory identifier (use system.getRootFolders to see available roots)'),
-      path: z.string().describe('File path relative to root directory')
+      rootId: z.string()
+        .min(1)
+        .max(100)
+        .regex(/^[a-zA-Z0-9_-]+$/)
+        .describe('Root directory identifier (use system.getRootFolders to see available roots)'),
+      path: z.string()
+        .min(1)
+        .max(1000)
+        .refine(value => !value.includes('\0'), 'Path cannot contain null bytes')
+        .refine(value => !/[<>:"|?*]/.test(value), 'Path contains invalid characters')
+        .describe('File path relative to root directory')
     }))
     .query(async ({ input }) => {
       try {
-        const { rootId, path } = input;
+        const { rootId, path: relativePath } = input;
 
-        // Get file stats using the secure defaultRootManager
-        const stats = await defaultRootManager.getFileStats(rootId, path);
+        // Get root folder configuration
+        const rootConfig = defaultRootManager.getRootConfig(rootId);
 
-        console.log(`ℹ️ File info: ${rootId}/${path}`);
+        if (!rootConfig) {
+          throw new Error(`Root '${rootId}' not found`);
+        }
+
+        // Normalize and validate the provided path before accessing the filesystem
+        const normalizedPath = path.normalize(relativePath);
+
+        if (path.isAbsolute(normalizedPath) || normalizedPath.startsWith('..')) {
+          throw new Error('Invalid path: directory traversal not allowed');
+        }
+
+        const fullPath = path.resolve(rootConfig.path, normalizedPath);
+        const resolvedRoot = path.resolve(rootConfig.path);
+        const relativeToRoot = path.relative(resolvedRoot, fullPath);
+
+        if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
+          throw new Error('Invalid path: outside root directory');
+        }
+
+        // Build full path and get stats after validation
+        const stats = await fs.stat(fullPath);
+
+        // Determine file permissions using fs.access checks rather than hard-coded assumptions
+        const isReadable = await fs.access(fullPath, fsConstants.R_OK).then(() => true).catch(() => false);
+        const isWritableTarget = stats.isDirectory() ? fullPath : path.dirname(fullPath);
+        const isWritable = await fs.access(isWritableTarget, fsConstants.W_OK).then(() => true).catch(() => false);
+
+        console.log(`ℹ️ File info: ${rootId}/${relativePath}`);
 
         return {
-          path,
+          path: relativePath,
           rootId,
           size: stats.size,
           isFile: stats.isFile(),
@@ -197,17 +319,23 @@ export const fileOperationsRouter = router({
           modified: stats.mtime?.toISOString(),
           accessed: stats.atime?.toISOString(),
           permissions: {
-            readable: true, // Default - RootManager handles access control
-            writable: !stats.isDirectory() // Directories typically need different handling
+            readable: isReadable,
+            writable: isWritable
           },
           timestamp: new Date().toISOString()
         };
 
       } catch (error) {
-        throw new Error(`Failed to get file info: ${error.message}`);
+        console.warn('Failed to get file info', { error: error instanceof Error ? error.message : String(error) });
+        throw new Error('Failed to get file info. Please verify the path and permissions.');
       }
     })
 });
+
+/**
+ * Import the prompt access router (reference implementation)
+ */
+import { promptAccessRouter } from './prompt-access.js';
 
 /**
  * Get all custom routers
@@ -216,6 +344,7 @@ export function getCustomRouters() {
   return {
     math: customMathRouter,
     utility: customUtilityRouter,
-    file: fileOperationsRouter
+    file: fileOperationsRouter,
+    prompts: promptAccessRouter
   };
 }

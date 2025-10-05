@@ -1,0 +1,29 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Alice Johnson",
+      "email": "alice@example.com",
+      "role": "admin",
+      "status": "active"
+    },
+    {
+      "id": 2,
+      "name": "Bob Smith",
+      "email": "bob@example.com",
+      "role": "developer",
+      "status": "active"
+    },
+    {
+      "id": 3,
+      "name": "Carol White",
+      "email": "carol@example.com",
+      "role": "designer",
+      "status": "inactive"
+    }
+  ],
+  "metadata": {
+    "total": 3,
+    "lastUpdated": "2025-09-30T00:00:00Z"
+  }
+}

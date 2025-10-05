@@ -1,16 +1,18 @@
 # Examples
 
-Three focused examples demonstrating different use cases of the simple-rpc-ai-backend package.
+Five focused examples demonstrating different use cases of the simple-rpc-ai-backend package.
 
 ## 📁 Example Structure
 
 ```
 examples/
-├── 01-basic-server/        # Simple AI server for quick prototyping
-├── 02-mcp-server/          # Production server with OAuth2 + MCP + tracking  
-└── 03-vscode-extension/    # VS Code extension with MCP integration
-    ├── extension/          # VS Code extension code
-    └── server -> ../02-mcp-server  # Symbolic link to shared server
+├── 01-basic-server/         # Simple AI server for quick prototyping
+├── 02-mcp-server/           # Production server with OAuth2 + MCP + tracking
+├── 03-vscode-extension/     # VS Code extension with MCP integration
+│   ├── extension/           # VS Code extension code
+│   └── server -> ../02-mcp-server  # Symbolic link to shared server
+├── 04-mcp-tasks-server/     # MCP server with AI-powered task management
+└── 05-local-resources-server/  # File reading and template engine demo
 ```
 
 > **Note**: Example 3 uses the same production server as Example 2 via a symbolic link. This demonstrates how a single backend can serve multiple client applications.
@@ -126,6 +128,33 @@ Complete VS Code extension demonstrating client integration with the production 
 **Architecture:** Extension client → Production server (from Example 2) → AI providers
 
 **Use cases:** VS Code extensions, IDE integrations, development tools
+
+---
+
+### [Example 4: MCP Tasks Server](./04-mcp-tasks-server/)
+MCP server with AI-powered task management and custom tools.
+
+**Features:**
+- ✅ Task creation, listing, and updates
+- ✅ AI-powered task suggestions
+- ✅ Custom MCP tools with validation
+- ✅ Multiple output formats (JSON, Markdown)
+
+**Use cases:** Task management tools, AI assistants, workflow automation
+
+---
+
+### [Example 5: Local Resources Server](./05-local-resources-server/)
+Demonstrates file reading and template engine for dynamic MCP resources.
+
+**Features:**
+- ✅ Secure file access with root folder management
+- ✅ File readers (text, code, directory browsing)
+- ✅ Template engine (Markdown, JSON, CSV, HTML)
+- ✅ Dynamic content generation
+- ✅ MCP resource auto-discovery
+
+**Use cases:** Documentation systems, file management, data transformation
 
 ## 🔧 Development Workflow
 

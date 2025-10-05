@@ -7,10 +7,36 @@
  * Perfect for getting started quickly with AI integration.
  */
 
-import { createRpcAiServer } from 'simple-rpc-ai-backend';
+import { createRpcAiServer, router, publicProcedure } from 'simple-rpc-ai-backend';
+import { z } from 'zod';
 
 // Configuration
 const port = process.env.PORT || 8000;
+
+// Custom router with simulated AI delay for load testing
+const testRouter = router({
+  simulateAI: publicProcedure
+    .input(z.object({
+      delay: z.number().min(100).max(5000).default(1500).optional(),
+      message: z.string().default('Test message').optional()
+    }))
+    .mutation(async ({ input }) => {
+      const startTime = performance.now();
+
+      // Simulate AI API delay
+      await new Promise(resolve => setTimeout(resolve, input.delay || 1500));
+
+      const endTime = performance.now();
+
+      return {
+        success: true,
+        message: input.message,
+        simulatedDelay: input.delay || 1500,
+        actualDelay: Math.round(endTime - startTime),
+        timestamp: new Date().toISOString()
+      };
+    })
+});
 
 console.log("config", port)
 
@@ -21,6 +47,12 @@ const server = createRpcAiServer({
   protocols: {
     jsonRpc: true,  // Keep JSON-RPC for compatibility
     tRpc: true      // Enable tRPC for development panel
+  },
+  mcp: {
+    enabled: false  // Basic server doesn't use MCP (example 02 does)
+  },
+  debug: {
+    enableTiming: process.env.ENABLE_TIMING === 'true'  // Enable via env var
   },
   cors: {
     // CORS_ORIGIN examples:
@@ -50,6 +82,9 @@ const server = createRpcAiServer({
         'mistralai/mistral-large'    // Example: Block specific models
       ]
     }
+  },
+  customRouters: {
+    test: testRouter  // Add test router for load testing
   }
 });
 
@@ -70,8 +105,9 @@ server.start().then(() => {
    - OpenRouter: ${process.env.OPENROUTER_API_KEY ? '✅ Configured' : '❌ Missing API key'}
 
 📝 Example Requests:
-   curl -X POST http://localhost:${port}/rpc \
-     -H "Content-Type: application/json" \
+   # AI generation (requires API key)
+   curl -X POST http://localhost:${port}/rpc \\
+     -H "Content-Type: application/json" \\
      -d '{
        "jsonrpc": "2.0",
        "method": "ai.generateText",
@@ -82,18 +118,27 @@ server.start().then(() => {
        },
        "id": 1
      }'
-   
-   # List allowed models (filtered by provider)
+
+   # Simulated AI delay (for load testing - no API key needed)
    curl -X POST http://localhost:${port}/rpc \\
      -H "Content-Type: application/json" \\
      -d '{
        "jsonrpc": "2.0",
-       "method": "ai.listAllowedModels",
+       "method": "test.simulateAI",
        "params": {
-         "provider": "openrouter"
+         "delay": 1500,
+         "message": "Load test"
        },
        "id": 2
      }'
+
+🧪 Load Testing:
+   # Test health endpoint (baseline - ~3000 req/sec)
+   ab -n 1000 -c 100 http://localhost:${port}/health
+
+   # Test simulated AI delay (realistic - ~65 req/sec with 1.5s delay)
+   ab -n 100 -c 10 -p post.json -T application/json http://localhost:${port}/rpc
+   # Create post.json with: {"jsonrpc":"2.0","method":"test.simulateAI","params":{},"id":1}
 
 ⚠️  Note: This server has no authentication. Use for development only!
   `);

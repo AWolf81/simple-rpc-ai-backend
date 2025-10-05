@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [22]
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
@@ -45,7 +45,7 @@ jobs:
           CI: true
 
       - name: Upload coverage to Codecov
-        if: matrix.node-version == 20 && matrix.os == 'ubuntu-latest'
+        if: matrix.node-version == 22 && matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -70,7 +70,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -94,7 +94,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: 22
         cache: 'pnpm'
     - name: Install dependencies
       run: pnpm install
@@ -116,7 +116,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: 22
         cache: 'pnpm'
     - name: Install dependencies
       run: pnpm install
@@ -144,19 +144,52 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: 22
         cache: 'pnpm'
     - name: Install dependencies
-      run: pnpm install
-    - name: Test basic server example
+      run: pnpm install --no-optional
+
+    - name: Build main package
+      run: pnpm build
+
+    - name: Install example dependencies separately
       run: |
-        node examples/servers/basic-server.js &
+        cd examples/01-basic-server && npm install && cd ../..
+        cd examples/02-mcp-server && npm install && cd ../..
+
+    - name: Test basic server example syntax
+      run: node -c examples/01-basic-server/server.js
+
+    - name: Test basic server startup
+      run: |
+        cd examples/01-basic-server
+        timeout 10s node server.js &
         SERVER_PID=$!
-        sleep 2
-        kill $SERVER_PID || echo "Server already stopped"
-    - name: Test AI server example
+        sleep 3
+        if ps -p $SERVER_PID > /dev/null; then
+          echo "✅ Basic server started successfully"
+          kill $SERVER_PID || echo "Server already stopped"
+        else
+          echo "❌ Basic server failed to start"
+          exit 1
+        fi
+
+    - name: Test MCP server example syntax
+      run: node -c examples/02-mcp-server/server.js
+
+    - name: Test MCP server startup
       run: |
-        node -c examples/servers/ai-server-example.js
+        cd examples/02-mcp-server
+        timeout 10s node server.js &
+        SERVER_PID=$!
+        sleep 3
+        if ps -p $SERVER_PID > /dev/null; then
+          echo "✅ MCP server started successfully"
+          kill $SERVER_PID || echo "Server already stopped"
+        else
+          echo "❌ MCP server failed to start"
+          exit 1
+        fi
 
   release-check:
     name: Release Readiness Check
@@ -172,7 +205,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: 22
         cache: 'pnpm'
     - name: Install dependencies
       run: pnpm install

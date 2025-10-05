@@ -10,7 +10,7 @@
 export const RPC_METHODS = {
   // Core AI Methods
   HEALTH: 'health',
-  EXECUTE_AI_REQUEST: 'executeAIRequest',
+  GENERATE_TEXT: 'ai.generateText',
   
   // Authentication Methods
   INITIALIZE_SESSION: 'initializeSession',
@@ -40,7 +40,7 @@ export const RPC_METHODS = {
 export const TRPC_METHODS = {
   // AI Router methods
   AI_HEALTH: 'ai.health',
-  AI_EXECUTE_AI_REQUEST: 'ai.executeAIRequest',
+  AI_GENERATE_TEXT: 'ai.generateText',
   AI_LIST_PROVIDERS: 'ai.listProviders',
   AI_LIST_PROVIDERS_BYOK: 'ai.listProvidersBYOK',
   AI_GET_REGISTRY_HEALTH: 'ai.getRegistryHealth',

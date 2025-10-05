@@ -5,8 +5,8 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '@src-trpc/index';
-import { VirtualTokenService } from '@services/virtual-token-service';
-import { UsageAnalyticsService } from '@services/usage-analytics-service';
+import { VirtualTokenService } from '@services/billing/virtual-token-service';
+import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
 
 interface HybridUserService {
   getUserProfile(userId: string): Promise<any>;
@@ -20,7 +20,7 @@ export function createUserRouter(
   usageAnalyticsService: UsageAnalyticsService | null,
   hybridUserService: HybridUserService | null,
   byokProviders: string[] = ['anthropic', 'openai', 'google']
-) {
+): ReturnType<typeof router> {
   return router({
     /**
      * Get user profile with capabilities and preferences (hybrid users)
@@ -238,4 +238,4 @@ export function createUserRouter(
   });
 }
 
-export const userRouter = createUserRouter(null, null, null);
+export const userRouter: ReturnType<typeof createUserRouter> = createUserRouter(null, null, null);

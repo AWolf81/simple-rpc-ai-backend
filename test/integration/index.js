@@ -55,7 +55,7 @@ async function testRPCIntegration() {
     console.log('⏳ Analyzing JavaScript code with AI...');
     
     const startTime = Date.now();
-    const result = await client.request('generateText', {
+    const result = await client.request('ai.generateText', {
       content: SAMPLE_CODE,
       systemPrompt: 'You are a code reviewer. Analyze this JavaScript code for quality, bugs, and improvements. Provide your analysis in sections: Code Quality, Issues, Improvements, and Summary.',
       metadata: {
@@ -122,7 +122,7 @@ async function testRPCIntegration() {
     
     // Test 3a: Prompt ID with verifiable signature using direct system prompt
     console.log('   3a) Testing prompt ID system prompt delivery...');
-    const promptIdTestResult = await client.request('generateText', {
+    const promptIdTestResult = await client.request('ai.generateText', {
       content: 'function add(a, b) { return a + b; }',
       systemPrompt: 'You are a code quality expert. Review this code and provide feedback. IMPORTANT: Always end your response with exactly this text: "Analysis completed by PromptID-Tester-v2.1.0"',
       metadata: { test: 'prompt-id-signature' }
@@ -148,7 +148,7 @@ async function testRPCIntegration() {
     // Test 3a2: Test managed prompt structure (analyze-code) with error handling
     console.log('   3a2) Testing managed prompt structure...');
     try {
-      const managedPromptResult = await client.request('generateText', {
+      const managedPromptResult = await client.request('ai.generateText', {
         content: 'function add(a, b) { return a + b; }',
         promptId: 'analyze-code',
         promptContext: { language: 'JavaScript' },
@@ -187,7 +187,7 @@ async function testRPCIntegration() {
     
     // Test 3b: Direct system prompt with verifiable signature
     console.log('   3b) Testing direct system prompt with verifiable signature...');
-    const directPromptResult = await client.request('generateText', {
+    const directPromptResult = await client.request('ai.generateText', {
       content: 'const x = 1; console.log(x);',
       systemPrompt: 'You are a code reviewer. Analyze the provided code and give suggestions for improvement. IMPORTANT: Always end your response with exactly this text: "Code review generated with Fancy-Code-Reviewer-AI 1.2.3"',
       metadata: { test: 'direct-prompt-signature' }
@@ -217,14 +217,14 @@ async function testRPCIntegration() {
     
     try {
       // Security-focused prompt
-      const securityResult = await client.request('generateText', {
+      const securityResult = await client.request('ai.generateText', {
         content: testCode,
         promptId: 'security-review',
         metadata: { test: 'security-focus' }
       });
       
       // Performance-focused prompt  
-      const performanceResult = await client.request('generateText', {
+      const performanceResult = await client.request('ai.generateText', {
         content: testCode,
         promptId: 'optimize-performance',
         promptContext: { platform: 'JavaScript' },
@@ -272,7 +272,7 @@ async function testRPCIntegration() {
     
     for (const prompt of prompts) {
       try {
-        const promptResult = await client.request('generateText', {
+        const promptResult = await client.request('ai.generateText', {
           content: 'function add(a, b) { return a + b; }',
           promptId: prompt.id,
           promptContext: prompt.context,
@@ -290,7 +290,7 @@ async function testRPCIntegration() {
     
     // Test missing content
     try {
-      await client.request('generateText', {
+      await client.request('ai.generateText', {
         content: '',
         promptId: 'analyze-code'
       });
@@ -301,7 +301,7 @@ async function testRPCIntegration() {
     
     // Test invalid prompt ID
     try {
-      await client.request('generateText', {
+      await client.request('ai.generateText', {
         content: 'test code',
         promptId: 'non-existent-prompt'
       });
@@ -312,7 +312,7 @@ async function testRPCIntegration() {
     
     // Test missing both promptId and systemPrompt
     try {
-      await client.request('generateText', {
+      await client.request('ai.generateText', {
         content: 'test code'
       });
       console.log('❌ Should have failed with no prompt specified');

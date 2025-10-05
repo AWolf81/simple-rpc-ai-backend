@@ -79,28 +79,29 @@ Server Workspaces are directories that the **server administrator** configures t
 const server = createRpcAiServer({
   // Server-managed directories (not MCP roots)
   serverWorkspaces: {
-    enableAPI: true,  // Enable workspace tools (default: true)
+    enabled: true,  // Enable workspace tools
 
-    // Define specific workspaces
-    templates: {
-      path: '/opt/templates',
-      name: 'Server Templates',
-      description: 'Pre-built project templates',
-      readOnly: true,
-      allowedExtensions: ['.js', '.ts', '.json', '.md']
-    },
-    sharedDocs: {
-      path: '/shared/documentation',
-      name: 'Shared Documentation',
-      description: 'Company-wide documentation',
-      readOnly: true
-    },
-    workArea: {
-      path: '/tmp/workspace',
-      name: 'Temporary Work Area',
-      description: 'Temporary file operations',
-      readOnly: false,
-      maxFileSize: 10485760  // 10MB limit
+    additionalWorkspaces: {
+      templates: {
+        path: '/opt/templates',
+        name: 'Server Templates',
+        description: 'Pre-built project templates',
+        readOnly: true,
+        allowedExtensions: ['.js', '.ts', '.json', '.md']
+      },
+      sharedDocs: {
+        path: '/shared/documentation',
+        name: 'Shared Documentation',
+        description: 'Company-wide documentation',
+        readOnly: true
+      },
+      workArea: {
+        path: '/tmp/workspace',
+        name: 'Temporary Work Area',
+        description: 'Temporary file operations',
+        readOnly: false,
+        maxFileSize: 10485760  // 10MB limit
+      }
     }
   }
 });
@@ -253,23 +254,25 @@ await server.start();
 const server = createRpcAiServer({
   // Restricted server workspaces
   serverWorkspaces: {
-    enableAPI: true,
+    enabled: true,
 
-    publicTemplates: {
-      path: '/opt/secure-templates',
-      name: 'Approved Templates',
-      readOnly: true,
-      allowedExtensions: ['.md', '.json', '.js'],
-      maxFileSize: 1048576  // 1MB
-    },
+    additionalWorkspaces: {
+      publicTemplates: {
+        path: '/opt/secure-templates',
+        name: 'Approved Templates',
+        readOnly: true,
+        allowedExtensions: ['.md', '.json', '.js'],
+        maxFileSize: 1048576  // 1MB
+      },
 
-    userScratch: {
-      path: '/tmp/user-workspace',
-      name: 'User Scratch Area',
-      readOnly: false,
-      allowedPaths: ['**/*.txt', '**/*.md'],
-      blockedPaths: ['**/*.exe', '**/*.sh'],
-      maxFileSize: 5242880  // 5MB
+      userScratch: {
+        path: '/tmp/user-workspace',
+        name: 'User Scratch Area',
+        readOnly: false,
+        allowedPaths: ['**/*.txt', '**/*.md'],
+        blockedPaths: ['**/*.exe', '**/*.sh'],
+        maxFileSize: 5242880  // 5MB
+      }
     }
   },
 
@@ -291,16 +294,19 @@ const server = createRpcAiServer({
 const server = createRpcAiServer({
   // Development server workspaces
   serverWorkspaces: {
-    examples: {
-      path: './examples',
-      name: 'Code Examples',
-      readOnly: true
-    },
-    playground: {
-      path: './playground',
-      name: 'Development Playground',
-      readOnly: false,
-      enableWatching: true
+    enabled: true,
+    additionalWorkspaces: {
+      examples: {
+        path: './examples',
+        name: 'Code Examples',
+        readOnly: true
+      },
+      playground: {
+        path: './playground',
+        name: 'Development Playground',
+        readOnly: false,
+        enableWatching: true
+      }
     }
   },
 
@@ -435,15 +441,17 @@ const server = createRpcAiServer({
 ```typescript
 const server = createRpcAiServer({
   serverWorkspaces: {
-    enableAPI: true,
+    enabled: true,
     defaultWorkspace: {
       path: './workspace',
       name: 'Default Workspace'
     },
-    templates: {
-      path: './templates',
-      name: 'Templates',
-      readOnly: true
+    additionalWorkspaces: {
+      templates: {
+        path: './templates',
+        name: 'Templates',
+        readOnly: true
+      }
     }
   }
 });

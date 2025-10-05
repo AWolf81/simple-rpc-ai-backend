@@ -5,8 +5,8 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '@src-trpc/index';
-import { VirtualTokenService } from '@services/virtual-token-service';
-import { UsageAnalyticsService } from '@services/usage-analytics-service';
+import { VirtualTokenService } from '@services/billing/virtual-token-service';
+import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
 
 interface HybridUserService {
   getUserTokenBalances(userId: string): Promise<any[]>;
@@ -18,7 +18,7 @@ export function createBillingRouter(
   virtualTokenService: VirtualTokenService | null,
   usageAnalyticsService: UsageAnalyticsService | null,
   hybridUserService: HybridUserService | null
-) {
+): ReturnType<typeof router> {
   return router({
     /**
      * Get user's token balances (all types)
@@ -254,4 +254,4 @@ export function createBillingRouter(
   });
 }
 
-export const billingRouter = createBillingRouter(null, null, null);
+export const billingRouter: ReturnType<typeof createBillingRouter> = createBillingRouter(null, null, null);

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AIService } from '../src/services/ai-service.js';
-import type { ExecuteRequest, ExecuteResult } from '../src/services/ai-service.js';
+import { AIService } from '../src/services/ai/ai-service.js';
+import type { ExecuteRequest, ExecuteResult } from '../src/services/ai/ai-service.js';
 
 // Mock the AI SDK
 vi.mock('ai', () => ({

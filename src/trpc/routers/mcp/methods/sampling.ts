@@ -1,7 +1,7 @@
 import { publicProcedure } from "../../../index";
 import z from "zod";
 import { createMCPTool } from '../../../../auth/scopes';
-import type { AIService } from '../../../../services/ai-service';
+import type { AIService } from '@services/ai/ai-service';
 
 /**
  * Sampling and Elicitation procedures for MCP
@@ -12,7 +12,7 @@ export function createSamplingProcedures(aiService: AIService, aiConfig: {
   useServerConfig: boolean;
   restrictToSampling: boolean;
   allowByokOverride: boolean;
-}) {
+}): Record<string, any> {
   return {
   // Generate content with approval workflow (demonstrates MCP sampling protocol)
   generateWithApproval: publicProcedure

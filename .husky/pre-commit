@@ -1,2 +1,5 @@
 #!/usr/bin/env sh
+# Prevent direct commits to master branch
 git-branch-is -r "^((?!master).)*$"
+# Scan for secrets
+ggshield secret scan pre-commit "$@"

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { StorageFactory } from '@storage/StorageFactory';
-import type { VaultStorageConfig, FileStorageConfig, ClientManagedStorageConfig } from '@storage/StorageAdapter';
+import { StorageFactory } from '../../src/storage/StorageFactory.js';
+import type { PostgreSQLStorageConfig, FileStorageConfig, ClientManagedStorageConfig } from '../../src/storage/StorageAdapter.js';
 
 // Mock the storage adapters
 vi.mock('@storage/VaultStorageAdapter', () => ({
@@ -46,8 +46,8 @@ describe('StorageFactory', () => {
   describe('createStorage', () => {
     it.skip('should create vault storage adapter (REMOVED FEATURE)', async () => {
       // VaultStorageAdapter was removed - functionality moved to PostgreSQL adapter
-      const config: VaultStorageConfig = {
-        type: 'vault',
+      const config: PostgreSQLStorageConfig = {
+        type: 'postgres',
         config: {
           host: 'localhost',
           port: 5432,
@@ -123,8 +123,8 @@ describe('StorageFactory', () => {
 
   describe('validateConfig', () => {
     it('should validate vault storage config', () => {
-      const validConfig: VaultStorageConfig = {
-        type: 'vault',
+      const validConfig: PostgreSQLStorageConfig = {
+        type: 'postgres',
         config: {
           host: 'localhost',
           port: 5432,
@@ -139,9 +139,9 @@ describe('StorageFactory', () => {
       expect(errors).toHaveLength(0);
     });
 
-    it('should return errors for invalid vault config', () => {
-      const invalidConfig: VaultStorageConfig = {
-        type: 'vault',
+    it('should return errors for invalid postgres config', () => {
+      const invalidConfig: PostgreSQLStorageConfig = {
+        type: 'postgres',
         config: {
           host: '',
           port: 5432,
@@ -153,10 +153,10 @@ describe('StorageFactory', () => {
       };
 
       const errors = StorageFactory.validateConfig(invalidConfig);
-      expect(errors).toContain('Vault storage host is required');
-      expect(errors).toContain('Vault storage database is required');
-      expect(errors).toContain('Vault storage password is required');
-      expect(errors).toContain('Vault storage encryptionKey is required');
+      expect(errors).toContain('PostgreSQL storage host is required');
+      expect(errors).toContain('PostgreSQL storage database is required');
+      expect(errors).toContain('PostgreSQL storage password is required');
+      expect(errors).toContain('PostgreSQL storage encryptionKey is required');
     });
 
     it('should validate file storage config', () => {

@@ -44,7 +44,7 @@ export type {
 
 // Database and validation
 export { PostgreSQLAdapter } from '@database/postgres-adapter';
-export { AIKeyValidator } from '@services/ai-validator';
+export { AIKeyValidator } from '@services/ai/ai-validator';
 
 // Client (now in main client.ts)
 export type { 
