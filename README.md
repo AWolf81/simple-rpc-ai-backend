@@ -127,7 +127,9 @@ Built with `simple-rpc-ai-backend` to demonstrate:
 
 ---
 
-## 📋 TODOS
+## 📋 Development Roadmap
+
+### ✅ Completed
 - [x] JSON-RPC server
 - [x] tRPC methods
 - [x] AI service integration
@@ -137,6 +139,8 @@ Built with `simple-rpc-ai-backend` to demonstrate:
 - [x] Extension OAuth (generic OAuth callback handler)
 - [x] `.simplerpcaibackendrc` configuration file
 - [x] Consumer-friendly defaults and tooling
+
+### 🔄 In Progress
 - [ ] Progressive authentication (anonymous → OAuth → Pro) for VS Code extensions
 - [ ] Bring-your-own key testing (CRUD and usage)
 - [ ] MCP remote servers support
@@ -711,6 +715,7 @@ pnpm test:coverage         # Run tests (80% threshold)
 
 ## 📋 TODO
 
+### Tests & Implementation
 - [ ] **Hugging Face Provider**: Fix and complete implementation
   - [ ] Fix `huggingfaceMethod` config not being respected (always uses textGeneration)
   - [ ] Fix test mocks for proper chatCompletion testing
@@ -723,6 +728,16 @@ pnpm test:coverage         # Run tests (80% threshold)
   - [ ] Update OpenRouter model expectations (returning empty arrays)
   - [ ] Verify model filtering works with new registry system
   - Files: `test/model-restrictions.test.ts`, `src/services/ai/model-registry.ts` (line 370)
+
+### Core Features
+- [ ] **Model Registry Safety**: Review curated model additions in `src/services/ai/hybrid-model-registry.ts`
+  - Ensure production IDs are correct for new Gemini, GPT-4.5, and o3 models
+
+- [ ] **OAuth Flow Documentation**: Add MCP OAuth authentication flow diagram to docs
+
+- [ ] **Test Coverage**: Increase from 60% to 80% threshold (see `vitest.config.ts`)
+
+- [ ] **Billing Integration**: Complete OpenSaaS integration in `src/billing/opensaas-integration.ts`
 
 ## 🤝 Contributing
 
