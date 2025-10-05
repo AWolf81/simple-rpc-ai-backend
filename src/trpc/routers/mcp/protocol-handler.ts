@@ -692,12 +692,13 @@ export class MCPProtocolHandler {
     }
 
     const maliciousPatterns = [
-      /{{.*?}}/g,
-      /SYSTEM\s*:/gi,
-      /ignore\s+.*?previous/gi,
-      /execute\s+.*?command/gi,
-      /\$\(.*?\)/g,
-      /<script.*?>/gi,
+      /{{.*?}}/g,                                    // Template injection
+      /SYSTEM\s*:/gi,                                // System instruction override
+      /ignore\s+(all\s+)?previous\s+instructions?/gi, // Instruction override attempts
+      /execute\s+(this|the)\s+command[:\s]/gi,       // More specific: "execute this command:" or "execute the command "
+      /run\s+(this|the)\s+command[:\s]/gi,           // "run this command:" or "run the command "
+      /\$\(.*?\)/g,                                  // Shell command substitution
+      /<script.*?>/gi,                               // XSS prevention
     ];
 
     let sanitized = description;
@@ -802,15 +803,6 @@ export class MCPProtocolHandler {
         );
       }
 
-      // Check auth requirements for tools/call
-      if (this.authConfig.requireAuthForToolsCall && !req?.user) {
-        return this.createErrorResponse(
-          request.id,
-          ErrorCode.InternalError,
-          'Authentication required for tools/call'
-        );
-      }
-
       // Extract user info
       const userInfo = this.extractUserInfo(req);
       const userScopes = this.extractUserScopes(req);
@@ -837,6 +829,20 @@ export class MCPProtocolHandler {
         category: tool.category,
         public: tool.public
       });
+
+      // Check auth requirements for tools/call (but allow public tools)
+      if (this.authConfig.requireAuthForToolsCall && !req?.user && !isPublic) {
+        return this.createErrorResponse(
+          request.id,
+          ErrorCode.InternalError,
+          'Authentication required for tools/call',
+          {
+            reason: 'authentication_required',
+            user: 'anonymous',
+            tool: name
+          }
+        );
+      }
 
       // Check scope requirements if defined
       let hasRequiredScopes = true;
@@ -891,6 +897,8 @@ export class MCPProtocolHandler {
       const inputParser = procedure._def?.inputs?.[0];
 
       // Validate input if parser exists
+      // Note: We don't sanitize user input - users should be able to say anything
+      // Sanitization is only for tool descriptions/titles that developers define
       let validatedInput = args || {};
       if (inputParser) {
         try {
