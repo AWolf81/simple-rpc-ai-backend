@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { StorageFactory } from '@storage/StorageFactory';
-import type { PostgreSQLStorageConfig, FileStorageConfig, ClientManagedStorageConfig } from '@storage/StorageAdapter';
+import { StorageFactory } from '../../src/storage/StorageFactory.js';
+import type { PostgreSQLStorageConfig, FileStorageConfig, ClientManagedStorageConfig } from '../../src/storage/StorageAdapter.js';
 
 // Mock the storage adapters
 vi.mock('@storage/VaultStorageAdapter', () => ({
