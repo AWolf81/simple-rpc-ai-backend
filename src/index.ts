@@ -40,6 +40,12 @@ export { router, publicProcedure, protectedProcedure } from './trpc/index';
 export { createRpcAiServer, RpcAiServer, defineRpcAiServerConfig } from './rpc-ai-server';
 export type { RpcAiServerConfig, CustomProvider, BuiltInProvider } from './rpc-ai-server';
 
+// Testing utilities (for consumer unit tests)
+export { createContextInner, createTestCaller } from './utils/trpc-test-helpers';
+export type { CreateContextOptions, TestContext } from './utils/trpc-test-helpers';
+
+// Note: OpenSaaSJWTPayload is already exported below in the auth section
+
 // Note: Simplified server creation has been integrated into the main rpc-ai-server
 // Use createRpcAiServer() with the serverWorkspaces configuration for file access
 

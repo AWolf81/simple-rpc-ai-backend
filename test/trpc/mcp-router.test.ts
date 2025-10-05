@@ -409,9 +409,9 @@ describe('MCP Router handleMCPRequest', () => {
   });
 
   describe('Request/Response Logging', () => {
-    it('should log incoming MCP requests', async () => {
+    it('should handle MCP requests without verbose logging', async () => {
       const consoleSpy = vi.spyOn(console, 'log');
-      
+
       mockReq.body = {
         jsonrpc: '2.0',
         method: 'ping',
@@ -420,19 +420,25 @@ describe('MCP Router handleMCPRequest', () => {
 
       await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
 
-      expect(consoleSpy).toHaveBeenCalledWith('📡 MCP Request:', expect.any(Object));
-      expect(consoleSpy).toHaveBeenCalledWith('📤 MCP Response:', expect.any(Object));
+      // Note: Request/response logging was removed for performance
+      // The handler should still process the request successfully
+      expect(jsonSpy).toHaveBeenCalledWith({
+        jsonrpc: '2.0',
+        id: 1,
+        result: {}
+      });
     });
 
     it('should log errors when they occur', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error');
-      
+
       // Force an error by passing invalid request
       mockReq.body = null;
 
       await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ MCP Error:', expect.any(Error));
+      // Logger format changed - no emoji prefix
+      expect(consoleErrorSpy).toHaveBeenCalledWith('MCP Error:', expect.any(Error));
     });
   });
 

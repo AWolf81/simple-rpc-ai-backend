@@ -470,6 +470,7 @@ export class RpcAiServer {
         enabled: false,
         ...config.oauth
       },
+      extensionOAuth: config.extensionOAuth,
       cors: {
         origin: parseCorsOrigin(config.cors?.origin) || '*',
         credentials: false,

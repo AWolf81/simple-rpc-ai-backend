@@ -189,15 +189,7 @@ export class HandlebarsTemplateEngine {
   updateConfig(config: HandlebarsTemplateConfig) {
     this.config = {
       ...this.config,
-      ...config,
-      branding: {
-        ...this.config.branding,
-        ...config.branding
-      },
-      variables: {
-        ...(this.config.variables || {}),
-        ...(config.variables || {})
-      }
+      ...config
     };
 
     // Ensure default footer text is preserved when not explicitly overridden

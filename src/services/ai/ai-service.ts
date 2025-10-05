@@ -588,7 +588,7 @@ export class AIService {
 
     // Handle 'auto' and 'default' as special cases that should trigger default model selection
     let modelName: string;
-    if (!modelOverride || modelOverride === 'auto' || modelOverride === 'default') {
+    if (!modelOverride || modelOverride === 'auto' || modelOverride === 'default' || modelOverride === 'undefined') {
       logger.debug(`🔧 Triggering default model selection (modelOverride was '${modelOverride}')`);
       modelName = this.config.model || await this.getDefaultModel(provider);
       logger.debug(`🔧 Resolved to default model: ${modelName}`);

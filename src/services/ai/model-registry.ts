@@ -226,11 +226,31 @@ ${this.config.useRegistry ? `
   private async getCachedDefaultModel(provider: string): Promise<string> {
     const cacheKey = 'default-' + provider;
     const cached = this.cache.get(cacheKey);
-    
+
     if (cached && this.isCacheValid(cached.timestamp)) {
       return cached.data;
     }
-    
+
+    // Special handling for Anthropic - use hybrid registry with production models
+    if (provider === 'anthropic') {
+      try {
+        const { HybridModelRegistry } = await import('./hybrid-model-registry.js');
+        const hybridRegistry = new HybridModelRegistry({
+          productionMode: true,  // Always use production mode for cached/test
+          fallbackToAliases: false
+        });
+        const productionModel = await hybridRegistry.getProductionModel('anthropic', 'balanced');
+        logger.debug(`📦 Cached Anthropic model: ${productionModel.productionId}`);
+
+        // Cache the result
+        this.cache.set(cacheKey, { data: productionModel.productionId, timestamp: Date.now() });
+        return productionModel.productionId;
+      } catch (error) {
+        console.warn('⚠️ Failed to get cached Anthropic model from hybrid registry:', error instanceof Error ? error.message : String(error));
+        throw new Error('Anthropic models require hybrid registry - cache miss and no fallback available');
+      }
+    }
+
     return this.getFallbackDefaultModel(provider);
   }
   
