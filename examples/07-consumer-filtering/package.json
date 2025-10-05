@@ -12,7 +12,7 @@
     "dev-panel": "npx simple-rpc-dev-panel"
   },
   "dependencies": {
-    "simple-rpc-ai-backend": "^0.1.0",
+    "simple-rpc-ai-backend": "file:../..",
     "zod": "^3.23.0",
     "@trpc/server": "^11.0.0"
   }

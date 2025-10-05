@@ -2,7 +2,6 @@ packages:
   # Main package
   - "."
   # Example packages
-  - "examples/servers"
-  - "examples/extensions"
+  - "examples/*"
   # Tools
   - "tools/*"
