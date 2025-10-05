@@ -149,6 +149,9 @@ jobs:
     - name: Install dependencies
       run: pnpm install
 
+    - name: Build package for examples
+      run: pnpm build
+
     - name: Test basic server example syntax
       run: node -c examples/01-basic-server/server.js
 
