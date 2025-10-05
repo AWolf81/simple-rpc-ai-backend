@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+ggshield secret scan pre-commit "$@"

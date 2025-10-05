@@ -6,9 +6,9 @@
  */
 
 import { generateText } from 'ai';
-import { anthropic, Anthropic } from '@ai-sdk/anthropic';
-import { openai, OpenAI } from '@ai-sdk/openai';
-import { google, Google } from '@ai-sdk/google';
+import { createAnthropic, anthropic } from '@ai-sdk/anthropic';
+import { createOpenAI, openai } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
 import { InferenceClient } from '@huggingface/inference';
 import crypto from 'crypto';
 import { LanguageModel } from 'ai';
@@ -623,13 +623,13 @@ export class AIService {
     // If user provides API key (BYOK), create provider instance with their key
     if (apiKey) {
       const models: Record<ServiceProvider['name'], (model: string, key: string) => unknown> = {
-        anthropic: (name, key) => new Anthropic({ apiKey: key }).messages(name),
-        openai: (name, key) => new OpenAI({ apiKey: key }).chat(name),
-        google: (name, key) => new Google({ apiKey: key }).generativeAI(name),
-        openrouter: (name, key) => new OpenAI({
+        anthropic: (name, key) => createAnthropic({ apiKey: key })(name),
+        openai: (name, key) => createOpenAI({ apiKey: key })(name),
+        google: (name, key) => createGoogleGenerativeAI({ apiKey: key })(name),
+        openrouter: (name, key) => createOpenAI({
           apiKey: key,
-          baseUrl: 'https://openrouter.ai/api/v1'
-        }).chat(name),
+          baseURL: 'https://openrouter.ai/api/v1'
+        })(name),
         huggingface: (name, key) => createHuggingFaceModel(name, key)
       };
       const getModelFn = models[provider as keyof typeof models];
@@ -648,20 +648,20 @@ export class AIService {
       logger.debug(`🔧 [FIXED VERSION] Using ${provider} API key from provider configuration (key length: ${providerApiKey.length})`);
       // Create provider instances with explicit API keys
       const modelsWithApiKey: Record<ServiceProvider['name'], (model: string) => unknown> = {
-        anthropic: (name) => new Anthropic({ apiKey: providerApiKey }).messages(name),
-        openai: (name) => new OpenAI({ apiKey: providerApiKey }).chat(name),
-        google: (name) => new Google({ apiKey: providerApiKey }).generativeAI(name),
-        openrouter: (name) => new OpenAI({
+        anthropic: (name) => createAnthropic({ apiKey: providerApiKey })(name),
+        openai: (name) => createOpenAI({ apiKey: providerApiKey })(name),
+        google: (name) => createGoogleGenerativeAI({ apiKey: providerApiKey })(name),
+        openrouter: (name) => createOpenAI({
           apiKey: providerApiKey,
-          baseUrl: 'https://openrouter.ai/api/v1'
-        }).chat(name),
+          baseURL: 'https://openrouter.ai/api/v1'
+        })(name),
         huggingface: (name) => createHuggingFaceModel(name, {
           apiKey: providerApiKey,
           method: currentProvider?.huggingfaceMethod || 'auto',
           enableFallback: currentProvider?.huggingfaceEnableFallback !== false
         })
       };
-      
+
       const getModelFn = modelsWithApiKey[provider as keyof typeof modelsWithApiKey];
       if (getModelFn) {
         return getModelFn(modelName);
@@ -679,10 +679,19 @@ export class AIService {
 
     logger.debug(`🔧 Using ${provider} helper function with environment variables`);
     const models: Record<ServiceProvider['name'], (model: string) => unknown> = {
-      anthropic: (name) => anthropic.messages(name), // Uses ANTHROPIC_API_KEY
-      openai: (name) => openai.chat(name), // Uses OPENAI_API_KEY
-      google: (name) => google.generativeAI(name), // Uses GOOGLE_GENERATIVE_AI_API_KEY
-      openrouter: (name) => openai.chat(name), // Uses OPENAI_API_KEY
+      anthropic: (name) => anthropic(name),
+      openai: (name) => openai(name),
+      google: (name) => google(name),
+      openrouter: (name) => {
+        const openrouterApiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+        if (!openrouterApiKey) {
+          throw new Error('OPENROUTER_API_KEY or OPENAI_API_KEY environment variable is required for OpenRouter provider');
+        }
+        return createOpenAI({
+          apiKey: openrouterApiKey,
+          baseURL: 'https://openrouter.ai/api/v1'
+        })(name);
+      },
       huggingface: (name) => {
         const hfApiKey = process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN;
         if (!hfApiKey) {

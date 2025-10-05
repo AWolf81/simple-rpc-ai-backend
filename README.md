@@ -677,6 +677,8 @@ pnpm dev:server            # Full MCP server (port 8001)
 pnpm test:coverage         # Run tests (80% threshold)
 ```
 
+> 💡 Tip: If you use Husky pre-commit hooks, install GitGuardian's CLI with `pipx install ggshield` (or a dedicated virtualenv) so secret scans run locally without touching the system Python.
+
 **Dev URLs:**
 - Dev Panel: `http://localhost:8080`
 - tRPC Playground: `http://localhost:8080/api/trpc-playground`
