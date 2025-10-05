@@ -146,11 +146,14 @@ jobs:
       with:
         node-version: 22
         cache: 'pnpm'
-    - name: Install dependencies
-      run: pnpm install
+    - name: Install dependencies (skip optional to avoid testcontainers issues)
+      run: pnpm install --no-optional
 
-    - name: Build package for examples
+    - name: Build main package
       run: pnpm build
+
+    - name: Reinstall examples to update workspace links
+      run: pnpm install --filter "./examples/**" --force
 
     - name: Test basic server example syntax
       run: node -c examples/01-basic-server/server.js
