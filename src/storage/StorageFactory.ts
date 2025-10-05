@@ -71,8 +71,8 @@ export class StorageFactory {
    * Create PostgreSQL storage adapter
    */
   private static createPostgreSQLStorage(
-    /*config: PostgreSQLStorageConfig, 
-    logger: winston.Logger*/
+    config: PostgreSQLStorageConfig,
+    logger: winston.Logger
   ): any {
     // PostgreSQL storage adapter implementation would go here
     // For now, throw an error as this needs to be implemented
