@@ -718,6 +718,12 @@ pnpm test:coverage         # Run tests (80% threshold)
   - [ ] Verify fallback behavior works correctly
   - Files: `src/services/ai/ai-service.ts` (lines 43-146), `test/huggingface-provider*.test.ts`
 
+- [ ] **Model Restrictions**: Update tests for hybrid registry architecture
+  - [ ] Fix Anthropic tests to use hybrid registry instead of fallbacks
+  - [ ] Update OpenRouter model expectations (returning empty arrays)
+  - [ ] Verify model filtering works with new registry system
+  - Files: `test/model-restrictions.test.ts`, `src/services/ai/model-registry.ts` (line 370)
+
 ## 🤝 Contributing
 
 Requirements: Node.js 22+, 80% coverage, TypeScript strict

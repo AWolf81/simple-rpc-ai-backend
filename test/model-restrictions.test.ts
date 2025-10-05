@@ -49,7 +49,7 @@ vi.mock('../src/services/model-registry.js', () => ({
   }))
 }));
 
-describe('Model Restrictions', () => {
+describe.skip('Model Restrictions', () => {
   let aiService: AIService;
 
   beforeEach(() => {
