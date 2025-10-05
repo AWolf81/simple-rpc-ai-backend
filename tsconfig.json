@@ -10,7 +10,7 @@
     // Project-specific settings
     "outDir": "dist",
     "declaration": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"],
