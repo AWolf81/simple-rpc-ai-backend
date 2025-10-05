@@ -1,7 +1,7 @@
 packages:
   # Main package
   - "."
-  # Example packages
-  - "examples/*"
+  # Examples intentionally excluded - they use file:../.. dependencies
+  # and are installed separately to avoid pnpm workspace symlink issues
   # Tools
   - "tools/*"
