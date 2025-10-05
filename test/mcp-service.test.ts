@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MCPService, MCPServiceConfig } from '../src/services/mcp-service.js';
-import { MCPRegistryService, MCPServerConfig } from '../src/services/mcp-registry.js';
+import { MCPService, MCPServiceConfig } from '../src/services/mcp/mcp-service.js';
+import { MCPRegistryService, MCPServerConfig } from '../src/services/mcp/mcp-registry.js';
 import { EventEmitter } from 'events';
 
 // Mock node-fetch

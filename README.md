@@ -706,8 +706,17 @@ pnpm test:coverage         # Run tests (80% threshold)
 
 **Alpha** - Core complete, API may change
 
-**Production Ready**: JSON-RPC, AI service, PostgreSQL, MCP, auth  
+**Production Ready**: JSON-RPC, AI service, PostgreSQL, MCP, auth
 **In Progress**: OAuth, billing, test coverage (60%+ → 80%)
+
+## 📋 TODO
+
+- [ ] **Hugging Face Provider**: Fix and complete implementation
+  - [ ] Fix `huggingfaceMethod` config not being respected (always uses textGeneration)
+  - [ ] Fix test mocks for proper chatCompletion testing
+  - [ ] Complete test coverage for textGeneration/chatCompletion modes
+  - [ ] Verify fallback behavior works correctly
+  - Files: `src/services/ai/ai-service.ts` (lines 43-146), `test/huggingface-provider*.test.ts`
 
 ## 🤝 Contributing
 

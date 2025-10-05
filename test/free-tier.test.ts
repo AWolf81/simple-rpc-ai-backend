@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { FreeTierService } from '../src/services/free-tier-service.js';
+import { FreeTierService } from '../src/services/archived/free-tier-service.js';
 
 describe('FreeTierService', () => {
   let freeTierService: FreeTierService;

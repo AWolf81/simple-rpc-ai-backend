@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import AIService from '../src/services/ai-service.js';
+import AIService from '../src/services/ai/ai-service.js';
 
 // Mock the AI SDK modules
 vi.mock('@ai-sdk/anthropic', () => ({
