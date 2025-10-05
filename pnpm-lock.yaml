@@ -17,7 +17,7 @@ overrides:
   json5: '>=1.0.2'
   cross-spawn: '>=6.0.6'
   lodash.set: '>=4.3.3'
-  hono: '>=4.9.6'
+  hono: '>=4.9.7'
   postcss: '>=8.4.31'
   '@octokit/request-error': '>=5.1.1'
   vite: ^6.3.6
@@ -26,6 +26,8 @@ overrides:
   prismjs: '>=1.30.0'
   babel-traverse: npm:@babel/traverse@^7.23.2
   html-parse-stringify2: npm:html-parse-stringify@^3.0.1
+  tar-fs: '>=3.1.1'
+  jsondiffpatch: '>=0.7.2'
 
 importers:
 
@@ -452,6 +454,9 @@ packages:
   '@date-fns/tz@1.4.1':
     resolution: {integrity: sha512-P5LUNhtbj6YfI3iJjw5EL9eUAG6OitD0W3fWQcpQjDRc/QIsL0tRNuO1PcDvPccWL1fSTXXdE1ds+l95DV/OFA==}
 
+  '@dmsnell/diff-match-patch@1.1.0':
+    resolution: {integrity: sha512-yejLPmM5pjsGvxS9gXablUSbInW7H976c/FJ4iQxWIm7/38xBySRemTPDe34lhg1gVLbJntX0+sH0jYfU+PN9A==}
+
   '@dnd-kit/accessibility@3.1.1':
     resolution: {integrity: sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw==}
     peerDependencies:
@@ -722,7 +727,7 @@ packages:
     resolution: {integrity: sha512-1k8/8OHf5VIymJEcJyVksFpT+AQ5euY0VA5hUkCnlKpD4mr8FSbvXaHblxeTTEr90OaqWzAkQaqD80qHZQKxBA==}
     engines: {node: '>=18.14.1'}
     peerDependencies:
-      hono: '>=4.9.6'
+      hono: '>=4.9.7'
 
   '@hookform/resolvers@3.10.0':
     resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
@@ -2787,9 +2792,6 @@ packages:
   '@types/debug@4.1.12':
     resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
 
-  '@types/diff-match-patch@1.0.36':
-    resolution: {integrity: sha512-xFdR6tkm0MWvBfO8xXCSsinYxHcqkQUlcHeSpMC2ukzOb6lwQAfDmW+Qt0AvlGd8HpsS28qKsB+oPeJn9I39jg==}
-
   '@types/docker-modem@3.0.6':
     resolution: {integrity: sha512-yKpAGEuKRSS8wwx0joknWxsmLha78wNMe9R2S3UNsVOkZded8UqOrV8KoeDXoXsjndxwyF3eIhyClGbO1SEhEg==}
 
@@ -3444,9 +3446,6 @@ packages:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
     engines: {node: '>=8'}
 
-  bl@4.1.0:
-    resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
-
   body-parser@1.20.3:
     resolution: {integrity: sha512-7rAxByjUMqQ3/bHJy7D6OGXvx/MMc4IqBn/X0fcM1QUcAItpZrBEYhWGem+tzXH90c+G01ypMcYJBO9Y30203g==}
     engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
@@ -3480,9 +3479,6 @@ packages:
 
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
-
-  buffer@5.7.1:
-    resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
 
   buffer@6.0.3:
     resolution: {integrity: sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==}
@@ -3589,9 +3585,6 @@ packages:
   chokidar@3.6.0:
     resolution: {integrity: sha512-7VT13fmjotKpGipCW9JEQAusEPE+Ei8nl6/g4FBAmIm0GOOLMua9NDDo/DWp0ZAxCr3cPq5ZpBqmPAQgDda2Pw==}
     engines: {node: '>= 8.10.0'}
-
-  chownr@1.1.4:
-    resolution: {integrity: sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg==}
 
   cjs-module-lexer@1.4.3:
     resolution: {integrity: sha512-9z8TZaGM1pfswYeXrUpzPrkx8UnWYdhJclsiYMm6x/w5+nN+8Tf/LnAgfLGQCm59qAOxU8WwHEq2vNwF6i4j+Q==}
@@ -4023,9 +4016,6 @@ packages:
 
   dezalgo@1.0.4:
     resolution: {integrity: sha512-rXSP0bf+5n0Qonsb+SVVfNfIsimO4HEtmnIpPHY8Q1UCzKlQrDMfdobr8nJOOsRgWCyMRqeSBQzmWUMq7zvVig==}
-
-  diff-match-patch@1.0.5:
-    resolution: {integrity: sha512-IayShXAgj/QMXgB0IWmKx+rOPuGMhqm5w6jvFxmVenXKIzRqTAAsbBPT3kWQeGANj3jGgvcvv4yK6SxqYmikgw==}
 
   diff-sequences@29.6.3:
     resolution: {integrity: sha512-EjePK1srD3P08o2j4f0ExnylqRs5B9tJjcp9t1krH2qRi8CCdsYfwe9JgSLurFBWwq4uOlipzfk5fHNvwFKr8Q==}
@@ -4524,9 +4514,6 @@ packages:
   fromentries@1.3.2:
     resolution: {integrity: sha512-cHEpEQHUg0f8XdtZCc2ZAhrHzKzT0MrFUTcvx+hfxYu7rGMDc5SKoXFh+n4YigxsHXRzc6OrCshdR1bWH6HHyg==}
 
-  fs-constants@1.0.0:
-    resolution: {integrity: sha512-y6OAwoSIf7FyjMIv94u+b5rdheZEjzR63GTyZJm5qh4Bi+2YgwLCcI/fPFZkL5PSixOt6ZNKm+w+Hfp/Bciwow==}
-
   fs-extra@10.1.0:
     resolution: {integrity: sha512-oRXApq54ETRj4eMiFzGnHWGy+zo5raudjuxN0b8H7s/RU2oW0Wvsx9O0ACRN/kRq9E8Vu/ReskGB5o3ji+FzHQ==}
     engines: {node: '>=12'}
@@ -4739,7 +4726,7 @@ packages:
       '@valibot/to-json-schema': ^1.0.0-beta.3
       arktype: ^2.0.0
       effect: ^3.11.3
-      hono: '>=4.9.6'
+      hono: '>=4.9.7'
       openapi-types: ^12.1.3
       valibot: ^1.0.0-beta.9
       zod: ^3.23.8
@@ -4772,8 +4759,8 @@ packages:
       zod-openapi:
         optional: true
 
-  hono@4.9.6:
-    resolution: {integrity: sha512-doVjXhSFvYZ7y0dNokjwwSahcrAfdz+/BCLvAMa/vHLzjj8+CFyV5xteThGUsKdkaasgN+gF2mUxao+SGLpUeA==}
+  hono@4.9.10:
+    resolution: {integrity: sha512-AlI15ijFyKTXR7eHo7QK7OR4RoKIedZvBuRjO8iy4zrxvlY5oFCdiRG/V/lFJHCNXJ0k72ATgnyzx8Yqa5arug==}
     engines: {node: '>=16.9.0'}
 
   hook-std@2.0.0:
@@ -5178,8 +5165,8 @@ packages:
   json-stringify-safe@5.0.1:
     resolution: {integrity: sha512-ZClg6AaYvamvYEE82d3Iyd3vSSIjQ+odgjaTzRuO3s7toCdFKczob2i0zCh7JE8kWn17yvAWhUVxvqGwUalsRA==}
 
-  jsondiffpatch@0.6.0:
-    resolution: {integrity: sha512-3QItJOXp2AP1uv7waBkao5nCvhEv+QmJAd38Ybq7wNI74Q+BBmnLn4EDKz6yI9xGAIQoUF87qHt+kc1IVxB4zQ==}
+  jsondiffpatch@0.7.3:
+    resolution: {integrity: sha512-zd4dqFiXSYyant2WgSXAZ9+yYqilNVvragVNkNRn2IFZKgjyULNrKRznqN4Zon0MkLueCg+3QaPVCnDAVP20OQ==}
     engines: {node: ^18.0.0 || >=20.0.0}
     hasBin: true
 
@@ -5660,9 +5647,6 @@ packages:
   minipass@7.1.2:
     resolution: {integrity: sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw==}
     engines: {node: '>=16 || 14 >=14.17'}
-
-  mkdirp-classic@0.5.3:
-    resolution: {integrity: sha512-gKLcREMhtuZRwRAfqP3RFW+TK4JqApVBtOIftVgjuABpAtpxhPGaDcfvbhNvD0B8iD1oUr/txX35NjcaY6Ns/A==}
 
   mkdirp@1.0.4:
     resolution: {integrity: sha512-vVqVZQyf3WLx2Shd0qJ9xuvqgAyKPLAiqITEtqW0oIUjzo3PePDd6fW9iFz30ef7Ysp/oiWqbhszeGWW2T6Gzw==}
@@ -7113,15 +7097,8 @@ packages:
   tailwind-merge@3.3.1:
     resolution: {integrity: sha512-gBXpgUm/3rp1lMZZrM/w7D8GKqshif0zAymAhbCyIt8KMe+0v9DQ7cdYLR4FHH/cKpdTXb+A/tKKU3eolfsI+g==}
 
-  tar-fs@2.1.3:
-    resolution: {integrity: sha512-090nwYJDmlhwFwEW3QQl+vaNnxsO2yVsd45eTKRBzSzu+hlb1w2K9inVq5b0ngXuLVqQ4ApvsUHHnu/zQNkWAg==}
-
-  tar-fs@3.1.0:
-    resolution: {integrity: sha512-5Mty5y/sOF1YWj1J6GiBodjlDc05CUR8PKXrsnFAiSG0xA+GHeWLovaZPYUDXkH/1iKRf2+M5+OrRgzC7O9b7w==}
-
-  tar-stream@2.2.0:
-    resolution: {integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==}
-    engines: {node: '>=6'}
+  tar-fs@3.1.1:
+    resolution: {integrity: sha512-LZA0oaPOc2fVo82Txf3gw+AkEd38szODlptMYejQUhndHMLQ9M059uXR+AfS7DNo0NpINvSqDsvyaCrBVkptWg==}
 
   tar-stream@3.1.7:
     resolution: {integrity: sha512-qJj60CXt7IU1Ffyc3NJMjh6EkuCFej46zUqJ4J7pqYlThyd9bO0XBTmcOIhSzZJVWfsLks0+nle/j538YAW9RQ==}
@@ -8127,6 +8104,8 @@ snapshots:
 
   '@date-fns/tz@1.4.1': {}
 
+  '@dmsnell/diff-match-patch@1.1.0': {}
+
   '@dnd-kit/accessibility@3.1.1(react@19.1.0)':
     dependencies:
       react: 19.1.0
@@ -8346,9 +8325,9 @@ snapshots:
 
   '@hexagon/base64@1.1.28': {}
 
-  '@hono/node-server@1.19.0(hono@4.9.6)':
+  '@hono/node-server@1.19.0(hono@4.9.10)':
     dependencies:
-      hono: 4.9.6
+      hono: 4.9.10
 
   '@hookform/resolvers@3.10.0(react-hook-form@7.62.0(react@19.1.0))':
     dependencies:
@@ -8477,8 +8456,8 @@ snapshots:
       ai: 4.3.19(react@19.1.0)(zod@3.25.76)
       date-fns: 3.6.0
       dotenv: 16.6.1
-      hono: 4.9.6
-      hono-openapi: 0.4.8(hono@4.9.6)(openapi-types@12.1.3)(zod@3.25.76)
+      hono: 4.9.10
+      hono-openapi: 0.4.8(hono@4.9.10)(openapi-types@12.1.3)(zod@3.25.76)
       json-schema: 0.4.0
       json-schema-to-zod: 2.6.1
       pino: 9.9.0
@@ -8568,10 +8547,10 @@ snapshots:
   '@material-ui/core@4.9.8(@types/react@19.1.12)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)':
     dependencies:
       '@babel/runtime': 7.28.3
-      '@material-ui/styles': 4.11.5(@types/react@19.1.12)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      '@material-ui/system': 4.12.2(@types/react@19.1.12)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@material-ui/styles': 4.11.5(@types/react@19.1.12)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
+      '@material-ui/system': 4.12.2(@types/react@19.1.12)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
       '@material-ui/types': 5.1.0(@types/react@19.1.12)
-      '@material-ui/utils': 4.11.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@material-ui/utils': 4.11.3(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
       '@types/react-transition-group': 4.4.12(@types/react@19.1.12)
       clsx: 1.2.1
       hoist-non-react-statics: 3.3.2
@@ -8580,17 +8559,17 @@ snapshots:
       react: 16.14.0
       react-dom: 16.14.0(react@16.14.0)
       react-is: 16.13.1
-      react-transition-group: 4.4.5(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      react-transition-group: 4.4.5(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
     optionalDependencies:
       '@types/react': 19.1.12
 
   '@material-ui/core@4.9.8(@types/react@19.1.12)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
     dependencies:
       '@babel/runtime': 7.28.3
-      '@material-ui/styles': 4.11.5(@types/react@19.1.12)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      '@material-ui/system': 4.12.2(@types/react@19.1.12)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@material-ui/styles': 4.11.5(@types/react@19.1.12)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
+      '@material-ui/system': 4.12.2(@types/react@19.1.12)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
       '@material-ui/types': 5.1.0(@types/react@19.1.12)
-      '@material-ui/utils': 4.11.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@material-ui/utils': 4.11.3(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
       '@types/react-transition-group': 4.4.12(@types/react@19.1.12)
       clsx: 1.2.1
       hoist-non-react-statics: 3.3.2
@@ -8599,7 +8578,7 @@ snapshots:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
       react-is: 16.13.1
-      react-transition-group: 4.4.5(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      react-transition-group: 4.4.5(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
     optionalDependencies:
       '@types/react': 19.1.12
 
@@ -8705,7 +8684,7 @@ snapshots:
       '@babel/runtime': 7.28.3
       '@emotion/hash': 0.8.0
       '@material-ui/types': 5.1.0(@types/react@19.1.12)
-      '@material-ui/utils': 4.11.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@material-ui/utils': 4.11.3(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
       clsx: 1.2.1
       csstype: 2.6.21
       hoist-non-react-statics: 3.3.2
@@ -8720,29 +8699,6 @@ snapshots:
       prop-types: 15.8.1
       react: 16.14.0
       react-dom: 16.14.0(react@16.14.0)
-    optionalDependencies:
-      '@types/react': 19.1.12
-
-  '@material-ui/styles@4.11.5(@types/react@19.1.12)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
-    dependencies:
-      '@babel/runtime': 7.28.3
-      '@emotion/hash': 0.8.0
-      '@material-ui/types': 5.1.0(@types/react@19.1.12)
-      '@material-ui/utils': 4.11.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      clsx: 1.2.1
-      csstype: 2.6.21
-      hoist-non-react-statics: 3.3.2
-      jss: 10.10.0
-      jss-plugin-camel-case: 10.10.0
-      jss-plugin-default-unit: 10.10.0
-      jss-plugin-global: 10.10.0
-      jss-plugin-nested: 10.10.0
-      jss-plugin-props-sort: 10.10.0
-      jss-plugin-rule-value-function: 10.10.0
-      jss-plugin-vendor-prefixer: 10.10.0
-      prop-types: 15.8.1
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
     optionalDependencies:
       '@types/react': 19.1.12
 
@@ -8768,14 +8724,14 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.1.12
 
-  '@material-ui/system@4.12.2(@types/react@19.1.12)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
+  '@material-ui/system@4.12.2(@types/react@19.1.12)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)':
     dependencies:
       '@babel/runtime': 7.28.3
-      '@material-ui/utils': 4.11.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@material-ui/utils': 4.11.3(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
       csstype: 2.6.21
       prop-types: 15.8.1
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
+      react: 16.14.0
+      react-dom: 16.14.0(react@16.14.0)
     optionalDependencies:
       '@types/react': 19.1.12
 
@@ -8807,14 +8763,6 @@ snapshots:
       react-dom: 16.14.0(react@16.14.0)
       react-is: 16.13.1
 
-  '@material-ui/utils@4.11.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
-    dependencies:
-      '@babel/runtime': 7.28.3
-      prop-types: 15.8.1
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
-      react-is: 16.13.1
-
   '@mcpjam/inspector@0.9.8(@babel/runtime@7.28.3)(@types/json-schema@7.0.15)(@types/react@19.1.12)(openapi-types@12.1.3)(use-sync-external-store@1.5.0(react@19.1.0))':
     dependencies:
       '@ai-sdk/anthropic': 1.2.12(zod@3.25.76)
@@ -8825,7 +8773,7 @@ snapshots:
       '@dnd-kit/modifiers': 9.0.0(@dnd-kit/core@6.3.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
       '@dnd-kit/sortable': 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
       '@dnd-kit/utilities': 3.2.2(react@19.1.0)
-      '@hono/node-server': 1.19.0(hono@4.9.6)
+      '@hono/node-server': 1.19.0(hono@4.9.10)
       '@hookform/resolvers': 3.10.0(react-hook-form@7.62.0(react@19.1.0))
       '@mastra/core': 0.13.2(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.76)
       '@mastra/mcp': 0.10.12(@mastra/core@0.13.2(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.76))(@types/json-schema@7.0.15)(zod@3.25.76)
@@ -8845,7 +8793,7 @@ snapshots:
       fast-deep-equal: 3.1.3
       fix-path: 4.0.0
       framer-motion: 12.23.12(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      hono: 4.9.6
+      hono: 4.9.10
       input-otp: 1.4.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       lucide-react: 0.525.0(react@19.1.0)
       next-themes: 0.4.6(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -11188,8 +11136,6 @@ snapshots:
     dependencies:
       '@types/ms': 2.1.0
 
-  '@types/diff-match-patch@1.0.36': {}
-
   '@types/docker-modem@3.0.6':
     dependencies:
       '@types/node': 20.19.11
@@ -11619,7 +11565,7 @@ snapshots:
       '@ai-sdk/react': 1.2.12(react@19.1.0)(zod@3.25.76)
       '@ai-sdk/ui-utils': 1.2.11(zod@3.25.76)
       '@opentelemetry/api': 1.9.0
-      jsondiffpatch: 0.6.0
+      jsondiffpatch: 0.7.3
       zod: 3.25.76
     optionalDependencies:
       react: 19.1.0
@@ -12109,13 +12055,6 @@ snapshots:
 
   binary-extensions@2.3.0: {}
 
-  bl@4.1.0:
-    dependencies:
-      buffer: 5.7.1
-      inherits: 2.0.4
-      readable-stream: 3.6.2
-    optional: true
-
   body-parser@1.20.3:
     dependencies:
       bytes: 3.1.2
@@ -12170,12 +12109,6 @@ snapshots:
   buffer-equal-constant-time@1.0.1: {}
 
   buffer-from@1.1.2: {}
-
-  buffer@5.7.1:
-    dependencies:
-      base64-js: 1.5.1
-      ieee754: 1.2.1
-    optional: true
 
   buffer@6.0.3:
     dependencies:
@@ -12301,9 +12234,6 @@ snapshots:
       readdirp: 3.6.0
     optionalDependencies:
       fsevents: 2.3.3
-
-  chownr@1.1.4:
-    optional: true
 
   cjs-module-lexer@1.4.3: {}
 
@@ -12730,8 +12660,6 @@ snapshots:
       asap: 2.0.6
       wrappy: 1.0.2
 
-  diff-match-patch@1.0.5: {}
-
   diff-sequences@29.6.3: {}
 
   diff@4.0.2: {}
@@ -12762,9 +12690,10 @@ snapshots:
       '@grpc/proto-loader': 0.7.15
       docker-modem: 5.0.6
       protobufjs: 7.5.4
-      tar-fs: 2.1.3
+      tar-fs: 3.1.1
       uuid: 10.0.0
     transitivePeerDependencies:
+      - bare-buffer
       - supports-color
     optional: true
 
@@ -13373,9 +13302,6 @@ snapshots:
 
   fromentries@1.3.2: {}
 
-  fs-constants@1.0.0:
-    optional: true
-
   fs-extra@10.1.0:
     dependencies:
       graceful-fs: 4.2.11
@@ -13623,15 +13549,15 @@ snapshots:
     dependencies:
       react-is: 16.13.1
 
-  hono-openapi@0.4.8(hono@4.9.6)(openapi-types@12.1.3)(zod@3.25.76):
+  hono-openapi@0.4.8(hono@4.9.10)(openapi-types@12.1.3)(zod@3.25.76):
     dependencies:
       json-schema-walker: 2.0.0
       openapi-types: 12.1.3
     optionalDependencies:
-      hono: 4.9.6
+      hono: 4.9.10
       zod: 3.25.76
 
-  hono@4.9.6: {}
+  hono@4.9.10: {}
 
   hook-std@2.0.0: {}
 
@@ -14015,11 +13941,9 @@ snapshots:
 
   json-stringify-safe@5.0.1: {}
 
-  jsondiffpatch@0.6.0:
+  jsondiffpatch@0.7.3:
     dependencies:
-      '@types/diff-match-patch': 1.0.36
-      chalk: 5.6.2
-      diff-match-patch: 1.0.5
+      '@dmsnell/diff-match-patch': 1.1.0
 
   jsonfile@6.2.0:
     dependencies:
@@ -14708,9 +14632,6 @@ snapshots:
   minimist@1.2.8: {}
 
   minipass@7.1.2: {}
-
-  mkdirp-classic@0.5.3:
-    optional: true
 
   mkdirp@1.0.4:
     optional: true
@@ -15611,6 +15532,15 @@ snapshots:
       react: 16.14.0
       react-dom: 16.12.0(react@16.12.0)
 
+  react-transition-group@4.4.5(react-dom@16.14.0(react@16.14.0))(react@16.14.0):
+    dependencies:
+      '@babel/runtime': 7.28.3
+      dom-helpers: 5.2.1
+      loose-envify: 1.4.0
+      prop-types: 15.8.1
+      react: 16.14.0
+      react-dom: 16.14.0(react@16.14.0)
+
   react-transition-group@4.4.5(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:
       '@babel/runtime': 7.28.3
@@ -16361,15 +16291,7 @@ snapshots:
 
   tailwind-merge@3.3.1: {}
 
-  tar-fs@2.1.3:
-    dependencies:
-      chownr: 1.1.4
-      mkdirp-classic: 0.5.3
-      pump: 3.0.3
-      tar-stream: 2.2.0
-    optional: true
-
-  tar-fs@3.1.0:
+  tar-fs@3.1.1:
     dependencies:
       pump: 3.0.3
       tar-stream: 3.1.7
@@ -16378,15 +16300,6 @@ snapshots:
       bare-path: 3.0.0
     transitivePeerDependencies:
       - bare-buffer
-    optional: true
-
-  tar-stream@2.2.0:
-    dependencies:
-      bl: 4.1.0
-      end-of-stream: 1.4.5
-      fs-constants: 1.0.0
-      inherits: 2.0.4
-      readable-stream: 3.6.2
     optional: true
 
   tar-stream@3.1.7:
@@ -16426,7 +16339,7 @@ snapshots:
       proper-lockfile: 4.1.2
       properties-reader: 2.3.0
       ssh-remote-port-forward: 1.0.4
-      tar-fs: 3.1.0
+      tar-fs: 3.1.1
       tmp: 0.2.5
       undici: 5.29.0
     transitivePeerDependencies:

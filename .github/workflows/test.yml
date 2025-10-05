@@ -148,15 +148,50 @@ jobs:
         cache: 'pnpm'
     - name: Install dependencies
       run: pnpm install
-    - name: Test basic server example
+
+    - name: Test basic server example syntax
+      run: node -c examples/01-basic-server/server.js
+
+    - name: Test basic server startup
       run: |
-        node examples/servers/basic-server.js &
+        timeout 10s pnpm start:basic &
         SERVER_PID=$!
-        sleep 2
-        kill $SERVER_PID || echo "Server already stopped"
-    - name: Test AI server example
+        sleep 3
+        if ps -p $SERVER_PID > /dev/null; then
+          echo "✅ Basic server started successfully"
+          kill $SERVER_PID || echo "Server already stopped"
+        else
+          echo "❌ Basic server failed to start"
+          exit 1
+        fi
+
+    - name: Test MCP server example syntax
+      run: node -c examples/02-mcp-server/server.js
+
+    - name: Test MCP server startup
       run: |
-        node -c examples/servers/ai-server-example.js
+        timeout 10s pnpm start:mcp &
+        SERVER_PID=$!
+        sleep 3
+        if ps -p $SERVER_PID > /dev/null; then
+          echo "✅ MCP server started successfully"
+          kill $SERVER_PID || echo "Server already stopped"
+        else
+          echo "❌ MCP server failed to start"
+          exit 1
+        fi
+
+    - name: Verify example dependencies installed
+      run: |
+        cd examples/01-basic-server && test -d node_modules && echo "✅ Basic example dependencies OK" && cd ../..
+        cd examples/02-mcp-server && test -d node_modules && echo "✅ MCP example dependencies OK" && cd ../..
+
+    - name: Test example package linking
+      run: |
+        cd examples/01-basic-server
+        npm ls simple-rpc-ai-backend || echo "⚠️  Package linked via file://"
+        cd ../02-mcp-server
+        npm ls simple-rpc-ai-backend || echo "⚠️  Package linked via file://"
 
   release-check:
     name: Release Readiness Check
