@@ -1,0 +1,13 @@
+remote_theme: just-the-docs/just-the-docs
+title: Simple RPC AI Backend Docs
+description: Developer documentation for the Simple RPC AI Backend server.
+logo: /assets/images/logo.png
+color_scheme: light
+aux_links:
+  Repository: https://github.com/AWolf81/simple-rpc-ai-backend
+nav_external_links:
+  - title: GitHub Repository
+    url: https://github.com/AWolf81/simple-rpc-ai-backend
+    opens_in_new_tab: true
+footer_content: "© 2024 Simple RPC AI Backend"
+search_enabled: true
