@@ -3,8 +3,7 @@
     "master",
     {
       "name": "next",
-      "channel": "next",
-      "prerelease": true
+      "prerelease": "next"
     }
   ],
   "plugins": [

@@ -215,6 +215,25 @@ npm install simple-rpc-ai-backend
 pnpm add simple-rpc-ai-backend
 ```
 
+## 🧰 Troubleshooting
+
+- **Error**: `Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: No "exports" main defined ...` with stack frames from `node:internal/modules/esm/resolve` while running under `tsx`
+- **Why**: When the consuming project lacks `"type": "module"` in `package.json`, `tsx` falls back to CommonJS resolution and Node cannot load this package's ESM export map
+- **Fix**: Opt the consuming server into ESM by declaring `"type": "module"` in its `package.json`, or otherwise run the code in an ESM runtime
+
+```jsonc
+// package.json
+{
+  "name": "your-server",
+  "type": "module",
+  "dependencies": {
+    "simple-rpc-ai-backend": "^0.1.4"
+  }
+}
+```
+
+- **Next**: Restart the process (or rerun `tsx ...`) so Node picks up the module type change
+
 ### Base Package Routers
 
 The installed package includes these core routers (50 procedures, 19 MCP tools):
