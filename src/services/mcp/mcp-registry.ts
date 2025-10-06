@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events';
 import { spawn, ChildProcess } from 'child_process';
 import fetch from 'node-fetch';
+import { resolveNodePackageRunner } from '../../utils/node-package-runner.js';
 
 export interface MCPServerConfig {
   id: string;
@@ -154,7 +155,16 @@ export class MCPRegistryService extends EventEmitter {
       throw new Error('Command is required for stdio servers');
     }
 
-    const childProcess = spawn(config.command, config.args || [], {
+    let command = config.command;
+    let args = [...(config.args || [])];
+
+    if (command === 'npx') {
+      const runner = resolveNodePackageRunner();
+      command = runner.command;
+      args = [...runner.args, ...args];
+    }
+
+    const childProcess = spawn(command, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, ...config.env }
     });

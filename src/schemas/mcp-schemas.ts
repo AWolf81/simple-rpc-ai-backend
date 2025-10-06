@@ -50,9 +50,9 @@ export const serverConfigSchema = defineSchema(
     type: z.enum(['stdio', 'http']).describe("Communication type"),
     command: z.string().optional().describe("Command to execute (stdio only)"),
     args: z.array(z.string()).optional().describe("Command arguments"),
-    env: z.record(z.string()).optional().describe("Environment variables"),
+    env: z.record(z.string(), z.string()).optional().describe("Environment variables"),
     url: z.string().url().optional().describe("HTTP endpoint URL"),
-    headers: z.record(z.string()).optional().describe("HTTP headers"),
+    headers: z.record(z.string(), z.string()).optional().describe("HTTP headers"),
     timeout: z.number().positive().optional().describe("Request timeout in milliseconds"),
     retryAttempts: z.number().min(0).optional().describe("Number of retry attempts"),
     autoRestart: z.boolean().optional().describe("Auto-restart on failure"),
@@ -78,7 +78,7 @@ export const serverConfigSchema = defineSchema(
 export const toolExecutionSchema = defineSchema(
   z.object({
     name: z.string().min(1).describe("Name of the tool to execute"),
-    arguments: z.record(z.any()).optional().describe("Tool arguments"),
+    arguments: z.record(z.string(), z.any()).optional().describe("Tool arguments"),
     serverId: z.string().optional().describe("Specific server ID to use"),
     context: z.object({
       userId: z.string().optional().describe("User identifier"),
@@ -107,7 +107,7 @@ export const toolExecutionSchema = defineSchema(
 export const sdkToolExecutionSchema = defineSchema(
   z.object({ 
     name: z.string().describe("Tool name"),
-    args: z.record(z.any()).optional().describe("Tool arguments") 
+    args: z.record(z.string(), z.any()).optional().describe("Tool arguments") 
   }),
   {
     id: 'mcp.sdkToolExecution',

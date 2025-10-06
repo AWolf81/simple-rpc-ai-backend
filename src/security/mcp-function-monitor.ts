@@ -7,7 +7,8 @@
 
 import crypto from 'crypto';
 import { SecurityLogger, SecurityEventType, SecuritySeverity } from './security-logger';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import type { ZodTypeAny } from 'zod';
+import { zodSchemaToJson } from '../utils/zod-json-schema';
 // Type definitions for better type safety
 
 export interface MCPFunctionMonitorConfig {
@@ -215,10 +216,10 @@ export class MCPFunctionMonitor {
       // Extract schema from Zod validator
       const procedureDef = procedure as { _def?: { inputs?: unknown[] } };
       if (procedureDef._def?.inputs && Array.isArray(procedureDef._def.inputs) && procedureDef._def.inputs.length > 0) {
-        const zodSchema = procedureDef._def.inputs[0];
+        const zodSchema = procedureDef._def.inputs[0] as ZodTypeAny;
         // Only process if zodSchema is valid
         if (zodSchema && typeof zodSchema === 'object' && 'parse' in zodSchema) {
-          jsonSchema = zodToJsonSchema(zodSchema as Parameters<typeof zodToJsonSchema>[0]);
+          jsonSchema = zodSchemaToJson(zodSchema);
         }
         
         // Analyze schema metadata
