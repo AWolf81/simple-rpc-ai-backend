@@ -89,16 +89,16 @@ npx check-mcp-security --url http://localhost:8000/mcp
 ### Screenshots
 
 **Dev Panel - API Explorer**
-![Dev Panel Screenshot](docs/images/dev_panel_screenshot_2025-10-04%2023-07-11.png)
+![Dev Panel Screenshot](https://raw.githubusercontent.com/AWolf81/simple-rpc-ai-backend/master/docs/images/dev_panel_screenshot_2025-10-04%2023-07-11.png)
 *Interactive API explorer with live testing and auto-generated documentation*
 
 **tRPC Playground**
-![tRPC Playground Screenshot](docs/images/trpc_playground_screenshot_2025-10-04%2023-11-12.png)
+![tRPC Playground Screenshot](https://raw.githubusercontent.com/AWolf81/simple-rpc-ai-backend/master/docs/images/trpc_playground_screenshot_2025-10-04%2023-11-12.png)
 *Type-safe tRPC testing with IntelliSense and full custom router support*
 → [sachinraja/trpc-playground](https://github.com/sachinraja/trpc-playground)
 
 **MCP Inspector (MCP Jam)**
-![MCP Jam Screenshot](docs/images/mcp_jam_screenshot_2025-10-04%2023-09-28.png)
+![MCP Jam Screenshot](https://raw.githubusercontent.com/AWolf81/simple-rpc-ai-backend/master/docs/images/mcp_jam_screenshot_2025-10-04%2023-09-28.png)
 *Live MCP tool discovery and testing with protocol compliance verification*
 → [MCPJam/inspector](https://github.com/MCPJam/inspector)
 
