@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Troubleshooting
 parent: Common Issues
 grand_parent: Documentation
@@ -72,5 +71,5 @@ Restart the server after restoring the module type so ESM imports resolve correc
 ## Getting Help
 
 1. Confirm Node.js and Python versions with `node --version` and `python3 --version`.
-2. Capture the failing command output.
-3. Open an issue with system details and logs so we can investigate quickly.
+2. Capture the failing command output and try to reduce it to a small reproduction.
+3. Open an issue with system details, the reproduction, and logs at [GitHub Issues](https://github.com/AWolf81/simple-rpc-ai-backend/issues) so we can investigate quickly.

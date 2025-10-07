@@ -20,7 +20,7 @@ Secure, platform-agnostic AI backend with **system prompt protection** for enter
 - 🤖 1,700+ AI models from 33+ providers
 - 🧩 Custom router extensions with automatic MCP tool discovery
 
-👉 **Need the full documentation?** Start at [`docs/index.md`](docs/index.md) or run `pnpm docs:dev` for a local GitHub Pages preview.
+👉 **Need the full documentation?** Start at [`docs/index.md`](docs/index.md) or run `pnpm jekyll:dev` for a local GitHub Pages preview.
 
 ---
 
@@ -140,14 +140,18 @@ npx check-mcp-security --url http://localhost:8000/mcp
 Publish the docs to GitHub Pages:
 
 ```bash
-pnpm docs:deploy
+pnpm jekyll:deploy
 ```
 
 Preview locally:
 
 ```bash
-pnpm docs:dev
+pnpm jekyll:setup   # installs the Ruby gems defined in docs/Gemfile
+pnpm jekyll:dev     # launches the live preview from the docs/ folder
 ```
+
+> 💡 On Windows, if you run `pnpm jekyll:build` manually and notice missing styles, pass an absolute `_site` path via `--baseurl`, e.g.  
+> `pnpm jekyll:build -- --baseurl "C:/path/to/simple-rpc-ai-backend/docs/_site"`
 
 ---
 

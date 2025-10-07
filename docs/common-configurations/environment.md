@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Environment Configuration
 parent: Common Configurations
 grand_parent: Documentation
@@ -34,12 +33,36 @@ Service providers correspond to server-managed credentials that the platform fun
 
 ## Registry Management
 
-```bash
-export REGISTRY_CACHE_PATH=.cache/registry
-export REGISTRY_REFRESH_INTERVAL=3600
+At install time the backend pulls the latest model catalogue from `@anolilab/ai-model-registry`. Runtime reads always go through that library, so there is no manual cache path or refresh interval to configure.
+
+To override pricing or models:
+
+```ts
+import { ProviderRegistryService } from 'simple-rpc-ai-backend';
+
+const registry = new ProviderRegistryService(
+  ['anthropic', 'openai'],      // service-managed providers
+  ['anthropic', 'openai'],      // BYOK providers
+  []
+);
+
+registry.addPricingOverride({
+  provider: 'openai',
+  model: 'gpt-4o',
+  pricing: { input: 2.5, output: 10 },
+  reason: 'Enterprise contract'
+});
+
+registry.addModelOverride({
+  provider: 'anthropic',
+  id: 'claude-3-7-sonnet-20250219',
+  name: 'Claude 3.7 Sonnet',
+  capabilities: ['text', 'json'],
+  contextWindow: 200000
+});
 ```
 
-Use `pnpm run registry:setup` to prefetch data before deployments and `pnpm run registry:health` to validate availability.
+Place overrides in your server bootstrap (before `createRpcAiServer`) so the dev panel and MCP surface the updated metadata.
 
 ## Workspace Controls
 

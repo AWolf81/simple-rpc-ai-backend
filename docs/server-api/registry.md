@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Registry
 parent: Server API
 grand_parent: Documentation
@@ -12,9 +11,9 @@ The Simple RPC AI Backend integrates with `@anolilab/ai-model-registry` to deliv
 
 ## Architecture
 
-1. **External Registry** – pulls live provider/model data.
+1. **External Registry Package** – ships curated provider/model metadata via `@anolilab/ai-model-registry`.
 2. **ProviderRegistryService** – filters providers, applies overrides, and exposes metadata via tRPC.
-3. **Fallback Data** – ensures availability when the external registry is offline.
+3. **Fallback Data** – ensures availability when the external registry package cannot be resolved.
 
 ## Quick Start
 
@@ -51,14 +50,6 @@ export AI_SERVICE_PROVIDERS=anthropic,openai,google
 export AI_BYOK_PROVIDERS=anthropic,openai,google,custom-ai
 ```
 
-Run helper scripts as needed:
-
-```bash
-pnpm run registry:setup        # Prefetch all data
-pnpm run registry:download -- openai
-pnpm run registry:health       # Check registry availability
-```
-
 ## Pricing Overrides
 
 ```typescript
@@ -75,12 +66,6 @@ registry.addPricingOverride({
 
 Apply provider-level overrides by omitting the `model` property.
 
-## Monitoring
+## Monitoring & Resilience
 
-Use `pnpm run registry:monitor` or custom scripts (see `examples/registry-health-monitoring.js`) to track freshness and detect outages early.
-
-## Zero-Downtime Strategy
-
-- Prefetch data during deployments with `registry:setup`.
-- Store cached registry files in mounted volumes or persistent disks.
-- Keep fallbacks updated with manual overrides for critical models.
+The service relies on `@anolilab/ai-model-registry` at runtime. When the library is unavailable the backend serves the bundled fallback metadata and `getHealthStatus()` returns `status: 'unhealthy'` with the error message from the import. Hook that method into your own health endpoint or scheduler if you need alerts when the live registry is unreachable. Because data is loaded directly from the package there is no explicit cache directory to manage; customize pricing or model entries through `addPricingOverride` / `addModelOverride` as shown above.

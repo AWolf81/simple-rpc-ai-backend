@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Resources
 parent: Server API
 grand_parent: Documentation

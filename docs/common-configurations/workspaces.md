@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Workspaces
 parent: Common Configurations
 grand_parent: Documentation
@@ -20,9 +19,34 @@ Understand the distinction between server-managed workspaces and client-supplied
 | Access Control | Enforced by server policies | Granted by the client |
 | MCP Role | Not part of `roots/list` | Exposed via `roots/list` |
 
+## Architecture Overview
+
+```mermaid
+flowchart TD
+  subgraph Client
+    clientRoots[Client-managed directories<br/>e.g. ~/projects,<br/>/mnt/shared/projectX]
+  end
+
+  subgraph Server
+    rpcServer((tRPC / MCP Server))
+    serverWorkspaces[Server Workspaces<br/>Configured via serverWorkspaces]
+  end
+
+  clientRoots -- "roots/list" --> rpcServer
+  rpcServer -- "registerClientWorkspace" --> clientRoots
+  rpcServer -- "listFiles / readFile / writeFile" --> serverWorkspaces
+```
+
 ## Server Workspaces
 
 Server workspaces are directories registered by the server to expose curated content. They are available via tRPC and MCP tools like `getServerWorkspaces`, `listFiles`, and `readFile`.
+
+### Use Cases
+
+- **Templates & examples** – expose curated sample projects or onboarding kits.
+- **Reference data** – serve static catalogues, project manifests, or SQL migrations.
+- **Shared resources** – provide compliance documents or knowledge-base exports.
+- **Scratch space** – give users a temporary area for uploads with quotas.
 
 ### Example Configuration
 
@@ -57,6 +81,15 @@ const server = createRpcAiServer({
 - Limit path traversal with `allowedPaths` and `blockedPaths`.
 - Set `followSymlinks: false` to avoid symlink escapes.
 - Impose `maxFileSize` limits for uploads or writes.
+- Set up monitoring to log high-risk operations (delete/write).
+
+### Available Tools
+
+When `serverWorkspaces` is configured, these tRPC/MCP tools become available:
+
+- `getServerWorkspaces`
+- `listFiles`, `readFile`, `writeFile`, `pathExists`
+- `addServerWorkspace`, `removeServerWorkspace`
 
 ## MCP Roots
 
@@ -79,7 +112,77 @@ const roots = await server.mcpCall('roots/list');
 - Validate incoming `file://` URIs on the client side.
 - Monitor access patterns and audit when sensitive files are involved.
 - Ensure MCP clients advertise the `roots` capability (`{"roots": {"listChanged": true}}`).
+- Send `notifications/roots/list_changed` when the client's workspace list changes.
+- Handle missing roots gracefully—clients may revoke them at any time.
 
-## Migration Notes
+## Configuration Scenarios
 
-Legacy `rootFolders` configurations should be replaced with the `serverWorkspaces` structure. Combine server-managed directories with client registrations to achieve the full MCP experience.
+```ts
+const server = createRpcAiServer({
+  serverWorkspaces: {
+    templates: {
+      path: '/opt/templates',
+      readOnly: true,
+      allowedExtensions: ['.md', '.json']
+    },
+    sandbox: {
+      path: '/tmp/workspace',
+      readOnly: false,
+      maxFileSize: 10 * 1024 * 1024,
+      allowedPaths: ['**/*.json', '**/*.md'],
+      blockedPaths: ['**/node_modules/**', '**/.git/**']
+    }
+  },
+  mcp: {
+    enabled: true,
+    auth: { requireAuthForToolsCall: true }
+  }
+});
+```
+
+On the MCP client side:
+
+```jsonc
+{
+  "method": "initialize",
+  "params": {
+    "capabilities": {
+      "roots": { "listChanged": true }
+    }
+  }
+}
+```
+
+## Security Considerations
+
+- **Principle of least privilege** – expose the smallest directory possible.
+- **Readonly first** – flip `readOnly` to `false` only when you truly need write access.
+- **File type allowlists** – set `allowedExtensions` rather than relying on defaults.
+- **Symlink protection** – keep `followSymlinks: false` unless you trust the tree.
+- **Audit trails** – enable structured logging for file operations and review regularly.
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Resolution |
+| --- | --- | --- |
+| `No workspaces available` | `serverWorkspaces` missing | Add at least one workspace configuration. |
+| `writeFile` returns `ACCESS_DENIED` | Workspace is read-only or path blocked | Toggle `readOnly` or adjust path rules. |
+| MCP client cannot see roots | Client did not advertise `roots` capability | Ensure `initialize` payload includes `roots`. |
+| Unexpected files exposed | `allowedPaths` too broad | Tighten glob patterns or add `blockedPaths`. |
+
+Enable debug logging to inspect decisions:
+
+```ts
+const server = createRpcAiServer({
+  monitoring: {
+    logging: { level: 'debug' }
+  }
+});
+```
+
+## Best Practices Recap
+
+- Keep server workspaces curated and audited.
+- Require explicit user consent before registering MCP roots.
+- Combine server and client workspaces for a complete experience.
+- Review configurations periodically—especially before enabling write access.

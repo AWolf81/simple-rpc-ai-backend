@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Tools
 parent: Server API
 grand_parent: Documentation

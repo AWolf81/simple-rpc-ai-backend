@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Authentication
 parent: Common Configurations
 grand_parent: Documentation

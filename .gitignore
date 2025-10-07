@@ -76,6 +76,9 @@ temp/
 # Local development
 .cache/
 .parcel-cache/
+docs/.bundle/
+docs/_site/
+docs/vendor/
 
 # Session logs
 last-session-*.txt

@@ -1,3 +1,10 @@
+---
+title: MCP OAuth Authentication
+parent: Common Configurations
+grand_parent: Documentation
+nav_order: 6
+---
+
 # MCP OAuth Authentication Configuration Guide
 
 Complete guide for configuring authentication in the Model Context Protocol (MCP) server.
@@ -187,7 +194,7 @@ NODE_ENV=production  # Automatically enables trust proxy
    - Ngrok: `https://your-ngrok-id.ngrok.io/oauth/callback`
 4. Copy Client ID and Secret to `.env.oauth`
 
-See [OAUTH_SETUP.md](./OAUTH_SETUP.md) for detailed OAuth setup instructions.
+See the [Authentication guide]({{ site.baseurl }}{% link common-configurations/authentication.md %}) for a full walkthrough of provider credential setup.
 
 ### OAuth Session Storage Options
 
@@ -403,81 +410,36 @@ When `authType: 'both'`, the server accepts either OAuth or JWT:
 
 ### OAuth Flow
 
-```
-┌─────────────┐                 ┌─────────────┐                 ┌─────────────┐
-│             │                 │             │                 │             │
-│  MCP Client │                 │  MCP Server │                 │   Google    │
-│  (Browser)  │                 │             │                 │   OAuth2    │
-│             │                 │             │                 │             │
-└──────┬──────┘                 └──────┬──────┘                 └──────┬──────┘
-       │                               │                               │
-       │  1. Discovery Request         │                               │
-       │  GET /.well-known/...         │                               │
-       ├──────────────────────────────>│                               │
-       │                               │                               │
-       │  2. OAuth Endpoints           │                               │
-       │  (authorize, token, etc.)     │                               │
-       │<──────────────────────────────┤                               │
-       │                               │                               │
-       │  3. Redirect to /oauth/authorize                              │
-       ├──────────────────────────────>│                               │
-       │                               │  4. Redirect to Google        │
-       │                               ├──────────────────────────────>│
-       │                               │                               │
-       │  5. Google Login Page                                         │
-       │<──────────────────────────────────────────────────────────────┤
-       │                               │                               │
-       │  6. User Authenticates        │                               │
-       ├──────────────────────────────────────────────────────────────>│
-       │                               │                               │
-       │  7. Redirect with code        │                               │
-       │<──────────────────────────────────────────────────────────────┤
-       │                               │                               │
-       │  8. Exchange code for token   │                               │
-       │  POST /oauth/token            │                               │
-       ├──────────────────────────────>│                               │
-       │                               │  9. Validate code with Google │
-       │                               ├──────────────────────────────>│
-       │                               │                               │
-       │                               │  10. User info + tokens       │
-       │                               │<──────────────────────────────┤
-       │                               │                               │
-       │  11. Access token + session   │                               │
-       │<──────────────────────────────┤                               │
-       │                               │                               │
-       │  12. MCP Request with token   │                               │
-       │  POST /mcp                    │                               │
-       │  Authorization: Bearer <token>│                               │
-       ├──────────────────────────────>│                               │
-       │                               │                               │
-       │  13. MCP Response             │                               │
-       │<──────────────────────────────┤                               │
-       │                               │                               │
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client (Browser)
+    participant Server as MCP Server
+    participant Google as Google OAuth 2.0
+
+    Client->>Server: 1. GET /.well-known/...
+    Server-->>Client: 2. OAuth metadata
+    Client->>Server: 3. Request /oauth/authorize
+    Server->>Google: 4. Redirect user to Google
+    Google-->>Client: 5. Render login page
+    Client->>Google: 6. Submit credentials / consent
+    Google-->>Server: 7. Redirect with authorization code
+    Server->>Google: 8. Exchange code for tokens (POST /oauth/token)
+    Google-->>Server: 9. Return tokens + user info
+    Server-->>Client: 10. Establish session / issue access token
+    Client->>Server: 11. POST /mcp (Authorization: Bearer token)
+    Server-->>Client: 12. Execute tool and respond
 ```
 
 ### JWT Flow
 
-```
-┌─────────────┐                 ┌─────────────┐
-│             │                 │             │
-│  MCP Client │                 │  MCP Server │
-│  (Service)  │                 │             │
-│             │                 │             │
-└──────┬──────┘                 └──────┬──────┘
-       │                               │
-       │  1. MCP Request with JWT      │
-       │  POST /mcp                    │
-       │  Authorization: Bearer <jwt>  │
-       ├──────────────────────────────>│
-       │                               │
-       │                               │  2. Validate JWT
-       │                               │     - Signature
-       │                               │     - Expiration
-       │                               │     - Scopes
-       │                               │
-       │  3. MCP Response              │
-       │<──────────────────────────────┤
-       │                               │
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client (Service)
+    participant Server as MCP Server
+
+    Client->>Server: 1. POST /mcp (Authorization: Bearer <jwt>)
+    Server->>Server: 2. Validate JWT (signature, expiry, scopes)
+    Server-->>Client: 3. Execute tool and respond
 ```
 
 ## Testing
@@ -485,6 +447,8 @@ When `authType: 'both'`, the server accepts either OAuth or JWT:
 ### Local Testing with Ngrok
 
 **Step 1: Start the server with trust proxy enabled:**
+
+> Note: the demo uses the OAuth configuration shown earlier (client IDs, secrets, and session storage).
 
 ```bash
 # Enable trust proxy for reverse proxy support
@@ -549,6 +513,8 @@ The OAuth flow will now work correctly with ngrok because:
 - OAuth redirects use the ngrok URL instead of localhost
 
 ### OAuth Testing (Direct localhost)
+
+> ⚠️ Not recommended: configuring HTTPS correctly for localhost is difficult, and many MCP clients (including MCP Jam) require HTTPS. Prefer the ngrok-based workflow above for real testing.
 
 **1. Start the OAuth-enabled server:**
 
@@ -822,21 +788,21 @@ LOG_LEVEL=info
 
 ## Related Documentation
 
-- [OAuth Setup Guide](./OAUTH_SETUP.md) - Complete OAuth setup with Google
-- [MCP Security](../specs/features/mcp-oauth-authentication.md) - Security architecture
-- [Server Workspaces](./SERVER_WORKSPACES_VS_MCP_ROOTS.md) - Workspace management
-- [Tool Usage](./TOOL_USAGE.md) - Using MCP tools
+- [OAuth Setup Guide]({ { "/./OAUTH_SETUP.md" | relative_url } }) - Complete OAuth setup with Google
+- [MCP Security]({ { "/../specs/features/mcp-oauth-authentication.md" | relative_url } }) - Security architecture
+- [Server Workspaces]({ { "/./SERVER_WORKSPACES_VS_MCP_ROOTS.md" | relative_url } }) - Workspace management
+- [Tool Usage]({ { "/./TOOL_USAGE.md" | relative_url } }) - Using MCP tools
 
 ## Reference
 
 ### Configuration Files
-- **Type definitions**: [src/trpc/routers/mcp/types.ts](../src/trpc/routers/mcp/types.ts)
-- **Server config**: [src/rpc-ai-server.ts:111-128](../src/rpc-ai-server.ts#L111-L128)
-- **Protocol handler**: [src/trpc/routers/mcp/protocol-handler.ts](../src/trpc/routers/mcp/protocol-handler.ts)
+- **Type definitions**: [src/trpc/routers/mcp/types.ts]({ { "/../src/trpc/routers/mcp/types.ts/index.md" | relative_url } })
+- **Server config**: [src/rpc-ai-server.ts:111-128]({ { "/../src/rpc-ai-server.ts#L111-L128/index.md" | relative_url } })
+- **Protocol handler**: [src/trpc/routers/mcp/protocol-handler.ts]({ { "/../src/trpc/routers/mcp/protocol-handler.ts/index.md" | relative_url } })
 
 ### Test Helpers
-- **OAuth config**: `createOAuthMCPConfig()` in [src/security/test-helpers.ts:187-199](../src/security/test-helpers.ts#L187-L199)
-- **JWT config**: `createJWTMCPConfig()` in [src/security/test-helpers.ts:163-182](../src/security/test-helpers.ts#L163-L182)
+- **OAuth config**: `createOAuthMCPConfig()` in [src/security/test-helpers.ts:187-199]({ { "/../src/security/test-helpers.ts#L187-L199/index.md" | relative_url } })
+- **JWT config**: `createJWTMCPConfig()` in [src/security/test-helpers.ts:163-182]({ { "/../src/security/test-helpers.ts#L163-L182/index.md" | relative_url } })
 
 ### Examples
 - **OAuth demo**: `pnpm demo:oauth` - See `examples/authentication/` directory
