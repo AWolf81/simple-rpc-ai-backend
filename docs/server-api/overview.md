@@ -54,3 +54,4 @@ Review the sections below for implementation details and integration examples:
 - [Resources]({{ site.baseurl }}{% link server-api/resources.md %})
 - [Tools]({{ site.baseurl }}{% link server-api/tools.md %})
 - [Registry]({{ site.baseurl }}{% link server-api/registry.md %})
+- [Methods]({{ site.baseurl }}{% link server-api/methods.md %})

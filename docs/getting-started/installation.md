@@ -35,6 +35,10 @@ pnpm build
 
 The install script pulls model registry data and compiles the TypeScript server output in `dist/`.
 
+## Install Example Dependencies
+
+The `examples/*` directories depend on the workspace copy of `simple-rpc-ai-backend` via a relative `file:../../` reference. After installing the root workspace, run `pnpm install` (or `npm install`) inside each example you intend to try. Skipping this step will surface runtime errors such as `Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'simple-rpc-ai-backend' imported from .../examples/02-mcp-server/server.js`.
+
 ## Safe Installation Mode
 
 If you hit native build issues (for example with `bcrypt`, `cpu-features`, or `ssh2`), run the safe installer which swaps in JavaScript fallbacks and ignores optional dependency failures.

@@ -786,25 +786,21 @@ LOG_LEVEL=info
 3. Verify token/session is still valid
 4. Check JWT scopes include 'mcp:call'
 
-## Related Documentation
-
-- [OAuth Setup Guide]({ { "/./OAUTH_SETUP.md" | relative_url } }) - Complete OAuth setup with Google
-- [MCP Security]({ { "/../specs/features/mcp-oauth-authentication.md" | relative_url } }) - Security architecture
-- [Server Workspaces]({ { "/./SERVER_WORKSPACES_VS_MCP_ROOTS.md" | relative_url } }) - Workspace management
-- [Tool Usage]({ { "/./TOOL_USAGE.md" | relative_url } }) - Using MCP tools
-
 ## Reference
 
+### Specifications
+- **Model Context Protocol Authorization** (2025-06-18): [modelcontextprotocol.io/specification/2025-06-18/basic/authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization)
+
 ### Configuration Files
-- **Type definitions**: [src/trpc/routers/mcp/types.ts]({ { "/../src/trpc/routers/mcp/types.ts/index.md" | relative_url } })
-- **Server config**: [src/rpc-ai-server.ts:111-128]({ { "/../src/rpc-ai-server.ts#L111-L128/index.md" | relative_url } })
-- **Protocol handler**: [src/trpc/routers/mcp/protocol-handler.ts]({ { "/../src/trpc/routers/mcp/protocol-handler.ts/index.md" | relative_url } })
+- **Type definitions**: [src/trpc/routers/mcp/types.ts](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/types.ts)
+- **Server config**: [src/rpc-ai-server.ts#L111-L128](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L111-L128)
+- **Protocol handler**: [src/trpc/routers/mcp/protocol-handler.ts](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/protocol-handler.ts)
 
 ### Test Helpers
-- **OAuth config**: `createOAuthMCPConfig()` in [src/security/test-helpers.ts:187-199]({ { "/../src/security/test-helpers.ts#L187-L199/index.md" | relative_url } })
-- **JWT config**: `createJWTMCPConfig()` in [src/security/test-helpers.ts:163-182]({ { "/../src/security/test-helpers.ts#L163-L182/index.md" | relative_url } })
+- **OAuth config**: `createOAuthMCPConfig()` in [src/security/test-helpers.ts#L187-L199](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/security/test-helpers.ts#L187-L199)
+- **JWT config**: `createJWTMCPConfig()` in [src/security/test-helpers.ts#L163-L182](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/security/test-helpers.ts#L163-L182)
 
 ### Examples
-- **OAuth demo**: `pnpm demo:oauth` - See `examples/authentication/` directory
-- **Basic server**: `examples/01-basic-server/server.js`
-- **MCP server**: `examples/02-mcp-server/server.js`
+- **Recommended OAuth walkthrough**: Use the [examples/02-mcp-server](https://github.com/AWolf81/simple-rpc-ai-backend/tree/master/examples/02-mcp-server) project (`pnpm install && pnpm start` inside that folder) to exercise the OAuth configuration described above.
+- **Basic server**: [`examples/01-basic-server/server.js`](https://github.com/AWolf81/simple-rpc-ai-backend/tree/master/examples/01-basic-server)
+- **MCP server**: [`examples/02-mcp-server/server.js`](https://github.com/AWolf81/simple-rpc-ai-backend/tree/master/examples/02-mcp-server)

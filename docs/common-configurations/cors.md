@@ -571,19 +571,19 @@ These endpoints use `Access-Control-Allow-Origin: *` regardless of your CORS con
 ## Reference
 
 ### Configuration Files
-- **Server config interface**: [src/rpc-ai-server.ts:130-134]({ { "/../src/rpc-ai-server.ts#L130-L134/index.md" | relative_url } })
-- **Default CORS config**: [src/rpc-ai-server.ts:461-465]({ { "/../src/rpc-ai-server.ts#L461-L465/index.md" | relative_url } })
-- **CORS middleware setup**: [src/rpc-ai-server.ts:692-707]({ { "/../src/rpc-ai-server.ts#L692-L707/index.md" | relative_url } })
-- **Origin parsing function**: [src/rpc-ai-server.ts:360-370]({ { "/../src/rpc-ai-server.ts#L360-L370/index.md" | relative_url } })
+- **Server config interface**: [src/rpc-ai-server.ts#L130-L134](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L130-L134)
+- **Default CORS config**: [src/rpc-ai-server.ts#L461-L465](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L461-L465)
+- **CORS middleware setup**: [src/rpc-ai-server.ts#L692-L707](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L692-L707)
+- **Origin parsing function**: [src/rpc-ai-server.ts#L360-L370](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L360-L370)
 
 ### Example Configurations
 - **MCP server example**: [examples/02-mcp-server/server.js:370-379]({ { "/../examples/02-mcp-server/server.js#L370-L379/index.md" | relative_url } })
 - **Basic server example**: [examples/01-basic-server/server.js:68]({ { "/../examples/01-basic-server/server.js#L68/index.md" | relative_url } })
 
 ### Related Documentation
-- [OAuth Setup]({ { "/./OAUTH_SETUP.md" | relative_url } }) - OAuth authentication configuration
+- [OAuth Setup]({{ "/OAUTH_SETUP.md" | relative_url }}) - OAuth authentication configuration
 - [MCP OAuth Authentication]({{ site.baseurl }}{% link common-configurations/mcp-oauth-authentication.md %}) - MCP-specific auth
-- [Security Best Practices]({ { "/../specs/features/mcp-oauth-authentication.md" | relative_url } }) - Security architecture
+- [Security Best Practices](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/specs/features/mcp-oauth-authentication.md) - Security architecture
 
 ## Quick Reference
 

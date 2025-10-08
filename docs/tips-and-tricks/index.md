@@ -3,7 +3,7 @@ title: Tips & Tricks
 nav_order: 5
 parent: Documentation
 has_children: true
-has_toc: false
+has_toc: true
 ---
 
 # Tips & Tricks

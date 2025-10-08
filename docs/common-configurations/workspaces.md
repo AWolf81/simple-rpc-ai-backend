@@ -32,10 +32,12 @@ flowchart TD
     serverWorkspaces[Server Workspaces<br/>Configured via serverWorkspaces]
   end
 
-  clientRoots -- "roots/list" --> rpcServer
-  rpcServer -- "registerClientWorkspace" --> clientRoots
+  rpcServer -- "roots/list" --> clientRoots
+  clientRoots -- "registerClientWorkspace" --> rpcServer
   rpcServer -- "listFiles / readFile / writeFile" --> serverWorkspaces
 ```
+
+Arrow directions reflect who makes each request: the server calls `roots/list` on the client, whereas the client invokes `registerClientWorkspace` on the server.
 
 ## Server Workspaces
 

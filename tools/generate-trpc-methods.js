@@ -924,7 +924,18 @@ async function extractTRPCMethods() {
 
         case 'enum':
           info.jsType = 'enum';
-          if (def.values) info.enum = def.values;
+          {
+            const values = extractEnumValuesFromDef(def);
+            if (values) info.enum = values;
+          }
+          break;
+
+        case 'nativeenum':
+          info.jsType = 'enum';
+          {
+            const values = extractEnumValuesFromDef(def);
+            if (values) info.enum = values;
+          }
           break;
 
         case 'literal':
@@ -978,6 +989,34 @@ async function extractTRPCMethods() {
           info.jsType = 'unknown';
           break;
       }
+    }
+
+    function extractEnumValuesFromDef(def) {
+      if (!def) {
+        return null;
+      }
+
+      if (Array.isArray(def.values)) {
+        return def.values;
+      }
+
+      if (Array.isArray(def.enum)) {
+        return def.enum;
+      }
+
+      if (Array.isArray(def.options)) {
+        return def.options;
+      }
+
+      if (Array.isArray(def._values)) {
+        return def._values;
+      }
+
+      if (def.entries && typeof def.entries === 'object') {
+        return Object.values(def.entries);
+      }
+
+      return null;
     }
 
     // Filter out MCP namespace if MCP is disabled

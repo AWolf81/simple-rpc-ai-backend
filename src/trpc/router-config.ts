@@ -5,8 +5,11 @@
  * are included in the generated tRPC methods documentation.
  */
 
-import { WorkspaceManager } from '../services/resources/workspace-manager';
-import type { WorkspaceManagerConfig, ServerWorkspaceConfig } from '../services/resources/workspace-manager';
+import { WorkspaceManager } from '../services/resources/workspace-manager.js';
+import type {
+  WorkspaceManagerConfig,
+  ServerWorkspaceConfig
+} from '../services/resources/workspace-manager.js';
 
 export interface TRPCGenerationConfig {
   /**
@@ -59,6 +62,9 @@ export interface TRPCGenerationConfig {
     enabled: boolean;
     includeInGeneration?: boolean;
   };  
+
+  /** When true all routers are included regardless of individual toggles */
+  includeAll?: boolean;
 
   /**
    * Namespace whitelist for filtering tools/methods
@@ -186,6 +192,33 @@ export function loadTRPCGenerationConfig(): TRPCGenerationConfig {
   if (process.env.TRPC_GEN_ADMIN_ENABLED !== undefined) {
     config.admin!.enabled = process.env.TRPC_GEN_ADMIN_ENABLED === 'true';
     config.admin!.includeInGeneration = config.admin!.enabled;
+  }
+
+  if (process.env.TRPC_GEN_INCLUDE_ALL === 'true') {
+    config.includeAll = true;
+
+    const enableSection = (section: keyof TRPCGenerationConfig) => {
+      const value = config[section];
+      if (value && typeof value === 'object' && 'enabled' in value) {
+        (value as { enabled: boolean }).enabled = true;
+        if ('includeInGeneration' in value) {
+          (value as { includeInGeneration?: boolean }).includeInGeneration = true;
+        }
+      }
+    };
+
+    enableSection('ai');
+    enableSection('mcp');
+    enableSection('system');
+    enableSection('user');
+    enableSection('billing');
+    enableSection('auth');
+    enableSection('admin');
+
+    if (config.mcp?.ai) {
+      config.mcp.ai.enabled = true;
+      config.mcp.ai.includeAIToolsInGeneration = true;
+    }
   }
 
   // Namespace whitelist configuration

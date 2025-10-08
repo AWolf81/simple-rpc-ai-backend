@@ -33,10 +33,12 @@ flowchart TD
     serverWorkspaces[Server Workspaces<br/>Configured via serverWorkspaces]
   end
 
-  clientRoots -- "roots/list" --> rpcServer
-  rpcServer -- "registerClientWorkspace" --> clientRoots
+  rpcServer -- "roots/list" --> clientRoots
+  clientRoots -- "registerClientWorkspace" --> rpcServer
   rpcServer -- "listFiles / readFile / writeFile" --> serverWorkspaces
 ```
+
+The direction of each arrow mirrors who initiates the call: the server invokes `roots/list` on the client to discover exposed directories, while the client calls `registerClientWorkspace` on the server to grant access to its folders.
 
 ### 🔑 Key Differences
 
