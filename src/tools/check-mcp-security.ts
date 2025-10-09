@@ -5,13 +5,13 @@
  * Command-line tool to scan MCP server packages for security issues.
  *
  * Usage:
- *   npx ts-node src/tools/check-mcp-security.ts <package-name> [--type npx|uvx]
- *   npx ts-node src/tools/check-mcp-security.ts --config <config.json>
+ *   npm exec -- ts-node src/tools/check-mcp-security.ts <package-name> [--type npx|npm-exec|uvx]
+ *   npm exec -- ts-node src/tools/check-mcp-security.ts --config <config.json>
  *
  * Examples:
- *   npx ts-node src/tools/check-mcp-security.ts mcp-server-time --type uvx
- *   npx ts-node src/tools/check-mcp-security.ts @modelcontextprotocol/server-filesystem --type npx
- *   npx ts-node src/tools/check-mcp-security.ts --config claude_desktop_config.json
+ *   npm exec -- ts-node src/tools/check-mcp-security.ts mcp-server-time --type uvx
+ *   npm exec -- ts-node src/tools/check-mcp-security.ts @modelcontextprotocol/server-filesystem --type npx
+ *   npm exec -- ts-node src/tools/check-mcp-security.ts --config claude_desktop_config.json
  */
 
 import fs from 'fs';
@@ -26,7 +26,7 @@ interface ClaudeDesktopConfig {
   }>;
 }
 
-async function scanSinglePackage(packageName: string, type: 'npx' | 'uvx') {
+async function scanSinglePackage(packageName: string, type: 'npx' | 'npm-exec' | 'uvx') {
   console.log(`\n🔍 Scanning MCP server: ${packageName} (${type})\n`);
 
   const result = await scanMCPServerPackage(packageName, type);
@@ -107,7 +107,7 @@ function printUsage() {
 MCP Security Checker - Scan MCP server packages for security issues
 
 Usage:
-  check-mcp-security <package-name> --type <npx|uvx>
+  check-mcp-security <package-name> --type <npx|npm-exec|uvx>
   check-mcp-security --config <config.json>
 
 Examples:
@@ -121,7 +121,8 @@ Examples:
   check-mcp-security --config ~/.config/claude/claude_desktop_config.json
 
 Options:
-  --type <npx|uvx>    Package manager type (required for single package scan)
+  --type <npx|npm-exec|uvx>
+                     Package manager type (required for single package scan)
   --config <path>     Path to Claude Desktop config file
   --help             Show this help message
   `);
@@ -154,10 +155,10 @@ if (args.includes('--config')) {
     process.exit(1);
   }
 
-  const type = args[typeIndex + 1] as 'npx' | 'uvx';
+  const type = args[typeIndex + 1] as 'npx' | 'npm-exec' | 'uvx';
 
-  if (!type || !['npx', 'uvx'].includes(type)) {
-    console.error('❌ Error: --type must be either "npx" or "uvx"');
+  if (!type || !['npx', 'npm-exec', 'uvx'].includes(type)) {
+    console.error('❌ Error: --type must be "npx", "npm-exec", or "uvx"');
     printUsage();
     process.exit(1);
   }

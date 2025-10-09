@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { TRPCError } from '@trpc/server';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import type { ZodTypeAny } from 'zod';
 import { ErrorCode, LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { ScopeValidator } from '../../../auth/scopes';
 import { JWTMiddleware, type AuthenticatedRequest } from '../../../auth/jwt-middleware';
@@ -11,6 +11,7 @@ import { MCPRouterConfig, MCPAuthConfig } from './types';
 import { mcpResourceRegistry } from '../../../services/resources/mcp/mcp-resource-registry.js';
 import { logger } from '../../../utils/logger.js';
 import { redactEmail } from '../../../utils/redact.js';
+import { zodSchemaToJson } from '../../../utils/zod-json-schema.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -657,11 +658,12 @@ export class MCPProtocolHandler {
         };
       }
 
-      const schema = zodToJsonSchema(inputParser, 'InputSchema') as any;
+      const schema = zodSchemaToJson(inputParser as ZodTypeAny) as any;
 
-      if (schema.$ref && schema.definitions) {
-        const refKey = schema.$ref.replace('#/definitions/', '');
-        const actualSchema = schema.definitions[refKey];
+      if (schema.$ref && (schema.definitions || schema.$defs)) {
+        const defs = schema.definitions || schema.$defs;
+        const refKey = schema.$ref.replace('#/definitions/', '').replace('#/$defs/', '');
+        const actualSchema = defs?.[refKey];
         if (actualSchema) {
           return actualSchema;
         }

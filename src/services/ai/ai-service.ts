@@ -48,10 +48,10 @@ function createHuggingFaceModel(modelId: string, config: string | HuggingFaceMod
   const hf = new InferenceClient(apiKey);
 
   return {
-    specificationVersion: 'v1',
+    specificationVersion: 'v2',
     modelId,
     provider: 'huggingface',
-    defaultObjectGenerationMode: 'json',
+    supportedUrls: {},
     async doGenerate(options) {
       try {
         // Convert messages to HF format
@@ -77,8 +77,8 @@ function createHuggingFaceModel(modelId: string, config: string | HuggingFaceMod
             model: modelId,
             inputs: prompt,
             parameters: {
-              max_new_tokens: options.maxTokens || 4000,
-              temperature: options.temperature || 0.7,
+              max_new_tokens: (options as any).maxTokens || 4000,
+              temperature: (options as any).temperature || 0.7,
               return_full_text: false,
             },
           });
@@ -95,8 +95,8 @@ function createHuggingFaceModel(modelId: string, config: string | HuggingFaceMod
           response = await hf.chatCompletion({
             model: modelId,
             messages: messages,
-            max_tokens: options.maxTokens || 4000,
-            temperature: options.temperature || 0.7,
+            max_tokens: (options as any).maxTokens || 4000,
+            temperature: (options as any).temperature || 0.7,
           });
 
           return response.choices?.[0]?.message?.content || '';
@@ -123,17 +123,26 @@ function createHuggingFaceModel(modelId: string, config: string | HuggingFaceMod
           }
         }
 
+        const generatedText = text || '';
+        const inputTokens = Math.ceil(prompt.length / 4);
+        const outputTokens = Math.ceil(generatedText.length / 4);
+        const totalTokens = inputTokens + outputTokens;
+
         return {
-          text: text || '',
-          usage: {
-            promptTokens: Math.ceil(prompt.length / 4), // Rough estimate
-            completionTokens: Math.ceil((text || '').length / 4),
-          },
+          content: generatedText
+            ? [{ type: 'text' as const, text: generatedText }]
+            : [],
           finishReason: 'stop' as const,
-          logprobs: undefined,
-          rawCall: { rawPrompt: prompt, rawSettings: options },
-          rawResponse: { headers: {} },
-          warnings: undefined,
+          usage: {
+            inputTokens,
+            outputTokens,
+            totalTokens,
+          },
+          providerMetadata: undefined,
+          response: {
+            modelId,
+          },
+          warnings: [],
         };
       } catch (error: any) {
         throw new Error(`Hugging Face API error: ${error.message}`);
@@ -531,14 +540,18 @@ export class AIService {
 
       timing.end();
 
+      const promptTokens = result.usage.inputTokens ?? (result.usage as any).promptTokens ?? 0;
+      const completionTokens = result.usage.outputTokens ?? (result.usage as any).completionTokens ?? 0;
+      const totalTokens = result.usage.totalTokens ?? (promptTokens + completionTokens);
+
       return {
         content: result.text,
         usage: {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          totalTokens: result.usage.totalTokens
+          promptTokens,
+          completionTokens,
+          totalTokens
         },
-        model: model.modelId,
+        model: typeof model === 'string' ? model : model.modelId,
         provider: executionConfig.provider,
         requestId: crypto.randomUUID(),
         finishReason: result.finishReason
@@ -1100,14 +1113,18 @@ The tools will be available during our conversation. Call them when needed to ga
    * Format execute result with tool call information
    */
   private formatExecuteResult(result: any, executionConfig: any): ExecuteResult {
+    const promptTokens = result.usage.inputTokens ?? (result.usage as any).promptTokens ?? 0;
+    const completionTokens = result.usage.outputTokens ?? (result.usage as any).completionTokens ?? 0;
+    const totalTokens = result.usage.totalTokens ?? (promptTokens + completionTokens);
+
     return {
       content: result.text,
       usage: {
-        promptTokens: result.usage.promptTokens,
-        completionTokens: result.usage.completionTokens,
-        totalTokens: result.usage.totalTokens
+        promptTokens,
+        completionTokens,
+        totalTokens
       },
-      model: result.model || 'unknown',
+      model: result.response?.modelId || executionConfig.model || 'unknown',
       provider: executionConfig.provider,
       requestId: crypto.randomUUID(),
       finishReason: result.finishReason

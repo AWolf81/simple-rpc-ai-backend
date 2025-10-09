@@ -109,7 +109,7 @@ export interface SecurityScanResult {
 
 export interface MCPServerSecurityConfig {
   name: string;
-  command: 'uvx' | 'npx' | 'docker' | 'node' | 'python';
+  command: string;
   args: string[];
 }
 
@@ -156,6 +156,38 @@ function scanFileContent(
   }
 
   return { red, yellow };
+}
+
+function resolvePackageName(config: MCPServerSecurityConfig): string | undefined {
+  const args = config.args || [];
+  const cmd = config.command.toLowerCase();
+
+  if (cmd === 'npm' || cmd === 'npm-exec' || cmd === 'npx') {
+    const execIndex = args.findIndex(arg => arg === 'exec');
+    if (execIndex !== -1) {
+      for (let i = execIndex + 1; i < args.length; i++) {
+        const value = args[i];
+        if (value === '--') {
+          return args[i + 1];
+        }
+        if (!value.startsWith('-')) {
+          return value;
+        }
+      }
+      return undefined;
+    }
+
+    // npx path where package is the first argument
+    if (args.length > 0) {
+      return args[0];
+    }
+  }
+
+  if (cmd === 'uvx' && args.length > 0) {
+    return args[0];
+  }
+
+  return args.find(arg => !arg.startsWith('-'));
 }
 
 /**
@@ -387,7 +419,7 @@ function classifySecurityLevel(
  */
 export async function scanMCPServerPackage(
   packageName: string,
-  command: 'uvx' | 'npx'
+  command: 'uvx' | 'npx' | 'npm-exec'
 ): Promise<SecurityScanResult> {
   const isOfficial = OFFICIAL_SERVERS.includes(packageName);
 
@@ -443,13 +475,32 @@ export async function scanMCPServerPackage(
 export async function scanMCPServerConfig(
   serverConfig: MCPServerSecurityConfig
 ): Promise<SecurityScanResult> {
-  const packageName = serverConfig.args[0];
+  const packageName = resolvePackageName(serverConfig);
 
-  if (serverConfig.command === 'uvx') {
+  if (!packageName) {
+    return {
+      level: 'YELLOW',
+      reasons: ['⚠️ Unable to determine package name from configuration'],
+      redFlags: [],
+      yellowFlags: [],
+      metadata: {
+        name: 'unknown',
+        language: 'javascript'
+      },
+      scannedFiles: 0,
+      timestamp: new Date()
+    };
+  }
+
+  const command = serverConfig.command.toLowerCase();
+
+  if (command === 'uvx') {
     return scanMCPServerPackage(packageName, 'uvx');
-  } else if (serverConfig.command === 'npx') {
+  } else if (command === 'npx') {
     return scanMCPServerPackage(packageName, 'npx');
-  } else if (serverConfig.command === 'docker') {
+  } else if (command === 'npm' || command === 'npm-exec') {
+    return scanMCPServerPackage(packageName, 'npm-exec');
+  } else if (command === 'docker') {
     // Docker scanning would require different approach
     return {
       level: 'YELLOW',

@@ -10,8 +10,9 @@
 
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
+import { resolveNodePackageRunner } from '../utils/node-package-runner.js';
 
-export type RemoteMCPTransport = 'uvx' | 'npx' | 'docker' | 'http' | 'https';
+export type RemoteMCPTransport = 'uvx' | 'npx' | 'npm-exec' | 'docker' | 'http' | 'https';
 
 export interface RemoteMCPServerConfig {
   name: string;
@@ -86,7 +87,8 @@ export class RemoteMCPClient extends EventEmitter {
         await this.connectViaUvx();
         break;
       case 'npx':
-        await this.connectViaNpx();
+      case 'npm-exec':
+        await this.connectViaNodePackage(this.config.transport);
         break;
       case 'docker':
         await this.connectViaDocker();
@@ -123,16 +125,17 @@ export class RemoteMCPClient extends EventEmitter {
   }
 
   /**
-   * Connect via npx (Node.js)
+   * Connect via Node-based package runner (npx or npm exec)
    */
-  private async connectViaNpx(): Promise<void> {
+  private async connectViaNodePackage(preference: 'npx' | 'npm-exec'): Promise<void> {
     if (!this.config.command) {
-      throw new Error('npx transport requires command');
+      throw new Error(`${preference} transport requires command`);
     }
 
-    const args = ['npx', this.config.command, ...(this.config.args || [])];
+    const runner = resolveNodePackageRunner(preference);
+    const args = [...runner.args, this.config.command, ...(this.config.args || [])];
 
-    this.process = spawn(args[0], args.slice(1), {
+    this.process = spawn(runner.command, args, {
       env: { ...process.env, ...this.config.env },
       stdio: ['pipe', 'pipe', 'pipe']
     });

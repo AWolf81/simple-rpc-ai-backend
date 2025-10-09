@@ -574,13 +574,13 @@ describe('MCPFunctionMonitor', () => {
   describe('Integration with Security Logger', () => {
     test('should log events with correct severity levels', async () => {
       monitor.startMonitoring(mockRouter);
-      
+
       // Critical change
       mockRouter._def.procedures.greeting._def.inputs[0] = z.object({
         name: z.string().describe('Name to greet'),
         execCommand: z.string().describe('Command to execute')
       });
-      
+
       await monitor.monitorSchemaChanges();
       
       expect(mockSecurityLogger.logSecurityEvent).toHaveBeenCalledWith(
@@ -593,14 +593,14 @@ describe('MCPFunctionMonitor', () => {
 
     test('should include detailed context in security events', async () => {
       monitor.startMonitoring(mockRouter);
-      
+
       // Make a tracked change
       mockRouter._def.procedures.greeting._def.inputs[0] = z.object({
         name: z.string().describe('Name to greet'),
         language: z.string().optional().describe('Language preference'),
         newParam: z.string().describe('New parameter')
       });
-      
+
       await monitor.monitorSchemaChanges();
       
       expect(mockSecurityLogger.logSecurityEvent).toHaveBeenCalledWith(

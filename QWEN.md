@@ -179,16 +179,12 @@ await client.ai.configureBYOK.mutate({ provider, apiKey });
 ```typescript
 import { createRpcAiServer } from 'simple-rpc-ai-backend';
 const server = createRpcAiServer({
-  ai: {
-    providers: {
-      anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
-      openai: { apiKey: process.env.OPENAI_API_KEY }
-    }
-  },
+  serverProviders: ['anthropic', 'openai'],
 
   // Server-managed directories (distinct from MCP client roots)
   serverWorkspaces: {
-    project: {
+    enabled: true,
+    defaultWorkspace: {
       path: '/home/user/project',
       name: 'Project Files',
       readOnly: false
@@ -612,7 +608,7 @@ If you overload the word "roots" to mean both "client-exposed folders" and "serv
 
 **📚 References**:
 - [Model Context Protocol - Roots](https://modelcontextprotocol.io/docs/concepts/roots)
-- [Complete Guide: Server Workspaces vs MCP Roots](./docs/SERVER_WORKSPACES_VS_MCP_ROOTS.md)
+- [Complete Guide: Server Workspaces vs MCP Roots](./docs/common-configurations/server-workspaces-vs-mcp-roots.md)
 - [Quick Reference: Workspace Concepts](./docs/WORKSPACE_QUICK_REFERENCE.md)
 
 #### 🏷️ Configuration Example
@@ -677,7 +673,7 @@ newTool: publicProcedure
 
 #### **Technical Implementation**
 - **Discovery Method**: `discoverMCPToolsFromTRPC()` scans `router._def.procedures`
-- **Schema Conversion**: Uses `zod-to-json-schema` for proper constraint handling
+- **Schema Conversion**: Uses Zod's built-in `z.toJSONSchema` for proper constraint handling
 - **Execution Path**: `procedure._def.resolver()` with input validation
 - **Error Handling**: Zod validation errors → proper MCP error responses
 
@@ -775,17 +771,15 @@ mcp: {
 // Independent MCP AI configuration - separate from main server
 const server = createRpcAiServer({
   // Main server AI configuration (e.g., for ai.generateText)
-  ai: {
-    providers: {
-      anthropic: {
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        models: ['claude-3-5-sonnet-20241022'] // Premium model
-      }
+  serverProviders: ['anthropic'],
+  modelRestrictions: {
+    anthropic: {
+      allowedModels: ['claude-3-5-sonnet-20241022'] // Premium model
     }
   },
 
   mcp: {
-    enableMCP: true,
+    enabled: true,
     ai: {
       enabled: true,
       useServerConfig: false,         // Don't inherit from main server config

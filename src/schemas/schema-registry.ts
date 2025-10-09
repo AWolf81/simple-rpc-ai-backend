@@ -10,7 +10,7 @@
  */
 
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { zodSchemaToJson } from '../utils/zod-json-schema';
 
 /**
  * Base validator interface - extensible for other validation libraries
@@ -173,12 +173,13 @@ export class SchemaRegistry {
   // Private converter methods
   private convertZodToJsonSchema(zodSchema: z.ZodType): any {
     try {
-      const schema = zodToJsonSchema(zodSchema, "Schema");
+      const schema = zodSchemaToJson(zodSchema);
       
       // Handle schemas with $ref and definitions
-      if ((schema as any).$ref && (schema as any).definitions) {
-        const refKey = (schema as any).$ref.replace('#/definitions/', '');
-        const resolvedSchema = (schema as any).definitions[refKey];
+      if ((schema as any).$ref && ((schema as any).definitions || (schema as any).$defs)) {
+        const defs = (schema as any).definitions || (schema as any).$defs;
+        const refKey = (schema as any).$ref.replace('#/definitions/', '').replace('#/$defs/', '');
+        const resolvedSchema = defs[refKey];
         
         if (resolvedSchema) {
           // Return the resolved schema for direct property access
@@ -326,11 +327,11 @@ export function defineSchema<T extends z.ZodType>(
   if ((validator as any)._isYupSchema) validatorType = ValidatorType.YUP;
   if ((validator as any).isJoi) validatorType = ValidatorType.JOI;
 
-  const schemaDefinition: SchemaDefinition<T> = {
+  const schemaDefinition: SchemaDefinition<z.infer<T>> = {
     id,
     name,
     description,
-    validator: validator as BaseValidator<T>,
+    validator: validator as BaseValidator<z.infer<T>>,
     validatorType,
     category: options.category,
     example: options.example

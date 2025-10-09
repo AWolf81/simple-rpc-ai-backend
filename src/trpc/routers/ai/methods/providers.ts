@@ -7,17 +7,12 @@ import { AIService } from '@services/ai/ai-service';
  * AI provider management procedures
  */
 export function createProviderProcedures(
-  aiService: AIService,
-  modelRestrictions?: Record<string, {
-    allowedModels?: string[];
-    allowedPatterns?: string[];
-    blockedModels?: string[];
-  }>
+  aiService: AIService
 ) {
   return {
     /**
-     * List available AI service providers
-     * Enhanced with @anolilab/ai-model-registry integration
+     * List available AI service providers.
+     * @description Returns the providers currently registered in the model registry along with metadata about the registry source.
      */
     listProviders: publicProcedure
       .input(z.void())
@@ -40,8 +35,8 @@ export function createProviderProcedures(
       }),
 
     /**
-     * List available BYOK (Bring Your Own Key) providers
-     * Returns only providers configured for BYOK usage
+     * List available BYOK (Bring Your Own Key) providers.
+     * @description Filters the provider catalog to only those eligible for user-supplied API keys.
      */
     listProvidersBYOK: publicProcedure
       .input(z.void())
@@ -101,8 +96,8 @@ export function createProviderProcedures(
       }),
 
     /**
-     * Get AI model registry health status
-     * Returns detailed health information about the registry integration
+     * Retrieve the AI model registry health status.
+     * @description Reports availability and summary metrics for the registry integration, falling back to error details when checks fail.
      */
     getRegistryHealth: publicProcedure
       .input(z.void())
@@ -142,7 +137,8 @@ export function createProviderProcedures(
       }),
 
     /**
-     * Validate AI provider configuration
+     * Validate AI provider configuration.
+     * @description Performs lightweight API key validation for supported providers to catch obvious misconfigurations.
      */
     validateProvider: publicProcedure
       .input(z.object({

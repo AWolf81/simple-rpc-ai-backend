@@ -9,6 +9,7 @@
 
 import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync } from 'fs';
 import { join, resolve, dirname } from 'path';
+import { Project, SyntaxKind } from 'ts-morph';
 import { fileURLToPath } from 'url';
 
 // Load RC configuration file if present
@@ -43,7 +44,260 @@ function zWithSource(schema, filePath, lineNumber) {
   return enhanced;
 }
 
+function getZodDef(schema) {
+  if (!schema || typeof schema !== 'object') {
+    return null;
+  }
+  return schema._def || schema.def || null;
+}
+
+function normalizeZodTypeName(name) {
+  if (!name || typeof name !== 'string') {
+    return 'unknown';
+  }
+  if (name.startsWith('Zod')) {
+    return name;
+  }
+
+  const map = {
+    object: 'ZodObject',
+    string: 'ZodString',
+    number: 'ZodNumber',
+    boolean: 'ZodBoolean',
+    array: 'ZodArray',
+    enum: 'ZodEnum',
+    literal: 'ZodLiteral',
+    union: 'ZodUnion',
+    optional: 'ZodOptional',
+    nullable: 'ZodNullable',
+    void: 'ZodVoid',
+    any: 'ZodAny',
+    unknown: 'ZodUnknown',
+    undefined: 'ZodUndefined',
+    null: 'ZodNull',
+    record: 'ZodRecord',
+    tuple: 'ZodTuple',
+    date: 'ZodDate',
+    bigint: 'ZodBigInt',
+    map: 'ZodMap',
+    set: 'ZodSet',
+    promise: 'ZodPromise',
+    function: 'ZodFunction'
+  };
+
+  return map[name] || name;
+}
+
+function getZodTypeName(schema) {
+  if (!schema) {
+    return 'unknown';
+  }
+  const def = getZodDef(schema);
+  const rawType = (def && (def.typeName || def.type)) || schema.type || schema.constructor?.name;
+  return normalizeZodTypeName(rawType);
+}
+
 console.log('🔨 Generating tRPC methods documentation...');
+
+let tsMorphProject = null;
+const sourceFileCache = new Map();
+let tsDocExtractionEnabled = true;
+
+function getProject() {
+  if (!tsDocExtractionEnabled) {
+    return null;
+  }
+
+  if (tsMorphProject) {
+    return tsMorphProject;
+  }
+
+  try {
+    tsMorphProject = new Project({
+      tsConfigFilePath: resolve(process.cwd(), 'tsconfig.json'),
+      skipAddingFilesFromTsConfig: false
+    });
+  } catch (error) {
+    console.warn(`⚠️  Failed to initialize ts-morph project: ${error instanceof Error ? error.message : String(error)}. TSDoc extraction disabled.`);
+    tsDocExtractionEnabled = false;
+    return null;
+  }
+
+  return tsMorphProject;
+}
+
+function getSourceFileFromProject(filePath) {
+  const project = getProject();
+  if (!project) {
+    return null;
+  }
+
+  const absolutePath = resolve(process.cwd(), filePath);
+  if (sourceFileCache.has(absolutePath)) {
+    return sourceFileCache.get(absolutePath);
+  }
+
+  let sourceFile = project.getSourceFile(absolutePath);
+
+  try {
+    if (!sourceFile && existsSync(absolutePath)) {
+      sourceFile = project.addSourceFileAtPathIfExists(absolutePath);
+    }
+  } catch (error) {
+    console.warn(`⚠️  Unable to add ${absolutePath} to ts-morph project: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  sourceFileCache.set(absolutePath, sourceFile || null);
+  return sourceFile || null;
+}
+
+function extractDocInfoFromNode(node) {
+  if (!node?.getLeadingCommentRanges) {
+    return null;
+  }
+
+  const commentRanges = node.getLeadingCommentRanges();
+  if (!commentRanges || commentRanges.length === 0) {
+    return null;
+  }
+
+  const sourceFile = node.getSourceFile?.();
+  let commentStartLine = null;
+  if (sourceFile) {
+    for (const range of commentRanges) {
+      const startPos = range.getPos?.();
+      if (typeof startPos === 'number') {
+        const { line } = sourceFile.getLineAndColumnAtPos(startPos);
+        commentStartLine = commentStartLine === null ? line : Math.min(commentStartLine, line);
+      }
+    }
+  }
+
+  // Use the last leading comment block (closest to the node)
+  const commentText = commentRanges
+    .map(range => range.getText())
+    .reverse()
+    .find(text => text.startsWith('/**'));
+
+  if (!commentText) {
+    return null;
+  }
+
+  const cleaned = commentText
+    .replace(/^\/\*\*/, '')
+    .replace(/\*\/$/, '');
+
+  const lines = cleaned
+    .split('\n')
+    .map(line => line.replace(/^\s*\*\s?/, '').trim());
+
+  const summaryLines = [];
+  const tagMap = new Map();
+  let currentTag = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) {
+      if (currentTag) {
+        currentTag.comment.push('');
+      }
+      continue;
+    }
+
+    if (line.startsWith('@')) {
+      const match = line.match(/^@(\S+)\s?(.*)$/);
+      if (match) {
+        if (currentTag) {
+          const existing = tagMap.get(currentTag.name) || [];
+          existing.push(currentTag.comment.join('\n').trim());
+          tagMap.set(currentTag.name, existing);
+        }
+        currentTag = {
+          name: match[1],
+          comment: match[2] ? [match[2]] : [],
+          lineNumber: commentStartLine != null ? commentStartLine + i : null
+        };
+        continue;
+      }
+    }
+
+    if (currentTag) {
+      currentTag.comment.push(line);
+    } else {
+      summaryLines.push(line);
+    }
+  }
+
+  if (currentTag) {
+    const existing = tagMap.get(currentTag.name) || [];
+    existing.push(currentTag.comment.join('\n').trim());
+    tagMap.set(currentTag.name, existing);
+  }
+
+  const summary = summaryLines.join('\n').trim();
+  const description =
+    (tagMap.get('description') || []).find(Boolean) ||
+    summary ||
+    null;
+  const examples = (tagMap.get('example') || []).filter(Boolean);
+  const deprecated = tagMap.has('deprecated')
+    ? (tagMap.get('deprecated').find(Boolean) || true)
+    : null;
+  const internal = tagMap.has('internal');
+
+  return {
+    description,
+    summary: summary ? summary.split('\n').shift().trim() : null,
+    examples,
+    deprecated,
+    internal,
+    startLine: commentStartLine
+  };
+}
+
+function getProcedureDocInfo(filePath, procedureName) {
+  if (!filePath) {
+    return null;
+  }
+
+  const sourceFile = getSourceFileFromProject(filePath);
+  if (!sourceFile) {
+    return null;
+  }
+
+  const propertyAssignments = sourceFile.getDescendantsOfKind(SyntaxKind.PropertyAssignment);
+  const matchedProperty = propertyAssignments.find(prop => prop.getName() === procedureName);
+
+  if (matchedProperty) {
+    const nameNode = matchedProperty.getNameNode?.();
+    const line = nameNode?.getStartLineNumber?.() || matchedProperty.getStartLineNumber?.();
+    const info = extractDocInfoFromNode(matchedProperty);
+    const docLine = info?.startLine ?? line;
+    return { doc: info, line: docLine, definitionLine: line };
+  }
+
+  const shorthandAssignments = sourceFile.getDescendantsOfKind(SyntaxKind.ShorthandPropertyAssignment);
+  const matchedShorthand = shorthandAssignments.find(prop => prop.getName() === procedureName);
+  if (matchedShorthand) {
+    const nameNode = matchedShorthand.getNameNode?.();
+    const line = nameNode?.getStartLineNumber?.() || matchedShorthand.getStartLineNumber?.();
+    const info = extractDocInfoFromNode(nameNode || matchedShorthand);
+    const docLine = info?.startLine ?? line;
+    return { doc: info, line: docLine, definitionLine: line };
+  }
+
+  const variableDeclarations = sourceFile.getDescendantsOfKind(SyntaxKind.VariableDeclaration);
+  const matchedVariable = variableDeclarations.find(variable => variable.getName() === procedureName);
+  if (matchedVariable) {
+    const nameNode = matchedVariable.getNameNode?.();
+    const line = nameNode?.getStartLineNumber?.() || matchedVariable.getStartLineNumber?.();
+    const info = extractDocInfoFromNode(matchedVariable);
+    const docLine = info?.startLine ?? line;
+    return { doc: info, line: docLine, definitionLine: line };
+  }
+
+  return null;
+}
 
 // Check if we're in the source tree (has src/trpc/routers)
 const isInSourceTree = existsSync('src/trpc/routers');
@@ -104,7 +358,7 @@ async function extractTRPCMethods() {
 
     // Store configuration for later use in MCP filtering
     const generationConfig = config;
-    
+
     // Extract procedures from router
     // Use the flattened procedures object for nested routers
     if (router._def && router._def.procedures) {
@@ -114,7 +368,7 @@ async function extractTRPCMethods() {
         methods[procedureName] = extractProcedureInfo(procedure, procedureName);
       }
     }
-    
+
     function inferSourceFile(procedurePath) {
       // Dynamically discover source files from filesystem
       const namespace = procedurePath.split('.')[0];
@@ -271,20 +525,30 @@ async function extractTRPCMethods() {
       try {
         const content = readFileSync(filePath, 'utf8');
         const lines = content.split('\n');
+        let fallbackLine = null;
         
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
+          const trimmed = line.trim();
           
           // Look for procedure definition patterns
-          if (line.includes(`${procName}:`) || 
-              line.trim().startsWith(`${procName}:`) || 
-              line.includes(`${procName}(`) || 
+          if (
+            line.includes(`${procName}:`) ||
+            trimmed.startsWith(`${procName}:`)
+          ) {
+            return i + 1; // Prefer explicit property definitions
+          }
+
+          if (
+            fallbackLine === null &&
+            (line.includes(`${procName}(`) ||
               line.includes(`const ${procName}`) ||
-              line.includes(`export const ${procName}`)) {
-            return i + 1; // 1-based line number
+              line.includes(`export const ${procName}`))
+          ) {
+            fallbackLine = i + 1;
           }
         }
-        return null;
+        return fallbackLine;
       } catch (e) {
         return null;
       }
@@ -439,7 +703,9 @@ async function extractTRPCMethods() {
     function extractProcedureInfo(procedure, path) {
       const def = procedure._def;
       const sourceFile = inferSourceFile(path);
-      const lineNumber = findProcedureLineNumber(sourceFile, path);
+      const namespace = path.split('.')[0];
+      const procName = path.split('.').pop();
+      const docSourceFile = findSpecificProcedureFile(namespace, procName) || sourceFile;
       
       // Extract source info from schema if available (from zWithSource)
       const inputSchema = def.inputs?.[0] || null;
@@ -447,10 +713,13 @@ async function extractTRPCMethods() {
       
       const inputSource = inputSchema?._source || null;
       const outputSource = outputSchema?._source || null;
+
+      const resolvedSourceFile = inputSource?.filePath || outputSource?.filePath || docSourceFile || sourceFile;
+      let lineNumber = findProcedureLineNumber(resolvedSourceFile, path);
       
       // Find specific line numbers for input and output schemas
-      const inputLineNumber = inputSource?.lineNumber || findSchemaLineNumber(sourceFile, path, 'input');
-      const outputLineNumber = outputSource?.lineNumber || findSchemaLineNumber(sourceFile, path, 'output');
+      const inputLineNumber = inputSource?.lineNumber || findSchemaLineNumber(resolvedSourceFile, path, 'input');
+      const outputLineNumber = outputSource?.lineNumber || findSchemaLineNumber(resolvedSourceFile, path, 'output');
       
       // Determine if this procedure requires authentication
       const requiresAuth = checkIfProcedureRequiresAuth(def);
@@ -465,7 +734,7 @@ async function extractTRPCMethods() {
         output: null,
         meta: def.meta || null,
         requiresAuth: requiresAuth,
-        sourceFile: inputSource?.filePath || outputSource?.filePath || sourceFile,
+        sourceFile: resolvedSourceFile,
         lineNumber: lineNumber,
         inputLineNumber: inputLineNumber,
         outputLineNumber: outputLineNumber
@@ -480,6 +749,64 @@ async function extractTRPCMethods() {
         info.description = openapi.description;
         info.tags = openapi.tags || [];
       }
+
+      let existingDescription = info.description || null;
+
+      const docResult = getProcedureDocInfo(docSourceFile, procName);
+      if (docResult?.definitionLine) {
+        lineNumber = docResult.definitionLine;
+      } else if (docResult?.line) {
+        lineNumber = docResult.line;
+      }
+      const docInfo = docResult?.doc || null;
+      if (docInfo) {
+        if (docInfo.description) {
+          info.docDescription = docInfo.description;
+        }
+        if (!info.summary && docInfo.summary) {
+          info.summary = docInfo.summary;
+        }
+        if (docInfo.deprecated) {
+          info.deprecated = docInfo.deprecated;
+        }
+        if (docInfo.examples && docInfo.examples.length > 0) {
+          info.examples = docInfo.examples;
+        }
+        if (docInfo.internal) {
+          info.internal = true;
+        }
+      }
+
+      const descriptionParts = [];
+
+      if (docInfo?.description) {
+        descriptionParts.push(docInfo.description);
+      }
+
+      const metaDescriptions = [
+        def.meta?.mcp?.description,
+        def.meta?.mcpPrompt?.description,
+        def.meta?.mcpResource?.description,
+        def.meta?.description
+      ].filter(Boolean);
+
+      for (const metaDesc of metaDescriptions) {
+        if (!descriptionParts.includes(metaDesc)) {
+          descriptionParts.push(metaDesc);
+        }
+      }
+
+      if (existingDescription && !descriptionParts.includes(existingDescription)) {
+        descriptionParts.push(existingDescription);
+      }
+
+      if (descriptionParts.length > 0) {
+        info.description = descriptionParts.join('\n\n');
+      } else {
+        info.description = existingDescription;
+      }
+
+      info.lineNumber = lineNumber;
       
       // Extract input schema info
       if (def.inputs && def.inputs.length > 0) {
@@ -496,28 +823,37 @@ async function extractTRPCMethods() {
     }
     
     function extractZodSchemaInfo(schema) {
-      if (!schema || !schema._def) {
+      if (!schema) {
         return { type: 'unknown' };
       }
 
-      const def = schema._def;
+      const def = getZodDef(schema);
+      const typeName = getZodTypeName(schema);
+
       const info = {
-        type: def.typeName || 'unknown',
-        description: def.description || null,
-        _source: schema._source || null  // Preserve source info if available
+        type: typeName || 'unknown',
+        description: schema.description || def?.description || null,
+        _source: schema._source || null
       };
 
       // Extract constraints based on schema type
-      extractSchemaConstraints(schema, info);
+      extractSchemaConstraints(schema, def, info);
 
       // Extract shape for objects
-      if (def.typeName === 'ZodObject' && def.shape) {
+      if (typeName === 'ZodObject' && def?.shape) {
         try {
-          const shape = typeof def.shape === 'function' ? def.shape() : def.shape;
-          info.properties = {};
+          const shapeResolver = def.shape;
+          const shape =
+            typeof shapeResolver === 'function'
+              ? shapeResolver()
+              : shapeResolver;
 
-          for (const [key, propSchema] of Object.entries(shape)) {
-            info.properties[key] = extractZodSchemaInfo(propSchema);
+          if (shape && typeof shape === 'object') {
+            info.properties = {};
+
+            for (const [key, propSchema] of Object.entries(shape)) {
+              info.properties[key] = extractZodSchemaInfo(propSchema);
+            }
           }
         } catch (e) {
           // Ignore shape extraction errors
@@ -525,19 +861,26 @@ async function extractTRPCMethods() {
       }
 
       // Extract other useful info
-      if (def.innerType) {
+      if (def?.innerType) {
         info.innerType = extractZodSchemaInfo(def.innerType);
+      } else if (def?.type === 'array' && def.type) {
+        // handled in constraints
       }
 
       return info;
     }
 
-    function extractSchemaConstraints(schema, info) {
-      const def = schema._def;
+    function extractSchemaConstraints(schema, def, info) {
+      if (!def || !info) {
+        return;
+      }
+
+      const typeName = info.type || '';
+      const normalizedType = typeName.replace(/^Zod/, '').toLowerCase();
 
       // Handle different Zod types and their constraints
-      switch (def.typeName) {
-        case 'ZodString':
+      switch (normalizedType) {
+        case 'string':
           info.jsType = 'string';
           if (def.checks) {
             for (const check of def.checks) {
@@ -550,7 +893,7 @@ async function extractTRPCMethods() {
           }
           break;
 
-        case 'ZodNumber':
+        case 'number':
           info.jsType = 'number';
           if (def.checks) {
             for (const check of def.checks) {
@@ -564,72 +907,81 @@ async function extractTRPCMethods() {
           }
           break;
 
-        case 'ZodBoolean':
+        case 'boolean':
           info.jsType = 'boolean';
           break;
 
-        case 'ZodArray':
+        case 'array':
           info.jsType = 'array';
           if (def.minLength) info.minItems = def.minLength.value;
           if (def.maxLength) info.maxItems = def.maxLength.value;
           if (def.type) info.items = extractZodSchemaInfo(def.type);
           break;
 
-        case 'ZodObject':
+        case 'object':
           info.jsType = 'object';
           break;
 
-        case 'ZodEnum':
+        case 'enum':
           info.jsType = 'enum';
-          if (def.values) info.enum = def.values;
+          {
+            const values = extractEnumValuesFromDef(def);
+            if (values) info.enum = values;
+          }
           break;
 
-        case 'ZodLiteral':
+        case 'nativeenum':
+          info.jsType = 'enum';
+          {
+            const values = extractEnumValuesFromDef(def);
+            if (values) info.enum = values;
+          }
+          break;
+
+        case 'literal':
           info.jsType = 'literal';
           info.const = def.value;
           break;
 
-        case 'ZodUnion':
+        case 'union':
           info.jsType = 'union';
           if (def.options) {
             info.oneOf = def.options.map(opt => extractZodSchemaInfo(opt));
           }
           break;
 
-        case 'ZodDefault':
-          try {
-            info.default = def.defaultValue();
-          } catch (e) {
-            // If default value can't be computed, mark it as having a default
-            info.hasDefault = true;
+        case 'default':
+          if (def.defaultValue) {
+            try {
+              info.default = def.defaultValue();
+            } catch (e) {
+              info.hasDefault = true;
+            }
           }
           if (def.innerType) {
-            const innerInfo = extractZodSchemaInfo(def.innerType);
-            Object.assign(info, innerInfo);
+            info.innerType = extractZodSchemaInfo(def.innerType);
           }
           break;
 
-        case 'ZodOptional':
+        case 'optional':
           info.optional = true;
           if (def.innerType) {
-            const innerInfo = extractZodSchemaInfo(def.innerType);
-            Object.assign(info, innerInfo);
+            info.innerType = extractZodSchemaInfo(def.innerType);
           }
           break;
 
-        case 'ZodNullable':
+        case 'nullable':
           info.nullable = true;
           if (def.innerType) {
-            const innerInfo = extractZodSchemaInfo(def.innerType);
-            Object.assign(info, innerInfo);
+            info.innerType = extractZodSchemaInfo(def.innerType);
           }
           break;
 
-        case 'ZodVoid':
+        case 'void':
           info.jsType = 'void';
           break;
 
-        case 'ZodAny':
+        case 'any':
           info.jsType = 'any';
           break;
 
@@ -637,6 +989,34 @@ async function extractTRPCMethods() {
           info.jsType = 'unknown';
           break;
       }
+    }
+
+    function extractEnumValuesFromDef(def) {
+      if (!def) {
+        return null;
+      }
+
+      if (Array.isArray(def.values)) {
+        return def.values;
+      }
+
+      if (Array.isArray(def.enum)) {
+        return def.enum;
+      }
+
+      if (Array.isArray(def.options)) {
+        return def.options;
+      }
+
+      if (Array.isArray(def._values)) {
+        return def._values;
+      }
+
+      if (def.entries && typeof def.entries === 'object') {
+        return Object.values(def.entries);
+      }
+
+      return null;
     }
 
     // Filter out MCP namespace if MCP is disabled

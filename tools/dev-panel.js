@@ -150,65 +150,7 @@ async function checkAndStartMCPJam() {
     }
 
     if (!mcpJamPath) {
-      // Try npx as a fallback for out-of-the-box functionality
-      console.log('📦 Local MCP JAM not found, trying npx @mcpjam/inspector...');
-      try {
-        mcpJamProcess = spawn('npx', ['@mcpjam/inspector', '--port', mcpJamStatus.port.toString()], {
-          stdio: 'pipe',
-          detached: false,
-          env: {
-            ...process.env,
-            PORT: mcpJamStatus.port.toString(),
-            NODE_ENV: 'production'
-          }
-        });
-
-        // Set up event handlers for npx approach
-        mcpJamProcess.stdout?.on('data', (data) => {
-          const output = data.toString();
-          if (output.includes('Inspector Launched') || output.includes('localhost:')) {
-            mcpJamStatus.running = true;
-            logMcpJamStarted();
-          }
-        });
-
-        mcpJamProcess.stderr?.on('data', (data) => {
-          const output = data.toString().trim();
-          if (output.includes('error') || output.includes('Error')) {
-            console.log(`MCP JAM (npx): ${output}`);
-          }
-        });
-
-        mcpJamProcess.on('exit', (code) => {
-          if (code !== 0) {
-            console.log(`⚠️  MCP JAM (npx) exited with code ${code}`);
-          }
-          mcpJamStatus.running = false;
-        });
-
-        // Wait a moment to see if it starts successfully
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Check if it's actually running
-        try {
-          const response = await fetch(`http://localhost:${mcpJamStatus.port}/health`);
-          if (response.ok) {
-            mcpJamStatus.running = true;
-            logMcpJamStarted();
-            return mcpJamStatus;
-          }
-        } catch (error) {
-          // Still not running, fall through to warning
-        }
-      } catch (error) {
-        console.log(`⚠️  MCP JAM could not be started via npx: ${error.message}`);
-      }
-
-      // Final fallback: graceful degradation
-      console.log('⚠️  MCP JAM could not be started - @mcpjam/inspector not accessible');
-      console.log('💡 Dev-panel will work without MCP JAM. To enable MCP JAM:');
-      console.log('   • Install locally: npm install @mcpjam/inspector');
-      console.log('   • Or ensure npx can access it globally');
+      // Inspector not installed; silently continue without MCP JAM
       mcpJamStatus.running = false;
       return mcpJamStatus;
     }

@@ -1,0 +1,35 @@
+{% assign siblings = site.html_pages
+  | where: "parent", page.parent
+  | where: "grand_parent", page.grand_parent
+  | sort: "nav_order" %}
+
+{% assign current_index = nil %}
+{% for sibling in siblings %}
+  {% if sibling.url == page.url %}
+    {% assign current_index = forloop.index0 %}
+  {% endif %}
+{% endfor %}
+
+{% if current_index != nil %}
+  {% assign prev_index = current_index | minus: 1 %}
+  {% assign next_index = current_index | plus: 1 %}
+  {% assign prev_page = siblings | slice: prev_index, 1 | first %}
+  {% assign next_page = siblings | slice: next_index, 1 | first %}
+
+  {% if prev_page or next_page %}
+    <nav class="page-nav">
+      {% if prev_page %}
+        <a class="page-nav__prev" href="{{ prev_page.url | relative_url }}">
+          <span aria-hidden="true">←</span>
+          <span class="page-nav__text">{{ prev_page.title }}</span>
+        </a>
+      {% endif %}
+      {% if next_page %}
+        <a class="page-nav__next" href="{{ next_page.url | relative_url }}">
+          <span class="page-nav__text">{{ next_page.title }}</span>
+          <span aria-hidden="true">→</span>
+        </a>
+      {% endif %}
+    </nav>
+  {% endif %}
+{% endif %}
