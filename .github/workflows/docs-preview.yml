@@ -47,6 +47,9 @@ jobs:
 
       - name: Deploy to Netlify
         id: netlify_deploy
+        env:
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_API_TOKEN }}
         run: |
           prod_flag=""
           if [ "${{ github.event_name }}" != "pull_request" ]; then
@@ -55,8 +58,6 @@ jobs:
 
           netlify deploy \
             --dir=_site \
-            --site=${{ secrets.NETLIFY_SITE_ID }} \
-            --auth=${{ secrets.NETLIFY_API_TOKEN }} \
             $prod_flag \
             --json > deploy-output.json
 
