@@ -194,7 +194,7 @@ jobs:
   release-check:
     name: Release Readiness Check
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4

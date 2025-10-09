@@ -1,6 +1,6 @@
 {
   "name": "simple-rpc-ai-backend",
-  "version": "0.1.4",
+  "version": "0.1.7",
   "description": "Simple RPC client and server for AI-powered VS Code extensions with secure system prompt management",
   "type": "module",
   "pnpm": {
@@ -27,7 +27,8 @@
       "babel-traverse": "npm:@babel/traverse@^7.23.2",
       "html-parse-stringify2": "npm:html-parse-stringify@^3.0.1",
       "tar-fs": ">=3.1.1",
-      "jsondiffpatch": ">=0.7.2"
+      "jsondiffpatch": ">=0.7.2",
+      "better-auth": ">=1.3.26"
     },
     "peerDependencyRules": {
       "ignoreMissing": [
@@ -166,6 +167,7 @@
     "@ai-sdk/openai": "^2.0.46",
     "@anolilab/ai-model-registry": "^1.3.0",
     "@huggingface/inference": "^4.8.0",
+    "@mcpjam/inspector": "^0.9.8",
     "@modelcontextprotocol/sdk": "^1.17.4",
     "@node-oauth/express-oauth-server": "^4.1.4",
     "@node-oauth/oauth2-server": "^5.2.1",
@@ -217,6 +219,7 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vitest/coverage-v8": "^1.0.0",
+    "better-auth": "^1.3.27",
     "cheerio": "^1.1.2",
     "concurrently": "^8.2.2",
     "eslint": "^8.0.0",

@@ -236,7 +236,7 @@ const app = createRpcAiServer({
   }
 });
 
-await app.start();
+app.start();
 ```
 
 
@@ -287,7 +287,7 @@ const server = createRpcAiServer({
   }
 });
 
-await server.start();
+server.start();
 ```
 
 ### Production Security Setup

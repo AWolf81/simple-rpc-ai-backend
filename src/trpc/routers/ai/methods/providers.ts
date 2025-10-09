@@ -7,12 +7,7 @@ import { AIService } from '@services/ai/ai-service';
  * AI provider management procedures
  */
 export function createProviderProcedures(
-  aiService: AIService,
-  modelRestrictions?: Record<string, {
-    allowedModels?: string[];
-    allowedPatterns?: string[];
-    blockedModels?: string[];
-  }>
+  aiService: AIService
 ) {
   return {
     /**
@@ -64,8 +59,8 @@ export function createProviderProcedures(
       }),
 
     /**
-     * List allowed models for a provider respecting configured restrictions.
-     * @description Provides production-ready model identifiers for a single provider or a map of providers to models.
+     * List allowed models for a provider (respects model restrictions)
+     * Returns production-ready model IDs that can be used directly with AI SDKs
      */
     listAllowedModels: publicProcedure
       .input(z.object({
