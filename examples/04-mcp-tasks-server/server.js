@@ -56,15 +56,9 @@ async function startServer() {
       },
 
       // AI Provider Configuration (minimal for task management)
-      ai: {
-        systemPrompt: 'You are a task management assistant helping with task scheduling, monitoring, and lifecycle management.',
-        providers: {
-          anthropic: {
-            enabled: !!process.env.ANTHROPIC_API_KEY,
-            apiKey: process.env.ANTHROPIC_API_KEY,
-            models: ['claude-3-5-haiku-20241022'] // Budget model for task management
-          }
-        }
+      serverProviders: ['anthropic'],
+      systemPrompts: {
+        default: 'You are a task management assistant helping with task scheduling, monitoring, and lifecycle management.'
       },
 
       // MCP Configuration - Focus on task management tools

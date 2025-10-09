@@ -1,6 +1,8 @@
 theme: just-the-docs
 title: Simple RPC AI Backend Docs
 description: Developer documentation for the Simple RPC AI Backend server.
+url: "https://awolf81.github.io"
+baseurl: "/simple-rpc-ai-backend"
 color_scheme: light
 sass:
   quiet_deps: true
@@ -31,4 +33,3 @@ defaults:
 
 mermaid:
   version: "10.9.1"
-

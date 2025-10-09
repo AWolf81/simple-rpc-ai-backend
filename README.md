@@ -40,24 +40,44 @@ Install the server into your app and start serving AI requests in minutes.
 pnpm add simple-rpc-ai-backend
 ```
 
-Create a minimal server (TypeScript):
+Create a minimal server with custom tRPC routes (TypeScript):
 
 ```ts
-import { createRpcAiServer } from 'simple-rpc-ai-backend';
+import { createRpcAiServer, router, publicProcedure } from 'simple-rpc-ai-backend';
+import { z } from 'zod';
+
+const mathRouter = router({
+  add: publicProcedure
+    .input(z.object({ a: z.number(), b: z.number() }))
+    .mutation(({ input }) => ({ result: input.a + input.b })),
+  multiply: publicProcedure
+    .input(z.object({ a: z.number(), b: z.number() }))
+    .mutation(({ input }) => ({ result: input.a * input.b }))
+});
+
+const utilsRouter = router({
+  ping: publicProcedure.query(() => ({ pong: true })),
+  echo: publicProcedure
+    .input(z.object({ message: z.string() }))
+    .mutation(({ input }) => ({ message: input.message }))
+});
+
+const customRouter = router({
+  // Add domain-specific procedures here
+});
 
 const server = createRpcAiServer({
-  port: 8000,
-  ai: {
-    providers: {
-      anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
-      openai: { apiKey: process.env.OPENAI_API_KEY }
-    }
-  },
-  mcp: { enabled: true }
+  port: Number(process.env.SERVER_PORT ?? 8000),
+  serverProviders: ['anthropic', 'openai'],
+  mcp: { enabled: true },
+  customRouters: {
+    math: mathRouter,
+    utils: utilsRouter,
+    custom: customRouter
+  }
 });
 
 await server.start();
-console.log('Server running at http://localhost:8000');
 ```
 
 Call it with JSON-RPC:

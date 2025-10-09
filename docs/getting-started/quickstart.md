@@ -82,12 +82,7 @@ const customRouter = router({
 
 const server = createRpcAiServer({
   port: Number(process.env.SERVER_PORT ?? 8000),
-  ai: {
-    providers: {
-      anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
-      openai: { apiKey: process.env.OPENAI_API_KEY }
-    }
-  },
+  serverProviders: ['anthropic', 'openai'],
   mcp: { enabled: true },
   customRouters: {
     math: mathRouter,
@@ -96,7 +91,7 @@ const server = createRpcAiServer({
   }
 });
 
-await server.start();
+server.start();
 ```
 
 > Re-run `pnpm trpc:build` after editing these routers so the dev panel and JSON-RPC schema stay in sync.

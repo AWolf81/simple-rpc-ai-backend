@@ -258,29 +258,28 @@ According to MCP specification, clients **MUST**:
 import { createRpcAiServer } from 'simple-rpc-ai-backend';
 
 const server = createRpcAiServer({
-  ai: {
-    providers: {
-      anthropic: { apiKey: process.env.ANTHROPIC_API_KEY }
-    }
-  },
+  serverProviders: ['anthropic'],
 
   // Server-managed directories
   serverWorkspaces: {
-    templates: {
-      path: './templates',
-      name: 'Project Templates',
-      readOnly: true
-    },
-    work: {
-      path: './workspace',
-      name: 'Work Area',
-      readOnly: false
+    enabled: true,
+    additionalWorkspaces: {
+      templates: {
+        path: './templates',
+        name: 'Project Templates',
+        readOnly: true
+      },
+      work: {
+        path: './workspace',
+        name: 'Work Area',
+        readOnly: false
+      }
     }
   },
 
   // MCP configuration for client roots
   mcp: {
-    enableMCP: true,
+    enabled: true,
     auth: {
       requireAuthForToolsList: false,
       requireAuthForToolsCall: false
@@ -321,7 +320,7 @@ const server = createRpcAiServer({
 
   // Secure MCP configuration
   mcp: {
-    enableMCP: true,
+    enabled: true,
     auth: {
       requireAuthForToolsList: true,   // Require auth
       requireAuthForToolsCall: true,   // Require auth
@@ -355,7 +354,7 @@ const server = createRpcAiServer({
 
   // Liberal MCP settings for development
   mcp: {
-    enableMCP: true,
+    enabled: true,
     auth: {
       requireAuthForToolsList: false,
       requireAuthForToolsCall: false,

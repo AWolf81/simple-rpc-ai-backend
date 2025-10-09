@@ -99,25 +99,10 @@ async function startServer() {
       },
 
       // AI Provider Configuration
-      ai: {
-        systemPrompt: 'You are a helpful AI assistant with access to mathematical calculations, utility functions, and secure file operations.',
-        providers: {
-          anthropic: {
-            enabled: !!process.env.ANTHROPIC_API_KEY,
-            apiKey: process.env.ANTHROPIC_API_KEY,
-            models: ['claude-3-5-sonnet-20241022']
-          },
-          openai: {
-            enabled: !!process.env.OPENAI_API_KEY,
-            apiKey: process.env.OPENAI_API_KEY,
-            models: ['gpt-4o']
-          },
-          google: {
-            enabled: !!process.env.GOOGLE_API_KEY,
-            apiKey: process.env.GOOGLE_API_KEY,
-            models: ['gemini-2.0-flash-exp']
-          }
-        }
+      serverProviders: ['anthropic', 'openai', 'google'],
+      byokProviders: ['anthropic', 'openai', 'google'],
+      systemPrompts: {
+        default: 'You are a helpful AI assistant with access to mathematical calculations, utility functions, and secure file operations.'
       },
 
       // MCP Configuration with all capabilities

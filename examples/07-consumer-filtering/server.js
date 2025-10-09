@@ -15,17 +15,12 @@ import { getCustomRouters } from './methods/index.js';
 const server = createRpcAiServer({
   port: 8002,
 
-  // Disable all AI features (won't affect tool generation)
-  ai: {
-    enabled: false
-  },
+  // No AI providers configured for this example
+  serverProviders: [],
 
   // Enable MCP with minimal configuration
   mcp: {
-    enabled: true,
-    ai: {
-      enabled: false  // No AI tools in MCP
-    }
+    enabled: true
   },
 
   // Custom routers from consumer
