@@ -171,9 +171,9 @@ describe('Test Helpers - Security Configuration', () => {
   describe('Test MCP Configuration Creator', () => {
     it('should create test-friendly MCP configuration', () => {
       const config = createTestMCPConfig();
-      
+
       expect(config).toEqual({
-        enableMCP: true,
+        enabled: true,
         transports: {
           http: true,
           stdio: false,
@@ -203,16 +203,16 @@ describe('Test Helpers - Security Configuration', () => {
 
     it('should merge custom overrides', () => {
       const overrides = {
-        enableMCP: false,
+        enabled: false,
         customProperty: 'test-value',
         auth: {
           publicTools: ['custom-tool']
         }
       };
-      
+
       const config = createTestMCPConfig(overrides);
-      
-      expect(config.enableMCP).toBe(false);
+
+      expect(config.enabled).toBe(false);
       expect(config.customProperty).toBe('test-value');
       expect(config.auth.publicTools).toEqual(['custom-tool']);
       expect(config.rateLimiting).toEqual(DISABLED_RATE_LIMITING);
@@ -426,17 +426,17 @@ describe('Test Helpers - Security Configuration', () => {
 
     it('should merge with existing MCP config', () => {
       process.env.NODE_ENV = 'test';
-      
+
       const config = {
         mcp: {
-          enableMCP: false,
+          enabled: false,
           customSetting: 'test'
         }
       };
-      
+
       const result = getTestSafeConfig(config);
-      
-      expect(result.mcp.enableMCP).toBe(false); // Original setting preserved
+
+      expect(result.mcp.enabled).toBe(false); // Original setting preserved
       expect(result.mcp.customSetting).toBe('test'); // Original setting preserved
       expect(result.mcp.rateLimiting).toEqual(DISABLED_RATE_LIMITING); // Security disabled
     });
@@ -493,22 +493,22 @@ describe('Test Helpers - Security Configuration', () => {
           message: 'Too many requests'
         },
         mcp: {
-          enableMCP: true,
+          enabled: true,
           existingConfig: 'preserve'
         }
       };
-      
+
       const result = getTestSafeConfig(complexConfig);
-      
+
       // Server and database config should be preserved
       expect(result.server).toEqual(complexConfig.server);
       expect(result.database).toEqual(complexConfig.database);
-      
+
       // Rate limiting should be disabled
       expect(result.rateLimit.max).toBe(0);
-      
+
       // MCP security should be disabled but existing settings preserved
-      expect(result.mcp.enableMCP).toBe(true);
+      expect(result.mcp.enabled).toBe(true);
       expect(result.mcp.existingConfig).toBe('preserve');
       expect(result.mcp.rateLimiting.enabled).toBe(false);
       expect(result.mcp.securityLogging.enabled).toBe(false);

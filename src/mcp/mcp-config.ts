@@ -8,13 +8,7 @@ import { MCPResource, MCPResourceHandler } from './default-resources';
 
 export interface MCPPromptsConfig {
   /**
-   * Whether to include default prompts
-   * @default true
-   */
-  includeDefaults?: boolean;
-
-  /**
-   * Custom prompts to add (merged with defaults if includeDefaults is true)
+   * Custom prompts to add
    */
   customPrompts?: MCPPrompt[];
 
@@ -22,11 +16,6 @@ export interface MCPPromptsConfig {
    * Custom prompt templates for prompts/get
    */
   customTemplates?: Record<string, MCPPromptTemplate>;
-
-  /**
-   * Prompts to exclude from defaults (by name)
-   */
-  excludeDefaults?: string[];
 }
 
 export interface MCPResourceTemplate {
@@ -43,13 +32,7 @@ export interface MCPResourceTemplate {
 
 export interface MCPResourcesConfig {
   /**
-   * Whether to include default resources
-   * @default true
-   */
-  includeDefaults?: boolean;
-
-  /**
-   * Custom resources to add (merged with defaults if includeDefaults is true)
+   * Custom resources to add
    */
   customResources?: MCPResource[];
 
@@ -67,11 +50,6 @@ export interface MCPResourcesConfig {
    * Custom template handlers for resource template execution
    */
   templateHandlers?: Record<string, (args: any) => any>;
-
-  /**
-   * Resources to exclude from defaults (by URI)
-   */
-  excludeDefaults?: string[];
 }
 
 export interface MCPExtensionConfig {
@@ -96,20 +74,16 @@ export class MCPExtensionManager {
 
   constructor(config: MCPExtensionConfig = {}) {
     this.promptsConfig = {
-      includeDefaults: true,
       customPrompts: [],
       customTemplates: {},
-      excludeDefaults: [],
       ...config.prompts
     };
 
     this.resourcesConfig = {
-      includeDefaults: true,
       customResources: [],
       customHandlers: {},
       customTemplates: [],
       templateHandlers: {},
-      excludeDefaults: [],
       ...config.resources
     };
   }
@@ -118,135 +92,47 @@ export class MCPExtensionManager {
    * Get merged prompts list
    */
   getPrompts(defaultPrompts: MCPPrompt[]): MCPPrompt[] {
-    let prompts: MCPPrompt[] = [];
-
-    // Add defaults if enabled
-    if (this.promptsConfig.includeDefaults) {
-      prompts = defaultPrompts.filter(p => 
-        !this.promptsConfig.excludeDefaults?.includes(p.name)
-      );
-    }
-
-    // Add custom prompts
-    if (this.promptsConfig.customPrompts) {
-      prompts = [...prompts, ...this.promptsConfig.customPrompts];
-    }
-
-    return prompts;
+    // Only include custom prompts - no defaults
+    return this.promptsConfig.customPrompts || [];
   }
 
   /**
    * Get merged prompt templates
    */
   getPromptTemplates(defaultTemplates: Record<string, MCPPromptTemplate>): Record<string, MCPPromptTemplate> {
-    let templates: Record<string, MCPPromptTemplate> = {};
-
-    // Add defaults if enabled
-    if (this.promptsConfig.includeDefaults) {
-      templates = { ...defaultTemplates };
-      
-      // Remove excluded defaults
-      this.promptsConfig.excludeDefaults?.forEach(name => {
-        delete templates[name];
-      });
-    }
-
-    // Add custom templates
-    if (this.promptsConfig.customTemplates) {
-      templates = { ...templates, ...this.promptsConfig.customTemplates };
-    }
-
-    return templates;
+    // Only include custom templates - no defaults
+    return this.promptsConfig.customTemplates || {};
   }
 
   /**
    * Get merged resources list
    */
   getResources(defaultResources: MCPResource[]): MCPResource[] {
-    let resources: MCPResource[] = [];
-
-    // Add defaults if enabled
-    if (this.resourcesConfig.includeDefaults) {
-      resources = defaultResources.filter(r => 
-        !this.resourcesConfig.excludeDefaults?.includes(r.uri)
-      );
-    }
-
-    // Add custom resources
-    if (this.resourcesConfig.customResources) {
-      resources = [...resources, ...this.resourcesConfig.customResources];
-    }
-
-    return resources;
+    // Only include custom resources - no defaults
+    return this.resourcesConfig.customResources || [];
   }
 
   /**
    * Get merged resource handlers
    */
   getResourceHandlers(defaultHandlers: Record<string, MCPResourceHandler>): Record<string, MCPResourceHandler> {
-    let handlers: Record<string, MCPResourceHandler> = {};
-
-    // Add defaults if enabled
-    if (this.resourcesConfig.includeDefaults) {
-      handlers = { ...defaultHandlers };
-
-      // Remove excluded defaults (by resource name from URI)
-      this.resourcesConfig.excludeDefaults?.forEach(uri => {
-        const resourceName = uri.replace('file://', '');
-        delete handlers[resourceName];
-      });
-    }
-
-    // Add custom handlers
-    if (this.resourcesConfig.customHandlers) {
-      handlers = { ...handlers, ...this.resourcesConfig.customHandlers };
-    }
-
-    return handlers;
+    // Only include custom handlers - no defaults
+    return this.resourcesConfig.customHandlers || {};
   }
 
   /**
    * Get merged resource templates list
    */
   getResourceTemplates(defaultTemplates: MCPResourceTemplate[] = []): MCPResourceTemplate[] {
-    let templates: MCPResourceTemplate[] = [];
-
-    // Add defaults if enabled
-    if (this.resourcesConfig.includeDefaults) {
-      templates = defaultTemplates.filter(t =>
-        !this.resourcesConfig.excludeDefaults?.includes(t.name)
-      );
-    }
-
-    // Add custom templates
-    if (this.resourcesConfig.customTemplates) {
-      templates = [...templates, ...this.resourcesConfig.customTemplates];
-    }
-
-    return templates;
+    // Only include custom templates - no defaults
+    return this.resourcesConfig.customTemplates || [];
   }
 
   /**
    * Get merged resource template handlers
    */
   getResourceTemplateHandlers(defaultHandlers: Record<string, (args: any) => any> = {}): Record<string, (args: any) => any> {
-    let handlers: Record<string, (args: any) => any> = {};
-
-    // Add defaults if enabled
-    if (this.resourcesConfig.includeDefaults) {
-      handlers = { ...defaultHandlers };
-
-      // Remove excluded defaults
-      this.resourcesConfig.excludeDefaults?.forEach(name => {
-        delete handlers[name];
-      });
-    }
-
-    // Add custom template handlers
-    if (this.resourcesConfig.templateHandlers) {
-      handlers = { ...handlers, ...this.resourcesConfig.templateHandlers };
-    }
-
-    return handlers;
+    // Only include custom template handlers - no defaults
+    return this.resourcesConfig.templateHandlers || {};
   }
 }

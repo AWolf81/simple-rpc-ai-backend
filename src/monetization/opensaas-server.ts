@@ -12,9 +12,9 @@ import { BillingEngine } from '../billing/billing-engine';
 import { PostgreSQLAdapter } from '../database/postgres-adapter';
 
 // Import existing server components
-import { AIService } from '../services/ai-service';
-import { FunctionRegistry } from '../services/function-registry';
-import { PromptManager, promptManager } from '../services/prompt-manager';
+import { AIService } from '@services/ai/ai-service';
+import { FunctionRegistry } from '../services/ai/function-registry';
+import { PromptManager, promptManager } from '../services/ai/prompt-manager';
 
 // Import configuration
 import type { MonetizedAIServerConfig, OpenSaaSMonetizationConfig } from './opensaas-config';
@@ -158,7 +158,7 @@ export async function createMonetizedAIServer(config: MonetizedAIServerConfig): 
       version: '1.0.0',
       rpcEndpoint: '/rpc',
       supportedMethods: [
-        'executeAIRequest', 'getUsageStats', 'checkQuotaStatus', 'health', 'rpc.discover'
+        'generateText', 'getUsageStats', 'checkQuotaStatus', 'health', 'rpc.discover'
       ],
       subscriptionTiers: Object.keys(mergedTiers),
       features: {
@@ -265,7 +265,7 @@ export async function createMonetizedAIServer(config: MonetizedAIServerConfig): 
       let result: any;
 
       switch (method) {
-        case 'executeAIRequest':
+        case 'generateText':
           result = await handleMonetizedAIRequest(
             params, 
             req, 
@@ -473,7 +473,7 @@ async function handleMonetizedAIRequest(
     userId,
     organizationId: req.authContext?.organizationId,
     requestId,
-    method: 'executeAIRequest',
+    method: 'generateText',
     provider: 'ai-service', // This should come from aiResult
     model: aiResult.model,
     inputTokens: aiResult.usage?.promptTokens || estimatedTokens,
@@ -547,7 +547,7 @@ async function handleDiscover(): Promise<any> {
     },
     methods: [
       {
-        name: 'executeAIRequest',
+        name: 'generateText',
         description: 'Execute AI request with usage tracking and billing',
         params: {
           type: 'object',

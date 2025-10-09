@@ -8,7 +8,22 @@
  */
 
 import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { join, resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Load RC configuration file if present
+const isInDist = dirname(fileURLToPath(import.meta.url)).includes('/dist/tools');
+const rcConfigPath = isInDist
+  ? '../config/rc-loader.js'  // From dist/tools/ -> dist/config/
+  : '../dist/config/rc-loader.js';  // From tools/ -> dist/config/
+
+try {
+  const { loadRCConfig, applyToEnv } = await import(rcConfigPath);
+  const rcConfig = loadRCConfig();
+  applyToEnv(rcConfig);
+} catch (error) {
+  // RC config is optional - silently ignore if not available
+}
 
 // Configure base URL for generated endpoints
 const baseUrl = `http://localhost:${process.env.AI_SERVER_PORT || 8000}`;
@@ -30,13 +45,58 @@ function zWithSource(schema, filePath, lineNumber) {
 
 console.log('🔨 Generating tRPC methods documentation...');
 
+// Check if we're in the source tree (has src/trpc/routers)
+const isInSourceTree = existsSync('src/trpc/routers');
+
 async function extractTRPCMethods() {
   try {
     // Import the router configuration after TypeScript compilation
-    const { createRouterForGeneration, loadTRPCGenerationConfig } = await import('../dist/trpc/router-config.js');
+    // If running from dist/tools/, go up one level. If from tools/, go up one then into dist
+    const isInDist = dirname(fileURLToPath(import.meta.url)).includes('/dist/tools');
+    const configPath = isInDist
+      ? '../trpc/router-config.js'  // From dist/tools/ -> dist/trpc/
+      : '../dist/trpc/router-config.js';  // From tools/ -> dist/trpc/
 
-    // Load configuration from environment variables
-    const config = loadTRPCGenerationConfig();
+    const { createRouterForGeneration, loadTRPCGenerationConfig } = await import(configPath);
+
+    // Load base configuration from environment variables
+    let config = loadTRPCGenerationConfig();
+
+    // If a custom server file is specified, extract its actual config
+    const customServerPath = process.env.TRPC_GEN_CUSTOM_ROUTERS;
+    if (customServerPath) {
+      try {
+        // Resolve path from current working directory
+        const resolvedPath = customServerPath.startsWith('/') || customServerPath.startsWith('file://')
+          ? customServerPath
+          : resolve(process.cwd(), customServerPath);
+
+        const serverModule = await import(resolvedPath);
+
+        // Try to extract server config if available (look for createRpcAiServer call)
+        // Read the file to parse the config (since it's not exported)
+        const serverFileContent = readFileSync(resolvedPath, 'utf8');
+
+        // Extract MCP config from the file content
+        const mcpEnabledMatch = serverFileContent.match(/mcp:\s*\{[^}]*enabled:\s*(true|false)/);
+        if (mcpEnabledMatch) {
+          const mcpEnabled = mcpEnabledMatch[1] === 'true';
+          console.log(`📄 Extracted from ${customServerPath}: mcp.enabled = ${mcpEnabled}`);
+
+          // Override config with actual server settings
+          config = {
+            ...config,
+            mcp: {
+              ...config.mcp,
+              enabled: mcpEnabled,
+              includeInGeneration: mcpEnabled
+            }
+          };
+        }
+      } catch (error) {
+        console.warn(`⚠️  Could not extract config from ${customServerPath}, using environment config:`, error.message);
+      }
+    }
 
     // Create router with configuration filtering
     const router = await createRouterForGeneration(config);
@@ -125,7 +185,10 @@ async function extractTRPCMethods() {
           }
         }
       } catch (e) {
-        console.log(`Could not find line number for ${procedureName} in ${sourceFile}:`, e.message);
+        // Only log if we're in the source tree
+        if (isInSourceTree) {
+          console.log(`Could not find line number for ${procedureName} in ${sourceFile}:`, e.message);
+        }
       }
       
       return null; // Line not found
@@ -267,7 +330,10 @@ async function extractTRPCMethods() {
           }
         }
       } catch (e) {
-        console.log(`Could not find ${schemaType} line number for ${procedureName} in ${fileToSearch}:`, e.message);
+        // Only log if we're in the source tree
+        if (isInSourceTree) {
+          console.log(`Could not find ${schemaType} line number for ${procedureName} in ${fileToSearch}:`, e.message);
+        }
       }
       
       return null; // Line not found
@@ -573,11 +639,24 @@ async function extractTRPCMethods() {
       }
     }
 
-    const mcpMethods = {};
-
-    // Only include MCP methods if MCP is enabled in configuration
+    // Filter out MCP namespace if MCP is disabled
     const includeMCPMethods = generationConfig.mcp?.enabled && generationConfig.mcp?.includeInGeneration;
+
+    if (!includeMCPMethods) {
+      // Remove all mcp.* procedures
+      const mcpProcedureNames = Object.keys(methods).filter(name => name.startsWith('mcp.'));
+      mcpProcedureNames.forEach(name => delete methods[name]);
+      console.log(`🚫 MCP disabled - filtered out ${mcpProcedureNames.length} mcp.* procedures`);
+    }
+
+    const mcpMethods = {};
+    const mcpToolIndex = {};
     const includeAITools = generationConfig.mcp?.ai?.enabled && generationConfig.mcp?.ai?.includeAIToolsInGeneration;
+
+    // Log namespace whitelist if configured
+    if (generationConfig.namespaceWhitelist && generationConfig.namespaceWhitelist.length > 0) {
+      console.log(`🔍 Namespace whitelist active: [${generationConfig.namespaceWhitelist.join(', ')}]`);
+    }
 
     const mcpProcedures = includeMCPMethods
       ? Object.entries(methods).filter(([name, method]) => {
@@ -588,6 +667,15 @@ async function extractTRPCMethods() {
             return false;
           }
 
+          // Apply namespace whitelist filtering
+          if (generationConfig.namespaceWhitelist && generationConfig.namespaceWhitelist.length > 0) {
+            const namespace = name.includes('.') ? name.split('.')[0] : name;
+            if (!generationConfig.namespaceWhitelist.includes(namespace)) {
+              console.log(`🚫 Tool ${name} filtered out: namespace "${namespace}" not in whitelist [${generationConfig.namespaceWhitelist.join(', ')}]`);
+              return false;
+            }
+          }
+
           return true;
         })
       : [];
@@ -596,8 +684,24 @@ async function extractTRPCMethods() {
       const mcpMeta = method.meta.mcp;
       const procedureName = name;
       const httpMethod = method.type === 'mutation' ? 'POST' : 'GET';
+      const toolName = (mcpMeta?.toolName || mcpMeta?.name || procedureName.split('.').pop() || procedureName).trim();
+
+      if (!toolName) {
+        console.error(`❌ MCP tool detected without a valid name: ${procedureName}`);
+        throw new Error(`MCP tool '${procedureName}' does not specify a tool name`);
+      }
+
+      if (mcpToolIndex[toolName]) {
+        const conflictWith = mcpToolIndex[toolName];
+        console.error(`❌ Duplicate MCP tool name detected: '${toolName}' used by both '${conflictWith}' and '${procedureName}'`);
+        throw new Error(`Duplicate MCP tool name '${toolName}' detected in procedures '${conflictWith}' and '${procedureName}'. Tool names must be unique.`);
+      }
+
+      mcpToolIndex[toolName] = procedureName;
       
       mcpMethods[name] = {
+        toolName,
+        procedure: procedureName,
         title: mcpMeta.title || mcpMeta.name || mcpMeta.description || `Tool ${name}`,
         description: mcpMeta.description,
         category: mcpMeta.category || 'general',
@@ -611,7 +715,7 @@ async function extractTRPCMethods() {
               id: 1,
               method: 'tools/call',
               params: {
-                name: name.split('.').pop(), // Remove router prefix for MCP
+                name: toolName,
                 arguments: generateExampleArgs(method.input)
               }
             }
@@ -684,6 +788,10 @@ async function extractTRPCMethods() {
       return args;
     }
 
+    // Note: We include all base procedures in the build (ai, mcp, system, etc.)
+    // Consumers can choose which routers to enable at server runtime via config
+    // This ensures the package distribution has all features available
+
     const documentation = {
       generated: new Date().toISOString(),
       version: '1.0.0',
@@ -707,7 +815,8 @@ async function extractTRPCMethods() {
         available: Object.keys(mcpMethods).length > 0,
         enabled: includeMCPMethods,
         methods: mcpMethods,
-        endpoint: 'http://localhost:8000/mcp',
+        endpoint: `${baseUrl}/mcp`,
+        toolIndex: mcpToolIndex,
         protocolVersion: '2024-11-05'
       },
       stats: {
@@ -715,7 +824,8 @@ async function extractTRPCMethods() {
         queries: Object.values(methods).filter(m => m.type === 'query').length,
         mutations: Object.values(methods).filter(m => m.type === 'mutation').length,
         subscriptions: Object.values(methods).filter(m => m.type === 'subscription').length,
-        mcpMethods: Object.keys(mcpMethods).length
+        mcpMethods: Object.keys(mcpMethods).length,
+        uniqueMcpTools: Object.keys(mcpToolIndex).length
       }
     };
     
@@ -731,6 +841,20 @@ async function extractTRPCMethods() {
       version: '1.0.0',
       description: 'Failed to extract tRPC methods - fallback structure',
       error: error.message,
+      configuration: {
+        ai: {
+          enabled: false,
+          includedInGeneration: false
+        },
+        mcp: {
+          enabled: false,
+          includedInGeneration: false,
+          ai: {
+            enabled: false,
+            includedInGeneration: false
+          }
+        }
+      },
       procedures: {},
       stats: {
         totalProcedures: 0,
@@ -759,14 +883,19 @@ async function main() {
   console.log(`   - ${documentation.stats.subscriptions} subscriptions`);
 
   // Show configuration status
-  console.log(`⚙️  Generation Configuration:`);
-  console.log(`   - AI: ${documentation.configuration.ai.enabled ? '✅ Enabled' : '❌ Disabled'}`);
-  console.log(`   - MCP: ${documentation.configuration.mcp.enabled ? '✅ Enabled' : '❌ Disabled'}`);
-  if (documentation.configuration.mcp.enabled) {
-    console.log(`   - MCP AI Tools: ${documentation.configuration.mcp.ai.enabled ? '✅ Enabled' : '❌ Disabled'}`);
+  if (documentation.configuration) {
+    console.log(`⚙️  Generation Configuration:`);
+    const aiEnabled = documentation.configuration.ai?.enabled ?? false;
+    const mcpEnabled = documentation.configuration.mcp?.enabled ?? false;
+    const mcpAiEnabled = documentation.configuration.mcp?.ai?.enabled ?? false;
+    console.log(`   - AI: ${aiEnabled ? '✅ Enabled' : '❌ Disabled'}`);
+    console.log(`   - MCP: ${mcpEnabled ? '✅ Enabled' : '❌ Disabled'}`);
+    if (mcpEnabled) {
+      console.log(`   - MCP AI Tools: ${mcpAiEnabled ? '✅ Enabled' : '❌ Disabled'}`);
+    }
   }
 
-  if (documentation.mcp.enabled && documentation.mcp.available) {
+  if (documentation.mcp?.enabled && documentation.mcp.available) {
     console.log(`🔧 MCP Integration:`);
     console.log(`   - ${documentation.stats.mcpMethods} MCP tools available`);
     console.log(`   - Endpoint: ${documentation.mcp.endpoint}`);
@@ -782,7 +911,7 @@ async function main() {
         console.log(`      🔹 JSON-RPC: POST ${tool.calling.jsonRpc.endpoint} (method: ${tool.calling.jsonRpc.method})`);
       }
     }
-  } else if (documentation.configuration.mcp.enabled) {
+  } else if (documentation.configuration?.mcp?.enabled) {
     console.log(`🔧 MCP Integration: Enabled but no tools found (add .meta({ mcp: {...} }) to procedures)`);
   } else {
     console.log(`🔧 MCP Integration: ❌ Disabled in configuration`);

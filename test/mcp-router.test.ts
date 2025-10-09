@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createMCPRouter } from '../src/trpc/routers/mcp.js';
-import { MCPService } from '../src/services/mcp-service.js';
-import { RefMCPIntegration } from '../src/services/ref-mcp-integration.js';
+import { createMCPRouter } from '../src/trpc/routers/mcp/index.js';
+import { MCPService } from '../src/services/mcp/mcp-service.js';
+import { RefMCPIntegration } from '../src/services/mcp/ref-mcp-integration.js';
 import { TRPCError } from '@trpc/server';
 
 // Mock dependencies
-vi.mock('../src/services/mcp-service.js');
-vi.mock('../src/services/ref-mcp-integration.js');
+vi.mock('../src/services/mcp/mcp-service.js');
+vi.mock('../src/services/mcp/ref-mcp-integration.js');
 
 // Skip MCP router tests in security-middleware branch - will be addressed in mcp-oauth-integration branch
 describe.skip('MCP Router', () => {

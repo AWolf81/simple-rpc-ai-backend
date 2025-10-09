@@ -6,8 +6,8 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure } from '@src-trpc/index';
 import { createAdminMCPTool } from '@auth/scopes';
-import { UsageAnalyticsService } from '@services/usage-analytics-service';
-import { VirtualTokenService } from '@services/virtual-token-service';
+import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
+import { VirtualTokenService } from '@services/billing/virtual-token-service';
 
 interface AdminConfig {
   adminUsers?: string[];
@@ -16,13 +16,40 @@ interface AdminConfig {
   virtualTokenService?: VirtualTokenService | null;
 }
 
-export function createAdminRouter(config: AdminConfig = {}) {
+export function createAdminRouter(config: AdminConfig = {}): ReturnType<typeof router> {
   const {
     adminUsers = ['admin@company.com'],
     requireAdminAuth = true,
     usageAnalyticsService,
     virtualTokenService
   } = config;
+
+  const assertAdminAccess = (ctx: any, procedureName: string) => {
+    if (!requireAdminAuth) {
+      return;
+    }
+
+    // First check: User must be authenticated
+    if (!ctx?.user) {
+      console.warn(`🚫 Admin access denied for ${procedureName} (unauthenticated request)`);
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required'
+      });
+    }
+
+    // Second check: Authenticated user must be in admin list
+    const userEmail = ctx.user.email || '';
+    const userId = ctx.user.id;
+    if (!adminUsers.includes(userEmail)) {
+      const actor = userEmail || userId || 'unknown';
+      console.warn(`🚫 Admin access denied for ${procedureName} (user: ${actor})`);
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Admin privileges required'
+      });
+    }
+  };
 
   return router({
     /**
@@ -57,12 +84,7 @@ export function createAdminRouter(config: AdminConfig = {}) {
       }))
       .query(({ input, ctx }) => {
         // Check admin permissions if required
-        if (requireAdminAuth && (!ctx.user || !adminUsers.includes(ctx.user.email || ''))) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Admin privileges required'
-          });
-        }
+        assertAdminAccess(ctx, 'admin.status');
 
         const memUsage = process.memoryUsage();
         const totalMem = memUsage.heapTotal;
@@ -110,12 +132,7 @@ export function createAdminRouter(config: AdminConfig = {}) {
       }))
       .query(async ({ input, ctx }) => {
         // Check admin permissions
-        if (requireAdminAuth && (!ctx.user || !adminUsers.includes(ctx.user.email || ''))) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Admin privileges required'
-          });
-        }
+        assertAdminAccess(ctx, 'admin.statistics');
 
         const stats: any = {
           period: {
@@ -181,12 +198,7 @@ export function createAdminRouter(config: AdminConfig = {}) {
       }))
       .query(async ({ input, ctx }) => {
         // Check admin permissions
-        if (requireAdminAuth && (!ctx.user || !adminUsers.includes(ctx.user.email || ''))) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Admin privileges required'
-          });
-        }
+        assertAdminAccess(ctx, 'admin.getUserInfo');
 
         const userInfo: any = {
           userId: input.userId,
@@ -227,12 +239,7 @@ export function createAdminRouter(config: AdminConfig = {}) {
       }))
       .query(({ input, ctx }) => {
         // Check admin permissions
-        if (requireAdminAuth && (!ctx.user || !adminUsers.includes(ctx.user.email || ''))) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Admin privileges required'
-          });
-        }
+        assertAdminAccess(ctx, 'admin.clearCache');
 
         const config: any = {};
 
@@ -289,12 +296,7 @@ export function createAdminRouter(config: AdminConfig = {}) {
       })
       .query(async ({ ctx }) => {
         // Check admin permissions
-        if (requireAdminAuth && (!ctx.user || !adminUsers.includes(ctx.user.email || ''))) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Admin privileges required'
-          });
-        }
+        assertAdminAccess(ctx, 'admin.updateConfig');
 
         const checks: any = {
           server: 'healthy',
@@ -348,12 +350,7 @@ export function createAdminRouter(config: AdminConfig = {}) {
       }))
       .mutation(({ input, ctx }) => {
         // Check admin permissions
-        if (requireAdminAuth && (!ctx.user || !adminUsers.includes(ctx.user.email || ''))) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Admin privileges required'
-          });
-        }
+        assertAdminAccess(ctx, 'admin.promoteUser');
 
         const cleared: string[] = [];
 
@@ -376,4 +373,4 @@ export function createAdminRouter(config: AdminConfig = {}) {
   });
 }
 
-export const adminRouter = createAdminRouter();
+export const adminRouter: ReturnType<typeof createAdminRouter> = createAdminRouter();

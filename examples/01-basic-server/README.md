@@ -45,7 +45,7 @@ curl -X POST http://localhost:8000/rpc \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
-    "method": "ai.executeAIRequest",
+    "method": "ai.generateText",
     "params": {
       "content": "What is 2+2?",
       "provider": "anthropic"
@@ -62,7 +62,7 @@ curl http://localhost:8000/health
 import { RPCClient } from 'simple-rpc-ai-backend';
 
 const client = new RPCClient('http://localhost:8000');
-const result = await client.request('ai.executeAIRequest', {
+const result = await client.request('ai.generateText', {
   content: 'What is 2+2?',
   provider: 'anthropic'
 });

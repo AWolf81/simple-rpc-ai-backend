@@ -48,7 +48,7 @@ export class MCPClient {
             throw new Error('Request cancelled');
         }
         
-        return await this.trpcClient.ai.executeAIRequest.mutate({
+        return await this.trpcClient.ai.generateText.mutate({
             content: params.content,
             provider: params.provider || 'anthropic',
             options: {

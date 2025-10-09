@@ -258,21 +258,39 @@ function convertContentToXML(content, department, version) {
 
 /**
  * Helper function to easily add workspace file resources
- * Uses relative paths from workspace root (e.g., './README.md', 'package.json', 'src/config.json')
+ * Uses relative paths from workspace root (e.g., 'README.md', 'package.json', 'src/config.json')
+ *
+ * @param {string} id - Unique resource identifier
+ * @param {string} name - Display name
+ * @param {string} filePath - Relative path from root (e.g., 'package.json', 'src/index.js')
+ * @param {Object} options - Configuration options
+ * @param {string} [options.rootId='project-root'] - Which root to read from
+ * @param {string} [options.category='project'] - Resource category
+ * @param {boolean} [options.requireAuth=false] - Require authentication
+ *
+ * Security: Defaults to 'project-root'. Custom roots via rootId option.
  */
 function addWorkspaceFileResource(id, name, filePath, options = {}) {
   const {
     description = `${name} from project workspace`,
     category = 'project',
     requireAuth = false,
-    mimeType = detectMimeType(filePath)
+    mimeType = detectMimeType(filePath),
+    rootId = 'project-root'  // Default to project-root
   } = options;
 
   // Clean up the file path - remove leading ./ if present
   const cleanPath = filePath.startsWith('./') ? filePath.substring(2) : filePath;
 
   registerFileResource(id, name, description, mimeType, category, requireAuth, (context) => {
-    return readFromWorkspace(context, cleanPath);
+    // Use specified rootId from options, or fallback to default
+    const workspaceManager = context?.workspaceManager;
+
+    if (workspaceManager) {
+      return workspaceManager.readFile('projectRoot', cleanPath);
+    } else {
+      return defaultRootManager.readFile(rootId, cleanPath);
+    }
   });
 }
 
@@ -412,23 +430,35 @@ async function readFromAbsolutePath(filePath) {
 
 /**
  * Setup custom resources
+ *
+ * Security Model:
+ * - Resources only access roots explicitly configured via defaultRootManager.addRoot()
+ * - Without a configured root, files are inaccessible (secure by default)
+ * - All paths are relative to the configured root (no absolute paths allowed)
+ * - Custom roots can be added for different projects (e.g., 'projectA', 'projectB')
  */
 export function setupCustomResources() {
-  // Simple workspace file resources - much cleaner!
-  addWorkspaceFileResource('package-info', 'Package Information', '${workspaceRoot}/package.json', {
+  // Simple workspace file resources - defaults to 'project-root'
+  addWorkspaceFileResource('package-info', 'Package Information', 'package.json', {
     description: 'Detailed information about this npm package'
   });
 
-  addWorkspaceFileResource('readme', 'Project README', '${workspaceRoot}/README.md', {
+  addWorkspaceFileResource('readme', 'Project README', 'README.md', {
     description: 'Main README.md file with project documentation',
     category: 'documentation'
   });
 
-  // You can easily add more files:
-  addWorkspaceFileResource('claude-md', 'Claude Instructions', '${workspaceRoot}/CLAUDE.md', {
+  addWorkspaceFileResource('claude-md', 'Claude Instructions', 'CLAUDE.md', {
     description: 'Claude Code instructions and project guidance',
     category: 'documentation'
   });
+
+  // Example: Using a custom root (if configured via defaultRootManager.addRoot('examples', {...}))
+  // addWorkspaceFileResource('examples-readme', 'Examples README', 'README.md', {
+  //   description: 'README from examples directory',
+  //   category: 'documentation',
+  //   rootId: 'examples'  // Uses 'examples' root instead of default 'project-root'
+  // });
 }
 
 /**

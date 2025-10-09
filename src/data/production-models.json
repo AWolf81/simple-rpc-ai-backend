@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "lastUpdated": "2025-09-16",
+  "version": "1.1.0",
+  "lastUpdated": "2025-11-08",
   "description": "Production-safe model mappings with versioned IDs for consistent behavior",
   "providers": {
     "anthropic": {
@@ -13,6 +13,13 @@
           "status": "stable",
           "pricingOverride": null,
           "verified": "2025-09-16"
+        },
+        "claude-sonnet-4-5": {
+          "productionId": "claude-sonnet-4-5-20251015",
+          "releaseDate": "2025-10-15",
+          "status": "stable",
+          "pricingOverride": null,
+          "verified": "2025-11-08"
         },
         "claude-sonnet-4": {
           "productionId": "claude-sonnet-4-20250514",
@@ -67,6 +74,6 @@
       "https://developers.generativeai.google/api/rest/v1beta/models"
     ],
     "updateFrequency": "weekly",
-    "lastVerified": "2025-09-16"
+    "lastVerified": "2025-11-08"
   }
 }

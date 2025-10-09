@@ -47,7 +47,7 @@ function registerCommands(context: vscode.ExtensionContext) {
             
             if (!question) return;
             
-            await executeAIRequest(question);
+            await runGenerateText(question);
         })
     );
     
@@ -69,7 +69,7 @@ function registerCommands(context: vscode.ExtensionContext) {
             const language = editor.document.languageId;
             const prompt = `Explain this ${language} code:\n\n\`\`\`${language}\n${selection}\n\`\`\``;
             
-            await executeAIRequest(prompt, 'Code Explanation');
+            await runGenerateText(prompt, 'Code Explanation');
         })
     );
     
@@ -91,7 +91,7 @@ function registerCommands(context: vscode.ExtensionContext) {
             const language = editor.document.languageId;
             const prompt = `Suggest refactoring improvements for this ${language} code:\n\n\`\`\`${language}\n${selection}\n\`\`\``;
             
-            await executeAIRequest(prompt, 'Refactoring Suggestions');
+            await runGenerateText(prompt, 'Refactoring Suggestions');
         })
     );
     
@@ -113,7 +113,7 @@ function registerCommands(context: vscode.ExtensionContext) {
             const language = editor.document.languageId;
             const prompt = `Generate unit tests for this ${language} code:\n\n\`\`\`${language}\n${selection}\n\`\`\``;
             
-            await executeAIRequest(prompt, 'Generated Tests');
+            await runGenerateText(prompt, 'Generated Tests');
         })
     );
     
@@ -159,7 +159,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     );
 }
 
-async function executeAIRequest(prompt: string, title: string = 'AI Response') {
+async function runGenerateText(prompt: string, title: string = 'AI Response') {
     // Check authentication
     if (!await authManager.isAuthenticated()) {
         const action = await vscode.window.showWarningMessage(

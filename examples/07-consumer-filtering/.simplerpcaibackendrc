@@ -1,0 +1,21 @@
+{
+  "trpcMethodGen": {
+    "customRoutersPath": "./methods/index.js",
+    "enableAI": true,
+    "enableMCP": true,
+    "enableMCPAI": true,
+    "enableSystem": false,
+    "enableUser": false,
+    "enableBilling": false,
+    "enableAuth": false,
+    "enableAdmin": false
+  },
+  "devPanel": {
+    "autoOpenBrowser": false,
+    "port": 8081
+  },
+  "server": {
+    "port": 8002,
+    "logLevel": "info"
+  }
+}

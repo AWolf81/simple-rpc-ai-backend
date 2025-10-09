@@ -197,10 +197,10 @@ export class AIClient extends RPCClient {
   }
 
   /**
-   * Execute AI request with user's keys or service keys
+   * Generate text with user's keys or service keys
    */
-  async executeAIRequest(content: string, systemPrompt: string, metadata?: any): Promise<any> {
-    return this.request('executeAIRequest', {
+  async generateText(content: string, systemPrompt: string, metadata?: any): Promise<any> {
+    return this.request('ai.generateText', {
       userId: this.userId,
       content,
       systemPrompt,
@@ -282,7 +282,7 @@ export class AIClient extends RPCClient {
  * });
  * 
  * // Fully typed without any casts
- * const result = await client.ai.executeAIRequest.mutate({ content: "test", systemPrompt: "You are helpful" });
+ * const result = await client.ai.generateText.mutate({ content: "test", systemPrompt: "You are helpful" });
  * const health = await client.ai.health.query();
  * ```
  */

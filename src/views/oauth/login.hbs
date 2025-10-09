@@ -43,7 +43,9 @@
     </div>
   {{/unless}}
   
-  <div class="footer">
-    Powered by {{appName}}
-  </div>
+  {{#if footerText}}
+    <div class="footer">
+      {{footerText}}
+    </div>
+  {{/if}}
 </div>

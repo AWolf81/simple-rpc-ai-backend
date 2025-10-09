@@ -7,22 +7,24 @@
 
 import 'dotenv/config';
 import express from 'express';
-import type { Express, Request, Response, Application } from 'express';
+import type { Express, Request, Response, Application, NextFunction } from 'express';
 import crypto from 'crypto';
 import type { Server } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as trpcExpress from '@trpc/server/adapters/express';
-import { createTRPCContext, router } from './trpc/index.js';
+import { createTRPCContext } from './trpc/index.js';
 import { createAppRouter } from './trpc/root.js';
 import type { AnyRouter } from '@trpc/server';
 import type { AppRouter } from './trpc/root.js';
 import type { AIRouterConfig } from './trpc/routers/ai/types.js';
 import { JWTMiddleware } from './auth/jwt-middleware.js';
+import type { AuthenticatedRequest, OpenSaaSJWTPayload } from './auth/jwt-middleware.js';
+import type { SessionStorage } from './auth/session-storage.js';
 import { PostgreSQLAdapter } from './database/postgres-adapter.js';
-import { VirtualTokenService } from './services/virtual-token-service.js';
-import { UsageAnalyticsService } from './services/usage-analytics-service.js';
+import { VirtualTokenService } from './services/billing/virtual-token-service.js';
+import { UsageAnalyticsService } from './services/billing/usage-analytics-service.js';
 import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods.js';
 import { RPC_METHODS } from './constants.js';
 import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge.js';
@@ -30,8 +32,11 @@ import { MCPExtensionConfig } from './mcp/mcp-config.js';
 import { MCPRateLimitConfig } from './security/rate-limiter.js';
 import { SecurityLoggerConfig } from './security/security-logger.js';
 import { AuthEnforcementConfig } from './security/auth-enforcer.js';
+import type { RootManagerConfig, RootFolderConfig } from './services/resources/root-manager.js';
 import { createOAuthServer, initializeOAuthServer, closeOAuthServer } from './auth/oauth-middleware.js';
 import { getTestSafeConfig } from './security/test-helpers.js';
+import { initializeTiming } from './utils/timing.js';
+import { logger } from './utils/logger.js';
 
 // Built-in provider types
 export type BuiltInProvider = 'anthropic' | 'openai' | 'google';
@@ -81,6 +86,11 @@ export interface RpcAiServerConfig {
     jsonRpc?: boolean;    // Enable JSON-RPC endpoint (default: true)
     tRpc?: boolean;       // Enable tRPC endpoint (default: false)
   };
+
+  // Debug & Performance
+  debug?: {
+    enableTiming?: boolean;      // Enable performance timing logs (default: false)
+  };
   
   // Token tracking & monetization
   tokenTracking?: {
@@ -116,7 +126,19 @@ export interface RpcAiServerConfig {
       };
     };
   };
-  
+
+  // Extension OAuth (Simplified OAuth for browser/VS Code extensions)
+  extensionOAuth?: {
+    enabled?: boolean;                    // Enable extension OAuth callback handler (default: false)
+    isExtensionOAuth?: (stateData: any) => boolean;  // Custom detection function (default: checks state.isExtensionAuth)
+    onUserAuthenticated?: (stateData: any, userId: string, userInfo: { email?: string; provider: string; [key: string]: any }) => void | Promise<void>;
+    tokenExchangeHandlers?: {             // Custom token exchange per provider
+      [provider: string]: (code: string, callbackUrl: string) => Promise<{ userId: string; email?: string; [key: string]: any }>;
+    };
+    successTemplate?: (user: any, stateData: any) => string;  // Custom success HTML
+    errorTemplate?: (error: string, stateData?: any) => string;  // Custom error HTML
+  };
+
   // Network settings
   cors?: {
     origin?: string | string[];
@@ -140,10 +162,9 @@ export interface RpcAiServerConfig {
     webhooks?: string;    // Default: '/webhooks/lemonsqueezy'
   };
 
-  // MCP configuration  
+  // MCP configuration
   mcp?: {
-    enabled?: boolean;
-    enableMCP?: boolean;  // Internal property - automatically set based on enabled and mcp object presence
+    enabled?: boolean;  // Enable/disable MCP server (default: true if mcp config provided)
     transports?: {
       http?: boolean;        // HTTP transport (default: true)
       stdio?: boolean;       // STDIO transport for Claude Desktop (default: false)  
@@ -207,14 +228,31 @@ export interface RpcAiServerConfig {
    * MCP roots are managed by the client and advertised via roots/list.
    */
   serverWorkspaces?: {
+    /** Enable server-managed file operations via tRPC/MCP (default: false) */
+    enabled?: boolean;
+
     /** Default workspace folder configuration */
     defaultWorkspace?: {
-      /** Path to default workspace folder (defaults to current working directory) */
+      /** Absolute path to default workspace folder */
       path?: string;
       /** Whether default workspace is read-only */
       readOnly?: boolean;
       /** Allowed file extensions */
       allowedExtensions?: string[];
+      /** Blocked file extensions */
+      blockedExtensions?: string[];
+      /** Maximum file size in bytes */
+      maxFileSize?: number;
+      /** Allowed path globs */
+      allowedPaths?: string[];
+      /** Blocked path globs */
+      blockedPaths?: string[];
+      /** Follow symbolic links */
+      followSymlinks?: boolean;
+      /** Enable file watching */
+      enableWatching?: boolean;
+      /** Watch ignore patterns */
+      watchIgnore?: string[];
     };
 
     /** Additional named workspace folders */
@@ -233,47 +271,95 @@ export interface RpcAiServerConfig {
       blockedExtensions?: string[];
       /** Maximum file size in bytes */
       maxFileSize?: number;
+      /** Allowed path globs */
+      allowedPaths?: string[];
+      /** Blocked path globs */
+      blockedPaths?: string[];
+      /** Follow symbolic links */
+      followSymlinks?: boolean;
+      /** Enable file watching */
+      enableWatching?: boolean;
+      /** Watch ignore patterns */
+      watchIgnore?: string[];
     }>;
-
-    /** Enable file operations via tRPC/MCP */
-    enableAPI?: boolean;
   };
 
   /**
-   * @deprecated Use serverWorkspaces instead. This will be removed in a future version.
-   * Root folder management configuration (legacy)
+   * Remote MCP Server Configuration
+   *
+   * Configure external MCP servers to connect to via different transports.
+   * Supports uvx (Python), npx (Node.js), docker, and HTTP/HTTPS.
    */
-  rootFolders?: {
-    /** Default root folder configuration */
-    defaultRoot?: {
-      /** Path to default root folder (defaults to current working directory) */
-      path?: string;
-      /** Whether default root is read-only */
-      readOnly?: boolean;
-      /** Allowed file extensions */
-      allowedExtensions?: string[];
-    };
+  remoteMcpServers?: {
+    /** Enable remote MCP server connections */
+    enabled?: boolean;
 
-    /** Additional named root folders */
-    additionalRoots?: Record<string, {
-      /** Absolute path to the root folder */
-      path: string;
-      /** Display name */
-      name?: string;
-      /** Description */
-      description?: string;
-      /** Whether read-only */
-      readOnly?: boolean;
-      /** Allowed file extensions */
-      allowedExtensions?: string[];
-      /** Blocked file extensions */
-      blockedExtensions?: string[];
-      /** Maximum file size in bytes */
-      maxFileSize?: number;
+    /** List of remote servers to connect to */
+    servers?: Array<{
+      /** Unique identifier for this server */
+      name: string;
+
+      /** Transport method */
+      transport: 'uvx' | 'npx' | 'docker' | 'http' | 'https';
+
+      /** For uvx/npx: package name to run */
+      command?: string;
+
+      /** For uvx/npx: additional command line arguments */
+      args?: string[];
+
+      /** For uvx/npx/docker: environment variables */
+      env?: Record<string, string>;
+
+      /** For docker: docker image name */
+      image?: string;
+
+      /** For docker: additional container arguments */
+      containerArgs?: string[];
+
+      /** For http/https: remote server URL */
+      url?: string;
+
+      /** For http/https: custom headers */
+      headers?: Record<string, string>;
+
+      /** Authentication configuration */
+      auth?: {
+        type: 'bearer' | 'basic' | 'none';
+        token?: string;
+        username?: string;
+        password?: string;
+      };
+
+      /** Auto-start on server initialization */
+      autoStart?: boolean;
+
+      /** Request timeout in milliseconds */
+      timeout?: number;
+
+      /** Number of retries on connection failure */
+      retries?: number;
     }>;
 
-    /** Enable file operations via tRPC/MCP */
-    enableAPI?: boolean;
+    /** Security scanning configuration */
+    security?: {
+      /** Enable security scanning on startup (default: true) */
+      enableStartupScan?: boolean;
+
+      /** Block server start if high-risk packages detected (default: false) */
+      blockOnHighRisk?: boolean;
+
+      /** Downgrade security level for official Anthropic servers (default: true) */
+      trustAnthropicServers?: boolean;
+
+      /** Custom package security overrides */
+      packageOverrides?: Record<string, 'GREEN' | 'YELLOW' | 'RED' | 'SKIP'>;
+    };
+
+    /** Auto-reconnect settings */
+    autoReconnect?: boolean;
+    reconnectDelay?: number;
+    maxReconnectAttempts?: number;
   };
 }
 
@@ -308,7 +394,8 @@ export class RpcAiServer {
   private postgresRPCMethods?: PostgreSQLRPCMethods;
   private jsonRpcBridge?: ReturnType<typeof createTRPCToJSONRPCBridge>;
   private oauthServer?: ReturnType<typeof createOAuthServer>['oauth'];
-  private oauthStorage?: ReturnType<typeof createOAuthServer>['storage'];
+  private oauthStorage?: SessionStorage;
+  private remoteMcpManager?: any; // RemoteMCPManager type
 
   /**
    * Opinionated protocol configuration:
@@ -352,13 +439,17 @@ export class RpcAiServer {
   constructor(config: RpcAiServerConfig = {}) {
     // Apply test-safe configuration if in test environment
     config = getTestSafeConfig(config);
-    
+
+    // Initialize timing/debug configuration
+    initializeTiming(config.debug);
+
     // Opinionated protocol defaults
     const protocols = this.getOpinionatedProtocols(config.protocols);
     
     // Set smart defaults
     this.config = {
       port: 8000,
+      debug: config.debug || {},
       aiLimits: {},
       serverProviders: ['anthropic'],  // Default: Anthropic only for easier onboarding
       byokProviders: ['anthropic'],    // Default: Anthropic BYOK only
@@ -379,6 +470,7 @@ export class RpcAiServer {
         enabled: false,
         ...config.oauth
       },
+      extensionOAuth: config.extensionOAuth,
       cors: {
         origin: parseCorsOrigin(config.cors?.origin) || '*',
         credentials: false,
@@ -398,7 +490,7 @@ export class RpcAiServer {
         ...config.paths
       },
       mcp: {
-        enableMCP: config.mcp?.enabled !== false && !!config.mcp,  // Enable MCP if mcp config object is provided and not explicitly disabled
+        enabled: config.mcp?.enabled !== false && !!config.mcp,  // Enable MCP if mcp config object is provided and not explicitly disabled
         transports: {
           http: true,    // HTTP transport enabled by default - universal compatibility
           sse: true,     // SSE transport enabled by default - real-time capabilities
@@ -424,16 +516,27 @@ export class RpcAiServer {
       },
       modelRestrictions: config.modelRestrictions || {},  // Default: no model restrictions
 
-      // Server workspace configuration (preferred)
-      serverWorkspaces: {
-        enableAPI: true,
-        ...config.serverWorkspaces
-      },
+      // Server workspace configuration (disabled by default)
+      serverWorkspaces: config.serverWorkspaces
+        ? {
+            ...config.serverWorkspaces,
+            enabled: config.serverWorkspaces.enabled ?? false,
+          }
+        : undefined,
 
-      // Legacy root folders configuration (for backward compatibility)
-      rootFolders: {
-        enableAPI: true,
-        ...config.rootFolders
+      // Remote MCP servers configuration
+      remoteMcpServers: {
+        enabled: false,
+        servers: [],
+        security: {
+          enableStartupScan: true,
+          blockOnHighRisk: false,
+          trustAnthropicServers: true,
+        },
+        autoReconnect: true,
+        reconnectDelay: 5000,
+        maxReconnectAttempts: 3,
+        ...config.remoteMcpServers
       },
 
       customRouters: config.customRouters || {},  // Default: no custom routers
@@ -474,16 +577,17 @@ export class RpcAiServer {
     }
 
     // Debug: log MCP config only if MCP is enabled
-    if (this.config.mcp?.enableMCP) {
-      console.log('🔍 RPC Server MCP Config:', {
-        hasMcpConfig: !!this.config.mcp,
-        extensions: this.config.mcp?.extensions ? {
-          hasPrompts: !!this.config.mcp.extensions.prompts,
-          hasResources: !!this.config.mcp.extensions.resources,
-          promptsConfig: this.config.mcp.extensions.prompts,
-          resourcesConfig: this.config.mcp.extensions.resources
-        } : null
-      });
+    if (this.config.mcp?.enabled) {
+      const promptsInfo = this.config.mcp.extensions?.prompts;
+      const resourcesInfo = this.config.mcp.extensions?.resources;
+      const promptsSummary = promptsInfo?.customPrompts?.length
+        ? `${promptsInfo.customPrompts.length} custom prompts`
+        : promptsInfo ? 'extensions configured' : 'none';
+      const resourcesSummary = resourcesInfo?.customResources?.length
+        ? `${resourcesInfo.customResources.length} custom resources`
+        : resourcesInfo ? 'extensions configured' : 'none';
+
+      logger.debug(`🔍 MCP enabled – prompts: ${promptsSummary}, resources: ${resourcesSummary}`);
     }
 
     if ((config as any).providers) {
@@ -504,19 +608,18 @@ export class RpcAiServer {
     }
 
     // Create router with AI configuration and token tracking
-    // Create workspace configuration with fallback to rootFolders for backward compatibility
-    const workspaceConfig = this.config.serverWorkspaces || this.config.rootFolders;
+    // Normalize server workspace configuration (requires explicit workspace definitions)
+    const workspaceConfig = (this.config.serverWorkspaces && this.config.serverWorkspaces.enabled &&
+      this.hasWorkspaceDefinitions(this.config.serverWorkspaces))
+      ? this.config.serverWorkspaces
+      : undefined;
+
+    if (this.config.serverWorkspaces?.enabled && !workspaceConfig) {
+      console.warn('⚠️  serverWorkspaces.enabled is true but no workspace paths are configured. Skipping workspace API initialization.');
+    }
 
     this.router = createAppRouter(
-      {
-        config: this.config.aiLimits,
-        tokenTrackingEnabled: this.config.tokenTracking.enabled || false,
-        dbAdapter: this.dbAdapter,
-        serverProviders: this.config.serverProviders,
-        byokProviders: this.config.byokProviders,
-        postgresRPCMethods: this.postgresRPCMethods,
-        modelRestrictions: this.config.modelRestrictions
-      },
+      undefined, // aiConfig - handled by separate params below
       this.config.tokenTracking.enabled || false,
       this.dbAdapter,
       this.config.serverProviders,
@@ -524,7 +627,7 @@ export class RpcAiServer {
       this.postgresRPCMethods,
       this.config.mcp,
       this.config.modelRestrictions,
-      workspaceConfig, // Pass serverWorkspaces (preferred) or rootFolders (fallback)
+      workspaceConfig,
       this.config.customRouters
     );
 
@@ -554,7 +657,7 @@ export class RpcAiServer {
     // Enable trust proxy if configured (for reverse proxies like ngrok, cloudflare, etc.)
     if (this.config.trustProxy) {
       this.app.set('trust proxy', 1);
-      console.log(`🔧 Trust proxy enabled for reverse proxy support`);
+      logger.debug(`🔧 Trust proxy enabled for reverse proxy support`);
     }
     
     this.setupMiddleware();
@@ -585,6 +688,7 @@ export class RpcAiServer {
       return {
         ...baseCtx,
         apiKey: apiKey || null,
+        appRouter: this.router, // Add router to context for prompt access tools
       };
     };
   }
@@ -619,6 +723,20 @@ export class RpcAiServer {
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+    if (this.oauthStorage) {
+      this.app.use(async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          await this.attachOAuthUserFromAccessToken(req as AuthenticatedRequest);
+          next();
+        } catch (error) {
+          logger.warn('⚠️ OAuth access token resolution failed', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+          next();
+        }
+      });
+    }
+
     // JWT Authentication (if enabled)
     if (this.jwtMiddleware) {
       this.app.use(this.jwtMiddleware.authenticate);
@@ -639,6 +757,129 @@ export class RpcAiServer {
     }
   }
 
+  private async attachOAuthUserFromAccessToken(req: AuthenticatedRequest): Promise<void> {
+    if (!this.oauthStorage) {
+      return;
+    }
+
+    // Skip if user already resolved
+    if (req.user) {
+      return;
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return;
+    }
+
+    const accessToken = authHeader.substring(7).trim();
+    if (!accessToken) {
+      return;
+    }
+
+    const tokenRecord = await this.oauthStorage.getToken(accessToken);
+    if (!tokenRecord) {
+      return;
+    }
+
+    const expiresAtRaw = tokenRecord.accessTokenExpiresAt ?? (tokenRecord as any).expiresAt;
+    const expiresAt = expiresAtRaw instanceof Date ? expiresAtRaw : expiresAtRaw ? new Date(expiresAtRaw) : undefined;
+    if (expiresAt && expiresAt.getTime() <= Date.now()) {
+      // Token expired - ignore so downstream auth will fail naturally
+      return;
+    }
+
+    const oauthUser = (tokenRecord.user || {}) as Record<string, any>;
+    const provider = oauthUser.provider || tokenRecord.client?.id;
+    const scopeList = this.normalizeOAuthScopes(tokenRecord.scope);
+    const featureSet = new Set<string>(scopeList);
+    featureSet.add('mcp');
+    featureSet.add('oauth');
+    const features = Array.from(featureSet);
+
+    const derivedUserId = (oauthUser.id || oauthUser.userId || oauthUser.email || oauthUser.username || `oauth-${accessToken.slice(0, 8)}`).toString();
+    const email = (oauthUser.email || (oauthUser.username ? `${oauthUser.username}@oauth.local` : `${derivedUserId}@oauth.local`)).toString();
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expSeconds = expiresAt ? Math.floor(expiresAt.getTime() / 1000) : nowSeconds + 3600;
+
+    const payload: OpenSaaSJWTPayload = {
+      userId: derivedUserId,
+      email,
+      subscriptionTier: 'oauth',
+      monthlyTokenQuota: Number.MAX_SAFE_INTEGER,
+      rpmLimit: 1000,
+      tpmLimit: 60000,
+      features,
+      iat: nowSeconds,
+      exp: expSeconds,
+      iss: provider ? `oauth:${provider}` : 'oauth',
+      aud: 'mcp',
+    };
+
+    req.user = payload;
+    req.authContext = {
+      type: 'oauth',
+      userId: payload.userId,
+      email: payload.email,
+      provider,
+      scopes: scopeList,
+      subscriptionTier: payload.subscriptionTier,
+      quotaInfo: {
+        monthlyTokenQuota: payload.monthlyTokenQuota,
+        rpmLimit: payload.rpmLimit,
+        tpmLimit: payload.tpmLimit,
+      },
+      features,
+      organizationId: oauthUser.organizationId || undefined,
+    };
+  }
+
+  private normalizeOAuthScopes(scope: unknown): string[] {
+    if (!scope) {
+      return [];
+    }
+
+    if (Array.isArray(scope)) {
+      return scope.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
+    }
+
+    if (typeof scope === 'string') {
+      return scope
+        .split(/[\s,]+/)
+        .map(entry => entry.trim())
+        .filter(entry => entry.length > 0);
+    }
+
+    if (typeof scope === 'object') {
+      const collected: string[] = [];
+      for (const value of Object.values(scope as Record<string, unknown>)) {
+        if (typeof value === 'string' && value.trim().length > 0) {
+          collected.push(value.trim());
+        } else if (Array.isArray(value)) {
+          for (const nested of value) {
+            if (typeof nested === 'string' && nested.trim().length > 0) {
+              collected.push(nested.trim());
+            }
+          }
+        }
+      }
+      return collected;
+    }
+
+    return [];
+  }
+
+  private hasWorkspaceDefinitions(config?: RpcAiServerConfig['serverWorkspaces']): boolean {
+    if (!config) {
+      return false;
+    }
+
+    const hasDefault = typeof config.defaultWorkspace?.path === 'string' && config.defaultWorkspace.path.trim().length > 0;
+    const hasAdditional = !!config.additionalWorkspaces && Object.keys(config.additionalWorkspaces).length > 0;
+
+    return hasDefault || hasAdditional;
+  }
+
   private async setupRoutes() {
     // Health endpoint
     this.app.get(this.config.paths.health!, (_req: Request, res: Response) => {
@@ -656,19 +897,22 @@ export class RpcAiServer {
 
     // Configuration endpoint for development tools
     this.app.get('/config', (_req: Request, res: Response) => {
+      // Use OAUTH_BASE_URL if available (e.g., for ngrok, tunneling services)
+      const baseUrl = process.env.OAUTH_BASE_URL || `http://localhost:${this.config.port}`;
+
       res.json({
         port: this.config.port,
-        baseUrl: `http://localhost:${this.config.port}`,
+        baseUrl: baseUrl,
         endpoints: {
-          health: `http://localhost:${this.config.port}${this.config.paths.health}`,
-          jsonRpc: this.config.protocols.jsonRpc ? `http://localhost:${this.config.port}${this.config.paths.jsonRpc}` : null,
-          tRpc: this.config.protocols.tRpc ? `http://localhost:${this.config.port}${this.config.paths.tRpc}` : null,
-          mcp: this.config.mcp?.enableMCP ? `http://localhost:${this.config.port}/mcp` : null,
+          health: `${baseUrl}${this.config.paths.health}`,
+          jsonRpc: this.config.protocols.jsonRpc ? `${baseUrl}${this.config.paths.jsonRpc}` : null,
+          tRpc: this.config.protocols.tRpc ? `${baseUrl}${this.config.paths.tRpc}` : null,
+          mcp: this.config.mcp?.enabled ? `${baseUrl}/mcp` : null,
         },
         protocols: {
           jsonRpc: this.config.protocols.jsonRpc,
           tRpc: this.config.protocols.tRpc,
-          mcp: this.config.mcp?.enableMCP || false,
+          mcp: this.config.mcp?.enabled || false,
         },
         timestamp: new Date().toISOString()
       });
@@ -838,6 +1082,15 @@ export class RpcAiServer {
       
       // Identity provider login routes
       this.app.get('/login/:provider', handleProviderLogin);
+
+      // Extension OAuth handler (intercepts before regular callback if enabled)
+      if (this.config.extensionOAuth?.enabled) {
+        const { createExtensionOAuthHandler } = await import('./auth/extension-oauth.js');
+        const extensionOAuthHandler = createExtensionOAuthHandler(this.config.extensionOAuth);
+        this.app.get('/callback/:provider', extensionOAuthHandler);
+      }
+
+      // Regular OAuth callback (for MCP, etc.)
       this.app.get('/callback/:provider', handleProviderCallback);
       
       // OAuth Authorization Endpoint with pre-authentication check
@@ -882,7 +1135,7 @@ export class RpcAiServer {
         try {
           res.header('Access-Control-Allow-Origin', '*');
           
-          const { redirect_uris, client_name, grant_types } = req.body;
+          const { redirect_uris, grant_types } = req.body;
           
           if (!redirect_uris || !Array.isArray(redirect_uris) || redirect_uris.length === 0) {
             res.status(400).json({ 
@@ -940,7 +1193,13 @@ export class RpcAiServer {
           router: this.router,
           createContext: this.createContext(this.providerApiKeys),
           onError: ({ path, error }) => {
-            console.error(`❌ tRPC failed on ${path ?? "<no-path>"}:`, error);
+            // In production, log only essential info without stack traces
+            if (process.env.NODE_ENV === 'production') {
+              logger.error(`❌ tRPC failed on ${path ?? "<no-path>"}: ${error.code} - ${error.message}`);
+            } else {
+              // In development, log full error for debugging
+              console.error(`❌ tRPC failed on ${path ?? "<no-path>"}:`, error);
+            }
           },
         })
       );
@@ -967,7 +1226,7 @@ export class RpcAiServer {
         res.json({
           message: 'JSON-RPC endpoint - use POST method',
           endpoint: this.config.paths.jsonRpc,
-          methods: [RPC_METHODS.HEALTH, RPC_METHODS.EXECUTE_AI_REQUEST, RPC_METHODS.LIST_PROVIDERS, RPC_METHODS.STORE_USER_KEY, RPC_METHODS.GET_USER_KEY, RPC_METHODS.GET_USER_PROVIDERS, RPC_METHODS.VALIDATE_USER_KEY, RPC_METHODS.ROTATE_USER_KEY, RPC_METHODS.DELETE_USER_KEY],
+          methods: [RPC_METHODS.HEALTH, RPC_METHODS.GENERATE_TEXT, RPC_METHODS.LIST_PROVIDERS, RPC_METHODS.STORE_USER_KEY, RPC_METHODS.GET_USER_KEY, RPC_METHODS.GET_USER_PROVIDERS, RPC_METHODS.VALIDATE_USER_KEY, RPC_METHODS.ROTATE_USER_KEY, RPC_METHODS.DELETE_USER_KEY],
           example: {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1039,7 +1298,9 @@ export class RpcAiServer {
           ...(this.config.protocols.tRpc && {
             tRpc: this.config.paths.tRpc + '/*'
           }),
-          mcp: '/mcp',
+          ...(this.config.mcp?.enabled && {
+            mcp: '/mcp'
+          }),
           custom: routes
         },
         configuration: {
@@ -1142,17 +1403,191 @@ export class RpcAiServer {
 
 
 
+  /**
+   * Initialize remote MCP servers with security scanning
+   */
+  private async initializeRemoteMcpServers(): Promise<void> {
+    const config = this.config.remoteMcpServers;
+    if (!config || !config.servers || config.servers.length === 0) {
+      return;
+    }
+
+    console.log('🔐 Initializing remote MCP servers...');
+
+    // Security scanning if enabled (default: true)
+    const securityConfig = config.security || {};
+    const enableStartupScan = securityConfig.enableStartupScan !== false; // Default: true
+    const blockOnHighRisk = securityConfig.blockOnHighRisk || false; // Default: false
+    const trustAnthropicServers = securityConfig.trustAnthropicServers !== false; // Default: true
+
+    if (enableStartupScan) {
+      console.log('🔍 Scanning remote MCP packages for security risks...');
+
+      try {
+        const { scanMCPServerPackage } = await import('./security/mcp-server-scanner.js');
+
+        const scanResults = new Map<string, any>();
+        let hasHighRisk = false;
+        let hasErrors = false;
+
+        // Scan each server package
+        for (const server of config.servers) {
+          // Only scan uvx and npx packages (not docker or HTTP)
+          if (server.transport !== 'uvx' && server.transport !== 'npx') {
+            continue;
+          }
+
+          if (!server.command) {
+            console.warn(`⚠️ Server ${server.name}: No command specified, skipping scan`);
+            continue;
+          }
+
+          // Check for custom override
+          if (securityConfig.packageOverrides?.[server.command] === 'SKIP') {
+            console.log(`⏭️ Server ${server.name}: Skipping scan (configured override)`);
+            continue;
+          }
+
+          try {
+            console.log(`   Scanning ${server.name} (${server.transport}:${server.command})...`);
+            const result = await scanMCPServerPackage(server.command, server.transport);
+            scanResults.set(server.name, result);
+
+            // Calculate total issues
+            const totalIssues = result.redFlags.length + result.yellowFlags.length;
+
+            // Apply custom overrides
+            let finalLevel: 'GREEN' | 'YELLOW' | 'RED' = result.level;
+            const override = securityConfig.packageOverrides?.[server.command];
+            if (override && override !== 'SKIP') {
+              finalLevel = override;
+              console.log(`   📋 Applied security override: ${result.level} → ${finalLevel}`);
+            }
+
+            // Apply Anthropic trust policy
+            const isAnthropicOfficial = result.metadata.name.startsWith('@modelcontextprotocol/') ||
+                                       result.metadata.name.startsWith('anthropic-');
+            if (trustAnthropicServers && isAnthropicOfficial) {
+              if (finalLevel === 'RED') {
+                finalLevel = 'YELLOW';
+                console.log(`   ✅ Downgraded security level: RED → YELLOW (official Anthropic package)`);
+              }
+            }
+
+            // Display result
+            const icon = finalLevel === 'GREEN' ? '✅' : finalLevel === 'YELLOW' ? '⚠️' : '🚨';
+            console.log(`   ${icon} ${server.name}: ${finalLevel} (${result.scannedFiles} files, ${totalIssues} issues)`);
+
+            if (finalLevel === 'RED') {
+              hasHighRisk = true;
+              if (result.redFlags.length > 0) {
+                console.log(`      High-risk patterns detected:`);
+                result.redFlags.slice(0, 3).forEach((flag: any) => {
+                  console.log(`      - ${flag.description} (${flag.file}:${flag.line})`);
+                });
+                if (result.redFlags.length > 3) {
+                  console.log(`      ... and ${result.redFlags.length - 3} more`);
+                }
+              }
+            }
+          } catch (error) {
+            hasErrors = true;
+            console.error(`   ❌ Failed to scan ${server.name}:`, error instanceof Error ? error.message : String(error));
+          }
+        }
+
+        // Check if we should block startup
+        if (hasHighRisk && blockOnHighRisk) {
+          throw new Error(
+            'Server startup blocked: High-risk MCP packages detected. ' +
+            'Set remoteMcpServers.security.blockOnHighRisk=false to bypass this check.'
+          );
+        }
+
+        if (hasHighRisk) {
+          console.warn('⚠️ Warning: One or more high-risk MCP packages detected. Review security scan results above.');
+        } else if (hasErrors) {
+          console.warn('⚠️ Warning: Some packages could not be scanned. They will still be initialized.');
+        } else {
+          console.log('✅ All MCP packages passed security scan');
+        }
+
+      } catch (error) {
+        if (blockOnHighRisk) {
+          throw error; // Re-throw if we're blocking on errors
+        }
+        console.error('❌ MCP security scanning failed:', error instanceof Error ? error.message : String(error));
+        console.warn('⚠️ Continuing with server initialization despite scan failure');
+      }
+    }
+
+    // Initialize RemoteMCPManager
+    try {
+      const { RemoteMCPManager } = await import('./mcp/remote-mcp-manager.js');
+
+      this.remoteMcpManager = new RemoteMCPManager({
+        servers: config.servers.map(server => ({
+          name: server.name,
+          transport: server.transport,
+          command: server.command,
+          args: server.args,
+          env: server.env,
+          image: server.image,
+          containerArgs: server.containerArgs,
+          url: server.url,
+          headers: server.headers,
+          auth: server.auth,
+          autoStart: server.autoStart,
+          timeout: server.timeout,
+          retries: server.retries
+        })),
+        autoConnect: true, // Auto-connect on init
+        retryOnFailure: config.autoReconnect !== false,
+        retryDelay: config.reconnectDelay || 5000,
+        maxRetries: config.maxReconnectAttempts || 3
+      });
+
+      // Setup event handlers
+      this.remoteMcpManager.on('serverConnected', (name: string) => {
+        console.log(`✅ Remote MCP server connected: ${name}`);
+      });
+
+      this.remoteMcpManager.on('serverDisconnected', ({ name, code }: { name: string; code?: number }) => {
+        console.warn(`⚠️ Remote MCP server disconnected: ${name}${code ? ` (exit code: ${code})` : ''}`);
+      });
+
+      this.remoteMcpManager.on('serverError', ({ server, error }: { server: string; error: any }) => {
+        console.error(`❌ Remote MCP server error (${server}):`, error instanceof Error ? error.message : String(error));
+      });
+
+      // Initialize connections
+      await this.remoteMcpManager.initialize();
+
+      const connectedServers = this.remoteMcpManager.getConnectedServers();
+      console.log(`✅ Remote MCP: ${connectedServers.length}/${config.servers.length} servers connected`);
+
+    } catch (error) {
+      console.error('❌ Failed to initialize remote MCP manager:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
   public async start(setupRoutes?: (app: Application) => void): Promise<void> {
     // Initialize OAuth server session storage (if enabled)
     if (this.config.oauth.enabled) {
       await initializeOAuthServer();
     }
-    
+
+    // Initialize remote MCP servers with security scanning
+    if (this.config.remoteMcpServers?.enabled && this.config.remoteMcpServers.servers?.length) {
+      await this.initializeRemoteMcpServers();
+    }
+
     // Setup routes (including OAuth routes)
     await this.setupRoutes();
 
     // Setup MCP endpoint if enabled
-    if (this.config.mcp?.enableMCP) {
+    if (this.config.mcp?.enabled) {
       console.log('🚀 Setting up MCP server...');
       // Import and create the protocol handler
       const { MCPProtocolHandler } = await import('./trpc/routers/mcp/protocol-handler.js');
@@ -1161,38 +1596,65 @@ export class RpcAiServer {
         this.config.mcp
       );
 
-      // Import and provide the default root manager for roots capability
-      try {
-        const { defaultRootManager } = await import('./services/root-manager.js');
-        protocolHandler.setRootManager(defaultRootManager);
-        console.log('✅ MCP roots capability enabled with defaultRootManager');
-      } catch (error) {
-        console.warn('⚠️ Could not initialize MCP roots capability:', error instanceof Error ? error.message : String(error));
+      const mcpWorkspaceConfig = (this.config.serverWorkspaces && this.config.serverWorkspaces.enabled &&
+        this.hasWorkspaceDefinitions(this.config.serverWorkspaces))
+        ? this.config.serverWorkspaces
+        : undefined;
+
+      if (this.config.serverWorkspaces?.enabled && !mcpWorkspaceConfig) {
+        console.warn('⚠️  Server workspace API enabled for MCP, but no workspace paths configured. Skipping workspace manager initialization.');
       }
 
-      // Also set up workspace manager for server workspaces if configured
-      if (this.config.serverWorkspaces) {
+      if (mcpWorkspaceConfig) {
         try {
-          const { WorkspaceManager } = await import('./services/workspace-manager.js');
-          const workspaceManager = new WorkspaceManager();
+          const { createRootManager } = await import('./services/resources/root-manager.js');
 
-          // Add configured server workspaces
-          for (const [workspaceId, config] of Object.entries(this.config.serverWorkspaces)) {
-            if (workspaceId !== 'enableAPI' && config && typeof config === 'object') {
-              try {
-                workspaceManager.addWorkspace(workspaceId, config as any);
-                console.log(`✅ Added server workspace: ${workspaceId} at ${config.path}`);
-              } catch (error) {
-                console.warn(`⚠️ Failed to add workspace ${workspaceId}:`, error instanceof Error ? error.message : String(error));
-              }
+          const rootManagerConfig: RootManagerConfig = {};
+
+          if (mcpWorkspaceConfig.defaultWorkspace?.path && mcpWorkspaceConfig.defaultWorkspace.path.trim().length > 0) {
+            const normalizedDefault: RootFolderConfig = {
+              ...mcpWorkspaceConfig.defaultWorkspace,
+              path: mcpWorkspaceConfig.defaultWorkspace.path.trim()
+            };
+            rootManagerConfig.defaultRoot = normalizedDefault;
+          } else if (mcpWorkspaceConfig.defaultWorkspace) {
+            console.warn('⚠️  MCP root manager default workspace is defined but missing a path. Ignoring default root.');
+          }
+
+          if (mcpWorkspaceConfig.additionalWorkspaces) {
+            const normalizedRoots = Object.fromEntries(
+              Object.entries(mcpWorkspaceConfig.additionalWorkspaces)
+                .map(([rootId, config]) => {
+                  if (!config?.path || config.path.trim().length === 0) {
+                    console.warn(`⚠️  MCP root manager additional workspace "${rootId}" is missing a path and will be ignored.`);
+                    return null;
+                  }
+
+                  const normalizedRoot: RootFolderConfig = {
+                    ...config,
+                    path: config.path.trim()
+                  };
+
+                  return [rootId, normalizedRoot] as const;
+                })
+                .filter((entry): entry is [string, RootFolderConfig] => Boolean(entry))
+            );
+
+            if (Object.keys(normalizedRoots).length > 0) {
+              rootManagerConfig.roots = normalizedRoots;
             }
           }
 
-          // Set the workspace manager on the protocol handler
-          protocolHandler.setWorkspaceManager(workspaceManager);
-          console.log('✅ MCP server workspace manager configured');
+          if (!rootManagerConfig.defaultRoot && !rootManagerConfig.roots) {
+            throw new Error('No valid workspace paths provided for MCP root manager');
+          }
+
+          const rootManager = createRootManager(rootManagerConfig);
+
+          protocolHandler.setRootManager(rootManager);
+          console.log('✅ MCP root manager configured for server workspaces');
         } catch (error) {
-          console.warn('⚠️ Could not initialize server workspace manager:', error instanceof Error ? error.message : String(error));
+          console.warn('⚠️ Could not initialize MCP root manager:', error instanceof Error ? error.message : String(error));
         }
       }
 

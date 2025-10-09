@@ -7,7 +7,7 @@ import path from 'path';
 /**
  * Resource management procedures for MCP
  */
-export const resourceProcedures = {
+export const resourceProcedures: Record<string, any> = {
   // Get available resources
   getResources: publicProcedure
     .meta({

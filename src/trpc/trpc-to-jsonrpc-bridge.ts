@@ -9,7 +9,8 @@ import type { AnyRouter, inferRouterContext, TRPCError } from '@trpc/server';
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import type { Request, Response } from 'express';
 import type { AppRouter } from './root';
-import { createTRPCContext } from './index';
+import { createTRPCContext, t } from './index';
+import { TimingLogger } from '../utils/timing';
 
 interface JSONRPCRequest {
   jsonrpc: '2.0';
@@ -61,41 +62,80 @@ function mapTRPCErrorToJSONRPC(error: TRPCError): JSONRPCError {
  * Bridge class that converts tRPC router to JSON-RPC handler
  */
 export class TRPCToJSONRPCBridge {
+  private callerFactory: any; // TODO: Fix type - should be ReturnType<ReturnType<typeof createCallerFactory>>
+
   constructor(
-    private router: AppRouter, 
+    private router: AppRouter,
     private contextCreator?: (opts: CreateExpressContextOptions) => any
-  ) {}
+  ) {
+    // Create the caller factory once during initialization (tRPC v11 API)
+    // t.createCallerFactory(router) returns a function that accepts context
+    this.callerFactory = t.createCallerFactory(this.router);
+  }
 
   /**
    * Create Express middleware that handles JSON-RPC requests using tRPC procedures
    */
   createHandler() {
     return async (req: Request, res: Response): Promise<void> => {
+      const timing = new TimingLogger('RPC');  // Auto-detects nesting level
+
       try {
         const { method, params, id }: JSONRPCRequest = req.body;
+        let t1 = timing.checkpoint('Request parsed');
 
         // Create tRPC context
-        const ctx = this.contextCreator 
+        const ctx = this.contextCreator
           ? await this.contextCreator({ req, res, info: {} as any })
           : await createTRPCContext({ req, res, info: {} as any });
+        let t2 = timing.checkpoint('Context created', t1);
 
         try {
-          // Direct server-side call using the full method path
-          const result = await this.router.createCaller(ctx)[method](params);
-          
+          // Parse nested method path (e.g., "ai.listAllowedModels" -> caller.ai.listAllowedModels)
+          // Use tRPC v11 callerFactory API
+          const caller = this.callerFactory(ctx);
+          let t3 = timing.checkpoint('Caller created', t2);
+
+          const methodParts = method.split('.');
+
+          // Navigate to the nested procedure
+          let procedure: any = caller;
+          for (const part of methodParts) {
+            const nextValue = procedure[part];
+            if (nextValue !== undefined) {
+              procedure = nextValue;
+            } else {
+              throw new Error(`No such procedure: ${method}`);
+            }
+          }
+          let t4 = timing.checkpoint('Procedure resolved', t3);
+
+          // Call the procedure
+          if (typeof procedure !== 'function') {
+            throw new Error(`No such procedure: ${method}`);
+          }
+
+          const result = await procedure(params);
+          let t5 = timing.checkpoint(`Procedure ${method} executed`, t4);
+
           res.json({
             jsonrpc: '2.0',
             id,
             result
           } as JSONRPCResponse);
+
+          timing.checkpoint('Response sent', t5);
+          timing.end();
         } catch (error: any) {
+          timing.end('Error occurred');
+
           // If method not found, return proper JSON-RPC error
           if (error.message?.includes('No such procedure')) {
             res.json({
               jsonrpc: '2.0',
               id,
-              error: { 
-                code: -32601, 
+              error: {
+                code: -32601,
                 message: `Method not found: ${method}`
               }
             } as JSONRPCResponse);
@@ -111,13 +151,15 @@ export class TRPCToJSONRPCBridge {
           } as JSONRPCResponse);
         }
       } catch (error: any) {
+        timing.end('Parse error');
+
         res.json({
           jsonrpc: '2.0',
           id: (req.body as JSONRPCRequest)?.id,
-          error: { 
-            code: -32700, 
-            message: 'Parse error', 
-            data: error.message 
+          error: {
+            code: -32700,
+            message: 'Parse error',
+            data: error.message
           }
         } as JSONRPCResponse);
       }

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RefMCPIntegration, RefMCPConfig, VSCodeRefIntegration } from '../src/services/ref-mcp-integration.js';
-import { MCPService } from '../src/services/mcp-service.js';
+import { RefMCPIntegration, RefMCPConfig, VSCodeRefIntegration } from '../src/services/mcp/ref-mcp-integration.js';
+import { MCPService } from '../src/services/mcp/mcp-service.js';
 import fs from 'fs/promises';
 
 // Mock dependencies
-vi.mock('../src/services/mcp-service.js');
+vi.mock('../src/services/mcp/mcp-service.js');
 vi.mock('fs/promises');
 
 // Skip Ref MCP integration tests in security-middleware branch - will be addressed in mcp-oauth-integration branch

@@ -4,7 +4,7 @@ import { publicProcedure } from '../../../index';
 /**
  * Basic AI procedures - health and testing
  */
-export const basicProcedures = {
+export const basicProcedures: Record<string, any> = {
 
   /**
    * Simple test procedure with minimal Zod schema

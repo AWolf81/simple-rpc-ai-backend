@@ -7,7 +7,7 @@ import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '@src-trpc/index';
 import { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
 
-export function createAuthRouter(postgresRPCMethods?: PostgreSQLRPCMethods) {
+export function createAuthRouter(postgresRPCMethods?: PostgreSQLRPCMethods): ReturnType<typeof router> {
   return router({
     /**
      * Store user API key (BYOK)
@@ -230,4 +230,4 @@ export function createAuthRouter(postgresRPCMethods?: PostgreSQLRPCMethods) {
   });
 }
 
-export const authRouter = createAuthRouter();
+export const authRouter: ReturnType<typeof createAuthRouter> = createAuthRouter();

@@ -412,7 +412,7 @@ export function createAdminMCPTool(config: Omit<MCPToolScope, 'scopes'> & {
   baseScopes?: ScopeRequirement;
 }): { mcp: MCPToolScope } {
   const { adminUsers, baseScopes, ...toolConfig } = config;
-  
+
   // Create scope requirement with admin user restriction
   const scopeRequirement = baseScopes || ScopeHelpers.mcpCall();
   const adminScopeRequirement = {
@@ -425,6 +425,85 @@ export function createAdminMCPTool(config: Omit<MCPToolScope, 'scopes'> & {
       ...toolConfig,
       scopes: adminScopeRequirement,
       requireAdminUser: true
+    }
+  };
+}
+
+/**
+ * MCP Prompt Configuration
+ * User-facing prompt templates for AI workflows (distinct from internal system prompts)
+ */
+export interface MCPPromptArgument {
+  name: string;
+  description?: string;
+  required?: boolean;
+  type?: 'string' | 'number' | 'boolean' | 'enum' | 'json' | 'object' | 'array';
+  options?: Array<string | number | boolean>;
+  default?: string | number | boolean | null;
+  example?: string;
+}
+
+export interface MCPPromptVariableDefinition {
+  type?: 'string' | 'number' | 'boolean' | 'enum' | 'json' | 'object' | 'array';
+  description?: string;
+  required?: boolean;
+  options?: Array<string | number | boolean>;
+  default?: string | number | boolean | null;
+  example?: string;
+  format?: string;
+}
+
+export interface MCPPromptConfig {
+  /** Prompt name/identifier */
+  name: string;
+  /** Prompt description - what this prompt helps with */
+  description: string;
+  /** Arguments that users can provide to customize the prompt */
+  arguments?: MCPPromptArgument[];
+  /** Optional reusable template with placeholder variables */
+  template?: string;
+  /** Structured variable definitions for dynamic prompts */
+  variables?: Record<string, MCPPromptVariableDefinition>;
+  /** Category for organization */
+  category?: 'coding' | 'documentation' | 'review' | 'analysis' | 'general' | string;
+  /** Whether prompt is public (no auth required) */
+  public?: boolean;
+  /** Scope requirements for accessing this prompt */
+  scopes?: ScopeRequirement;
+}
+
+/**
+ * Utility function to create MCP-compatible prompt metadata for tRPC procedures
+ *
+ * **IMPORTANT:** This is for MCP prompt templates (user-facing workflows),
+ * NOT for internal system prompts used by AIService.
+ *
+ * @example
+ * ```typescript
+ * // Add to tRPC procedure
+ * codeReview: publicProcedure
+ *   .meta(createMCPPrompt({
+ *     name: 'code-review',
+ *     description: 'Generate comprehensive code review feedback',
+ *     arguments: [
+ *       { name: 'language', description: 'Programming language', required: true },
+ *       { name: 'focusArea', description: 'Specific area to focus on', required: false }
+ *     ],
+ *     category: 'review'
+ *   }))
+ *   .input(z.object({ language: z.string(), focusArea: z.string().optional() }))
+ *   .query(({ input }) => {
+ *     // Return the prompt text with interpolated arguments
+ *     return generatePromptText(input);
+ *   })
+ * ```
+ */
+export function createMCPPrompt(config: MCPPromptConfig): { mcpPrompt: MCPPromptConfig } {
+  return {
+    mcpPrompt: {
+      ...config,
+      // If marked as public, ensure no scope requirements
+      ...(config.public && { scopes: DefaultScopes.PUBLIC })
     }
   };
 }

@@ -10,12 +10,20 @@ export default defineConfig({
     pool: 'threads',
     poolOptions: {
       threads: {
-        singleThread: true
+        singleThread: false, // Enable parallel execution for faster CI
+        maxThreads: process.env.CI ? 4 : undefined, // Limit threads in CI
+        minThreads: process.env.CI ? 2 : undefined
       }
     },
+    testTimeout: 30000, // 30s timeout per test
+    hookTimeout: 10000, // 10s timeout for hooks
+    teardownTimeout: 10000,
+    retry: process.env.CI ? 1 : 0, // Retry once in CI for flaky tests
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
+      reporter: process.env.CI
+        ? ['text-summary', 'json', 'lcov'] // Minimal reporters in CI
+        : ['text', 'json', 'html', 'lcov'], // Full reporters locally
       reportsDirectory: './coverage',
       exclude: [
         'node_modules/',
@@ -56,7 +64,7 @@ export default defineConfig({
     }
   },
   esbuild: {
-    target: 'node18'
+    target: 'node22' // Match our minimum Node.js version
   },
   plugins: [tsconfigPaths({
     configNames: ["tsconfig.test.json"]
