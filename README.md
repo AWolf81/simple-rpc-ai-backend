@@ -20,7 +20,7 @@ Secure, platform-agnostic AI backend with **system prompt protection** for enter
 - 🤖 1,700+ AI models from 33+ providers
 - 🧩 Custom router extensions with automatic MCP tool discovery
 
-👉 **Need the full documentation?** Start at [`docs/index.md`](docs/index.md) or run `pnpm jekyll:dev` for a local GitHub Pages preview.
+👉 **Need the full documentation?** Visit **[📖 Documentation](https://awolf81.github.io/simple-rpc-ai-backend/)** or run `pnpm jekyll:dev` for a local preview.
 
 ---
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:8000/rpc \
   }'
 ```
 
-For local development inside this repository (contributors/maintainers), follow the developer-focused guide in [`docs/getting-started/installation.md`](docs/getting-started/installation.md).
+For local development inside this repository (contributors/maintainers), see the **[Developer Guide](https://awolf81.github.io/simple-rpc-ai-backend/developer/)**.
 
 ---
 
@@ -112,46 +112,57 @@ npx simple-rpc-gen-methods
 npx check-mcp-security --url http://localhost:8000/mcp
 ```
 
-> ℹ️ Configure these tools via `.simplerpcaibackendrc` – see [`docs/common-configurations`](docs/common-configurations/index.md).
+> ℹ️ Configure these tools via `.simplerpcaibackendrc` – see **[Common Configurations](https://awolf81.github.io/simple-rpc-ai-backend/common-configurations/)**.
 
 ---
 
 ## 📸 Screenshots
 
-**Dev Panel – API Explorer**  
-![Dev Panel Screenshot](https://raw.githubusercontent.com/AWolf81/simple-rpc-ai-backend/master/docs/images/dev_panel_screenshot_2025-10-04%2023-07-11.png)
+**Dev Panel – API Explorer**
+![Dev Panel Screenshot](https://raw.githubusercontent.com/AWolf81/simple-rpc-ai-backend/develop/docs/images/dev_panel_screenshot_2025-10-04%2023-07-11.png)
 
-**tRPC Playground**  
-![tRPC Playground Screenshot](https://raw.githubusercontent.com/AWolf81/simple-rpc-ai-backend/master/docs/images/trpc_playground_screenshot_2025-10-04%2023-11-12.png)
+**tRPC Playground**
+![tRPC Playground Screenshot](https://raw.githubusercontent.com/AWolf81/simple-rpc-ai-backend/develop/docs/images/trpc_playground_screenshot_2025-10-04%2023-11-12.png)
 
-**MCP Inspector (MCP Jam)**  
-![MCP Jam Screenshot](https://raw.githubusercontent.com/AWolf81/simple-rpc-ai-backend/master/docs/images/mcp_jam_screenshot_2025-10-04%2023-09-28.png)
+**MCP Inspector (MCP Jam)**
+![MCP Jam Screenshot](https://raw.githubusercontent.com/AWolf81/simple-rpc-ai-backend/develop/docs/images/mcp_jam_screenshot_2025-10-04%2023-09-28.png)
 
 ---
 
 ## 📚 Documentation & Samples
 
-- **Docs Home** – [`docs/index.md`](docs/index.md)  
-- **Getting Started** – [`docs/getting-started/overview.md`](docs/getting-started/overview.md)  
-- **Server API** – [`docs/server-api/index.md`](docs/server-api/index.md)  
-- **Common Configurations** – [`docs/common-configurations/index.md`](docs/common-configurations/index.md)  
-- **Sample Projects** – `examples/`
+**📖 [Complete Documentation](https://awolf81.github.io/simple-rpc-ai-backend/)**
+Full guides, API reference, and examples hosted on GitHub Pages. Includes:
 
-Publish the docs to GitHub Pages:
+- **[Getting Started](https://awolf81.github.io/simple-rpc-ai-backend/getting-started/)** – Installation, quick start, and basic usage
+- **[Server API Reference](https://awolf81.github.io/simple-rpc-ai-backend/server-api/)** – Complete API documentation with examples
+- **[Common Configurations](https://awolf81.github.io/simple-rpc-ai-backend/common-configurations/)** – Recipes for typical use cases
+- **[Developer Guide](https://awolf81.github.io/simple-rpc-ai-backend/developer/)** – Contributing, architecture, and internals
+
+**💻 Sample Projects**
+Working examples in the [`examples/`](examples/) directory:
+- `01-basic-server` – Minimal JSON-RPC + tRPC setup
+- `02-mcp-server` – Full MCP implementation with OAuth
+- `03-custom-routers` – Extend with your own tRPC routers
+- `04-byok-usage` – Bring-your-own-key patterns
+- And more...
+
+**🔧 Local Development**
+
+Preview docs locally with Jekyll:
 
 ```bash
-pnpm jekyll:deploy
+pnpm jekyll:setup   # One-time: install Ruby gems
+pnpm jekyll:dev     # Launch live preview at http://localhost:4000
 ```
 
-Preview locally:
+Deploy to GitHub Pages:
 
 ```bash
-pnpm jekyll:setup   # installs the Ruby gems defined in docs/Gemfile
-pnpm jekyll:dev     # launches the live preview from the docs/ folder
+pnpm jekyll:deploy  # Build and push to gh-pages branch
 ```
 
-> 💡 On Windows, if you run `pnpm jekyll:build` manually and notice missing styles, pass an absolute `_site` path via `--baseurl`, e.g.  
-> `pnpm jekyll:build -- --baseurl "C:/path/to/simple-rpc-ai-backend/docs/_site"`
+> 💡 **Windows users:** If styles are missing, specify an absolute `--baseurl` path when building manually.
 
 ---
 
