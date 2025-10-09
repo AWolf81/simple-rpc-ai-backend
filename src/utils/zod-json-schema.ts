@@ -5,9 +5,11 @@ import { z, ZodFirstPartyTypeKind } from 'zod';
  * Normalizes root $ref structures so consumers can rely on standard object shapes.
  */
 export function zodSchemaToJson(schema: z.ZodTypeAny): Record<string, unknown> {
-  const typeName = (schema as any)?._def?.typeName;
+  // In Zod 4, _def.typeName is not available. Check by constructor name instead
+  const constructorName = schema?.constructor?.name;
 
-  if (typeName === ZodFirstPartyTypeKind.ZodVoid || typeName === ZodFirstPartyTypeKind.ZodUndefined) {
+  // Handle void/undefined schemas (return empty object)
+  if (constructorName === 'ZodVoid' || constructorName === 'ZodUndefined') {
     return {
       type: 'object',
       properties: {},

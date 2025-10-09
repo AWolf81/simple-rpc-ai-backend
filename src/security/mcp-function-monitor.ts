@@ -148,19 +148,19 @@ export class MCPFunctionMonitor {
 
     const analyses: SchemaChangeAnalysis[] = [];
     const currentProcedures = this.extractMCPProcedures(this.currentRouter);
-    
+
     for (const [toolName, procedure] of currentProcedures) {
       const previousSnapshot = this.schemaSnapshots.get(toolName);
       const currentSnapshot = this.createSchemaSnapshot(toolName, procedure);
-      
+
       if (previousSnapshot && this.hasSchemaChanged(previousSnapshot, currentSnapshot)) {
         const analysis = await this.analyzeSchemaChange(toolName, previousSnapshot, currentSnapshot);
         analyses.push(analysis);
-        
+
         // Handle the detected change
         await this.handleSchemaChange(analysis);
       }
-      
+
       // Update snapshot
       this.schemaSnapshots.set(toolName, currentSnapshot);
     }
@@ -221,7 +221,7 @@ export class MCPFunctionMonitor {
         if (zodSchema && typeof zodSchema === 'object' && 'parse' in zodSchema) {
           jsonSchema = zodSchemaToJson(zodSchema);
         }
-        
+
         // Analyze schema metadata
         metadata = this.analyzeSchemaMetadata(jsonSchema);
       }
