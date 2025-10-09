@@ -3,12 +3,11 @@ name: Docs Preview
 on:
   pull_request:
     paths:
-      - "docs/**"
-    paths-ignore:
-      - "docs/_site/**"
-      - "docs/.jekyll-cache/**"
-      - "docs/vendor/**"
-      - "docs/.bundle/**"
+      - 'docs/**'
+      - '!docs/_site/**'
+      - '!docs/.jekyll-cache/**'
+      - '!docs/vendor/**'
+      - '!docs/.bundle/**'
   workflow_dispatch:
 
 permissions:
