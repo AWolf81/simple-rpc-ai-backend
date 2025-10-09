@@ -1,0 +1,446 @@
+<!DOCTYPE html> <html lang="en-US"> <head> <meta charset="UTF-8"> <meta http-equiv="X-UA-Compatible" content="IE=Edge"> <link rel="stylesheet" href="/assets/css/just-the-docs-default.css"> <link rel="stylesheet" href="/assets/css/just-the-docs-head-nav.css" id="jtd-head-nav-stylesheet"> <style id="jtd-nav-activation"> .site-nav > ul.nav-list:first-child > li > a, .site-nav > ul.nav-list:first-child > li > ul > li > a, .site-nav > ul.nav-list:first-child > li > ul > li > ul > li:not(:nth-child(6)) > a, .site-nav > ul.nav-list:first-child > li > ul > li > ul > li > ul > li a { background-image: none; } .site-nav > ul.nav-list:not(:first-child) a, .site-nav li.external a { background-image: none; } .site-nav > ul.nav-list:first-child > li:nth-child(1) > ul > li:nth-child(2) > ul > li:nth-child(6) > a { font-weight: 600; text-decoration: none; }.site-nav > ul.nav-list:first-child > li:nth-child(1) > button svg, .site-nav > ul.nav-list:first-child > li:nth-child(1) > ul > li:nth-child(2) > button svg, .site-nav > ul.nav-list:first-child > li:nth-child(1) > ul > li:nth-child(2) > ul > li:nth-child(6) > button svg { transform: rotate(-90deg); }.site-nav > ul.nav-list:first-child > li.nav-list-item:nth-child(1) > ul.nav-list, .site-nav > ul.nav-list:first-child > li.nav-list-item:nth-child(1) > ul.nav-list > li.nav-list-item:nth-child(2) > ul.nav-list, .site-nav > ul.nav-list:first-child > li.nav-list-item:nth-child(1) > ul.nav-list > li.nav-list-item:nth-child(2) > ul.nav-list > li.nav-list-item:nth-child(6) > ul.nav-list { display: block; } </style> <script src="/assets/js/vendor/lunr.min.js"></script> <script src="/assets/js/just-the-docs.js"></script> <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- Begin Jekyll SEO tag v2.8.0 --> <title>MCP OAuth Authentication | Simple RPC AI Backend Docs</title> <meta name="generator" content="Jekyll v4.4.1" /> <meta property="og:title" content="MCP OAuth Authentication" /> <meta property="og:locale" content="en_US" /> <meta name="description" content="Developer documentation for the Simple RPC AI Backend server." /> <meta property="og:description" content="Developer documentation for the Simple RPC AI Backend server." /> <meta property="og:site_name" content="Simple RPC AI Backend Docs" /> <meta property="og:type" content="website" /> <meta name="twitter:card" content="summary" /> <meta property="twitter:title" content="MCP OAuth Authentication" /> <script type="application/ld+json"> {"@context":"https://schema.org","@type":"WebPage","description":"Developer documentation for the Simple RPC AI Backend server.","headline":"MCP OAuth Authentication","url":"/common-configurations/mcp-oauth-authentication.html"}</script> <!-- End Jekyll SEO tag --> </head> <body> <a class="skip-to-main" href="#main-content">Skip to main content</a> <svg xmlns="http://www.w3.org/2000/svg" class="d-none"> <symbol id="svg-link" viewBox="0 0 24 24"> <title>Link</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-link"> <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path> </svg> </symbol> <symbol id="svg-menu" viewBox="0 0 24 24"> <title>Menu</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"> <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line> </svg> </symbol> <symbol id="svg-arrow-right" viewBox="0 0 24 24"> <title>Expand</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"> <polyline points="9 18 15 12 9 6"></polyline> </svg> </symbol> <!-- Feather. MIT License: https://github.com/feathericons/feather/blob/master/LICENSE --> <symbol id="svg-external-link" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-external-link"> <title id="svg-external-link-title">(external link)</title> <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line> </symbol> <symbol id="svg-doc" viewBox="0 0 24 24"> <title>Document</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file"> <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline> </svg> </symbol> <symbol id="svg-search" viewBox="0 0 24 24"> <title>Search</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"> <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line> </svg> </symbol> <!-- Bootstrap Icons. MIT License: https://github.com/twbs/icons/blob/main/LICENSE.md --> <symbol id="svg-copy" viewBox="0 0 16 16"> <title>Copy</title> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16"> <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/> <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/> </svg> </symbol> <symbol id="svg-copied" viewBox="0 0 16 16"> <title>Copied</title> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard-check-fill" viewBox="0 0 16 16"> <path d="M6.5 0A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3Zm3 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3Z"/> <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1A2.5 2.5 0 0 1 9.5 5h-3A2.5 2.5 0 0 1 4 2.5v-1Zm6.854 7.354-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L7.5 10.793l2.646-2.647a.5.5 0 0 1 .708.708Z"/> </svg> </symbol> </svg> <div class="side-bar"> <div class="site-header" role="banner"> <a href="/" class="site-title lh-tight"> Simple RPC AI Backend Docs </a> <button id="menu-button" class="site-button btn-reset" aria-label="Toggle menu" aria-pressed="false"> <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><use xlink:href="#svg-menu"></use></svg> </button> </div> <nav aria-label="Main" id="site-nav" class="site-nav"> <ul class="nav-list"><li class="nav-list-item"><button class="nav-list-expander btn-reset" aria-label="toggle items in Documentation category" aria-pressed="false"> <svg viewBox="0 0 24 24" aria-hidden="true"><use xlink:href="#svg-arrow-right"></use></svg> </button><a href="/" class="nav-list-link">Documentation</a><ul class="nav-list"><li class="nav-list-item"><button class="nav-list-expander btn-reset" aria-label="toggle items in Getting Started category" aria-pressed="false"> <svg viewBox="0 0 24 24" aria-hidden="true"><use xlink:href="#svg-arrow-right"></use></svg> </button><a href="/getting-started/" class="nav-list-link">Getting Started</a><ul class="nav-list"><li class="nav-list-item"><a href="/getting-started/overview.html" class="nav-list-link">Project Overview</a></li><li class="nav-list-item"><a href="/getting-started/installation.html" class="nav-list-link">Installation</a></li><li class="nav-list-item"><a href="/getting-started/quickstart.html" class="nav-list-link">Quickstart</a></li></ul></li><li class="nav-list-item"><button class="nav-list-expander btn-reset" aria-label="toggle items in Common Configurations category" aria-pressed="false"> <svg viewBox="0 0 24 24" aria-hidden="true"><use xlink:href="#svg-arrow-right"></use></svg> </button><a href="/common-configurations/" class="nav-list-link">Common Configurations</a><ul class="nav-list"><li class="nav-list-item"><a href="/common-configurations/environment.html" class="nav-list-link">Environment Configuration</a></li><li class="nav-list-item"><a href="/common-configurations/authentication.html" class="nav-list-link">Authentication</a></li><li class="nav-list-item"><a href="/common-configurations/workspaces.html" class="nav-list-link">Workspaces</a></li><li class="nav-list-item"><a href="/common-configurations/cors.html" class="nav-list-link">CORS</a></li><li class="nav-list-item"><a href="/common-configurations/extension-oauth.html" class="nav-list-link">Extension OAuth</a></li><li class="nav-list-item"><a href="/common-configurations/mcp-oauth-authentication.html" class="nav-list-link">MCP OAuth Authentication</a></li><li class="nav-list-item"><a href="/common-configurations/server-workspaces-vs-mcp-roots.html" class="nav-list-link">Server Workspaces vs MCP Roots</a></li></ul></li><li class="nav-list-item"><button class="nav-list-expander btn-reset" aria-label="toggle items in Server API category" aria-pressed="false"> <svg viewBox="0 0 24 24" aria-hidden="true"><use xlink:href="#svg-arrow-right"></use></svg> </button><a href="/server-api/" class="nav-list-link">Server API</a><ul class="nav-list"><li class="nav-list-item"><a href="/server-api/overview.html" class="nav-list-link">Overview</a></li><li class="nav-list-item"><a href="/server-api/resources.html" class="nav-list-link">Resources</a></li><li class="nav-list-item"><a href="/server-api/tools.html" class="nav-list-link">Tools</a></li><li class="nav-list-item"><a href="/server-api/registry.html" class="nav-list-link">Registry</a></li><li class="nav-list-item"><a href="/server-api/methods.html" class="nav-list-link">Methods</a></li></ul></li><li class="nav-list-item"><button class="nav-list-expander btn-reset" aria-label="toggle items in Common Issues category" aria-pressed="false"> <svg viewBox="0 0 24 24" aria-hidden="true"><use xlink:href="#svg-arrow-right"></use></svg> </button><a href="/common-issues/" class="nav-list-link">Common Issues</a><ul class="nav-list"><li class="nav-list-item"><a href="/common-issues/troubleshooting.html" class="nav-list-link">Troubleshooting</a></li></ul></li><li class="nav-list-item"><button class="nav-list-expander btn-reset" aria-label="toggle items in Tips & Tricks category" aria-pressed="false"> <svg viewBox="0 0 24 24" aria-hidden="true"><use xlink:href="#svg-arrow-right"></use></svg> </button><a href="/tips-and-tricks/" class="nav-list-link">Tips & Tricks</a><ul class="nav-list"><li class="nav-list-item"><a href="/tips-and-tricks/testing-trpc.html" class="nav-list-link">Testing tRPC Procedures</a></li><li class="nav-list-item"><a href="/tips-and-tricks/typescript-usage.html" class="nav-list-link">TypeScript Usage</a></li></ul></li></ul></li></ul> <ul class="nav-list"><li class="nav-list-item external"> <a href="https://github.com/AWolf81/simple-rpc-ai-backend" class="nav-list-link external" target="_blank" rel="noopener noreferrer" > GitHub Repository <svg viewBox="0 0 24 24" aria-labelledby="svg-external-link-title"><use xlink:href="#svg-external-link"></use></svg> </a> </li></ul> </nav> <nav class="page-nav"> <a class="page-nav__prev" href="/common-configurations/extension-oauth.html"> <span aria-hidden="true">←</span> <span class="page-nav__text">Extension OAuth</span> </a> <a class="page-nav__next" href="/common-configurations/server-workspaces-vs-mcp-roots.html"> <span class="page-nav__text">Server Workspaces vs MCP Roots</span> <span aria-hidden="true">→</span> </a> </nav> </div> <div class="main" id="top"> <div id="main-header" class="main-header"> <div class="search" role="search"> <div class="search-input-wrap"> <input type="text" id="search-input" class="search-input" tabindex="0" placeholder="Search Simple RPC AI Backend Docs" aria-label="Search Simple RPC AI Backend Docs" autocomplete="off"> <label for="search-input" class="search-label"><svg viewBox="0 0 24 24" class="search-icon"><use xlink:href="#svg-search"></use></svg></label> </div> <div id="search-results" class="search-results"></div> </div> <nav aria-label="Auxiliary" class="aux-nav"> <ul class="aux-nav-list"> <li class="aux-nav-list-item"> <a href="https://github.com/AWolf81/simple-rpc-ai-backend" class="site-button" > Repository </a> </li> </ul> </nav> </div> <div class="main-content-wrap"> <nav aria-label="Breadcrumb" class="breadcrumb-nav"> <ol class="breadcrumb-nav-list"> <li class="breadcrumb-nav-list-item"><a href="/">Documentation</a></li> <li class="breadcrumb-nav-list-item"><a href="/common-configurations/">Common Configurations</a></li> <li class="breadcrumb-nav-list-item"><span>MCP OAuth Authentication</span></li> </ol> </nav> <div id="main-content" class="main-content"> <main> <h1 id="mcp-oauth-authentication-configuration-guide"> <a href="#mcp-oauth-authentication-configuration-guide" class="anchor-heading" aria-labelledby="mcp-oauth-authentication-configuration-guide"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> MCP OAuth Authentication Configuration Guide </h1> <p>Complete guide for configuring authentication in the Model Context Protocol (MCP) server.</p> <h2 id="table-of-contents"> <a href="#table-of-contents" class="anchor-heading" aria-labelledby="table-of-contents"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Table of Contents </h2> <ul> <li><a href="#overview">Overview</a></li> <li><a href="#authentication-types">Authentication Types</a></li> <li><a href="#oauth-configuration">OAuth Configuration</a></li> <li><a href="#jwt-configuration">JWT Configuration</a></li> <li><a href="#dual-authentication">Dual Authentication</a></li> <li><a href="#authentication-flows">Authentication Flows</a></li> <li><a href="#testing">Testing</a></li> <li><a href="#production-considerations">Production Considerations</a></li> </ul> <h2 id="overview"> <a href="#overview" class="anchor-heading" aria-labelledby="overview"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Overview </h2> <p>The MCP server supports multiple authentication strategies via the <code class="language-plaintext highlighter-rouge">authType</code> configuration:</p> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">type</span> <span class="nx">MCPAuthType</span> <span class="o">=</span> <span class="dl">'</span><span class="s1">oauth</span><span class="dl">'</span> <span class="o">|</span> <span class="dl">'</span><span class="s1">jwt</span><span class="dl">'</span> <span class="o">|</span> <span class="dl">'</span><span class="s1">both</span><span class="dl">'</span> <span class="o">|</span> <span class="dl">'</span><span class="s1">none</span><span class="dl">'</span><span class="p">;</span>
+</code></pre></div></div> <p><strong>Default</strong>: <code class="language-plaintext highlighter-rouge">'oauth'</code> (for backward compatibility)</p> <h3 id="when-to-use-each-type"> <a href="#when-to-use-each-type" class="anchor-heading" aria-labelledby="when-to-use-each-type"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> When to Use Each Type </h3> <div class="table-wrapper"><table> <thead> <tr> <th>Auth Type</th> <th>Use Case</th> <th>Best For</th> </tr> </thead> <tbody> <tr> <td><code class="language-plaintext highlighter-rouge">oauth</code></td> <td>User-facing applications with browser-based login</td> <td>Web apps, MCP Jam, Claude Desktop with OAuth</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">jwt</code></td> <td>Service-to-service communication</td> <td>APIs, automated tools, server integrations</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">both</code></td> <td>Flexible environments supporting multiple clients</td> <td>Enterprise deployments, multi-client systems</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">none</code></td> <td>Development/testing only</td> <td>Local testing, demos (NOT for production)</td> </tr> </tbody> </table></div> <h2 id="authentication-types"> <a href="#authentication-types" class="anchor-heading" aria-labelledby="authentication-types"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Authentication Types </h2> <h3 id="1-oauth-authentication"> <a href="#1-oauth-authentication" class="anchor-heading" aria-labelledby="1-oauth-authentication"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 1. OAuth Authentication </h3> <p>OAuth 2.0 provides user-facing authentication with support for external providers (Google, GitHub, etc.).</p> <p><strong>Configuration Location</strong>: <code class="language-plaintext highlighter-rouge">src/trpc/routers/mcp/types.ts:6-37</code></p> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kr">interface</span> <span class="nx">MCPAuthConfig</span> <span class="p">{</span>
+  <span class="nl">authType</span><span class="p">?:</span> <span class="dl">'</span><span class="s1">oauth</span><span class="dl">'</span><span class="p">;</span>  <span class="c1">// ⭐ Set this to 'oauth'</span>
+
+  <span class="nl">oauth</span><span class="p">?:</span> <span class="p">{</span>
+    <span class="nx">enabled</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span>              <span class="c1">// Default: true when authType = 'oauth'</span>
+    <span class="nl">sessionStorePath</span><span class="p">?:</span> <span class="kr">string</span><span class="p">;</span>      <span class="c1">// Path to OAuth session storage</span>
+    <span class="nl">requireValidSession</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span>  <span class="c1">// Default: true</span>
+  <span class="p">};</span>
+
+  <span class="nl">requireAuthForToolsList</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span>  <span class="c1">// Default: false (public discovery)</span>
+  <span class="nl">requireAuthForToolsCall</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span>  <span class="c1">// Default: true (protected execution)</span>
+  <span class="nl">publicTools</span><span class="p">?:</span> <span class="kr">string</span><span class="p">[];</span>             <span class="c1">// Tools exempt from auth</span>
+<span class="p">}</span>
+</code></pre></div></div> <h3 id="2-jwt-authentication"> <a href="#2-jwt-authentication" class="anchor-heading" aria-labelledby="2-jwt-authentication"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 2. JWT Authentication </h3> <p>JSON Web Token authentication for service-to-service communication.</p> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kr">interface</span> <span class="nx">MCPAuthConfig</span> <span class="p">{</span>
+  <span class="nl">authType</span><span class="p">?:</span> <span class="dl">'</span><span class="s1">jwt</span><span class="dl">'</span><span class="p">;</span>  <span class="c1">// ⭐ Set this to 'jwt'</span>
+
+  <span class="nl">jwt</span><span class="p">?:</span> <span class="p">{</span>
+    <span class="nx">enabled</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span>                <span class="c1">// Default: true when authType = 'jwt'</span>
+    <span class="nl">requireValidSignature</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span>  <span class="c1">// Default: true</span>
+    <span class="nl">requiredScopes</span><span class="p">?:</span> <span class="kr">string</span><span class="p">[];</span>        <span class="c1">// Required JWT scopes (e.g., ['mcp', 'mcp:call'])</span>
+    <span class="nl">allowExpiredTokens</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span>     <span class="c1">// Default: false</span>
+  <span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div></div> <h3 id="3-dual-authentication-both"> <a href="#3-dual-authentication-both" class="anchor-heading" aria-labelledby="3-dual-authentication-both"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 3. Dual Authentication (Both) </h3> <p>Support both OAuth and JWT simultaneously.</p> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kr">interface</span> <span class="nx">MCPAuthConfig</span> <span class="p">{</span>
+  <span class="nl">authType</span><span class="p">?:</span> <span class="dl">'</span><span class="s1">both</span><span class="dl">'</span><span class="p">;</span>  <span class="c1">// ⭐ Set this to 'both'</span>
+
+  <span class="nl">oauth</span><span class="p">?:</span> <span class="p">{</span> <span class="nx">enabled</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span> <span class="nl">requireValidSession</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span> <span class="p">};</span>
+  <span class="nl">jwt</span><span class="p">?:</span> <span class="p">{</span> <span class="nx">enabled</span><span class="p">?:</span> <span class="nx">boolean</span><span class="p">;</span> <span class="nl">requiredScopes</span><span class="p">?:</span> <span class="kr">string</span><span class="p">[];</span> <span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div></div> <h2 id="oauth-configuration"> <a href="#oauth-configuration" class="anchor-heading" aria-labelledby="oauth-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> OAuth Configuration </h2> <h3 id="complete-oauth-setup"> <a href="#complete-oauth-setup" class="anchor-heading" aria-labelledby="complete-oauth-setup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Complete OAuth Setup </h3> <p><strong>Step 1: Server-Level OAuth Configuration</strong></p> <p>Configure the OAuth server at the top level of your server config:</p> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">import</span> <span class="p">{</span> <span class="nx">createRpcAiServer</span> <span class="p">}</span> <span class="k">from</span> <span class="dl">'</span><span class="s1">simple-rpc-ai-backend</span><span class="dl">'</span><span class="p">;</span>
+
+<span class="kd">const</span> <span class="nx">server</span> <span class="o">=</span> <span class="nf">createRpcAiServer</span><span class="p">({</span>
+  <span class="na">port</span><span class="p">:</span> <span class="mi">8082</span><span class="p">,</span>
+
+  <span class="c1">// 🔐 Server-level OAuth configuration</span>
+  <span class="na">oauth</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="na">googleClientId</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_ID</span><span class="p">,</span>
+    <span class="na">googleClientSecret</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_SECRET</span><span class="p">,</span>
+    <span class="na">encryptionKey</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">ENCRYPTION_KEY</span> <span class="o">||</span> <span class="dl">'</span><span class="s1">dev-key-min-32-chars-required!!</span><span class="dl">'</span><span class="p">,</span>
+
+    <span class="c1">// Session storage options</span>
+    <span class="na">sessionStorage</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">type</span><span class="p">:</span> <span class="dl">'</span><span class="s1">memory</span><span class="dl">'</span><span class="p">,</span>  <span class="c1">// 'memory' | 'file' | 'redis'</span>
+
+      <span class="c1">// For file storage:</span>
+      <span class="c1">// filePath: './oauth-sessions.json',</span>
+
+      <span class="c1">// For Redis:</span>
+      <span class="c1">// redis: {</span>
+      <span class="c1">//   host: 'localhost',</span>
+      <span class="c1">//   port: 6379,</span>
+      <span class="c1">//   password: 'your-redis-password',</span>
+      <span class="c1">//   db: 0,</span>
+      <span class="c1">//   keyPrefix: 'oauth:'</span>
+      <span class="c1">// }</span>
+    <span class="p">}</span>
+  <span class="p">},</span>
+
+  <span class="c1">// 🔧 Trust proxy configuration for reverse proxies (ngrok, Cloudflare, etc.)</span>
+  <span class="na">trustProxy</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">NODE_ENV</span> <span class="o">===</span> <span class="dl">'</span><span class="s1">production</span><span class="dl">'</span> <span class="o">||</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">TRUST_PROXY</span> <span class="o">===</span> <span class="dl">'</span><span class="s1">true</span><span class="dl">'</span><span class="p">,</span>
+
+  <span class="c1">// 🔧 MCP-specific OAuth configuration</span>
+  <span class="na">mcp</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="na">auth</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">authType</span><span class="p">:</span> <span class="dl">'</span><span class="s1">oauth</span><span class="dl">'</span><span class="p">,</span>  <span class="c1">// ⭐ Required: Set authentication type</span>
+
+      <span class="na">oauth</span><span class="p">:</span> <span class="p">{</span>
+        <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>                    <span class="c1">// Enable OAuth for MCP</span>
+        <span class="na">sessionStorePath</span><span class="p">:</span> <span class="dl">'</span><span class="s1">./sessions</span><span class="dl">'</span><span class="p">,</span>   <span class="c1">// Optional: custom session path</span>
+        <span class="na">requireValidSession</span><span class="p">:</span> <span class="kc">true</span>         <span class="c1">// Require valid OAuth session</span>
+      <span class="p">},</span>
+
+      <span class="c1">// Access control</span>
+      <span class="na">requireAuthForToolsList</span><span class="p">:</span> <span class="kc">false</span><span class="p">,</span>  <span class="c1">// tools/list is public (discovery)</span>
+      <span class="na">requireAuthForToolsCall</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>   <span class="c1">// tools/call requires authentication</span>
+      <span class="na">publicTools</span><span class="p">:</span> <span class="p">[</span><span class="dl">'</span><span class="s1">greeting</span><span class="dl">'</span><span class="p">,</span> <span class="dl">'</span><span class="s1">ping</span><span class="dl">'</span><span class="p">]</span> <span class="c1">// Exception list for public tools</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">});</span>
+
+<span class="nx">server</span><span class="p">.</span><span class="nf">start</span><span class="p">();</span>
+</code></pre></div></div> <p><strong>Step 2: Environment Variables</strong></p> <p>Create <code class="language-plaintext highlighter-rouge">.env.oauth</code> file:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Google OAuth2 Credentials</span>
+<span class="nv">GOOGLE_CLIENT_ID</span><span class="o">=</span>your_client_id.apps.googleusercontent.com
+<span class="nv">GOOGLE_CLIENT_SECRET</span><span class="o">=</span>your_client_secret
+
+<span class="c"># Encryption key for token storage (min 32 characters)</span>
+<span class="nv">ENCRYPTION_KEY</span><span class="o">=</span>your-secure-random-key-min-32-chars-required
+
+<span class="c"># Trust proxy for ngrok/CORS support</span>
+<span class="nv">TRUST_PROXY</span><span class="o">=</span><span class="nb">true</span>
+</code></pre></div></div> <p><strong>Step 3: Trust Proxy Configuration (for ngrok/CORS)</strong></p> <p>Configure trust proxy for proper CORS handling behind reverse proxies:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Environment variable for reverse proxy support</span>
+<span class="nv">TRUST_PROXY</span><span class="o">=</span><span class="nb">true</span>
+
+<span class="c"># Or enable based on environment</span>
+<span class="nv">NODE_ENV</span><span class="o">=</span>production  <span class="c"># Automatically enables trust proxy</span>
+</code></pre></div></div> <p><strong>Step 4: Google OAuth Setup</strong></p> <ol> <li>Go to <a href="https://console.developers.google.com">Google Cloud Console</a></li> <li>Create OAuth 2.0 Client ID</li> <li>Add authorized redirect URIs: <ul> <li>Local: <code class="language-plaintext highlighter-rouge">http://localhost:8082/oauth/callback</code></li> <li>Ngrok: <code class="language-plaintext highlighter-rouge">https://your-ngrok-id.ngrok.io/oauth/callback</code></li> </ul> </li> <li>Copy Client ID and Secret to <code class="language-plaintext highlighter-rouge">.env.oauth</code></li> </ol> <p>See the <a href="/common-configurations/authentication.html">Authentication guide</a> for a full walkthrough of provider credential setup.</p> <h3 id="oauth-session-storage-options"> <a href="#oauth-session-storage-options" class="anchor-heading" aria-labelledby="oauth-session-storage-options"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> OAuth Session Storage Options </h3> <h4 id="memory-storage-development"> <a href="#memory-storage-development" class="anchor-heading" aria-labelledby="memory-storage-development"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Memory Storage (Development) </h4> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">oauth</span><span class="p">:</span> <span class="p">{</span>
+  <span class="nl">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+  <span class="nx">googleClientId</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_ID</span><span class="p">,</span>
+  <span class="nx">googleClientSecret</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_SECRET</span><span class="p">,</span>
+  <span class="nx">encryptionKey</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">ENCRYPTION_KEY</span><span class="p">,</span>
+  <span class="nx">sessionStorage</span><span class="p">:</span> <span class="p">{</span> <span class="nl">type</span><span class="p">:</span> <span class="dl">'</span><span class="s1">memory</span><span class="dl">'</span> <span class="p">}</span>  <span class="c1">// ⚠️ Lost on restart</span>
+<span class="p">}</span>
+</code></pre></div></div> <p><strong>Pros</strong>: Fast, simple setup <strong>Cons</strong>: Sessions lost on restart, not suitable for production</p> <h4 id="file-storage-small-deployments"> <a href="#file-storage-small-deployments" class="anchor-heading" aria-labelledby="file-storage-small-deployments"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> File Storage (Small Deployments) </h4> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">oauth</span><span class="p">:</span> <span class="p">{</span>
+  <span class="nl">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+  <span class="nx">googleClientId</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_ID</span><span class="p">,</span>
+  <span class="nx">googleClientSecret</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_SECRET</span><span class="p">,</span>
+  <span class="nx">encryptionKey</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">ENCRYPTION_KEY</span><span class="p">,</span>
+  <span class="nx">sessionStorage</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nl">type</span><span class="p">:</span> <span class="dl">'</span><span class="s1">file</span><span class="dl">'</span><span class="p">,</span>
+    <span class="nx">filePath</span><span class="p">:</span> <span class="dl">'</span><span class="s1">./data/oauth-sessions.json</span><span class="dl">'</span>  <span class="c1">// Persistent file storage</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div> <p><strong>Pros</strong>: Persistent across restarts, simple <strong>Cons</strong>: Not suitable for multi-server deployments</p> <h4 id="redis-storage-production"> <a href="#redis-storage-production" class="anchor-heading" aria-labelledby="redis-storage-production"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Redis Storage (Production) </h4> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">oauth</span><span class="p">:</span> <span class="p">{</span>
+  <span class="nl">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+  <span class="nx">googleClientId</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_ID</span><span class="p">,</span>
+  <span class="nx">googleClientSecret</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_SECRET</span><span class="p">,</span>
+  <span class="nx">encryptionKey</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">ENCRYPTION_KEY</span><span class="p">,</span>
+  <span class="nx">sessionStorage</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nl">type</span><span class="p">:</span> <span class="dl">'</span><span class="s1">redis</span><span class="dl">'</span><span class="p">,</span>
+    <span class="nx">redis</span><span class="p">:</span> <span class="p">{</span>
+      <span class="nl">host</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">REDIS_HOST</span> <span class="o">||</span> <span class="dl">'</span><span class="s1">localhost</span><span class="dl">'</span><span class="p">,</span>
+      <span class="nx">port</span><span class="p">:</span> <span class="nf">parseInt</span><span class="p">(</span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">REDIS_PORT</span> <span class="o">||</span> <span class="dl">'</span><span class="s1">6379</span><span class="dl">'</span><span class="p">),</span>
+      <span class="nx">password</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">REDIS_PASSWORD</span><span class="p">,</span>
+      <span class="nx">db</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+      <span class="nx">keyPrefix</span><span class="p">:</span> <span class="dl">'</span><span class="s1">oauth:session:</span><span class="dl">'</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div> <p><strong>Pros</strong>: Scalable, multi-server support, TTL support <strong>Cons</strong>: Requires Redis server</p> <h2 id="jwt-configuration"> <a href="#jwt-configuration" class="anchor-heading" aria-labelledby="jwt-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> JWT Configuration </h2> <h3 id="complete-jwt-setup"> <a href="#complete-jwt-setup" class="anchor-heading" aria-labelledby="complete-jwt-setup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Complete JWT Setup </h3> <p>JWT authentication is ideal for service-to-service communication and API integrations.</p> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">import</span> <span class="p">{</span> <span class="nx">createRpcAiServer</span> <span class="p">}</span> <span class="k">from</span> <span class="dl">'</span><span class="s1">simple-rpc-ai-backend</span><span class="dl">'</span><span class="p">;</span>
+
+<span class="kd">const</span> <span class="nx">server</span> <span class="o">=</span> <span class="nf">createRpcAiServer</span><span class="p">({</span>
+  <span class="na">port</span><span class="p">:</span> <span class="mi">8082</span><span class="p">,</span>
+
+  <span class="c1">// 🔐 JWT configuration (if using OpenSaaS or custom JWT)</span>
+  <span class="na">jwt</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">secret</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">JWT_SECRET</span><span class="p">,</span>
+    <span class="na">issuer</span><span class="p">:</span> <span class="dl">'</span><span class="s1">your-service</span><span class="dl">'</span><span class="p">,</span>
+    <span class="na">audience</span><span class="p">:</span> <span class="dl">'</span><span class="s1">mcp-api</span><span class="dl">'</span>
+  <span class="p">},</span>
+
+  <span class="c1">// 🔧 MCP-specific JWT configuration</span>
+  <span class="na">mcp</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="na">auth</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">authType</span><span class="p">:</span> <span class="dl">'</span><span class="s1">jwt</span><span class="dl">'</span><span class="p">,</span>  <span class="c1">// ⭐ Set authentication type to JWT</span>
+
+      <span class="na">jwt</span><span class="p">:</span> <span class="p">{</span>
+        <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>                      <span class="c1">// Enable JWT authentication</span>
+        <span class="na">requireValidSignature</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>        <span class="c1">// Verify JWT signature</span>
+        <span class="na">requiredScopes</span><span class="p">:</span> <span class="p">[</span><span class="dl">'</span><span class="s1">mcp</span><span class="dl">'</span><span class="p">,</span> <span class="dl">'</span><span class="s1">mcp:call</span><span class="dl">'</span><span class="p">],</span> <span class="c1">// Required scopes</span>
+        <span class="na">allowExpiredTokens</span><span class="p">:</span> <span class="kc">false</span>           <span class="c1">// Reject expired tokens</span>
+      <span class="p">},</span>
+
+      <span class="c1">// Disable OAuth</span>
+      <span class="na">oauth</span><span class="p">:</span> <span class="p">{</span>
+        <span class="na">enabled</span><span class="p">:</span> <span class="kc">false</span>
+      <span class="p">},</span>
+
+      <span class="c1">// Access control</span>
+      <span class="na">requireAuthForToolsList</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>   <span class="c1">// Require JWT for discovery</span>
+      <span class="na">requireAuthForToolsCall</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>   <span class="c1">// Require JWT for execution</span>
+      <span class="na">publicTools</span><span class="p">:</span> <span class="p">[]</span>                   <span class="c1">// No public tools</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">});</span>
+
+<span class="nx">server</span><span class="p">.</span><span class="nf">start</span><span class="p">();</span>
+</code></pre></div></div> <h3 id="jwt-token-format"> <a href="#jwt-token-format" class="anchor-heading" aria-labelledby="jwt-token-format"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> JWT Token Format </h3> <p>MCP clients should send JWT tokens in the Authorization header:</p> <div class="language-http highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nf">POST</span> <span class="nn">/mcp</span> <span class="k">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<span class="na">Host</span><span class="p">:</span> <span class="s">localhost:8082</span>
+<span class="na">Authorization</span><span class="p">:</span> <span class="s">Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</span>
+<span class="na">Content-Type</span><span class="p">:</span> <span class="s">application/json</span>
+
+<span class="p">{</span><span class="w">
+  </span><span class="nl">"jsonrpc"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2.0"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"method"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tools/call"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"greeting"</span><span class="p">,</span><span class="w"> </span><span class="nl">"arguments"</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span><span class="w"> </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div> <h3 id="jwt-payload-structure"> <a href="#jwt-payload-structure" class="anchor-heading" aria-labelledby="jwt-payload-structure"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> JWT Payload Structure </h3> <div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"sub"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user-id-123"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"email"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user@example.com"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"scopes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"mcp"</span><span class="p">,</span><span class="w"> </span><span class="s2">"mcp:call"</span><span class="p">,</span><span class="w"> </span><span class="s2">"mcp:admin"</span><span class="p">],</span><span class="w">
+  </span><span class="nl">"iss"</span><span class="p">:</span><span class="w"> </span><span class="s2">"your-service"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"aud"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mcp-api"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"exp"</span><span class="p">:</span><span class="w"> </span><span class="mi">1735689600</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"iat"</span><span class="p">:</span><span class="w"> </span><span class="mi">1735603200</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div> <h2 id="dual-authentication"> <a href="#dual-authentication" class="anchor-heading" aria-labelledby="dual-authentication"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Dual Authentication </h2> <p>Support both OAuth and JWT authentication simultaneously.</p> <h3 id="use-cases"> <a href="#use-cases" class="anchor-heading" aria-labelledby="use-cases"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Use Cases </h3> <ul> <li><strong>Enterprise deployments</strong>: Web users via OAuth, services via JWT</li> <li><strong>Multi-client systems</strong>: Claude Desktop (OAuth) + automation scripts (JWT)</li> <li><strong>Migration periods</strong>: Gradual transition from OAuth to JWT or vice versa</li> </ul> <h3 id="configuration"> <a href="#configuration" class="anchor-heading" aria-labelledby="configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Configuration </h3> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">import</span> <span class="p">{</span> <span class="nx">createRpcAiServer</span> <span class="p">}</span> <span class="k">from</span> <span class="dl">'</span><span class="s1">simple-rpc-ai-backend</span><span class="dl">'</span><span class="p">;</span>
+
+<span class="kd">const</span> <span class="nx">server</span> <span class="o">=</span> <span class="nf">createRpcAiServer</span><span class="p">({</span>
+  <span class="na">port</span><span class="p">:</span> <span class="mi">8082</span><span class="p">,</span>
+
+  <span class="c1">// Both OAuth and JWT server configs</span>
+  <span class="na">oauth</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="na">googleClientId</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_ID</span><span class="p">,</span>
+    <span class="na">googleClientSecret</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_SECRET</span><span class="p">,</span>
+    <span class="na">encryptionKey</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">ENCRYPTION_KEY</span><span class="p">,</span>
+    <span class="na">sessionStorage</span><span class="p">:</span> <span class="p">{</span> <span class="na">type</span><span class="p">:</span> <span class="dl">'</span><span class="s1">redis</span><span class="dl">'</span><span class="p">,</span> <span class="na">redis</span><span class="p">:</span> <span class="p">{</span> <span class="cm">/* ... */</span> <span class="p">}</span> <span class="p">}</span>
+  <span class="p">},</span>
+
+  <span class="na">jwt</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">secret</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">JWT_SECRET</span><span class="p">,</span>
+    <span class="na">issuer</span><span class="p">:</span> <span class="dl">'</span><span class="s1">your-service</span><span class="dl">'</span><span class="p">,</span>
+    <span class="na">audience</span><span class="p">:</span> <span class="dl">'</span><span class="s1">mcp-api</span><span class="dl">'</span>
+  <span class="p">},</span>
+
+  <span class="c1">// MCP with dual authentication</span>
+  <span class="na">mcp</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="na">auth</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">authType</span><span class="p">:</span> <span class="dl">'</span><span class="s1">both</span><span class="dl">'</span><span class="p">,</span>  <span class="c1">// ⭐ Support both OAuth and JWT</span>
+
+      <span class="na">oauth</span><span class="p">:</span> <span class="p">{</span>
+        <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+        <span class="na">requireValidSession</span><span class="p">:</span> <span class="kc">true</span>
+      <span class="p">},</span>
+
+      <span class="na">jwt</span><span class="p">:</span> <span class="p">{</span>
+        <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+        <span class="na">requireValidSignature</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+        <span class="na">requiredScopes</span><span class="p">:</span> <span class="p">[</span><span class="dl">'</span><span class="s1">mcp</span><span class="dl">'</span><span class="p">],</span>
+        <span class="na">allowExpiredTokens</span><span class="p">:</span> <span class="kc">false</span>
+      <span class="p">},</span>
+
+      <span class="c1">// Access control (applies to both auth types)</span>
+      <span class="na">requireAuthForToolsList</span><span class="p">:</span> <span class="kc">false</span><span class="p">,</span>  <span class="c1">// Public discovery</span>
+      <span class="na">requireAuthForToolsCall</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>   <span class="c1">// Auth required for execution</span>
+      <span class="na">publicTools</span><span class="p">:</span> <span class="p">[</span><span class="dl">'</span><span class="s1">greeting</span><span class="dl">'</span><span class="p">]</span>         <span class="c1">// Public tools exception</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">});</span>
+
+<span class="nx">server</span><span class="p">.</span><span class="nf">start</span><span class="p">();</span>
+</code></pre></div></div> <h3 id="authentication-priority"> <a href="#authentication-priority" class="anchor-heading" aria-labelledby="authentication-priority"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Authentication Priority </h3> <p>When <code class="language-plaintext highlighter-rouge">authType: 'both'</code>, the server accepts either OAuth or JWT:</p> <ol> <li>Check for OAuth session (if <code class="language-plaintext highlighter-rouge">oauth.enabled: true</code>)</li> <li>Check for JWT token (if <code class="language-plaintext highlighter-rouge">jwt.enabled: true</code>)</li> <li>If both present, both are validated</li> <li>If neither present and auth required → 401 Unauthorized</li> </ol> <h2 id="authentication-flows"> <a href="#authentication-flows" class="anchor-heading" aria-labelledby="authentication-flows"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Authentication Flows </h2> <h3 id="oauth-flow"> <a href="#oauth-flow" class="anchor-heading" aria-labelledby="oauth-flow"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> OAuth Flow </h3><pre><code class="language-mermaid">sequenceDiagram
+    participant Client as MCP Client (Browser)
+    participant Server as MCP Server
+    participant Google as Google OAuth 2.0
+
+    Client-&gt;&gt;Server: 1. GET /.well-known/...
+    Server--&gt;&gt;Client: 2. OAuth metadata
+    Client-&gt;&gt;Server: 3. Request /oauth/authorize
+    Server-&gt;&gt;Google: 4. Redirect user to Google
+    Google--&gt;&gt;Client: 5. Render login page
+    Client-&gt;&gt;Google: 6. Submit credentials / consent
+    Google--&gt;&gt;Server: 7. Redirect with authorization code
+    Server-&gt;&gt;Google: 8. Exchange code for tokens (POST /oauth/token)
+    Google--&gt;&gt;Server: 9. Return tokens + user info
+    Server--&gt;&gt;Client: 10. Establish session / issue access token
+    Client-&gt;&gt;Server: 11. POST /mcp (Authorization: Bearer token)
+    Server--&gt;&gt;Client: 12. Execute tool and respond
+</code></pre><h3 id="jwt-flow"> <a href="#jwt-flow" class="anchor-heading" aria-labelledby="jwt-flow"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> JWT Flow </h3><pre><code class="language-mermaid">sequenceDiagram
+    participant Client as MCP Client (Service)
+    participant Server as MCP Server
+
+    Client-&gt;&gt;Server: 1. POST /mcp (Authorization: Bearer &lt;jwt&gt;)
+    Server-&gt;&gt;Server: 2. Validate JWT (signature, expiry, scopes)
+    Server--&gt;&gt;Client: 3. Execute tool and respond
+</code></pre><h2 id="testing"> <a href="#testing" class="anchor-heading" aria-labelledby="testing"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Testing </h2> <h3 id="local-testing-with-ngrok"> <a href="#local-testing-with-ngrok" class="anchor-heading" aria-labelledby="local-testing-with-ngrok"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Local Testing with Ngrok </h3> <p><strong>Step 1: Start the server with trust proxy enabled:</strong></p> <blockquote> <p>Note: the demo uses the OAuth configuration shown earlier (client IDs, secrets, and session storage).</p> </blockquote> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Enable trust proxy for reverse proxy support</span>
+<span class="nb">export </span><span class="nv">TRUST_PROXY</span><span class="o">=</span><span class="nb">true</span>
+
+<span class="c"># Or set in .env.oauth</span>
+<span class="nb">echo</span> <span class="s2">"TRUST_PROXY=true"</span> <span class="o">&gt;&gt;</span> .env.oauth
+
+<span class="c"># Start the OAuth-enabled server</span>
+pnpm demo:oauth
+</code></pre></div></div> <p><strong>Step 2: Start ngrok for local testing:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Install ngrok if not already installed</span>
+<span class="c"># npm install -g ngrok  # or download from https://ngrok.com/</span>
+
+<span class="c"># Start ngrok tunnel to your local server</span>
+ngrok http 8082
+</code></pre></div></div> <p>Ngrok will output:</p> <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Session Status                online
+Account                       Your Name (Plan: Free)
+Version                       3.x.x
+Region                        United States (us-cal-1)
+Forwarding                    https://abc123.ngrok.io -&gt; http://localhost:8082
+
+Connections                   ttl     opn     rt1     rt5     p50     p90
+                              0       0       0.00    0.00    0.00    0.00
+</code></pre></div></div> <p><strong>Step 3: Update Google OAuth redirect URI:</strong></p> <ol> <li>Go to <a href="https://console.developers.google.com">Google Cloud Console</a></li> <li>Edit your OAuth 2.0 Client ID</li> <li>Add ngrok URL to authorized redirect URIs: <ul> <li><code class="language-plaintext highlighter-rouge">https://abc123.ngrok.io/oauth/callback</code> (replace abc123 with your ngrok ID)</li> </ul> </li> </ol> <p><strong>Step 4: Test OAuth with ngrok URL:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Verify OAuth discovery works through ngrok</span>
+curl https://abc123.ngrok.io/.well-known/oauth-authorization-server
+</code></pre></div></div> <p><strong>Step 5: Test MCP with OAuth:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># In a separate terminal</span>
+<span class="nb">cd </span>path/to/mcp-jam
+npm start
+</code></pre></div></div> <p>Visit <code class="language-plaintext highlighter-rouge">http://localhost:4000</code> and connect to <code class="language-plaintext highlighter-rouge">https://abc123.ngrok.io/mcp</code></p> <p>The OAuth flow will now work correctly with ngrok because:</p> <ul> <li><code class="language-plaintext highlighter-rouge">trustProxy: true</code> tells Express to trust <code class="language-plaintext highlighter-rouge">X-Forwarded-*</code> headers</li> <li>CORS middleware can properly validate the origin from proxy headers</li> <li>OAuth redirects use the ngrok URL instead of localhost</li> </ul> <h3 id="oauth-testing-direct-localhost"> <a href="#oauth-testing-direct-localhost" class="anchor-heading" aria-labelledby="oauth-testing-direct-localhost"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> OAuth Testing (Direct localhost) </h3> <blockquote> <p>⚠️ Not recommended: configuring HTTPS correctly for localhost is difficult, and many MCP clients (including MCP Jam) require HTTPS. Prefer the ngrok-based workflow above for real testing.</p> </blockquote> <p><strong>1. Start the OAuth-enabled server:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pnpm demo:oauth
+</code></pre></div></div> <p><strong>2. Verify OAuth discovery endpoints:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl http://localhost:8082/.well-known/oauth-authorization-server
+</code></pre></div></div> <p>Expected response:</p> <div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://localhost:8082"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"authorization_endpoint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://localhost:8082/oauth/authorize"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"token_endpoint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://localhost:8082/oauth/token"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"userinfo_endpoint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://localhost:8082/oauth/userinfo"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"registration_endpoint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://localhost:8082/register"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"jwks_uri"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://localhost:8082/.well-known/jwks.json"</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div> <p><strong>3. Test with MCP Jam (localhost):</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># In a separate terminal</span>
+<span class="nb">cd </span>path/to/mcp-jam
+npm start
+</code></pre></div></div> <p>Visit <code class="language-plaintext highlighter-rouge">http://localhost:4000</code> and connect to <code class="language-plaintext highlighter-rouge">http://localhost:8082/mcp</code></p> <h3 id="jwt-testing"> <a href="#jwt-testing" class="anchor-heading" aria-labelledby="jwt-testing"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> JWT Testing </h3> <p><strong>1. Generate a test JWT:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Using jwt.io or a JWT library</span>
+node <span class="nt">-e</span> <span class="s2">"
+const jwt = require('jsonwebtoken');
+const token = jwt.sign(
+  {
+    sub: 'test-user',
+    email: 'test@example.com',
+    scopes: ['mcp', 'mcp:call']
+  },
+  'your-jwt-secret',
+  {
+    expiresIn: '1h',
+    issuer: 'your-service',
+    audience: 'mcp-api'
+  }
+);
+console.log(token);
+"</span>
+</code></pre></div></div> <p><strong>2. Test MCP request with JWT:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-X</span> POST http://localhost:8082/mcp <span class="se">\</span>
+  <span class="nt">-H</span> <span class="s2">"Content-Type: application/json"</span> <span class="se">\</span>
+  <span class="nt">-H</span> <span class="s2">"Authorization: Bearer YOUR_JWT_TOKEN"</span> <span class="se">\</span>
+  <span class="nt">-d</span> <span class="s1">'{
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "params": {},
+    "id": 1
+  }'</span>
+</code></pre></div></div> <h3 id="dual-authentication-testing"> <a href="#dual-authentication-testing" class="anchor-heading" aria-labelledby="dual-authentication-testing"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Dual Authentication Testing </h3> <p>Test both OAuth and JWT work simultaneously:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Test OAuth flow (use browser)</span>
+open http://localhost:8082/oauth/authorize
+
+<span class="c"># Test JWT in same server</span>
+curl <span class="nt">-X</span> POST http://localhost:8082/mcp <span class="se">\</span>
+  <span class="nt">-H</span> <span class="s2">"Authorization: Bearer YOUR_JWT_TOKEN"</span> <span class="se">\</span>
+  <span class="nt">-d</span> <span class="s1">'{"jsonrpc":"2.0","method":"tools/list","id":1}'</span>
+</code></pre></div></div> <h2 id="production-considerations"> <a href="#production-considerations" class="anchor-heading" aria-labelledby="production-considerations"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Production Considerations </h2> <h3 id="security-checklist"> <a href="#security-checklist" class="anchor-heading" aria-labelledby="security-checklist"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Security Checklist </h3> <ul class="task-list"> <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" /><strong>Use HTTPS</strong>: Never use OAuth over plain HTTP in production</li> <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" /><strong>Strong encryption keys</strong>: Min 32 characters, cryptographically random</li> <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" /><strong>Secure session storage</strong>: Use Redis or database, not memory/file</li> <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" /><strong>Token rotation</strong>: Implement refresh token rotation</li> <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" /><strong>Rate limiting</strong>: Enable rate limiting on auth endpoints</li> <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" /><strong>Audit logging</strong>: Enable security logging for auth events</li> <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" /><strong>Scope validation</strong>: Require specific scopes for sensitive operations</li> <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" /><strong>Token expiration</strong>: Set reasonable expiration times (1h access, 7d refresh)</li> </ul> <h3 id="oauth-production-config"> <a href="#oauth-production-config" class="anchor-heading" aria-labelledby="oauth-production-config"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> OAuth Production Config </h3> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">const</span> <span class="nx">server</span> <span class="o">=</span> <span class="nf">createRpcAiServer</span><span class="p">({</span>
+  <span class="na">port</span><span class="p">:</span> <span class="mi">443</span><span class="p">,</span>  <span class="c1">// HTTPS</span>
+
+  <span class="na">oauth</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="na">googleClientId</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_ID</span><span class="p">,</span>
+    <span class="na">googleClientSecret</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">GOOGLE_CLIENT_SECRET</span><span class="p">,</span>
+    <span class="na">encryptionKey</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">ENCRYPTION_KEY</span><span class="p">,</span>  <span class="c1">// From secrets manager</span>
+    <span class="na">sessionStorage</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">type</span><span class="p">:</span> <span class="dl">'</span><span class="s1">redis</span><span class="dl">'</span><span class="p">,</span>
+      <span class="na">redis</span><span class="p">:</span> <span class="p">{</span>
+        <span class="na">host</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">REDIS_HOST</span><span class="p">,</span>
+        <span class="na">port</span><span class="p">:</span> <span class="mi">6379</span><span class="p">,</span>
+        <span class="na">password</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">REDIS_PASSWORD</span><span class="p">,</span>
+        <span class="na">db</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="na">keyPrefix</span><span class="p">:</span> <span class="dl">'</span><span class="s1">oauth:prod:</span><span class="dl">'</span><span class="p">,</span>
+        <span class="na">tls</span><span class="p">:</span> <span class="kc">true</span>  <span class="c1">// Enable TLS for Redis connection</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">},</span>
+
+  <span class="na">mcp</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="na">auth</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">authType</span><span class="p">:</span> <span class="dl">'</span><span class="s1">oauth</span><span class="dl">'</span><span class="p">,</span>
+      <span class="na">oauth</span><span class="p">:</span> <span class="p">{</span>
+        <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+        <span class="na">requireValidSession</span><span class="p">:</span> <span class="kc">true</span>
+      <span class="p">},</span>
+      <span class="na">requireAuthForToolsList</span><span class="p">:</span> <span class="kc">false</span><span class="p">,</span>   <span class="c1">// Allow public discovery</span>
+      <span class="na">requireAuthForToolsCall</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>    <span class="c1">// Require auth for execution</span>
+      <span class="na">publicTools</span><span class="p">:</span> <span class="p">[]</span>                   <span class="c1">// No public tools in production</span>
+    <span class="p">},</span>
+
+    <span class="c1">// Enable security features</span>
+    <span class="na">rateLimiting</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+      <span class="na">windowMs</span><span class="p">:</span> <span class="mi">60000</span><span class="p">,</span>
+      <span class="na">maxRequests</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
+      <span class="na">maxToolCalls</span><span class="p">:</span> <span class="mi">50</span>
+    <span class="p">},</span>
+
+    <span class="na">securityLogging</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+      <span class="na">logLevel</span><span class="p">:</span> <span class="dl">'</span><span class="s1">info</span><span class="dl">'</span><span class="p">,</span>
+      <span class="na">logToFile</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+      <span class="na">logFilePath</span><span class="p">:</span> <span class="dl">'</span><span class="s1">/var/log/mcp-security.log</span><span class="dl">'</span>
+    <span class="p">},</span>
+
+    <span class="na">authEnforcement</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+      <span class="na">requireAuth</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+      <span class="na">requireValidSession</span><span class="p">:</span> <span class="kc">true</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">});</span>
+</code></pre></div></div> <h3 id="jwt-production-config"> <a href="#jwt-production-config" class="anchor-heading" aria-labelledby="jwt-production-config"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> JWT Production Config </h3> <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">const</span> <span class="nx">server</span> <span class="o">=</span> <span class="nf">createRpcAiServer</span><span class="p">({</span>
+  <span class="na">port</span><span class="p">:</span> <span class="mi">443</span><span class="p">,</span>
+
+  <span class="na">jwt</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">secret</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">JWT_SECRET</span><span class="p">,</span>  <span class="c1">// From secrets manager</span>
+    <span class="na">issuer</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">JWT_ISSUER</span><span class="p">,</span>
+    <span class="na">audience</span><span class="p">:</span> <span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">JWT_AUDIENCE</span>
+  <span class="p">},</span>
+
+  <span class="na">mcp</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="na">auth</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">authType</span><span class="p">:</span> <span class="dl">'</span><span class="s1">jwt</span><span class="dl">'</span><span class="p">,</span>
+      <span class="na">jwt</span><span class="p">:</span> <span class="p">{</span>
+        <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+        <span class="na">requireValidSignature</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+        <span class="na">requiredScopes</span><span class="p">:</span> <span class="p">[</span><span class="dl">'</span><span class="s1">mcp</span><span class="dl">'</span><span class="p">,</span> <span class="dl">'</span><span class="s1">mcp:call</span><span class="dl">'</span><span class="p">],</span>
+        <span class="na">allowExpiredTokens</span><span class="p">:</span> <span class="kc">false</span>
+      <span class="p">},</span>
+      <span class="na">oauth</span><span class="p">:</span> <span class="p">{</span> <span class="na">enabled</span><span class="p">:</span> <span class="kc">false</span> <span class="p">},</span>
+      <span class="na">requireAuthForToolsList</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>   <span class="c1">// Require JWT for everything</span>
+      <span class="na">requireAuthForToolsCall</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+      <span class="na">publicTools</span><span class="p">:</span> <span class="p">[]</span>
+    <span class="p">},</span>
+
+    <span class="c1">// Security features...</span>
+    <span class="na">rateLimiting</span><span class="p">:</span> <span class="p">{</span> <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span> <span class="na">maxRequests</span><span class="p">:</span> <span class="mi">100</span> <span class="p">},</span>
+    <span class="na">securityLogging</span><span class="p">:</span> <span class="p">{</span> <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span> <span class="p">},</span>
+    <span class="na">authEnforcement</span><span class="p">:</span> <span class="p">{</span> <span class="na">enabled</span><span class="p">:</span> <span class="kc">true</span> <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">});</span>
+</code></pre></div></div> <h3 id="environment-variables-best-practices"> <a href="#environment-variables-best-practices" class="anchor-heading" aria-labelledby="environment-variables-best-practices"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Environment Variables Best Practices </h3> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Use a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.)</span>
+<span class="c"># Never commit these to version control</span>
+
+<span class="c"># OAuth</span>
+<span class="nv">GOOGLE_CLIENT_ID</span><span class="o">=</span>from_secrets_manager
+<span class="nv">GOOGLE_CLIENT_SECRET</span><span class="o">=</span>from_secrets_manager
+<span class="nv">ENCRYPTION_KEY</span><span class="o">=</span>from_secrets_manager
+
+<span class="c"># JWT</span>
+<span class="nv">JWT_SECRET</span><span class="o">=</span>from_secrets_manager
+<span class="nv">JWT_ISSUER</span><span class="o">=</span>your-service-name
+<span class="nv">JWT_AUDIENCE</span><span class="o">=</span>mcp-api
+
+<span class="c"># Redis</span>
+<span class="nv">REDIS_HOST</span><span class="o">=</span>redis.production.internal
+<span class="nv">REDIS_PORT</span><span class="o">=</span>6379
+<span class="nv">REDIS_PASSWORD</span><span class="o">=</span>from_secrets_manager
+<span class="nv">REDIS_TLS</span><span class="o">=</span><span class="nb">true</span>
+
+<span class="c"># Server</span>
+<span class="nv">NODE_ENV</span><span class="o">=</span>production
+<span class="nv">TRUST_PROXY</span><span class="o">=</span><span class="nb">true</span>  <span class="c"># Required for reverse proxy/CDN deployments</span>
+<span class="nv">PORT</span><span class="o">=</span>443
+<span class="nv">LOG_LEVEL</span><span class="o">=</span>info
+</code></pre></div></div> <h2 id="troubleshooting"> <a href="#troubleshooting" class="anchor-heading" aria-labelledby="troubleshooting"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Troubleshooting </h2> <h3 id="common-issues"> <a href="#common-issues" class="anchor-heading" aria-labelledby="common-issues"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Common Issues </h3> <p><strong>Problem</strong>: “OAuth failed” with no clear error</p> <p><strong>Solution</strong>:</p> <ol> <li>Check Google OAuth redirect URI matches exactly</li> <li>Verify client ID and secret in <code class="language-plaintext highlighter-rouge">.env.oauth</code></li> <li>Check server is running on correct port</li> <li>Test discovery endpoint: <code class="language-plaintext highlighter-rouge">curl http://localhost:8082/.well-known/oauth-authorization-server</code></li> <li>If using ngrok/CDN: Ensure <code class="language-plaintext highlighter-rouge">TRUST_PROXY=true</code> is set</li> <li>Verify OAuth redirect URI includes the ngrok/CDN URL for proxy setups</li> </ol><hr /> <p><strong>Problem</strong>: JWT authentication fails with “Invalid signature”</p> <p><strong>Solution</strong>:</p> <ol> <li>Verify JWT secret matches between client and server</li> <li>Check JWT payload includes required scopes</li> <li>Verify issuer and audience match configuration</li> <li>Check token hasn’t expired</li> </ol><hr /> <p><strong>Problem</strong>: “Session not found” error with OAuth</p> <p><strong>Solution</strong>:</p> <ol> <li>Check session storage is properly configured</li> <li>For Redis: verify connection with <code class="language-plaintext highlighter-rouge">redis-cli ping</code></li> <li>For file storage: verify write permissions</li> <li>Check encryption key hasn’t changed (invalidates old sessions)</li> </ol><hr /> <p><strong>Problem</strong>: MCP tools/call returns 401 even with valid token</p> <p><strong>Solution</strong>:</p> <ol> <li>Verify <code class="language-plaintext highlighter-rouge">requireAuthForToolsCall: true</code> is set</li> <li>Check tool isn’t in <code class="language-plaintext highlighter-rouge">publicTools</code> list</li> <li>Verify token/session is still valid</li> <li>Check JWT scopes include ‘mcp:call’</li> </ol> <h2 id="reference"> <a href="#reference" class="anchor-heading" aria-labelledby="reference"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Reference </h2> <h3 id="specifications"> <a href="#specifications" class="anchor-heading" aria-labelledby="specifications"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Specifications </h3> <ul> <li><strong>Model Context Protocol Authorization</strong> (2025-06-18): <a href="https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization">modelcontextprotocol.io/specification/2025-06-18/basic/authorization</a></li> </ul> <h3 id="configuration-files"> <a href="#configuration-files" class="anchor-heading" aria-labelledby="configuration-files"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Configuration Files </h3> <ul> <li><strong>Type definitions</strong>: <a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/types.ts">src/trpc/routers/mcp/types.ts</a></li> <li><strong>Server config</strong>: <a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L111-L128">src/rpc-ai-server.ts#L111-L128</a></li> <li><strong>Protocol handler</strong>: <a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/protocol-handler.ts">src/trpc/routers/mcp/protocol-handler.ts</a></li> </ul> <h3 id="test-helpers"> <a href="#test-helpers" class="anchor-heading" aria-labelledby="test-helpers"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Test Helpers </h3> <ul> <li><strong>OAuth config</strong>: <code class="language-plaintext highlighter-rouge">createOAuthMCPConfig()</code> in <a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/security/test-helpers.ts#L187-L199">src/security/test-helpers.ts#L187-L199</a></li> <li><strong>JWT config</strong>: <code class="language-plaintext highlighter-rouge">createJWTMCPConfig()</code> in <a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/security/test-helpers.ts#L163-L182">src/security/test-helpers.ts#L163-L182</a></li> </ul> <h3 id="examples"> <a href="#examples" class="anchor-heading" aria-labelledby="examples"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Examples </h3> <ul> <li><strong>Recommended OAuth walkthrough</strong>: Use the <a href="https://github.com/AWolf81/simple-rpc-ai-backend/tree/master/examples/02-mcp-server">examples/02-mcp-server</a> project (<code class="language-plaintext highlighter-rouge">pnpm install &amp;&amp; pnpm start</code> inside that folder) to exercise the OAuth configuration described above.</li> <li><strong>Basic server</strong>: <a href="https://github.com/AWolf81/simple-rpc-ai-backend/tree/master/examples/01-basic-server"><code class="language-plaintext highlighter-rouge">examples/01-basic-server/server.js</code></a></li> <li><strong>MCP server</strong>: <a href="https://github.com/AWolf81/simple-rpc-ai-backend/tree/master/examples/02-mcp-server"><code class="language-plaintext highlighter-rouge">examples/02-mcp-server/server.js</code></a></li> </ul> </main> <hr> <footer> <p><a href="#top" id="back-to-top"></a></p> <p class="text-small text-grey-dk-100 mb-0">© 2025 Simple RPC AI Backend.</p> <div class="d-flex mt-2"> <p class="text-small text-grey-dk-000 mb-0"> <a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/docs/common-configurations/mcp-oauth-authentication.md" id="edit-this-page">Edit this page on GitHub</a> </p> </div> </footer> </div> </div> <div class="search-overlay"></div> </div> <script type="module"> import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs'; var config = {} ; mermaid.initialize(config); mermaid.run({ querySelector: '.language-mermaid', }); </script> </body> </html>

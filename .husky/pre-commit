@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+git-branch-is -r "^((?!master).)*$"

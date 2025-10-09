@@ -1,0 +1,226 @@
+name: Test Simple RPC AI Backend
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    name: Unit Tests on Node.js ${{ matrix.node-version }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    environment: test
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20, 22]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run tests with coverage
+        run: pnpm test:coverage -- --run
+        env:
+          CI: true
+
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == 20 && matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: coverage/
+          fail_ci_if_error: false
+          verbose: true
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    environment: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run integration tests
+        run: pnpm test -- --run
+        env:
+          CI: true
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.6.1
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+    - name: Install dependencies
+      run: pnpm install
+    - name: Run security audit
+      run: pnpm audit --audit-level=moderate
+    - name: Check for vulnerabilities
+      run: pnpm audit --audit-level=high --prod
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.6.1
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+    - name: Install dependencies
+      run: pnpm install
+    - name: Build package
+      run: pnpm run build
+    - name: Check package can be packed
+      run: pnpm pack
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-output
+        path: dist/
+        retention-days: 7
+
+  examples-test:
+    name: Test Examples
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.6.1
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+    - name: Install dependencies
+      run: pnpm install
+    - name: Test basic server example
+      run: |
+        node examples/servers/basic-server.js &
+        SERVER_PID=$!
+        sleep 2
+        kill $SERVER_PID || echo "Server already stopped"
+    - name: Test AI server example
+      run: |
+        node -c examples/servers/ai-server-example.js
+
+  release-check:
+    name: Release Readiness Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.6.1
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+    - name: Install dependencies
+      run: pnpm install
+    - name: Check package.json validity
+      run: pnpm run lint:package || echo "Package.json validation not available"
+    - name: Verify README exists and is valid
+      run: |
+        if [ ! -f "README.md" ]; then
+          echo "❌ README.md not found"
+          exit 1
+        fi
+        echo "✅ README.md found"
+    - name: Check for required files
+      run: |
+        required_files=("package.json" "tsconfig.json" "src/index.ts" "CONTRIBUTING.md")
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "❌ Required file missing: $file"
+            exit 1
+          fi
+          echo "✅ Found: $file"
+        done
+    - name: Test package installation
+      run: |
+        pnpm pack
+        PACKAGE_FILE=$(ls *.tgz)
+        mkdir -p /tmp/test-install
+        cd /tmp/test-install
+        echo '{"name":"test-install","version":"1.0.0"}' > package.json
+        pnpm install $GITHUB_WORKSPACE/$PACKAGE_FILE
+
+  notify-results:
+    name: Notify Test Results
+    runs-on: ubuntu-latest
+    needs: [test, security-audit, build, integration-tests, examples-test]
+    if: always()
+    steps:
+    - name: Check test results
+      run: |
+        echo "Test Results Summary:"
+        echo "- Unit Tests: ${{ needs.test.result }}"
+        echo "- Security Audit: ${{ needs.security-audit.result }}"
+        echo "- Build: ${{ needs.build.result }}"
+        echo "- Integration Tests: ${{ needs.integration-tests.result }}"
+        echo "- Examples Test: ${{ needs.examples-test.result }}"
+        if [[ "${{ needs.test.result }}" == "failure" || "${{ needs.security-audit.result }}" == "failure" || "${{ needs.build.result }}" == "failure" ]]; then
+          echo "❌ Critical tests failed"
+          exit 1
+        else
+          echo "✅ All critical tests passed"
+        fi
