@@ -105,3 +105,6 @@ auth-tokens*
 .oauth-tokens.json
 .oauth-tokens.encrypted
 .oauth-tokens-debug.json
+
+# Local Netlify folder
+.netlify
