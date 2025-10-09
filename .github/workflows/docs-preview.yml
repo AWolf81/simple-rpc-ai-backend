@@ -21,9 +21,6 @@ jobs:
   build-and-upload:
     name: Build Jekyll preview
     runs-on: ubuntu-latest
-    env:
-      BUNDLE_GEMFILE: docs/Gemfile
-      BUNDLE_PATH: vendor/bundle
     defaults:
       run:
         working-directory: docs
