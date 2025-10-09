@@ -19,8 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-upload:
-    name: Build Jekyll preview
+  build-and-deploy:
+    name: Build and deploy Jekyll preview
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -41,52 +41,54 @@ jobs:
         env:
           JEKYLL_ENV: production
 
-      - name: Upload preview artifact
-        uses: actions/upload-artifact@v4
-        id: artifact-upload
-        with:
-          name: docs-preview-pr-${{ github.event.pull_request.number || 'main' }}
-          path: docs/_site
-          if-no-files-found: error
-          retention-days: 14
+      - name: Install Netlify CLI
+        run: npm install netlify-cli@17.10.1 -g
+        working-directory: .
 
-      - name: Generate preview URLs
-        id: urls
+      - name: Deploy to Netlify
+        id: netlify_deploy
         run: |
-          echo "artifact_url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
-          echo "pr_number=${{ github.event.pull_request.number || 'main' }}" >> $GITHUB_OUTPUT
+          prod_flag=""
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            prod_flag="--prod"
+          fi
+
+          netlify deploy \
+            --dir=_site \
+            --site=${{ secrets.NETLIFY_SITE_ID }} \
+            --auth=${{ secrets.NETLIFY_API_TOKEN }} \
+            $prod_flag \
+            --json > deploy-output.json
+
+          # Extract deploy URL
+          DEPLOY_URL=$(cat deploy-output.json | jq -r '.deploy_url // .url')
+          echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $DEPLOY_URL"
 
       - name: Add job summary
         run: |
-          cat >> $GITHUB_STEP_SUMMARY <<'EOF'
-          # 📖 Docs Preview Ready!
+          DEPLOY_URL="${{ steps.netlify_deploy.outputs.deploy_url }}"
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # 📖 Docs Preview Deployed!
 
-          Your documentation preview has been built successfully.
+          Your documentation preview has been deployed to Netlify.
 
-          ## 🔗 Quick Access
+          ## 🔗 Preview URL
 
-          **[📦 Download Preview Artifact](${{ steps.urls.outputs.artifact_url }})**
+          **[🚀 View Live Preview]($DEPLOY_URL)**
 
-          Look for: `docs-preview-pr-${{ steps.urls.outputs.pr_number }}`
+          ## ℹ️ Deployment Info
 
-          ## 📋 How to View
-
-          ### Option 1: Download and Open
-          1. Click the artifact link above
-          2. Extract the ZIP file
-          3. Open `index.html` in your browser
-
-          ### Option 2: Local Server
-          ```bash
-          # After extracting the artifact
-          cd docs-preview-pr-${{ steps.urls.outputs.pr_number }}
-          python3 -m http.server 8000
-          # Visit http://localhost:8000
-          ```
+          | | |
+          |---|---|
+          | 🌐 **URL** | $DEPLOY_URL |
+          | 📦 **Site ID** | ${{ secrets.NETLIFY_SITE_ID }} |
+          | 🔄 **Status** | ✅ Deployed successfully |
+          | ⚡ **Type** | ${{ github.event_name == 'pull_request' && 'Preview' || 'Production' }} |
 
           ---
 
-          💡 **Tip:** For automatic PR previews at unique URLs (no downloads), consider [Netlify](https://www.netlify.com/) or [Cloudflare Pages](https://pages.cloudflare.com/)
+          💡 **Tip:** Preview deploys are automatic for each commit to a pull request!
           EOF
 
       - name: Comment on PR
@@ -95,37 +97,19 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const runId = context.runId;
-            const artifactUrl = `https://github.com/${{ github.repository }}/actions/runs/${runId}`;
+            const deployUrl = '${{ steps.netlify_deploy.outputs.deploy_url }}';
 
-            const comment = `### 📖 Docs Preview Ready!
+            const comment = `### 📖 Docs Preview Deployed!
 
             | | |
             |---|---|
-            | 🔗 **Preview** | **[Download Artifact](${artifactUrl})** → \`docs-preview-pr-${prNumber}\` |
-            | 📦 **Artifact** | \`docs-preview-pr-${prNumber}\` |
-            | ⏱️ **Retention** | 14 days |
-            | 🔄 **Status** | ✅ Built successfully |
-
-            <details>
-            <summary>📋 How to view the preview</summary>
-
-            ### Quick View
-            1. Click the "Download Artifact" link above
-            2. Download \`docs-preview-pr-${prNumber}\`
-            3. Extract and open \`index.html\`
-
-            ### Local Server
-            \`\`\`bash
-            cd docs-preview-pr-${prNumber}
-            python3 -m http.server 8000
-            # Visit http://localhost:8000
-            \`\`\`
-
-            </details>
+            | 🔗 **Preview** | **[🚀 View Live Preview](${deployUrl})** |
+            | 🌐 **URL** | ${deployUrl} |
+            | 🔄 **Status** | ✅ Deployed successfully |
+            | ⚡ **Type** | PR Preview Deploy |
 
             ---
-            <sub>💡 Want automatic PR previews with live URLs? Check out [Netlify](https://www.netlify.com/) or [Cloudflare Pages](https://pages.cloudflare.com/)</sub>`;
+            <sub>✨ Deployed with [Netlify](https://www.netlify.com/) • Preview updates automatically on every commit</sub>`;
 
             // Find and update/create comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -136,7 +120,7 @@ jobs:
 
             const botComment = comments.find(comment =>
               comment.user.type === 'Bot' &&
-              comment.body.includes('📖 Docs Preview Ready!')
+              comment.body.includes('📖 Docs Preview Deployed!')
             );
 
             if (botComment) {
