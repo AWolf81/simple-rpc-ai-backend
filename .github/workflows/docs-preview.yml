@@ -43,13 +43,53 @@ jobs:
 
       - name: Upload preview artifact
         uses: actions/upload-artifact@v4
+        id: artifact-upload
         with:
           name: docs-preview-pr-${{ github.event.pull_request.number || 'main' }}
           path: docs/_site
           if-no-files-found: error
           retention-days: 14
 
-      - name: Comment PR with download instructions
+      - name: Generate preview URLs
+        id: urls
+        run: |
+          echo "artifact_url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
+          echo "pr_number=${{ github.event.pull_request.number || 'main' }}" >> $GITHUB_OUTPUT
+
+      - name: Add job summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<'EOF'
+          # 📖 Docs Preview Ready!
+
+          Your documentation preview has been built successfully.
+
+          ## 🔗 Quick Access
+
+          **[📦 Download Preview Artifact](${{ steps.urls.outputs.artifact_url }})**
+
+          Look for: `docs-preview-pr-${{ steps.urls.outputs.pr_number }}`
+
+          ## 📋 How to View
+
+          ### Option 1: Download and Open
+          1. Click the artifact link above
+          2. Extract the ZIP file
+          3. Open `index.html` in your browser
+
+          ### Option 2: Local Server
+          ```bash
+          # After extracting the artifact
+          cd docs-preview-pr-${{ steps.urls.outputs.pr_number }}
+          python3 -m http.server 8000
+          # Visit http://localhost:8000
+          ```
+
+          ---
+
+          💡 **Tip:** For automatic PR previews at unique URLs (no downloads), consider [Netlify](https://www.netlify.com/) or [Cloudflare Pages](https://pages.cloudflare.com/)
+          EOF
+
+      - name: Comment on PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
@@ -58,30 +98,36 @@ jobs:
             const runId = context.runId;
             const artifactUrl = `https://github.com/${{ github.repository }}/actions/runs/${runId}`;
 
-            const comment = `## 📖 Docs Preview Built!
+            const comment = `### 📖 Docs Preview Ready!
 
-            Your documentation has been built successfully. To view the preview:
-
-            1. 🔗 **[Download the preview artifact](${artifactUrl})** (look for "docs-preview-pr-${prNumber}")
-            2. Extract the ZIP file
-            3. Open \`index.html\` in your browser, or serve with:
-               \`\`\`bash
-               cd docs-preview-pr-${prNumber}
-               python3 -m http.server 8000
-               # Then visit http://localhost:8000
-               \`\`\`
-
-            **Alternative:** For easier PR previews without affecting production, consider:
-            - Setting up [Netlify](https://www.netlify.com/) or [Cloudflare Pages](https://pages.cloudflare.com/) (automatic PR previews)
-            - Using a separate GitHub Pages repository for previews
+            | | |
+            |---|---|
+            | 🔗 **Preview** | **[Download Artifact](${artifactUrl})** → \`docs-preview-pr-${prNumber}\` |
+            | 📦 **Artifact** | \`docs-preview-pr-${prNumber}\` |
+            | ⏱️ **Retention** | 14 days |
+            | 🔄 **Status** | ✅ Built successfully |
 
             <details>
-            <summary>💡 Why not auto-deploy?</summary>
+            <summary>📋 How to view the preview</summary>
 
-            GitHub Pages only supports one deployment target per repository. Deploying PR previews would overwrite the production docs. For automatic PR previews with unique URLs, use Netlify or Cloudflare Pages.
-            </details>`;
+            ### Quick View
+            1. Click the "Download Artifact" link above
+            2. Download \`docs-preview-pr-${prNumber}\`
+            3. Extract and open \`index.html\`
 
-            // Find existing preview comment
+            ### Local Server
+            \`\`\`bash
+            cd docs-preview-pr-${prNumber}
+            python3 -m http.server 8000
+            # Visit http://localhost:8000
+            \`\`\`
+
+            </details>
+
+            ---
+            <sub>💡 Want automatic PR previews with live URLs? Check out [Netlify](https://www.netlify.com/) or [Cloudflare Pages](https://pages.cloudflare.com/)</sub>`;
+
+            // Find and update/create comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -90,11 +136,10 @@ jobs:
 
             const botComment = comments.find(comment =>
               comment.user.type === 'Bot' &&
-              comment.body.includes('📖 Docs Preview Built!')
+              comment.body.includes('📖 Docs Preview Ready!')
             );
 
             if (botComment) {
-              // Update existing comment
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -102,7 +147,6 @@ jobs:
                 body: comment
               });
             } else {
-              // Create new comment
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
