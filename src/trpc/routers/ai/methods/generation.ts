@@ -44,12 +44,33 @@ export function createGenerationProcedures(
 
   return {
     /**
-     * Execute AI request with system prompt protection
-     * REQUIRES AUTHENTICATION - All users must have valid JWT token
-     * Payment method (subscription/one-time/BYOK) determined server-side
+     * Generate structured text completions across supported AI providers.
+     * @description Executes guarded text generation with system prompt protection, token metering, and BYOK handling for authenticated and public callers.
+     * @example
+     * ```ts
+     * const { data } = await client.ai.generateText.mutate({
+     *   content: 'Compose a friendly onboarding email for new engineers.',
+     *   systemPrompt: 'You are a helpful onboarding assistant.',
+     * });
+     * console.log(data.success, data.data?.usage?.totalTokens);
+     * ```
      */
     generateText: publicProcedure
       .input(generateTextSchema)
+      .output(z.object({
+        success: z.boolean(),
+        data: z.any(),
+        tokenUsage: z.object({
+          tokensUsed: z.number(),
+          tokensCharged: z.number(),
+          platformFee: z.number().nullable(),
+          remainingBalance: z.number().nullable(),
+        }).optional(),
+        usageInfo: z.object({
+          tokensUsed: z.number(),
+          estimatedCostUsd: z.number()
+        }).optional()
+      }))
       .mutation(async ({ input, ctx }) => {
         const timing = new TimingLogger('AI');
 
@@ -102,7 +123,7 @@ export function createGenerationProcedures(
                 );
 
                 return {
-                  success: true,
+                  success: true as const,
                   data: result,
                   tokenUsage: {
                     tokensUsed: result.usage.totalTokens,
@@ -114,7 +135,7 @@ export function createGenerationProcedures(
               }
 
               return {
-                success: true,
+                success: true as const,
                 data: result,
               };
             } catch (error) {
@@ -160,7 +181,7 @@ export function createGenerationProcedures(
             }
 
             return {
-              success: true,
+              success: true as const,
               data: result,
               usageInfo: result.usage ? {
                 tokensUsed: result.usage.totalTokens,
@@ -202,7 +223,7 @@ export function createGenerationProcedures(
             timing.end();
 
             return {
-              success: true,
+              success: true as const,
               data: result,
             };
           } catch (error) {

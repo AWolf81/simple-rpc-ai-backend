@@ -612,7 +612,7 @@ If you overload the word "roots" to mean both "client-exposed folders" and "serv
 
 **📚 References**:
 - [Model Context Protocol - Roots](https://modelcontextprotocol.io/docs/concepts/roots)
-- [Complete Guide: Server Workspaces vs MCP Roots](./docs/SERVER_WORKSPACES_VS_MCP_ROOTS.md)
+- [Complete Guide: Server Workspaces vs MCP Roots](./docs/common-configurations/server-workspaces-vs-mcp-roots.md)
 - [Quick Reference: Workspace Concepts](./docs/WORKSPACE_QUICK_REFERENCE.md)
 
 #### 🏷️ Configuration Example

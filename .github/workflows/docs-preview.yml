@@ -1,0 +1,141 @@
+name: Docs Preview
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '!docs/_site/**'
+      - '!docs/.jekyll-cache/**'
+      - '!docs/vendor/**'
+      - '!docs/.bundle/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: docs-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy Jekyll preview
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: docs
+
+      - name: Build site
+        run: bundle exec jekyll build
+        env:
+          JEKYLL_ENV: production
+
+      - name: Install Netlify CLI
+        run: npm install netlify-cli@17.10.1 -g
+        working-directory: .
+
+      - name: Deploy to Netlify
+        id: netlify_deploy
+        env:
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_API_TOKEN }}
+        run: |
+          prod_flag=""
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            prod_flag="--prod"
+          fi
+
+          netlify deploy \
+            --dir=_site \
+            $prod_flag \
+            --json > deploy-output.json
+
+          # Extract deploy URL
+          DEPLOY_URL=$(cat deploy-output.json | jq -r '.deploy_url // .url')
+          echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $DEPLOY_URL"
+
+      - name: Add job summary
+        run: |
+          DEPLOY_URL="${{ steps.netlify_deploy.outputs.deploy_url }}"
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # 📖 Docs Preview Deployed!
+
+          Your documentation preview has been deployed to Netlify.
+
+          ## 🔗 Preview URL
+
+          **[🚀 View Live Preview]($DEPLOY_URL)**
+
+          ## ℹ️ Deployment Info
+
+          | | |
+          |---|---|
+          | 🌐 **URL** | $DEPLOY_URL |
+          | 📦 **Site ID** | ${{ secrets.NETLIFY_SITE_ID }} |
+          | 🔄 **Status** | ✅ Deployed successfully |
+          | ⚡ **Type** | ${{ github.event_name == 'pull_request' && 'Preview' || 'Production' }} |
+
+          ---
+
+          💡 **Tip:** Preview deploys are automatic for each commit to a pull request!
+          EOF
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const deployUrl = '${{ steps.netlify_deploy.outputs.deploy_url }}';
+
+            const comment = `### 📖 Docs Preview Deployed!
+
+            | | |
+            |---|---|
+            | 🔗 **Preview** | **[🚀 View Live Preview](${deployUrl})** |
+            | 🌐 **URL** | ${deployUrl} |
+            | 🔄 **Status** | ✅ Deployed successfully |
+            | ⚡ **Type** | PR Preview Deploy |
+
+            ---
+            <sub>✨ Deployed with [Netlify](https://www.netlify.com/) • Preview updates automatically on every commit</sub>`;
+
+            // Find and update/create comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('📖 Docs Preview Deployed!')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: comment
+              });
+            }

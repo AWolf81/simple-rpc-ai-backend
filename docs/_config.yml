@@ -1,0 +1,34 @@
+theme: just-the-docs
+title: Simple RPC AI Backend Docs
+description: Developer documentation for the Simple RPC AI Backend server.
+color_scheme: light
+sass:
+  quiet_deps: true
+aux_links:
+  Repository: https://github.com/AWolf81/simple-rpc-ai-backend
+gh_edit_link: true
+gh_edit_link_text: "Edit this page on GitHub"
+gh_edit_repository: https://github.com/AWolf81/simple-rpc-ai-backend
+gh_edit_branch: master
+gh_edit_source: docs
+gh_edit_view_mode: blob
+nav_footer: true
+back_to_top: true
+heading_anchors: true
+nav_external_links:
+  - title: GitHub Repository
+    url: https://github.com/AWolf81/simple-rpc-ai-backend
+    opens_in_new_tab: true
+footer_content: "© 2025 Simple RPC AI Backend."
+search_enabled: true
+defaults:
+  -
+    scope:
+      path: ""
+    values:
+      layout: "default"
+      has_toc: true
+
+mermaid:
+  version: "10.9.1"
+

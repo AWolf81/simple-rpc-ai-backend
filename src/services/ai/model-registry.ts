@@ -81,7 +81,7 @@ ${this.config.useRegistry ? `
    ${env === 'development' ? '🔒 For production, set: MODEL_REGISTRY_MODE=production' : ''}
 ` : `
    🔒 Using cached/validated models for safety
-   🔄 Run: pnpm models:check to update
+   📦 Update cached data by editing src/data/* or bumping @anolilab/ai-model-registry
 `}
     `.trim());
   }

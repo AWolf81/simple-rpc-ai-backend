@@ -1,3 +1,10 @@
+---
+title: CORS
+parent: Common Configurations
+grand_parent: Documentation
+nav_order: 4
+---
+
 # CORS Configuration Guide
 
 Complete guide for configuring Cross-Origin Resource Sharing (CORS) in the Simple RPC AI Backend.
@@ -54,7 +61,7 @@ cors: {
 }
 ```
 
-**Implementation**: [src/rpc-ai-server.ts:461-465](../src/rpc-ai-server.ts#L461-L465)
+**Implementation**: [src/rpc-ai-server.ts:461-465]({ { "/../src/rpc-ai-server.ts#L461-L465/index.md" | relative_url } })
 
 ### CORS Middleware Setup
 
@@ -79,7 +86,7 @@ app.use(cors({
 }));
 ```
 
-**Implementation**: [src/rpc-ai-server.ts:692-707](../src/rpc-ai-server.ts#L692-L707)
+**Implementation**: [src/rpc-ai-server.ts:692-707]({ { "/../src/rpc-ai-server.ts#L692-L707/index.md" | relative_url } })
 
 ## Understanding `credentials: true`
 
@@ -189,7 +196,7 @@ const server = createRpcAiServer({
 - ⚠️ Must list all allowed origins explicitly
 - ⚠️ Cannot use wildcard `*`
 
-**Example**: [examples/02-mcp-server/server.js:370-379](../examples/02-mcp-server/server.js#L370-L379)
+**Example**: [examples/02-mcp-server/server.js:370-379]({ { "/../examples/02-mcp-server/server.js#L370-L379/index.md" | relative_url } })
 
 ### Scenario 3: Production (Single Origin, Secure)
 
@@ -248,7 +255,7 @@ const server = createRpcAiServer({
 CORS_ORIGIN=https://app.example.com,https://client1.example.com,https://client2.example.com
 ```
 
-**Automatic Parsing**: [src/rpc-ai-server.ts:360-370](../src/rpc-ai-server.ts#L360-L370)
+**Automatic Parsing**: [src/rpc-ai-server.ts:360-370]({ { "/../src/rpc-ai-server.ts#L360-L370/index.md" | relative_url } })
 
 The server automatically splits comma-separated origins into an array.
 
@@ -547,7 +554,7 @@ Look for CORS-related log entries.
 
 The server has special CORS handling for OAuth discovery endpoints to ensure compatibility with MCP clients:
 
-**Implementation**: [src/rpc-ai-server.ts:910-915](../src/rpc-ai-server.ts#L910-L915)
+**Implementation**: [src/rpc-ai-server.ts:910-915]({ { "/../src/rpc-ai-server.ts#L910-L915/index.md" | relative_url } })
 
 ```typescript
 // OAuth discovery endpoints always allow all origins
@@ -564,19 +571,19 @@ These endpoints use `Access-Control-Allow-Origin: *` regardless of your CORS con
 ## Reference
 
 ### Configuration Files
-- **Server config interface**: [src/rpc-ai-server.ts:130-134](../src/rpc-ai-server.ts#L130-L134)
-- **Default CORS config**: [src/rpc-ai-server.ts:461-465](../src/rpc-ai-server.ts#L461-L465)
-- **CORS middleware setup**: [src/rpc-ai-server.ts:692-707](../src/rpc-ai-server.ts#L692-L707)
-- **Origin parsing function**: [src/rpc-ai-server.ts:360-370](../src/rpc-ai-server.ts#L360-L370)
+- **Server config interface**: [src/rpc-ai-server.ts#L130-L134](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L130-L134)
+- **Default CORS config**: [src/rpc-ai-server.ts#L461-L465](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L461-L465)
+- **CORS middleware setup**: [src/rpc-ai-server.ts#L692-L707](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L692-L707)
+- **Origin parsing function**: [src/rpc-ai-server.ts#L360-L370](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/rpc-ai-server.ts#L360-L370)
 
 ### Example Configurations
-- **MCP server example**: [examples/02-mcp-server/server.js:370-379](../examples/02-mcp-server/server.js#L370-L379)
-- **Basic server example**: [examples/01-basic-server/server.js:68](../examples/01-basic-server/server.js#L68)
+- **MCP server example**: [examples/02-mcp-server/server.js:370-379]({ { "/../examples/02-mcp-server/server.js#L370-L379/index.md" | relative_url } })
+- **Basic server example**: [examples/01-basic-server/server.js:68]({ { "/../examples/01-basic-server/server.js#L68/index.md" | relative_url } })
 
 ### Related Documentation
-- [OAuth Setup](./OAUTH_SETUP.md) - OAuth authentication configuration
-- [MCP OAuth Authentication](./MCP_OAUTH_AUTHENTICATION.md) - MCP-specific auth
-- [Security Best Practices](../specs/features/mcp-oauth-authentication.md) - Security architecture
+- [OAuth Setup]({{ "/OAUTH_SETUP.md" | relative_url }}) - OAuth authentication configuration
+- [MCP OAuth Authentication]({{ site.baseurl }}{% link common-configurations/mcp-oauth-authentication.md %}) - MCP-specific auth
+- [Security Best Practices](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/specs/features/mcp-oauth-authentication.md) - Security architecture
 
 ## Quick Reference
 
