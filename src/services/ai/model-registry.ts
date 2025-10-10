@@ -380,10 +380,10 @@ ${this.config.useRegistry ? `
         source: 'fallback' as const
       }],
       'google': [{
-        id: 'gemini-1.5-flash',
-        name: 'Gemini 1.5 Flash',
+        id: 'gemini-2.0-flash',
+        name: 'Gemini 2.0 Flash',
         provider: 'google',
-        contextWindow: 1000000,
+        contextWindow: 1048576,
         capabilities: ['text', 'vision', 'reasoning'],
         source: 'fallback' as const
       }],
