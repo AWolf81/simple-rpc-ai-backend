@@ -190,9 +190,8 @@ ${this.config.useRegistry ? `
         if (provider === 'openrouter') {
           // Look for Claude 3.7 Sonnet models first
           const preferredModels = [
-            'anthropic/claude-3.7-sonnet',
+            'anthropic/claude-3-7-sonnet',
             'anthropic/claude-3-7-sonnet-20250115',
-            'claude-3.7-sonnet',
             'claude-3-7-sonnet'
           ];
 
@@ -259,8 +258,8 @@ ${this.config.useRegistry ? `
     // Note: Anthropic no longer uses fallbacks - uses registry conversion instead
     const fallbacks: Record<string, string> = {
       'openai': 'gpt-4o',
-      'google': 'gemini-1.5-flash',
-      'openrouter': 'anthropic/claude-3.7-sonnet',
+      'google': 'gemini-2.0-flash',
+      'openrouter': 'anthropic/claude-3-7-sonnet',
       'huggingface': 'qwen-qwen-2-5-14b-instruct'  // Best coding model available in registry
     };
 
