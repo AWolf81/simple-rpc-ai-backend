@@ -4,39 +4,39 @@
   "description": "Curated Hugging Face models with priority ordering for coding agents and latest models",
   "provider": "huggingface",
   "models": {
-    "google/flan-t5-base": {
-      "productionId": "google/flan-t5-base",
-      "releaseDate": "2022-10-20",
+    "meta-llama/Meta-Llama-3-8B-Instruct": {
+      "productionId": "meta-llama/Meta-Llama-3-8B-Instruct",
+      "releaseDate": "2024-04-18",
       "status": "stable",
       "priority": 1,
-      "capabilities": ["chat", "text-generation"],
+      "capabilities": ["chat", "instruct", "code"],
       "pricingOverride": null,
       "verified": "2025-01-15",
-      "notes": "Free tier model - reliably available on HF serverless inference",
+      "notes": "Best free tier model - Llama 3 8B available on HF Inference",
       "source": "extension",
       "freeTier": true
     },
-    "microsoft/DialoGPT-medium": {
-      "productionId": "microsoft/DialoGPT-medium",
-      "releaseDate": "2020-05-08",
+    "google-t5/t5-base": {
+      "productionId": "google-t5/t5-base",
+      "releaseDate": "2019-10-23",
       "status": "stable",
       "priority": 2,
-      "capabilities": ["chat", "conversation"],
+      "capabilities": ["text-generation", "translation"],
       "pricingOverride": null,
       "verified": "2025-01-15",
-      "notes": "Free tier conversational model",
+      "notes": "T5 base model - reliable free tier",
       "source": "extension",
       "freeTier": true
     },
-    "distilgpt2": {
-      "productionId": "distilgpt2",
-      "releaseDate": "2019-10-01",
+    "google-t5/t5-small": {
+      "productionId": "google-t5/t5-small",
+      "releaseDate": "2019-10-23",
       "status": "stable",
       "priority": 3,
-      "capabilities": ["text-generation", "chat"],
+      "capabilities": ["text-generation", "translation"],
       "pricingOverride": null,
       "verified": "2025-01-15",
-      "notes": "Free tier lightweight model",
+      "notes": "T5 small - fast and free",
       "source": "extension",
       "freeTier": true
     },
