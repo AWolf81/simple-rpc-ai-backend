@@ -260,7 +260,7 @@ ${this.config.useRegistry ? `
       'openai': 'gpt-4o',
       'google': 'gemini-2.0-flash',
       'openrouter': 'anthropic/claude-3.7-sonnet',  // Registry uses dots, not hyphens
-      'huggingface': 'qwen-qwen-2-5-14b-instruct'  // Best coding model available in registry
+      'huggingface': 'google/flan-t5-base'  // Free tier model available on HF Inference API
     };
 
     // Anthropic should not reach this point - it uses registry-based conversion
