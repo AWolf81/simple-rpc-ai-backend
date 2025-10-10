@@ -85,7 +85,6 @@
     "build:prod": "npm run build",
     "postinstall": "test -d .git && node scripts/safe-build.js || echo 'Skipping build (installed package)'",
     "prepare": "test -d .git && (node scripts/safe-build.js && husky) || echo 'Skipping prepare (installed package)'",
-    "release:next": "semantic-release --branches next",
     "release": "semantic-release",
     "build:trpc-methods": "node tools/generate-trpc-methods.js",
     "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data dist/tools dist/tools/bin && cp -r docker/* dist/docker/ 2>/dev/null || true && cp docker-compose.postgres.yml dist/ 2>/dev/null || true && cp .env.postgres.example dist/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true && cp -r src/views/* dist/views/ 2>/dev/null || true && cp -r src/data/* dist/data/ 2>/dev/null || true && cp tools/dev-panel.js dist/tools/dev-panel.js 2>/dev/null || true && cp tools/trpc-playground-fix.js dist/tools/trpc-playground-fix.js 2>/dev/null || true && cp tools/generate-trpc-methods.js dist/tools/generate-trpc-methods.js 2>/dev/null || true && cp tools/bin/generate-trpc-methods.js dist/tools/bin/generate-trpc-methods.js 2>/dev/null || true && chmod +x dist/tools/dev-panel.js dist/tools/generate-trpc-methods.js dist/tools/bin/generate-trpc-methods.js dist/tools/check-mcp-security.js 2>/dev/null || true",
