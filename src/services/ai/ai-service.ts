@@ -728,11 +728,7 @@ export class AIService {
     const targetProvider = provider || this.config.provider;
     if (!targetProvider) return 'unknown-model';
 
-    // For Hugging Face, provide a sensible default until model registry supports it
-    if (targetProvider === 'huggingface') {
-      return 'meta-llama/Llama-2-7b-chat-hf'; // Popular free chat model
-    }
-
+    // Use model registry for all providers including HuggingFace
     return await this.modelRegistry.getDefaultModel(targetProvider);
   }
 
