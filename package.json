@@ -1,6 +1,6 @@
 {
   "name": "simple-rpc-ai-backend",
-  "version": "0.1.7",
+  "version": "0.1.8-next.2",
   "description": "Simple RPC client and server for AI-powered VS Code extensions with secure system prompt management",
   "type": "module",
   "pnpm": {
@@ -85,7 +85,6 @@
     "build:prod": "npm run build",
     "postinstall": "test -d .git && node scripts/safe-build.js || echo 'Skipping build (installed package)'",
     "prepare": "test -d .git && (node scripts/safe-build.js && husky) || echo 'Skipping prepare (installed package)'",
-    "release:next": "semantic-release --branches next",
     "release": "semantic-release",
     "build:trpc-methods": "node tools/generate-trpc-methods.js",
     "copy-assets": "mkdir -p dist/docker dist/database/migrations dist/views dist/data dist/tools dist/tools/bin && cp -r docker/* dist/docker/ 2>/dev/null || true && cp docker-compose.postgres.yml dist/ 2>/dev/null || true && cp .env.postgres.example dist/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true && cp -r src/views/* dist/views/ 2>/dev/null || true && cp -r src/data/* dist/data/ 2>/dev/null || true && cp tools/dev-panel.js dist/tools/dev-panel.js 2>/dev/null || true && cp tools/trpc-playground-fix.js dist/tools/trpc-playground-fix.js 2>/dev/null || true && cp tools/generate-trpc-methods.js dist/tools/generate-trpc-methods.js 2>/dev/null || true && cp tools/bin/generate-trpc-methods.js dist/tools/bin/generate-trpc-methods.js 2>/dev/null || true && chmod +x dist/tools/dev-panel.js dist/tools/generate-trpc-methods.js dist/tools/bin/generate-trpc-methods.js dist/tools/check-mcp-security.js 2>/dev/null || true",
@@ -171,6 +170,7 @@
     "@modelcontextprotocol/sdk": "^1.17.4",
     "@node-oauth/express-oauth-server": "^4.1.4",
     "@node-oauth/oauth2-server": "^5.2.1",
+    "@openrouter/ai-sdk-provider": "^1.2.0",
     "@trpc/client": "^11.4.4",
     "@trpc/server": "^11.4.4",
     "@tsconfig/node22": "^22.0.2",
@@ -222,6 +222,7 @@
     "better-auth": "^1.3.27",
     "cheerio": "^1.1.2",
     "concurrently": "^8.2.2",
+    "conventional-changelog-conventionalcommits": "^9.1.0",
     "eslint": "^8.0.0",
     "gh-pages": "^6.1.1",
     "git-branch-is": "^4.0.0",
