@@ -372,7 +372,7 @@ export class AIService {
     if(config.serviceProviders) {
       logger.debug(`🔍 AIService received serviceProviders config:`, JSON.stringify(config.serviceProviders, null, 2));
       this.providers = normalizeServiceProviders(config.serviceProviders);
-      logger.debug(`🔍 Normalized providers:`, this.providers.map(p => `${p.name} (apiKey: ${p.apiKey ? p.apiKey.substring(0, 10) + '...' : 'EMPTY'})`));
+      logger.debug(`🔍 Normalized providers:`, this.providers.map(p => `${p.name} (hasKey: ${!!p.apiKey})`));
       if (this.providers.length === 0) {
         throw new Error('No valid AI service providers configured.');
       }
@@ -516,6 +516,9 @@ export class AIService {
       console.log('🚀 About to call generateText with:');
       console.log(`   Model type: ${typeof model}`);
       console.log(`   Model constructor: ${model.constructor?.name}`);
+      console.log(`   Model ID: ${(model as any)?.modelId || 'unknown'}`);
+      console.log(`   Model spec:`, (model as any)?.specificationVersion);
+      console.log(`   Model provider: ${(model as any)?.provider}`);
       console.log(`   Generate options keys: ${Object.keys(generateOptions)}`);
       console.log(`   Max tokens: ${generateOptions.maxTokens}`);
 
@@ -573,8 +576,8 @@ export class AIService {
         resolvedModel: resolvedModelName,
         message: error.message,
         statusCode,
-        apiKeyLength: apiKey ? apiKey.length : 0,
-        apiKeyPrefix: apiKey ? apiKey.substring(0, 8) + '...' : 'none'
+        responseBody: error.responseBody || error.body || 'N/A',
+        responseText: typeof error.text === 'string' ? error.text.substring(0, 500) : 'N/A'
       });
       
       // Generate user-friendly error message
@@ -598,7 +601,7 @@ export class AIService {
 
     // Debug logging to see what we receive
     logger.debug(`🔧 getModel() called with: modelOverride='${modelOverride}', provider='${provider}'`);
-    logger.debug(`🔧 apiKey parameter: ${apiKey ? `provided (${apiKey.length} chars)` : 'none'}`);
+    logger.debug(`🔧 apiKey parameter: ${apiKey ? 'provided' : 'none'}`);
     logger.debug(`🔧 Available providers: ${JSON.stringify(this.providers.map(p => ({ name: p.name, hasKey: !!p.apiKey })))}`);
 
     // Handle 'auto' and 'default' as special cases that should trigger default model selection
