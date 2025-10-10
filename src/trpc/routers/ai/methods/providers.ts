@@ -64,7 +64,7 @@ export function createProviderProcedures(
      */
     listAllowedModels: publicProcedure
       .input(z.object({
-        provider: z.enum(['anthropic', 'openai', 'google', 'openrouter']).optional()
+        provider: z.enum(['anthropic', 'openai', 'google', 'openrouter', 'huggingface']).optional()
       }).optional())
       .query(async ({ input }) => {
         const { provider } = input || {};
@@ -142,7 +142,7 @@ export function createProviderProcedures(
      */
     validateProvider: publicProcedure
       .input(z.object({
-        provider: z.enum(['anthropic', 'openai', 'google']),
+        provider: z.enum(['anthropic', 'openai', 'google', 'openrouter', 'huggingface']),
         apiKey: z.string().min(1),
       }))
       .mutation(async ({ input }) => {

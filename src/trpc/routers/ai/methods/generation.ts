@@ -25,7 +25,7 @@ export function createGenerationProcedures(
     systemPrompt: z.string()
       .min(mergedConfig.systemPrompt.minLength)
       .max(mergedConfig.systemPrompt.maxLength),
-    provider: z.enum(['anthropic', 'openai', 'google', 'openrouter']).optional(),
+    provider: z.enum(['anthropic', 'openai', 'google', 'openrouter', 'huggingface']).optional(),
     apiKey: z.string().optional(),
     metadata: z.object({
       name: z.string().optional(),
