@@ -80,6 +80,22 @@ export function createGenerationProcedures(
         const apiKey = input.apiKey || ctx.apiKey;
         let t1 = timing.checkpoint('Input parsed');
 
+        // Validate provider is allowed (if configured)
+        if (provider && (ctx as any).isProviderAllowed) {
+          const isAllowed = (ctx as any).isProviderAllowed(provider);
+          if (!isAllowed) {
+            const allowedProviders = (ctx as any).allowedProviders;
+            const allowedList = allowedProviders instanceof Set
+              ? Array.from(allowedProviders).join(', ')
+              : 'none (all providers blocked)';
+
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: `Provider '${provider}' is not allowed. Allowed providers: ${allowedList}`,
+            });
+          }
+        }
+
         // Determine user type and execution path
         if (userId && usageAnalyticsService) {
           // Authenticated user - determine if subscription or BYOK
