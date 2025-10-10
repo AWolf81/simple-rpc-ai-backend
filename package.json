@@ -1,6 +1,6 @@
 {
   "name": "simple-rpc-ai-backend",
-  "version": "0.1.8-next.1",
+  "version": "0.1.8-next.2",
   "description": "Simple RPC client and server for AI-powered VS Code extensions with secure system prompt management",
   "type": "module",
   "pnpm": {
