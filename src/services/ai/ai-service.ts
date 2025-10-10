@@ -9,6 +9,7 @@ import { generateText } from 'ai';
 import { createAnthropic, anthropic } from '@ai-sdk/anthropic';
 import { createOpenAI, openai } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { InferenceClient } from '@huggingface/inference';
 import crypto from 'crypto';
 import { LanguageModel } from 'ai';
@@ -644,9 +645,8 @@ export class AIService {
         anthropic: (name, key) => createAnthropic({ apiKey: key })(name),
         openai: (name, key) => createOpenAI({ apiKey: key })(name),
         google: (name, key) => createGoogleGenerativeAI({ apiKey: key })(name),
-        openrouter: (name, key) => createOpenAI({
-          apiKey: key,
-          baseURL: 'https://openrouter.ai/api/v1'
+        openrouter: (name, key) => createOpenRouter({
+          apiKey: key
         })(name),
         huggingface: (name, key) => createHuggingFaceModel(name, key)
       };
@@ -669,9 +669,8 @@ export class AIService {
         anthropic: (name) => createAnthropic({ apiKey: providerApiKey })(name),
         openai: (name) => createOpenAI({ apiKey: providerApiKey })(name),
         google: (name) => createGoogleGenerativeAI({ apiKey: providerApiKey })(name),
-        openrouter: (name) => createOpenAI({
-          apiKey: providerApiKey,
-          baseURL: 'https://openrouter.ai/api/v1'
+        openrouter: (name) => createOpenRouter({
+          apiKey: providerApiKey
         })(name),
         huggingface: (name) => createHuggingFaceModel(name, {
           apiKey: providerApiKey,
@@ -701,13 +700,12 @@ export class AIService {
       openai: (name) => openai(name),
       google: (name) => google(name),
       openrouter: (name) => {
-        const openrouterApiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+        const openrouterApiKey = process.env.OPENROUTER_API_KEY;
         if (!openrouterApiKey) {
-          throw new Error('OPENROUTER_API_KEY or OPENAI_API_KEY environment variable is required for OpenRouter provider');
+          throw new Error('OPENROUTER_API_KEY environment variable is required for OpenRouter provider');
         }
-        return createOpenAI({
-          apiKey: openrouterApiKey,
-          baseURL: 'https://openrouter.ai/api/v1'
+        return createOpenRouter({
+          apiKey: openrouterApiKey
         })(name);
       },
       huggingface: (name) => {
