@@ -39,18 +39,36 @@ import { initializeTiming } from './utils/timing.js';
 import { logger } from './utils/logger.js';
 
 // Built-in provider types
-export type BuiltInProvider = 'anthropic' | 'openai' | 'google';
+export type BuiltInProvider = 'anthropic' | 'openai' | 'google' | 'openrouter' | 'huggingface';
 
-// Custom provider interface
-export interface CustomProvider {
-  name: string;                          // e.g. 'deepseek', 'claude-custom'
-  baseUrl: string;                       // Custom API endpoint
-  apiKeyHeader?: string;                 // Default: 'Authorization'  
+// Provider configuration object (extended config for a provider)
+export interface ProviderConfig {
+  name: BuiltInProvider | string;        // Provider name
+  apiKey?: string;                       // Explicit API key (overrides env var)
+  defaultModel?: string;                 // Default model for this provider
+  systemPrompts?: Record<string, string>; // Provider-specific system prompts
+  modelRestrictions?: {                  // Provider-specific model restrictions
+    allowedModels?: string[];
+    allowedPatterns?: string[];
+    blockedModels?: string[];
+  };
+  // For custom providers (non-built-in)
+  type?: BuiltInProvider;                // Base provider type to use (e.g., 'openai' for OpenAI-compatible)
+  baseUrl?: string;                      // Custom API endpoint
+  apiKeyHeader?: string;                 // Default: 'Authorization'
   apiKeyPrefix?: string;                 // Default: 'Bearer '
-  modelMapping?: Record<string, string>; // Map generic -> provider-specific models
-  defaultModel?: string;                 // Default model to use
-  requestTransform?: (req: unknown) => unknown;  // Transform request format
-  responseTransform?: (res: unknown) => unknown; // Transform response format
+}
+
+// Legacy custom provider interface (deprecated, use ProviderConfig instead)
+export interface CustomProvider {
+  name: string;
+  baseUrl: string;
+  apiKeyHeader?: string;
+  apiKeyPrefix?: string;
+  modelMapping?: Record<string, string>;
+  defaultModel?: string;
+  requestTransform?: (req: unknown) => unknown;
+  responseTransform?: (res: unknown) => unknown;
 }
 
 // More practical approach: Use const assertions for type safety
@@ -60,9 +78,19 @@ export interface RpcAiServerConfig {
   
   // AI Configuration
   aiLimits?: AIRouterConfig;
-  serverProviders?: (BuiltInProvider | string)[];    // Built-in providers + custom names
-  byokProviders?: (BuiltInProvider | string)[];      // Built-in providers + custom names  
-  customProviders?: CustomProvider[];                // Register custom providers
+
+  // Provider Configuration (both 'providers' and 'serverProviders' are supported)
+  providers?: (BuiltInProvider | string | ProviderConfig)[];  // Hybrid: strings or objects
+  // - undefined: Allow all providers with env vars (auto-detect BYOK mode)
+  // - []: Block all providers (no AI allowed)
+  // - ['anthropic', 'openai']: Only these providers allowed (reads from env vars)
+  // - [{name: 'anthropic', apiKey: '...', defaultModel: '...'}]: Extended config
+
+  serverProviders?: (BuiltInProvider | string)[];    // Alternative to 'providers' (same behavior)
+  byokProviders?: (BuiltInProvider | string)[];      // Additional BYOK-only providers
+  customProviders?: CustomProvider[];                // Custom provider configurations
+
+  // Global settings (can be overridden per-provider in ProviderConfig)
   systemPrompts?: Record<string, string>;           // Custom system prompt definitions
   modelRestrictions?: Record<string, {               // Per-provider model restrictions
     allowedModels?: string[];                        // Exact model names allowed
@@ -435,6 +463,7 @@ export class RpcAiServer {
   }
 
   private providerApiKeys: Record<string, string | undefined> = {};
+  private allowedProviders: Set<string> | null = null; // null = allow all, Set = whitelist
 
   constructor(config: RpcAiServerConfig = {}) {
     // Apply test-safe configuration if in test environment
@@ -590,21 +619,54 @@ export class RpcAiServer {
       logger.debug(`🔍 MCP enabled – prompts: ${promptsSummary}, resources: ${resourcesSummary}`);
     }
 
-    if ((config as any).providers) {
-      const providersObj = (config as any).providers;
-      for (const providerName in providersObj) {
-        if (providersObj[providerName].apiKey) {
-          this.providerApiKeys[providerName] = providersObj[providerName].apiKey;
-        }
-      }
-    } else if (this.config.serverProviders) {
-      for (const provider of this.config.serverProviders) {
+    // Normalize provider configuration
+    // Priority: config.providers > config.serverProviders > undefined (allow all with env)
+    const providerConfig = this.config.providers || this.config.serverProviders;
+
+    if (providerConfig !== undefined) {
+      // Explicit provider list defined - create whitelist
+      this.allowedProviders = new Set<string>();
+
+      for (const provider of providerConfig) {
         if (typeof provider === 'string') {
+          // Simple string: 'anthropic' → read from ANTHROPIC_API_KEY
           const envKey = `${provider.toUpperCase()}_API_KEY`;
           const apiKey = process.env[envKey];
           this.providerApiKeys[provider] = apiKey;
+          this.allowedProviders.add(provider);
+        } else if (typeof provider === 'object' && provider.name) {
+          // Object config: { name: 'anthropic', apiKey: '...' }
+          const providerName = provider.name;
+          const explicitKey = (provider as ProviderConfig).apiKey;
+
+          if (explicitKey) {
+            this.providerApiKeys[providerName] = explicitKey;
+          } else {
+            // No explicit key, try env var
+            const envKey = `${providerName.toUpperCase()}_API_KEY`;
+            this.providerApiKeys[providerName] = process.env[envKey];
+          }
+          this.allowedProviders.add(providerName);
         }
       }
+
+      logger.debug(`🔒 Provider whitelist enabled: ${Array.from(this.allowedProviders).join(', ')}`);
+    } else {
+      // undefined: Allow all providers with env vars (BYOK mode)
+      // Auto-detect from environment variables
+      this.allowedProviders = null; // null = allow all
+
+      const knownProviders: BuiltInProvider[] = ['anthropic', 'openai', 'google', 'openrouter', 'huggingface'];
+      for (const provider of knownProviders) {
+        const envKey = `${provider.toUpperCase()}_API_KEY`;
+        const apiKey = process.env[envKey];
+        if (apiKey) {
+          this.providerApiKeys[provider] = apiKey;
+          logger.debug(`🔍 Auto-detected provider: ${provider} (from ${envKey})`);
+        }
+      }
+
+      logger.debug(`🔓 Provider mode: Allow all with valid API keys (BYOK)`);
     }
 
     // Create router with AI configuration and token tracking
@@ -666,7 +728,7 @@ export class RpcAiServer {
   private createContext(providerApiKeys: Record<string, string | undefined>) {
     return (opts: trpcExpress.CreateExpressContextOptions) => {
       const baseCtx = createTRPCContext(opts);
-      
+
       // Get provider from request, or use first configured provider as default
       // For JSON-RPC requests, provider is in req.body.params.provider
       // For tRPC requests, provider might be in different locations
@@ -674,23 +736,46 @@ export class RpcAiServer {
       const requestedProvider = jsonRpcParams?.provider || baseCtx.req.body?.params?.provider;
       const defaultProvider = this.config.serverProviders?.[0];
       const providerToUse = requestedProvider || defaultProvider;
-      
+
       // Get API key for the provider, or fall back to any available API key
       let apiKey = baseCtx.apiKey || providerApiKeys[providerToUse as string];
-      
+
       // If no specific provider API key found, try to use any available API key as fallback
       if (!apiKey && !requestedProvider) {
         // Use the first available API key if no specific provider was requested
         apiKey = Object.values(providerApiKeys).find(key => key) || null;
       }
-      
-      
+
+
       return {
         ...baseCtx,
         apiKey: apiKey || null,
         appRouter: this.router, // Add router to context for prompt access tools
+        // Expose provider validation for procedures
+        isProviderAllowed: (provider: string) => this.isProviderAllowed(provider),
+        allowedProviders: this.allowedProviders
       };
     };
+  }
+
+  /**
+   * Check if a provider is allowed based on configuration
+   * @param provider Provider name to check
+   * @returns true if allowed, false otherwise
+   */
+  private isProviderAllowed(provider: string): boolean {
+    // null = allow all providers (undefined config or BYOK mode)
+    if (this.allowedProviders === null) {
+      return true;
+    }
+
+    // Empty set = block all providers
+    if (this.allowedProviders.size === 0) {
+      return false;
+    }
+
+    // Check whitelist
+    return this.allowedProviders.has(provider);
   }
 
   private setupMiddleware() {
