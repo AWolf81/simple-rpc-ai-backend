@@ -48,10 +48,13 @@ curl -X POST http://localhost:8000/rpc \
     "method": "ai.generateText",
     "params": {
       "content": "What is 2+2?",
+      "systemPrompt": "default",
       "provider": "anthropic"
     },
     "id": 1
   }'
+# Note: systemPrompt is optional. Defaults to "default" if not provided.
+# You can use predefined IDs ("default", "creative") or custom prompt text.
 
 # Check health
 curl http://localhost:8000/health
@@ -64,6 +67,7 @@ import { RPCClient } from 'simple-rpc-ai-backend';
 const client = new RPCClient('http://localhost:8000');
 const result = await client.request('ai.generateText', {
   content: 'What is 2+2?',
+  systemPrompt: 'default', // Optional - can be ID or custom text
   provider: 'anthropic'
 });
 ```

@@ -16,7 +16,7 @@ const server = createRpcAiServer({
   port: 8002,
 
   // No AI providers configured for this example
-  serverProviders: [],
+  providers: [],
 
   // Enable MCP with minimal configuration
   mcp: {
