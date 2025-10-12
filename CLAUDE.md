@@ -539,6 +539,34 @@ app.post('/mcp', handleMCP);         // Model Context Protocol
 - **OAuth Authentication**: Anonymous discovery → JWT authentication for execution
 - **Input Validation**: All MCP tool calls validated against tRPC schemas
 
+## Development Documentation
+
+### specs/development/ - Work-in-Progress Documentation
+
+This folder contains detailed technical documentation during active development. Avoid sprinkling `.md` files throughout the repository.
+
+**Structure:**
+- **Work-in-progress files**: UPPERCASE filenames (e.g., `SSE_IMPLEMENTATION_PLAN.md`)
+- **Completed implementations**: Move to topic subfolder with `final_implementation.md` (lowercase)
+- **Purpose**: Capture detailed technical decisions, implementation plans, and debugging notes
+
+**Workflow:**
+1. Create `TOPIC_NAME.md` while actively working on a feature
+2. When complete, create `specs/development/topic-name/` folder
+3. Move related docs to subfolder and rename main doc to `final_implementation.md`
+4. Keep as reference for future similar work
+
+**Example:**
+```
+specs/development/
+├── SSE_IMPLEMENTATION_PLAN.md          # Active work
+├── SMITHERY_LIMITATION.md              # Active debugging
+└── remote-mcp/                         # Completed topic
+    ├── final_implementation.md         # Main doc (lowercase)
+    ├── debugging-notes.md
+    └── api-examples.md
+```
+
 ## Security & Development Guidelines
 
 **Security**: System prompt protection, AES-256-GCM encryption, no hardcoded secrets, input validation, rate limiting
