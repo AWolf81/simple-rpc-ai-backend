@@ -6,7 +6,7 @@
  */
 
 import crypto from 'crypto';
-import { SecurityLogger, SecurityEventType, SecuritySeverity } from './security-logger';
+import { SecurityLogger, SecurityEventType, SecuritySeverity } from './security-logger.js';
 import type { ZodTypeAny } from 'zod';
 import { zodSchemaToJson } from '../utils/zod-json-schema';
 // Type definitions for better type safety

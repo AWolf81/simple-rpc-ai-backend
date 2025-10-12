@@ -107,7 +107,12 @@ export class RemoteMCPManager extends EventEmitter {
     });
 
     // Connect if auto-connect is enabled
-    if (this.config.autoConnect && config.autoStart !== false) {
+    // For HTTP/HTTPS/SSE, autoStart=false just means "don't spawn a process" - still connect
+    // For stdio-based (npx, docker), autoStart=false means "don't connect yet"
+    const isHttpTransport = config.transport === 'http' || config.transport === 'https' || config.transport === 'sse';
+    const shouldConnect = this.config.autoConnect && (isHttpTransport || config.autoStart !== false);
+
+    if (shouldConnect) {
       try {
         await client.connect();
 
@@ -115,6 +120,8 @@ export class RemoteMCPManager extends EventEmitter {
         const tools = await client.listTools();
         this.updateServerStatus(config.name, { tools: tools.tools || [] });
       } catch (error) {
+        // Disconnect the client on failure
+        await client.disconnect().catch(() => {});
         this.updateServerStatus(config.name, {
           connected: false,
           lastError: error instanceof Error ? error.message : 'Failed to connect'

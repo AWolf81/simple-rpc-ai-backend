@@ -12,17 +12,25 @@
  * - OAuth2, token tracking, and production features
  */
 
-import { createRpcAiServer, PostgreSQLAdapter } from 'simple-rpc-ai-backend';
+// Load environment variables FIRST before any imports that need them
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Get the directory of this file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load .env from the same directory as this script
+dotenv.config({ path: join(__dirname, '.env') });
+
+import { createRpcAiServer, PostgreSQLAdapter } from 'simple-rpc-ai-backend';
 import path from 'path';
 
 // Import modular components
 import { getCustomRouters } from './methods/index.js';
 import { setupAllResources } from './resources/index.js';
 import { setupPrompts } from './prompts/index.js';
-
-// Load environment variables
-dotenv.config();
 
 // ============================================================================
 // Server Configuration and Startup
@@ -98,9 +106,8 @@ async function startServer() {
         }
       },
 
-      // AI Provider Configuration
-      serverProviders: ['anthropic', 'openai', 'google'],
-      byokProviders: ['anthropic', 'openai', 'google'],
+      // AI Provider Configuration (unified format)
+      providers: ['anthropic', 'openai', 'google'],
       systemPrompts: {
         default: 'You are a helpful AI assistant with access to mathematical calculations, utility functions, and secure file operations.'
       },
@@ -309,7 +316,7 @@ Format: ${format}`;
       // Server Workspace Configuration (for server-managed file access)
       // Note: This is separate from MCP client roots (which are client-managed)
       serverWorkspaces: {
-        enabled: true,
+        enabled: true,  // Persistent SSE connection now implemented
         additionalWorkspaces: {
           projectRoot: {
             path: path.resolve(import.meta.dirname, '../..'),  // Resolve relative to this file's directory
@@ -369,6 +376,22 @@ Format: ${format}`;
           level: process.env.LOG_LEVEL || 'info',
           format: 'pretty'
         }
+      },
+
+      // Remote MCP Servers - External MCP servers for additional tools
+      // Smithery provides hosted MCP servers via SSE (Server-Sent Events)
+      // Requires both api_key and profile parameters
+      remoteMcpServers: {
+        enabled: false,  // Disabled for testing - SSE connection issues
+        servers: [
+          {
+            name: 'duckduckgo-search',
+            transport: 'sse',  // Use SSE for stateful Smithery connections
+            url: `https://server.smithery.ai/@nickclyde/duckduckgo-mcp-server/mcp?api_key=${process.env.SMITHERY_API_KEY}&profile=${process.env.SMITHERY_PROFILE}`,
+            autoStart: false,  // SSE connections are established in connect()
+            timeout: 30000
+          }
+        ]
       }
     };
 

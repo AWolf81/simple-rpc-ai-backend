@@ -3,9 +3,9 @@
  * Provides easy-to-use abstractions for MCP server setup
  */
 
-import { MCPExtensionConfig, MCPPromptsConfig, MCPResourcesConfig } from './mcp-config';
-import { MCPPrompt, MCPPromptTemplate } from './default-prompts';
-import { MCPResource, MCPResourceHandler } from './default-resources';
+import { MCPExtensionConfig, MCPPromptsConfig, MCPResourcesConfig } from './mcp-config.js';
+import { MCPPrompt, MCPPromptTemplate } from './default-prompts.js';
+import { MCPResource, MCPResourceHandler } from './default-resources.js';
 
 // Global handler registry for reusable handlers
 export const GlobalHandlers = {
