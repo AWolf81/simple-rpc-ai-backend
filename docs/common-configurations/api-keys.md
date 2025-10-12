@@ -1,3 +1,10 @@
+---
+title: API Keys
+parent: Common Configurations
+grand_parent: Documentation
+nav_order: 3
+---
+
 # API Keys
 
 This document explains how API keys are managed and used in the Simple RPC AI Backend.
@@ -314,6 +321,6 @@ type ProviderConfig =
 
 ## See Also
 
-- [Configuration Guide](./configuration.md)
-- [Authentication](../authentication.md)
-- [BYOK Setup](../guides/byok-setup.md)
+- [Server Configuration]({% link common-configurations/configuration.md %}) - Complete configuration options
+- [Provider Configuration]({% link common-configurations/provider-configuration.md %}) - Provider setup and customization
+- [Authentication]({% link common-configurations/authentication.md %}) - OAuth and JWT setup

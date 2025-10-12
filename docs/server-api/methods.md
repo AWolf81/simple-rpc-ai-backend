@@ -23,7 +23,7 @@ nav_order: 5
 ## ai.generateText
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">ai.generateText</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/generation.ts#L58">src/trpc/routers/ai/methods/generation.ts:58</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">ai.generateText</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/generation.ts#L63">src/trpc/routers/ai/methods/generation.ts:63</a></span></div></div>
 <div class="method-card__summary">Generate structured text completions across supported AI providers.</div>
 <div class="method-card__description"><p>Executes guarded text generation with system prompt protection, token metering, and BYOK handling for authenticated and public callers.</p></div>
 <div class="method-card__columns">
@@ -58,7 +58,7 @@ nav_order: 5
       <span class="method-field__badges"><span class="method-badge method-badge--type">enum</span><span class="method-badge method-badge--optional">optional</span></span>
     </div>
     
-    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>anthropic</code><code>openai</code><code>google</code><code>openrouter</code></div></div>
+    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>anthropic</code><code>openai</code><code>google</code><code>openrouter</code><code>huggingface</code></div></div>
     
   </li><li class="method-field">
     <div class="method-field__row">
@@ -91,6 +91,51 @@ nav_order: 5
       <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
       <span class="method-field__name">type</span>
       <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">useWebSearch</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">boolean</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">webSearchPreference</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">enum</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>duckduckgo</code><code>mcp</code><code>ai-web-search</code><code>never</code></div></div>
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">maxWebSearches</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">number</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">allowedDomains</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">blockedDomains</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
     </div>
     
     
@@ -165,7 +210,8 @@ nav_order: 5
           &quot;anthropic&quot;,
           &quot;openai&quot;,
           &quot;google&quot;,
-          &quot;openrouter&quot;
+          &quot;openrouter&quot;,
+          &quot;huggingface&quot;
         ]
       }
     },
@@ -214,6 +260,82 @@ nav_order: 5
               &quot;description&quot;: null,
               &quot;_source&quot;: null,
               &quot;jsType&quot;: &quot;string&quot;
+            }
+          },
+          &quot;useWebSearch&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodBoolean&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;boolean&quot;
+            }
+          },
+          &quot;webSearchPreference&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodEnum&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;enum&quot;,
+              &quot;enum&quot;: [
+                &quot;duckduckgo&quot;,
+                &quot;mcp&quot;,
+                &quot;ai-web-search&quot;,
+                &quot;never&quot;
+              ]
+            }
+          },
+          &quot;maxWebSearches&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodNumber&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;number&quot;
+            }
+          },
+          &quot;allowedDomains&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodArray&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;array&quot;,
+              &quot;items&quot;: {
+                &quot;type&quot;: &quot;String&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null
+              }
+            }
+          },
+          &quot;blockedDomains&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodArray&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;array&quot;,
+              &quot;items&quot;: {
+                &quot;type&quot;: &quot;String&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null
+              }
             }
           }
         }
@@ -524,7 +646,7 @@ console.log(result);</code></pre></div>
 ## ai.getRegistryHealth
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.getRegistryHealth</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L107">src/trpc/routers/ai/methods/providers.ts:107</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.getRegistryHealth</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L102">src/trpc/routers/ai/methods/providers.ts:102</a></span></div></div>
 <div class="method-card__summary">Retrieve the AI model registry health status.</div>
 <div class="method-card__description"><p>Reports availability and summary metrics for the registry integration, falling back to error details when checks fail.</p></div>
 <div class="method-card__columns">
@@ -592,9 +714,10 @@ console.log(result);</code></pre></div>
 ## ai.listAllowedModels
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listAllowedModels</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L70">src/trpc/routers/ai/methods/providers.ts:70</a></span></div></div>
-<div class="method-card__summary">List allowed models for a provider respecting configured restrictions.</div>
-<div class="method-card__description"><p>Provides production-ready model identifiers for a single provider or a map of providers to models.</p></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listAllowedModels</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L65">src/trpc/routers/ai/methods/providers.ts:65</a></span></div></div>
+<div class="method-card__summary">List allowed models for a provider (respects model restrictions)</div>
+<div class="method-card__description"><p>List allowed models for a provider (respects model restrictions)
+Returns production-ready model IDs that can be used directly with AI SDKs</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
   <div class="method-section__header">
@@ -609,7 +732,7 @@ console.log(result);</code></pre></div>
       <span class="method-field__badges"><span class="method-badge method-badge--type">enum</span><span class="method-badge method-badge--optional">optional</span></span>
     </div>
     
-    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>anthropic</code><code>openai</code><code>google</code><code>openrouter</code></div></div>
+    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>anthropic</code><code>openai</code><code>google</code><code>openrouter</code><code>huggingface</code></div></div>
     
   </li></ul>
     <div class="method-section__schema" id="schema-ai-listallowedmodels-input" hidden><pre><code class="language-json">{
@@ -637,7 +760,8 @@ console.log(result);</code></pre></div>
             &quot;anthropic&quot;,
             &quot;openai&quot;,
             &quot;google&quot;,
-            &quot;openrouter&quot;
+            &quot;openrouter&quot;,
+            &quot;huggingface&quot;
           ]
         }
       }
@@ -697,7 +821,7 @@ console.log(result);</code></pre></div>
 ## ai.listProviders
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listProviders</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L22">src/trpc/routers/ai/methods/providers.ts:22</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listProviders</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L17">src/trpc/routers/ai/methods/providers.ts:17</a></span></div></div>
 <div class="method-card__summary">List available AI service providers.</div>
 <div class="method-card__description"><p>Returns the providers currently registered in the model registry along with metadata about the registry source.</p></div>
 <div class="method-card__columns">
@@ -765,7 +889,7 @@ console.log(result);</code></pre></div>
 ## ai.listProvidersBYOK
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listProvidersBYOK</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L46">src/trpc/routers/ai/methods/providers.ts:46</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listProvidersBYOK</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L41">src/trpc/routers/ai/methods/providers.ts:41</a></span></div></div>
 <div class="method-card__summary">List available BYOK (Bring Your Own Key) providers.</div>
 <div class="method-card__description"><p>Filters the provider catalog to only those eligible for user-supplied API keys.</p></div>
 <div class="method-card__columns">
@@ -833,7 +957,7 @@ console.log(result);</code></pre></div>
 ## ai.validateProvider
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">ai.validateProvider</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L148">src/trpc/routers/ai/methods/providers.ts:148</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">ai.validateProvider</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/ai/methods/providers.ts#L143">src/trpc/routers/ai/methods/providers.ts:143</a></span></div></div>
 <div class="method-card__summary">Validate AI provider configuration.</div>
 <div class="method-card__description"><p>Performs lightweight API key validation for supported providers to catch obvious misconfigurations.</p></div>
 <div class="method-card__columns">
@@ -850,7 +974,7 @@ console.log(result);</code></pre></div>
       <span class="method-field__badges"><span class="method-badge method-badge--type">enum</span></span>
     </div>
     
-    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>anthropic</code><code>openai</code><code>google</code></div></div>
+    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>anthropic</code><code>openai</code><code>google</code><code>openrouter</code><code>huggingface</code></div></div>
     
   </li><li class="method-field">
     <div class="method-field__row">
@@ -876,7 +1000,9 @@ console.log(result);</code></pre></div>
       &quot;enum&quot;: [
         &quot;anthropic&quot;,
         &quot;openai&quot;,
-        &quot;google&quot;
+        &quot;google&quot;,
+        &quot;openrouter&quot;,
+        &quot;huggingface&quot;
       ]
     },
     &quot;apiKey&quot;: {
@@ -2028,7 +2154,7 @@ console.log(result);</code></pre></div>
 ## admin.clearCache
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">admin.clearCache</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L339">src/trpc/routers/admin/index.ts:339</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">admin.clearCache</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L346">src/trpc/routers/admin/index.ts:346</a></span></div></div>
 <div class="method-card__summary">Clear caches and reset services</div>
 <div class="method-card__description"><p>Clear caches and reset services</p><p>Clear system caches and reset services</p></div>
 <div class="method-card__columns">
@@ -2127,7 +2253,7 @@ console.log(result);</code></pre></div>
 ## admin.getConfig
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.getConfig</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L228">src/trpc/routers/admin/index.ts:228</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.getConfig</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L235">src/trpc/routers/admin/index.ts:235</a></span></div></div>
 <div class="method-card__summary">System configuration management</div>
 <div class="method-card__description"><p>System configuration management</p><p>Get current system configuration</p></div>
 <div class="method-card__columns">
@@ -2227,7 +2353,7 @@ console.log(result);</code></pre></div>
 ## admin.getUserInfo
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.getUserInfo</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L185">src/trpc/routers/admin/index.ts:185</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.getUserInfo</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L192">src/trpc/routers/admin/index.ts:192</a></span></div></div>
 <div class="method-card__summary">Get user information (admin only)</div>
 <div class="method-card__description"><p>Get user information (admin only)</p><p>Get detailed user information and permissions</p></div>
 <div class="method-card__columns">
@@ -2354,7 +2480,7 @@ console.log(result);</code></pre></div>
 ## admin.healthCheck
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.healthCheck</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L288">src/trpc/routers/admin/index.ts:288</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.healthCheck</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L295">src/trpc/routers/admin/index.ts:295</a></span></div></div>
 <div class="method-card__summary">System health checks</div>
 <div class="method-card__description"><p>System health checks</p><p>Run comprehensive health checks on all services</p></div>
 <div class="method-card__columns">
@@ -2417,7 +2543,7 @@ console.log(result);</code></pre></div>
 ## admin.statistics
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.statistics</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L121">src/trpc/routers/admin/index.ts:121</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.statistics</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L128">src/trpc/routers/admin/index.ts:128</a></span></div></div>
 <div class="method-card__summary">Get system statistics</div>
 <div class="method-card__description"><p>Get system statistics</p><p>Get detailed system statistics and metrics</p></div>
 <div class="method-card__columns">
@@ -2510,7 +2636,7 @@ console.log(result);</code></pre></div>
 ## admin.status
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.status</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L58">src/trpc/routers/admin/index.ts:58</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.status</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/src/trpc/routers/admin/index.ts#L65">src/trpc/routers/admin/index.ts:65</a></span></div></div>
 <div class="method-card__summary">Server status with detailed information</div>
 <div class="method-card__description"><p>Server status with detailed information</p><p>Get detailed server status and health information</p></div>
 <div class="method-card__columns">

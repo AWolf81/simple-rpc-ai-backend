@@ -1,8 +1,8 @@
 ---
-title: Environment Configuration
+title: Environment Variables
 parent: Common Configurations
 grand_parent: Documentation
-nav_order: 1
+nav_order: 4
 ---
 
 # Environment Configuration

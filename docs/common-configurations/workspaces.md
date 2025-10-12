@@ -2,7 +2,7 @@
 title: Workspaces
 parent: Common Configurations
 grand_parent: Documentation
-nav_order: 3
+nav_order: 8
 ---
 
 # Workspaces

@@ -2,7 +2,7 @@
 title: Authentication
 parent: Common Configurations
 grand_parent: Documentation
-nav_order: 2
+nav_order: 5
 ---
 
 # Authentication

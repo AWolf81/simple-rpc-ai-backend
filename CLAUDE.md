@@ -71,10 +71,40 @@ const server = createRpcAiServer({ customRouters: { math: mathRouter } });
 
 **IMPORTANT**: AI provider configuration is at the **root level**, NOT nested under an `ai` property.
 
-### ✅ Correct Configuration
+### ✅ Unified Provider Configuration (Recommended)
 ```typescript
 const server = createRpcAiServer({
-  // AI configuration - at root level
+  // New unified provider configuration
+  providers: [  // New alias for serverProviders
+    'anthropic',  // Simple string form (uses ANTHROPIC_API_KEY env var)
+    'openai',     // Simple string form (uses OPENAI_API_KEY env var)
+    {             // Extended object form with per-provider config
+      name: 'google',
+      apiKey: process.env.GOOGLE_API_KEY,
+      defaultModel: 'gemini-1.5-flash',
+      modelRestrictions: {
+        allowedModels: ['gemini-1.5-flash', 'gemini-1.5-pro']
+      }
+    }
+  ],
+
+  systemPrompts: { default: '...' },  // Global system prompts
+
+  // MCP configuration
+  mcp: {
+    enabled: true,
+    ai: {
+      enabled: true,
+      useServerConfig: true  // Uses providers config above
+    }
+  }
+});
+```
+
+### ✅ Legacy Configuration (Still Supported)
+```typescript
+const server = createRpcAiServer({
+  // Legacy split configuration
   serverProviders: ['anthropic', 'openai'],      // Server-managed providers
   byokProviders: ['anthropic', 'openai'],        // Bring-your-own-key providers
   systemPrompts: { default: '...' },             // System prompts
@@ -83,9 +113,9 @@ const server = createRpcAiServer({
   // MCP configuration
   mcp: {
     enabled: true,
-    ai: {                                         // MCP-specific AI config (optional)
+    ai: {
       enabled: true,
-      useServerConfig: true                       // Use serverProviders above
+      useServerConfig: true
     }
   }
 });
@@ -103,7 +133,7 @@ const server = createRpcAiServer({
 });
 ```
 
-**See**: [Configuration Documentation](docs/server-api/configuration.md) for complete reference.
+**See**: [Provider Configuration](docs/common-configurations/provider-configuration.md) for detailed guide and [Server Configuration](docs/common-configurations/configuration.md) for complete reference.
 
 ## Key Methods
 

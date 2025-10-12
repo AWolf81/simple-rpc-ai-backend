@@ -2,7 +2,7 @@
 title: Extension OAuth
 parent: Common Configurations
 grand_parent: Documentation
-nav_order: 5
+nav_order: 7
 ---
 
 # Extension OAuth - Generic OAuth Callback Handler

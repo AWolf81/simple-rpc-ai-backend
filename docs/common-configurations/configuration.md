@@ -1,8 +1,8 @@
 ---
-title: Configuration
-parent: Server API
+title: Server Configuration
+parent: Common Configurations
 grand_parent: Documentation
-nav_order: 2
+nav_order: 1
 ---
 
 # Server Configuration
@@ -32,7 +32,7 @@ await server.start();
 |--------|------|---------|-------------|
 | `port` | `number` | `8000` | Server port number |
 | `trustProxy` | `boolean` | `false` | Enable trust proxy for reverse proxies |
-| `debug.enableTiming` | `boolean` | `false` | Enable performance timing logs |
+| `debug.enableTiming` | `boolean` | `false` | Enable performance timing logs (see [Debug & Monitoring]({% link performance/debug-monitoring.md %})) |
 
 **Example:**
 ```typescript
@@ -40,10 +40,12 @@ await server.start();
   port: 3000,
   trustProxy: true,
   debug: {
-    enableTiming: true
+    enableTiming: true  // See Performance docs for details
   }
 }
 ```
+
+**See also:** [Performance Benchmarks]({% link performance/benchmarks.md %}) for timing analysis and optimization tips.
 
 ---
 
@@ -51,14 +53,55 @@ await server.start();
 
 | Option | Type | Description |
 |--------|------|-------------|
+| `providers` | `(string \| ProviderConfig)[]` | Unified provider configuration (strings or objects) |
 | `serverProviders` | `string[]` | Built-in provider names: `'anthropic'`, `'openai'`, `'google'` |
 | `byokProviders` | `string[]` | Providers available for Bring-Your-Own-Key (BYOK) |
-| `customProviders` | `CustomProvider[]` | Custom provider configurations for non-standard APIs |
+| `customProviders` | `CustomProvider[]` | Legacy custom provider configurations |
 | `systemPrompts` | `Record<string, string>` | Named system prompt templates |
 | `modelRestrictions` | `Record<string, {...}>` | Per-provider model allow/block lists |
 | `aiLimits` | `AIRouterConfig` | Rate limits and token restrictions for AI operations |
 
-**Example:**
+#### Provider Configuration Approaches
+
+**Approach 1: New Unified `providers` Configuration (Recommended)**
+```typescript
+{
+  providers: [
+    // Simple string form (uses environment variables)
+    'anthropic',
+    'openai',
+
+    // Extended object form with per-provider config
+    {
+      name: 'google',
+      apiKey: process.env.GOOGLE_API_KEY,  // Explicit API key
+      defaultModel: 'gemini-1.5-flash',
+      systemPrompts: {
+        'default': 'You are a helpful Google assistant'
+      },
+      modelRestrictions: {
+        allowedModels: ['gemini-1.5-flash', 'gemini-1.5-pro']
+      }
+    },
+
+    // Custom provider (OpenAI-compatible)
+    {
+      name: 'deepseek',
+      type: 'openai',  // Base provider type
+      baseUrl: 'https://api.deepseek.com/v1',
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      defaultModel: 'deepseek-chat'
+    }
+  ],
+
+  // Global system prompts (can be overridden per-provider)
+  systemPrompts: {
+    'code-review': 'You are an expert code reviewer...'
+  }
+}
+```
+
+**Approach 2: Legacy Split Configuration (Still Supported)**
 ```typescript
 {
   serverProviders: ['anthropic', 'openai'],
@@ -88,6 +131,27 @@ await server.start();
   }]
 }
 ```
+
+**⚠️ Deprecated Pattern: Nested `ai` Configuration**
+
+The following pattern is **deprecated** and should be avoided:
+
+```typescript
+// ❌ DEPRECATED: Don't nest AI config under 'ai' property
+{
+  ai: {
+    providers: {
+      anthropic: { apiKey: '...' }
+    }
+  }
+}
+```
+
+**Why deprecated:** AI provider configuration belongs at the root level, not nested under an `ai` object. This pattern causes confusion and conflicts with the unified configuration approach.
+
+**Migration:** Move all AI-related configuration to the root level using the `providers` array (Approach 1) or legacy split configuration (Approach 2).
+
+**See:** [Provider Configuration Guide]({% link common-configurations/provider-configuration.md %}) for detailed migration instructions.
 
 ---
 
