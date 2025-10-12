@@ -10,7 +10,7 @@
  */
 
 import { PostgreSQLAdapter } from '../database/postgres-adapter';
-import { UsageAnalyticsService } from './usage-analytics-service';
+import { UsageAnalyticsService } from './usage-analytics-service.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface UserProfile {

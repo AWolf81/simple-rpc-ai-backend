@@ -5,12 +5,12 @@
  */
 
 // Core authentication classes
-export { UserManager } from './user-manager';
-export { SimpleKeyManager } from './key-manager';
-export { AuthManager } from './auth-manager';
+export { UserManager } from './user-manager.js';
+export { SimpleKeyManager } from './key-manager.js';
+export { AuthManager } from './auth-manager.js';
 
 // OAuth authentication (recommended secure approach)
-export { OAuthAuthManager } from './oauth-auth-manager';
+export { OAuthAuthManager } from './oauth-auth-manager.js';
 
 // Interfaces
 export type { 
@@ -18,21 +18,21 @@ export type {
   UserDevice, 
   OAuthData,
   DatabaseAdapter 
-} from './user-manager';
+} from './user-manager.js';
 
 export type {
   UserKey,
   KeyValidationResult,
   KeyStorageAdapter,
   AIProviderValidator
-} from './key-manager';
+} from './key-manager.js';
 
 export type {
   AuthSession,
   OAuthProvider,
   PasskeyCredential,
   AuthUpgradeOptions
-} from './auth-manager';
+} from './auth-manager.js';
 
 // Private key authentication types removed for security reasons
 // Use OAuth authentication instead
@@ -40,7 +40,7 @@ export type {
 export type {
   OAuthSession,
   OAuthConfig
-} from './oauth-auth-manager';
+} from './oauth-auth-manager.js';
 
 // Database and validation
 export { PostgreSQLAdapter } from '@database/postgres-adapter';

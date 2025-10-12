@@ -477,9 +477,10 @@ export class RpcAiServer {
     
     // Set smart defaults
     this.config = {
-      port: 8000,
+      port: config.port ?? 8000,       // Use provided port or default to 8000
       debug: config.debug || {},
       aiLimits: {},
+      providers: config.providers,     // Optional: undefined by default
       serverProviders: ['anthropic'],  // Default: Anthropic only for easier onboarding
       byokProviders: ['anthropic'],    // Default: Anthropic BYOK only
       customProviders: [],             // Default: no custom providers
@@ -751,32 +752,11 @@ export class RpcAiServer {
         ...baseCtx,
         apiKey: apiKey || null,
         appRouter: this.router, // Add router to context for prompt access tools
-        // Expose provider validation for procedures
-        isProviderAllowed: (provider: string) => this.isProviderAllowed(provider),
-        allowedProviders: this.allowedProviders
       };
     };
   }
 
-  /**
-   * Check if a provider is allowed based on configuration
-   * @param provider Provider name to check
-   * @returns true if allowed, false otherwise
-   */
-  private isProviderAllowed(provider: string): boolean {
-    // null = allow all providers (undefined config or BYOK mode)
-    if (this.allowedProviders === null) {
-      return true;
-    }
-
-    // Empty set = block all providers
-    if (this.allowedProviders.size === 0) {
-      return false;
-    }
-
-    // Check whitelist
-    return this.allowedProviders.has(provider);
-  }
+  // Provider validation removed - now handled in AIService.execute()
 
   private setupMiddleware() {
     // Security - with CORS-friendly settings
@@ -1649,7 +1629,8 @@ export class RpcAiServer {
       await this.remoteMcpManager.initialize();
 
       const connectedServers = this.remoteMcpManager.getConnectedServers();
-      console.log(`✅ Remote MCP: ${connectedServers.length}/${config.servers.length} servers connected`);
+      const icon = connectedServers.length === config.servers.length ? '✅' : connectedServers.length > 0 ? '⚠️' : '❌';
+      console.log(`${icon} Remote MCP: ${connectedServers.length}/${config.servers.length} servers connected`);
 
     } catch (error) {
       console.error('❌ Failed to initialize remote MCP manager:', error instanceof Error ? error.message : String(error));
@@ -1678,7 +1659,8 @@ export class RpcAiServer {
       const { MCPProtocolHandler } = await import('./trpc/routers/mcp/protocol-handler.js');
       const protocolHandler = new MCPProtocolHandler(
         this.router,
-        this.config.mcp
+        this.config.mcp,
+        this.remoteMcpManager // Pass remote MCP manager for external tool discovery
       );
 
       const mcpWorkspaceConfig = (this.config.serverWorkspaces && this.config.serverWorkspaces.enabled &&

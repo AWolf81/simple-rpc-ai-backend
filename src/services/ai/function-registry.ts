@@ -5,8 +5,8 @@
  * via JSON-RPC with centralized system prompts.
  */
 
-import { promptManager, type PromptContext } from './prompt-manager';
-import { AIService, type ExecuteRequest, type ExecuteResult } from './ai-service';
+import { promptManager, type PromptContext } from './prompt-manager.js';
+import { AIService, type ExecuteRequest, type ExecuteResult } from './ai-service.js';
 
 export interface CustomFunctionDefinition {
   name: string;

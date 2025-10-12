@@ -169,12 +169,23 @@ export interface AIServiceConfig {
   maxTokens?: number;
   temperature?: number;
   mcpConfig?: MCPServiceConfig; // MCP service configuration for web search
-  
+
+  // System Prompt Policy Configuration
+  systemPromptPolicy?: {
+    /**
+     * Restrict systemPrompt to only use predefined prompt IDs
+     * When true: Only allows systemPrompt values that match keys in systemPrompts config
+     * When false (default): Allows both prompt IDs and custom prompt text
+     * Use case: Enterprise environments where system prompts must be controlled
+     */
+    restrictToPromptIds?: boolean;
+  };
+
   // Model Registry Configuration
   modelRegistry?: {
     registryConfig?: Partial<import('../../config/model-safety.js').ModelSafetyConfig>;
   };
-  
+
   // Model Restrictions Configuration
   modelRestrictions?: Record<string, {
     allowedModels?: string[];
@@ -185,8 +196,7 @@ export interface AIServiceConfig {
 
 export interface ExecuteRequest {
   content: string;
-  promptId?: string; // Can be a key (like "code_review") or direct text
-  systemPrompt?: string; // Legacy - for backward compatibility
+  systemPrompt?: string; // Can be a promptId (like "default", "creative") or direct prompt text. Defaults to "default"
   metadata?: {
     name?: string;
     type?: string;
@@ -356,6 +366,7 @@ function normalizeServiceProviders(
 export class AIService {
   private config: AIServiceConfig;
   private systemPrompts: Record<string, string>;
+  private systemPromptPolicy: { restrictToPromptIds: boolean };
   private providers: ServiceProvider[] = [];
   private mcpService?: MCPService; // MCP service for web search tools
   private modelRegistry: ModelRegistry; // Unified registry with safety features
@@ -368,12 +379,16 @@ export class AIService {
   constructor(config: AIServiceConfig) {
     // Initialize system prompts from config or use defaults
     this.systemPrompts = config.systemPrompts || this.getDefaultSystemPrompts();
+    // Initialize system prompt policy
+    this.systemPromptPolicy = {
+      restrictToPromptIds: config.systemPromptPolicy?.restrictToPromptIds || false
+    };
     // Initialize model restrictions
     this.modelRestrictions = config.modelRestrictions;
     if(config.serviceProviders) {
-      logger.debug(`🔍 AIService received serviceProviders config:`, JSON.stringify(config.serviceProviders, null, 2));
+      // Parse and normalize provider configuration (no logging of API keys)
       this.providers = normalizeServiceProviders(config.serviceProviders);
-      logger.debug(`🔍 Normalized providers:`, this.providers.map(p => `${p.name} (hasKey: ${!!p.apiKey})`));
+      logger.debug(`🔍 Configured providers:`, this.providers.map(p => `${p.name} (hasKey: ${!!p.apiKey})`));
       if (this.providers.length === 0) {
         throw new Error('No valid AI service providers configured.');
       }
@@ -399,13 +414,9 @@ export class AIService {
     // Use explicit defaultProvider or fall back to highest-priority provider
     this.config.provider = config.defaultProvider || this.providers[0]?.name;
     
-    // Initialize MCP service if web search config is provided
+    // Initialize MCP service only if explicitly configured
     if (config.mcpConfig) {
       this.mcpService = new MCPService(config.mcpConfig);
-      console.log("service", this.mcpService)
-    } else if (config.systemPrompts) {
-      // If system prompts are configured, enable MCP for potential web search
-      this.mcpService = new MCPService({ enableWebSearch: true });
     }
 
     // Initialize model registry
@@ -413,18 +424,62 @@ export class AIService {
     this.modelRegistry = new ModelRegistry(config.modelRegistry?.registryConfig);
   }
   /**
+   * Validate that a provider is allowed based on service configuration
+   * @param provider Provider name to validate
+   * @throws Error if provider is not allowed
+   */
+  private validateProvider(provider: string): void {
+    // Get list of configured provider names
+    const allowedProviders = this.providers.map(p => p.name);
+
+    if (!allowedProviders.includes(provider as any)) {
+      throw new Error(
+        `Provider '${provider}' is not allowed. Allowed providers: ${allowedProviders.join(', ')}`
+      );
+    }
+  }
+
+  /**
+   * Validate systemPrompt based on policy configuration
+   * @param systemPromptInput The systemPrompt value from request
+   * @throws Error if systemPrompt violates policy
+   * @returns The validated promptId or text
+   */
+  private validateSystemPrompt(systemPromptInput?: string): string {
+    const promptIdOrText = systemPromptInput || 'default';
+
+    // If policy restricts to prompt IDs only, validate
+    if (this.systemPromptPolicy.restrictToPromptIds) {
+      const availablePromptIds = Object.keys(this.systemPrompts);
+
+      // Check if the input matches a known prompt ID
+      if (!availablePromptIds.includes(promptIdOrText)) {
+        throw new Error(
+          `Custom system prompts are not allowed. Use one of the predefined prompt IDs: ${availablePromptIds.join(', ')}`
+        );
+      }
+    }
+
+    return promptIdOrText;
+  }
+
+  /**
    * Execute AI request with system prompt using Vercel AI SDK
    */
   async execute(request: ExecuteRequest): Promise<ExecuteResult> {
     const timing = new TimingLogger('SERVICE');
 
-    const { content, promptId, systemPrompt: legacySystemPrompt, metadata = {}, options = {}, apiKey } = request;
+    const { content, systemPrompt: systemPromptInput, metadata = {}, options = {}, apiKey } = request;
 
-    // Support both promptId (new) and systemPrompt (legacy) for backwards compatibility
-    const actualPromptId = promptId || legacySystemPrompt;
-    if (!actualPromptId) {
-      throw new Error('Either promptId or systemPrompt must be provided');
+    // Validate systemPrompt based on policy (may restrict to prompt IDs only)
+    const promptIdOrText = this.validateSystemPrompt(systemPromptInput);
+
+    // Validate provider if specified
+    const requestedProvider = metadata?.provider || this.config.provider;
+    if (requestedProvider) {
+      this.validateProvider(requestedProvider);
     }
+
     let t1 = timing.checkpoint('Request validation');
 
     // Check for model deprecation warnings
@@ -438,7 +493,7 @@ export class AIService {
     }
 
     // Resolve promptId to actual system prompt text
-    const systemPrompt = this.resolveSystemPrompt(actualPromptId);
+    const systemPrompt = this.resolveSystemPrompt(promptIdOrText);
 
     // Merge metadata into execution options (metadata takes precedence)
     const executionConfig = {
@@ -504,13 +559,17 @@ export class AIService {
       // Add tools if available
       if (availableTools.length > 0) {
         if (executionConfig.webSearchPreference === 'ai-web-search') {
-          // For provider-native tools, pass them directly to the AI SDK
+          // Provider-native tools: AI SDK executes them directly within the provider
+          // Example: Claude's web_search_20250305, Google's googleSearch
           generateOptions.tools = availableTools;
           // Don't set toolChoice for native tools - let provider handle it
         } else {
-          // For MCP tools, use our custom tool execution pipeline
+          // MCP tools: We pass tool schemas to AI SDK so the AI knows what's available
+          // AI SDK returns tool call requests, then WE execute them via MCP server
+          // This is "proactive tool discovery" - no separate tools/list call needed
           generateOptions.tools = availableTools;
           generateOptions.toolChoice = 'auto'; // Let AI decide when to use tools
+          // Note: executeToolCalls() at line 590 intercepts and executes via MCP
         }
       }
 

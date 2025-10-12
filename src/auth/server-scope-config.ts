@@ -4,7 +4,7 @@
  * Configuration interface for integrating configurable scopes into the RPC AI Server
  */
 
-import type { ServerScopeConfig } from './scope-integration';
+import type { ServerScopeConfig } from './scope-integration.js';
 
 /**
  * Extended server configuration with scope management

@@ -168,10 +168,16 @@ export function createAppRouter(
   const billingRouter = createBillingRouter(virtualTokenService, usageAnalyticsService, hybridUserService);
   const authRouter = createAuthRouter(postgresRPCMethods);
   const adminRouter = createAdminRouter({
-    adminUsers: ['admin@company.com'],
+    adminUsers: mcpConfig?.adminUsers || [],
     requireAdminAuth: true,
     usageAnalyticsService,
-    virtualTokenService
+    virtualTokenService,
+    serverConfig: {
+      serverProviders,
+      byokProviders,
+      modelRestrictions,
+      mcpEnabled: mcpConfig?.enabled !== false
+    }
   });
 
   const aiRouter = createAIRouter({

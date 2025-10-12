@@ -8,7 +8,7 @@
  * - Replace the entire scope system
  */
 
-import { ScopeHelpers, ScopeValidator, DefaultScopes, type ScopeRequirement, type MCPToolScope } from './scopes';
+import { ScopeHelpers, ScopeValidator, DefaultScopes, type ScopeRequirement, type MCPToolScope } from './scopes.js';
 
 /**
  * Configuration for custom scope definitions

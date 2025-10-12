@@ -8,8 +8,8 @@
 import type { AnyRouter, inferRouterContext, TRPCError } from '@trpc/server';
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import type { Request, Response } from 'express';
-import type { AppRouter } from './root';
-import { createTRPCContext, t } from './index';
+import type { AppRouter } from './root.js';
+import { createTRPCContext, t } from './index.js';
 import { TimingLogger } from '../utils/timing';
 
 interface JSONRPCRequest {

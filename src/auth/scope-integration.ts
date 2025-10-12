@@ -5,8 +5,8 @@
  * and the existing RPC server infrastructure.
  */
 
-import { ConfigurableScopeManager, type ConfigurableScopeConfig, type ScopeConfigurationPreset, DefaultScopeConfigurations } from './configurable-scopes';
-import { ScopeHelpers, type ScopeRequirement, type MCPToolScope } from './scopes';
+import { ConfigurableScopeManager, type ConfigurableScopeConfig, type ScopeConfigurationPreset, DefaultScopeConfigurations } from './configurable-scopes.js';
+import { ScopeHelpers, type ScopeRequirement, type MCPToolScope } from './scopes.js';
 
 /**
  * Server scope configuration

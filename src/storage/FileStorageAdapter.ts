@@ -8,7 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { StorageAdapter } from './StorageAdapter';
+import { StorageAdapter } from './StorageAdapter.js';
 import * as winston from 'winston';
 
 export interface FileStorageData {

@@ -6,8 +6,8 @@
  * for VS Code extensions and development workflows.
  */
 
-import { MCPService, MCPServiceConfig, MCPUtils } from './mcp-service';
-import { MCPServerConfig } from './mcp-registry';
+import { MCPService, MCPServiceConfig, MCPUtils } from './mcp-service.js';
+import { MCPServerConfig } from './mcp-registry.js';
 import path from 'path';
 import fs from 'fs/promises';
 

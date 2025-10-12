@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { input, defineSchema } from './schema-registry';
+import { input, defineSchema } from './schema-registry.js';
 
 // ===== MCP Tool Schemas =====
 

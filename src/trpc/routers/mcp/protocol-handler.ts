@@ -7,7 +7,7 @@ import { JWTMiddleware, type AuthenticatedRequest } from '../../../auth/jwt-midd
 import { MCPRateLimiter, getDefaultRateLimiter } from '../../../security/rate-limiter';
 import { SecurityLogger, getDefaultSecurityLogger } from '../../../security/security-logger';
 import { AuthEnforcer, getDefaultAuthEnforcer } from '../../../security/auth-enforcer';
-import { MCPRouterConfig, MCPAuthConfig } from './types';
+import { MCPRouterConfig, MCPAuthConfig } from './types.js';
 import { mcpResourceRegistry } from '../../../services/resources/mcp/mcp-resource-registry.js';
 import { logger } from '../../../utils/logger.js';
 import { redactEmail } from '../../../utils/redact.js';
@@ -45,13 +45,15 @@ export class MCPProtocolHandler {
   private clientCapabilities: any = null;
   private aiEnabled: boolean;
   private namespaceWhitelist?: string[];
+  private remoteMcpManager?: any; // Remote MCP manager for external tools
 
-  constructor(appRouter: any, config?: MCPRouterConfig) {
+  constructor(appRouter: any, config?: MCPRouterConfig, remoteMcpManager?: any) {
     this.appRouter = appRouter;
     this.adminUsers = config?.adminUsers || [];
     this.jwtMiddleware = config?.jwtMiddleware;
     this.aiEnabled = config?.ai?.enabled || false;
     this.namespaceWhitelist = config?.namespaceWhitelist;
+    this.remoteMcpManager = remoteMcpManager;
 
     // Initialize auth config with defaults
     this.authConfig = {
@@ -735,8 +737,47 @@ export class MCPProtocolHandler {
       // Get all available MCP tools from tRPC procedures
       const mcpTools = this.extractMCPToolsFromTRPC();
 
+      // Get remote MCP tools if available
+      let remoteTools: any[] = [];
+      if (this.remoteMcpManager) {
+        try {
+          console.log(`🔍 [MCP] Fetching remote tools from remoteMcpManager...`);
+          const toolsByServer = await this.remoteMcpManager.listAllTools();
+          // Flatten tools from all servers
+          for (const [serverName, tools] of toolsByServer) {
+            remoteTools.push(...tools.map(tool => ({ ...tool, serverName })));
+          }
+          console.log(`📦 [MCP] Found ${remoteTools.length} remote tools from ${toolsByServer.size} servers`);
+        } catch (err) {
+          console.warn('⚠️ Failed to list remote MCP tools:', err instanceof Error ? err.message : String(err));
+        }
+      }
+
+      // Combine local tRPC tools and remote MCP tools
+      const allTools = [
+        ...mcpTools,
+        ...remoteTools.map((tool: any) => {
+          // Prefix remote tool names to avoid collisions and provide transparency
+          // Can be disabled per-server with prefixToolNames: false
+          const shouldPrefix = tool.prefixToolNames !== false;  // Default: true
+          const toolName = shouldPrefix ? `${tool.serverName}__${tool.name}` : tool.name;
+          const description = shouldPrefix 
+            ? `[${tool.serverName}] ${tool.description || 'Remote MCP tool'}`
+            : tool.description || 'Remote MCP tool';
+
+          return {
+            name: toolName,
+            fullName: toolName,
+            description,
+            inputSchema: tool.inputSchema || { type: 'object', properties: {}, required: [] },
+            procedure: null as any,
+            scopes: null
+          };
+        })
+      ];
+
       // Filter tools based on auth and visibility rules
-      const availableTools = mcpTools
+      const availableTools = allTools
         .map(tool => {
           // Check if tool should be public
           const isPublic = this.isToolPublic({
@@ -813,9 +854,37 @@ export class MCPProtocolHandler {
       // Privacy: Don't log user input - only log tool name and arg count
       logger.debug(`MCP tools/call: ${name} (${Object.keys(args || {}).length} args)`);
 
-      // Find the requested tool
+      // Find the requested tool (check both local and remote)
       const mcpTools = this.extractMCPToolsFromTRPC();
-      const tool = mcpTools.find(t => t.name === name || t.fullName === name);
+      let tool = mcpTools.find(t => t.name === name || t.fullName === name);
+      let isRemoteTool = false;
+
+      // If not found locally, check remote tools
+      if (!tool && this.remoteMcpManager) {
+        try {
+          const toolsByServer = await this.remoteMcpManager.listAllTools();
+          // Flatten and search for tool
+          for (const [serverName, tools] of toolsByServer) {
+            const remoteTool = tools.find((t: any) => t.name === name);
+            if (remoteTool) {
+              tool = {
+                name: remoteTool.name,
+                fullName: remoteTool.name,
+                description: remoteTool.description || 'Remote MCP tool',
+                inputSchema: remoteTool.inputSchema || { type: 'object', properties: {}, required: [] },
+                procedure: null as any,
+                scopes: null
+              };
+              // Store serverName separately since it's not in the type
+              (tool as any).serverName = serverName;
+              isRemoteTool = true;
+              break;
+            }
+          }
+        } catch (err) {
+          console.warn('⚠️ Failed to list remote MCP tools for call:', err instanceof Error ? err.message : String(err));
+        }
+      }
 
       if (!tool) {
         return this.createErrorResponse(
@@ -894,54 +963,69 @@ export class MCPProtocolHandler {
         );
       }
 
-      // Execute the tRPC procedure
-      const procedure = tool.procedure;
-      const inputParser = procedure._def?.inputs?.[0];
+      // Handle remote vs local tool execution
+      let result;
 
-      // Validate input if parser exists
-      // Note: We don't sanitize user input - users should be able to say anything
-      // Sanitization is only for tool descriptions/titles that developers define
-      let validatedInput = args || {};
-      if (inputParser) {
+      if (isRemoteTool && this.remoteMcpManager && (tool as any).serverName) {
+        // Execute remote MCP tool
+        logger.debug(`Executing remote tool ${name} on server ${(tool as any).serverName}`);
         try {
-          validatedInput = inputParser.parse(args || {});
-        } catch (error: any) {
-          // Extract simple error summary for logging
-          const errorSummary = error?.issues
-            ? error.issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ')
-            : error instanceof Error ? error.message : String(error);
-
-          // Debug only - MCP clients may send empty args on first call
-          logger.debug(`Validation failed for ${name}: ${errorSummary}`);
-
-          return this.createErrorResponse(
-            request.id,
-            ErrorCode.InvalidParams,
-            `Invalid input parameters: ${error instanceof Error ? error.message : String(error)}`
-          );
+          result = await this.remoteMcpManager.callTool((tool as any).serverName, name, args || {});
+          logger.debug(`Remote tool ${name} executed successfully`);
+        } catch (error) {
+          logger.error(`Remote tool ${name} execution failed:`, error);
+          throw error;
         }
+      } else {
+        // Execute local tRPC procedure
+        const procedure = tool.procedure;
+        const inputParser = procedure._def?.inputs?.[0];
+
+        // Validate input if parser exists
+        // Note: We don't sanitize user input - users should be able to say anything
+        // Sanitization is only for tool descriptions/titles that developers define
+        let validatedInput = args || {};
+        if (inputParser) {
+          try {
+            validatedInput = inputParser.parse(args || {});
+          } catch (error: any) {
+            // Extract simple error summary for logging
+            const errorSummary = error?.issues
+              ? error.issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ')
+              : error instanceof Error ? error.message : String(error);
+
+            // Debug only - MCP clients may send empty args on first call
+            logger.debug(`Validation failed for ${name}: ${errorSummary}`);
+
+            return this.createErrorResponse(
+              request.id,
+              ErrorCode.InvalidParams,
+              `Invalid input parameters: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+
+        // Create execution context
+        const ctx = {
+          user: req?.user,
+          type: procedure._def?.type || 'mutation',
+          appRouter: this.appRouter // Add appRouter for tools that need to discover procedures
+        };
+
+        // Privacy: Don't log user input - only log tool name
+        logger.debug(`Executing tool ${name}`);
+
+        // Execute the procedure resolver
+        result = await procedure._def.resolver({
+          input: validatedInput,
+          ctx,
+          type: procedure._def?.type || 'mutation',
+          path: name,
+          getRawInput: () => validatedInput
+        });
+
+        logger.debug(`Tool ${name} executed successfully`);
       }
-
-      // Create execution context
-      const ctx = {
-        user: req?.user,
-        type: procedure._def?.type || 'mutation',
-        appRouter: this.appRouter // Add appRouter for tools that need to discover procedures
-      };
-
-      // Privacy: Don't log user input - only log tool name
-      logger.debug(`Executing tool ${name}`);
-
-      // Execute the procedure resolver
-      const result = await procedure._def.resolver({
-        input: validatedInput,
-        ctx,
-        type: procedure._def?.type || 'mutation',
-        path: name,
-        getRawInput: () => validatedInput
-      });
-
-      logger.debug(`Tool ${name} executed successfully`);
 
       return {
         jsonrpc: '2.0',

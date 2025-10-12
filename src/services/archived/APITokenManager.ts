@@ -7,7 +7,7 @@
 
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
-import { PostgreSQLSecretManager } from './PostgreSQLSecretManager';
+import { PostgreSQLSecretManager } from './PostgreSQLSecretManager.js';
 import * as winston from 'winston';
 
 export type TokenScope = 

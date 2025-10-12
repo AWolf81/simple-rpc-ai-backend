@@ -7,8 +7,8 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { createTemplate } from './template-engine';
-import type { RootManager } from './root-manager';
+import { createTemplate } from './template-engine.js';
+import type { RootManager } from './root-manager.js';
 
 export interface FileReaderConfig {
   /** Resource ID */

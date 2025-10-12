@@ -5,7 +5,7 @@
  * Install with: npm install yup
  */
 
-import type { BaseValidator, ValidatorType } from './schema-registry';
+import type { BaseValidator, ValidatorType } from './schema-registry.js';
 
 /**
  * Yup validator adapter - implements BaseValidator interface
@@ -56,8 +56,8 @@ export function createYupSchema<T>(
  * Example usage:
  * 
  * import * as yup from 'yup';
- * import { schemaRegistry } from './schema-registry';
- * import { createYupSchema } from './yup-adapter';
+ * import { schemaRegistry } from './schema-registry.js';
+ * import { createYupSchema } from './yup-adapter.js';
  * 
  * const userSchema = yup.object({
  *   name: yup.string().required(),

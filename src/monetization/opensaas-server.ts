@@ -17,8 +17,8 @@ import { FunctionRegistry } from '../services/ai/function-registry';
 import { PromptManager, promptManager } from '../services/ai/prompt-manager';
 
 // Import configuration
-import type { MonetizedAIServerConfig, OpenSaaSMonetizationConfig } from './opensaas-config';
-import { mergeOpenSaaSConfig, validateOpenSaaSConfig } from './opensaas-config';
+import type { MonetizedAIServerConfig, OpenSaaSMonetizationConfig } from './opensaas-config.js';
+import { mergeOpenSaaSConfig, validateOpenSaaSConfig } from './opensaas-config.js';
 
 export interface MonetizedServerInstance {
   app: Express;

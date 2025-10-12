@@ -1,12 +1,12 @@
 import { router } from "../../index";
-import { utilityProcedures } from "./methods/utility";
-import { taskProcedures } from "./methods/task";
-import { resourceProcedures } from "./methods/resource";
-import { createSamplingProcedures } from "./methods/sampling";
-import { promptProcedures, mcpPromptProcedures } from "./methods/prompt";
-import { adminProcedures } from "./methods/admin";
-import { MCPProtocolHandler } from "./protocol-handler";
-import type { MCPRouterConfig } from "./types";
+import { utilityProcedures } from "./methods/utility.js";
+import { taskProcedures } from "./methods/task.js";
+import { resourceProcedures } from "./methods/resource.js";
+import { createSamplingProcedures } from "./methods/sampling.js";
+import { promptProcedures, mcpPromptProcedures } from "./methods/prompt.js";
+import { adminProcedures } from "./methods/admin.js";
+import { MCPProtocolHandler } from "./protocol-handler.js";
+import type { MCPRouterConfig } from "./types.js";
 
 /**
  * Create MCP router with all procedure modules
@@ -59,7 +59,7 @@ export function createMCPRouter(config: MCPRouterConfig = {}): ReturnType<typeof
 }
 
 // Export types for external use
-export type { MCPRouterConfig, MCPAuthConfig } from "./types";
+export type { MCPRouterConfig, MCPAuthConfig } from "./types.js";
 
 // Export individual procedure modules for testing or custom composition
 export {

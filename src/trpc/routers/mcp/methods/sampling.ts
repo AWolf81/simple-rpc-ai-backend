@@ -115,7 +115,7 @@ This tool demonstrates the MCP sampling protocol with real AI generation.`,
         // Real AI generation using the AIService
         const aiResult = await aiService.execute({
           content: userPrompt,
-          promptId: systemPrompt, // Using systemPrompt directly
+          systemPrompt: systemPrompt, // Using systemPrompt directly
           metadata: {
             maxTokens: input.maxTokens,
             type: 'content-generation',

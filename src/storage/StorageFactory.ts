@@ -10,10 +10,10 @@ import {
   StorageConfig, 
   PostgreSQLStorageConfig, 
   FileStorageConfig
-} from './StorageAdapter';
+} from './StorageAdapter.js';
 // VaultStorageAdapter removed - using simplified storage
-import { FileStorageAdapter } from './FileStorageAdapter';
-import { ClientManagedStorageAdapter } from './ClientManagedStorageAdapter';
+import { FileStorageAdapter } from './FileStorageAdapter.js';
+import { ClientManagedStorageAdapter } from './ClientManagedStorageAdapter.js';
 import * as winston from 'winston';
 import * as path from 'path';
 

@@ -17,7 +17,7 @@
 
 import { JSONRPCClient } from 'json-rpc-2.0';
 import { createTRPCProxyClient, type CreateTRPCClientOptions } from '@trpc/client';
-import type { AppRouter } from './trpc/root';
+import type { AppRouter } from './trpc/root.js';
 import type { AIRouterType } from './trpc/routers/ai';
 
 export interface ClientOptions {
@@ -107,7 +107,7 @@ export default RPCClient;
  * - VS Code authentication API integration
  */
 
-import { AuthSession } from './auth/index';
+import { AuthSession } from './auth/index.js';
 
 export interface AIClientOptions {
   baseUrl: string;

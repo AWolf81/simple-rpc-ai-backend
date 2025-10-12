@@ -12,12 +12,12 @@ export {
   PostgreSQLStorageConfig,
   FileStorageConfig, 
   ClientManagedStorageConfig 
-} from './StorageAdapter';
+} from './StorageAdapter.js';
 
 // Storage adapters
 // VaultStorageAdapter removed - using simplified storage
-export { FileStorageAdapter } from './FileStorageAdapter';
-export { ClientManagedStorageAdapter } from './ClientManagedStorageAdapter';
+export { FileStorageAdapter } from './FileStorageAdapter.js';
+export { ClientManagedStorageAdapter } from './ClientManagedStorageAdapter.js';
 
 // Factory and utilities
-export { StorageFactory } from './StorageFactory';
+export { StorageFactory } from './StorageFactory.js';

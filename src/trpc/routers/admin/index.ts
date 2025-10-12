@@ -14,14 +14,21 @@ interface AdminConfig {
   requireAdminAuth?: boolean;
   usageAnalyticsService?: UsageAnalyticsService | null;
   virtualTokenService?: VirtualTokenService | null;
+  serverConfig?: {
+    serverProviders?: string[];
+    byokProviders?: string[];
+    modelRestrictions?: Record<string, any>;
+    mcpEnabled?: boolean;
+  };
 }
 
 export function createAdminRouter(config: AdminConfig = {}): ReturnType<typeof router> {
   const {
-    adminUsers = ['admin@company.com'],
+    adminUsers = [],
     requireAdminAuth = true,
     usageAnalyticsService,
-    virtualTokenService
+    virtualTokenService,
+    serverConfig
   } = config;
 
   const assertAdminAccess = (ctx: any, procedureName: string) => {
@@ -262,9 +269,9 @@ export function createAdminRouter(config: AdminConfig = {}): ReturnType<typeof r
 
         if (input.section === 'all' || input.section === 'ai') {
           config.ai = {
-            providers: ['anthropic', 'openai', 'google'],
-            defaultProvider: 'anthropic',
-            modelRestrictions: false
+            serverProviders: serverConfig?.serverProviders || [],
+            byokProviders: serverConfig?.byokProviders || [],
+            modelRestrictions: serverConfig?.modelRestrictions || {}
           };
         }
 

@@ -30,6 +30,11 @@ export function createGenerationProcedures(
     metadata: z.object({
       name: z.string().optional(),
       type: z.string().optional(),
+      useWebSearch: z.boolean().optional(),
+      webSearchPreference: z.enum(['duckduckgo', 'mcp', 'ai-web-search', 'never']).optional(),
+      maxWebSearches: z.number().int().min(1).max(10).optional(),
+      allowedDomains: z.array(z.string()).optional(),
+      blockedDomains: z.array(z.string()).optional(),
     }).optional(),
     options: z.object({
       model: z.string().optional(),
@@ -80,21 +85,8 @@ export function createGenerationProcedures(
         const apiKey = input.apiKey || ctx.apiKey;
         let t1 = timing.checkpoint('Input parsed');
 
-        // Validate provider is allowed (if configured)
-        if (provider && (ctx as any).isProviderAllowed) {
-          const isAllowed = (ctx as any).isProviderAllowed(provider);
-          if (!isAllowed) {
-            const allowedProviders = (ctx as any).allowedProviders;
-            const allowedList = allowedProviders instanceof Set
-              ? Array.from(allowedProviders).join(', ')
-              : 'none (all providers blocked)';
-
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: `Provider '${provider}' is not allowed. Allowed providers: ${allowedList}`,
-            });
-          }
-        }
+        // Provider validation now happens in AIService.execute()
+        // This provides cleaner separation of concerns and better error messages
 
         // Determine user type and execution path
         if (userId && usageAnalyticsService) {

@@ -8,9 +8,9 @@ import { VirtualTokenService } from '@services/billing/virtual-token-service';
 import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
 import { PostgreSQLAdapter } from '@database/postgres-adapter'; // unused, why?
 import { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods'; // unused, why?
-import { createGenerationProcedures } from './methods/generation';
-import { createProviderProcedures } from './methods/providers';
-import { AIRouterFactoryConfig, DEFAULT_CONFIG, createServiceProvidersConfig, AIRouterConfig } from './types'; // AIRouterConig is imported but not used, why?
+import { createGenerationProcedures } from './methods/generation.js';
+import { createProviderProcedures } from './methods/providers.js';
+import { AIRouterFactoryConfig, DEFAULT_CONFIG, createServiceProvidersConfig, AIRouterConfig } from './types.js'; // AIRouterConig is imported but not used, why?
 
 export function createAIRouter(factoryConfig: AIRouterFactoryConfig = {}): ReturnType<typeof router> {
   const {
@@ -78,4 +78,4 @@ export const aiRouter: ReturnType<typeof createAIRouter> = createAIRouter();
 export type AIRouterType = ReturnType<typeof createAIRouter>;
 
 // Export types for compatibility
-export type { AIRouterConfig, AIRouterFactoryConfig } from './types';
+export type { AIRouterConfig, AIRouterFactoryConfig } from './types.js';

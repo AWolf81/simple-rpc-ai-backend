@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { UsageTracker, type UsageEvent } from './usage-tracker';
+import { UsageTracker, type UsageEvent } from './usage-tracker.js';
 import { PostgreSQLAdapter } from '../database/postgres-adapter';
 import winston from 'winston';
 
