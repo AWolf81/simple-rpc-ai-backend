@@ -93,6 +93,8 @@ let mcpInspectorStatus = { running: false, token: null };
 let mcpJamProcess = null;
 let mcpJamStatus = { running: false, port: 4000 };
 let mcpJamStartLogged = false;
+const SERVER_FAILURE_LOG_INTERVAL = 5000;
+let lastServerHealthFailure = 0;
 
 function logMcpJamStarted(message = '✅ MCP JAM started successfully') {
   if (mcpJamStartLogged) {
@@ -295,7 +297,12 @@ async function checkServerHealth() {
       config.endpoints.jsonRpc
     ].filter(url => url && url !== config.endpoints.health);
 
-    console.log(`⚠️  Backend server health check failed: ${error.message} (trying ${config.endpoints.health})`);
+    const now = Date.now();
+    const shouldLog = now - lastServerHealthFailure > SERVER_FAILURE_LOG_INTERVAL;
+
+    if (shouldLog) {
+      console.log(`⚠️  Backend server health check failed: ${error.message} (trying ${config.endpoints.health})`);
+    }
 
     // Try alternative endpoints to see if server is running
     for (const altUrl of alternativeEndpoints) {
@@ -315,7 +322,10 @@ async function checkServerHealth() {
     }
 
     // If all endpoints fail, server is likely not running
-    console.log(`💡 Backend server not detected on port ${config.port}. Is it running?`);
+    if (shouldLog) {
+      console.log(`💡 Backend server not detected on port ${config.port}. Is it running?`);
+      lastServerHealthFailure = now;
+    }
     if (serverConfig && serverConfig.detected) {
       serverConfig = { ...serverConfig, detected: false };
     }
@@ -350,14 +360,16 @@ async function checkDevPanelHealth() {
 async function waitForServicesReady() {
   console.log('🔄 Waiting for services to be ready...');
 
-  const maxWaitTime = 30000; // 30 seconds (reduced from 60)
+  const maxWaitTime = 120000; // 2 minutes max wait
   const pollInterval = 1000; // 1 second
-  const serverMaxWaitTime = 10000; // Only wait 10 seconds for server
+  const serverInitialDelay = 10000; // Wait 10 seconds before first backend check
+  const serverMaxWaitTime = 90000; // Allow backend up to 90 seconds
   const startTime = Date.now();
 
   let serverReady = false;
   let mcpJamReady = false;
   let devPanelReady = false;
+  let serverDelayLogged = false;
 
   while (Date.now() - startTime < maxWaitTime) {
     // Check server health with shorter timeout
@@ -365,9 +377,14 @@ async function waitForServicesReady() {
       if (skipServerCheck) {
         serverReady = true; // Skip server check
         console.log('⏭️  Backend server check skipped');
+      } else if (Date.now() - startTime < serverInitialDelay) {
+        if (!serverDelayLogged) {
+          console.log('⏳ Waiting a moment before checking backend server health...');
+          serverDelayLogged = true;
+        }
       } else if (Date.now() - startTime > serverMaxWaitTime) {
-        // After 10 seconds, give up on server and continue with dev-panel only
-        console.log('⚠️  Backend server timeout after 10s - continuing with dev-panel only mode');
+        // After serverMaxWaitTime, give up on server and continue with dev-panel only
+        console.log(`⚠️  Backend server timeout after ${serverMaxWaitTime / 1000}s - continuing with dev-panel only mode`);
         serverReady = true; // Continue without server
       } else {
         serverReady = await checkServerHealth();

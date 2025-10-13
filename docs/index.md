@@ -18,5 +18,6 @@ Welcome to the official documentation for the Simple RPC AI Backend. This site c
 - [Performance]({{ site.baseurl }}{% link performance/index.md %}) – benchmarks, load testing, and debug monitoring.
 - [Common Issues]({{ site.baseurl }}{% link common-issues/index.md %}) – troubleshooting steps for local and production deployments.
 - [Tips & Tricks]({{ site.baseurl }}{% link tips-and-tricks/index.md %}) – handy TypeScript patterns and testing utilities.
+- [Remote MCP Integrations]({{ site.baseurl }}{% link getting-started/remote-mcp.md %}) – walkthroughs for connecting external MCP servers.
 
 Need a quick overview? Start with the [Quickstart]({{ site.baseurl }}{% link getting-started/quickstart.md %}) to launch a development instance in minutes.

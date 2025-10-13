@@ -6,14 +6,12 @@ import { ScopeValidator } from '../../../auth/scopes';
 import { JWTMiddleware, type AuthenticatedRequest } from '../../../auth/jwt-middleware';
 import { MCPRateLimiter, getDefaultRateLimiter } from '../../../security/rate-limiter';
 import { SecurityLogger, getDefaultSecurityLogger } from '../../../security/security-logger';
-import { AuthEnforcer, getDefaultAuthEnforcer } from '../../../security/auth-enforcer';
+import { AuthEnforcer } from '../../../security/auth-enforcer';
 import { MCPRouterConfig, MCPAuthConfig } from './types.js';
 import { mcpResourceRegistry } from '../../../services/resources/mcp/mcp-resource-registry.js';
 import { logger } from '../../../utils/logger.js';
 import { redactEmail } from '../../../utils/redact.js';
 import { zodSchemaToJson } from '../../../utils/zod-json-schema.js';
-import fs from 'fs';
-import path from 'path';
 
 /**
  * MCP Protocol implementation for tRPC router
@@ -30,6 +28,20 @@ export interface DNSRebindingConfig {
   /** Enable DNS rebinding protection (requires allowedHosts and/or allowedOrigins to be configured) */
   enableDnsRebindingProtection?: boolean;
 }
+
+type DiscoveredTool = {
+  name: string;
+  fullName: string;
+  description: string;
+  inputSchema: any;
+  procedure: any;
+  scopes?: any;
+  category?: string;
+  public?: boolean;
+  requireAdminUser?: boolean;
+  serverName?: string;
+  originalName?: string;
+};
 
 export class MCPProtocolHandler {
   private appRouter: any;
@@ -357,7 +369,7 @@ export class MCPProtocolHandler {
       res.header('Content-Type', 'application/json');
 
       const mcpRequest = req.body;
-      const requestId = mcpRequest.id || 'unknown';
+      // const requestId = mcpRequest.id || 'unknown';
 
       let response;
 
@@ -390,7 +402,7 @@ export class MCPProtocolHandler {
           response = await this.handleResourcesTemplatesList(mcpRequest, req);
           break;
         case 'roots/list':
-          response = await this.handleRootsList(mcpRequest, req);
+          response = await this.handleRootsList(mcpRequest); //, req);
           break;
         case 'notifications/cancelled':
           response = this.handleCancellation(mcpRequest);
@@ -399,7 +411,7 @@ export class MCPProtocolHandler {
           response = this.handleNotificationInitialized(mcpRequest);
           break;
         case 'notifications/roots/list_changed':
-          response = this.handleRootsListChanged(mcpRequest);
+          response = this.handleRootsListChanged(/*mcpRequest*/);
           break;
         default:
           response = this.createErrorResponse(
@@ -511,28 +523,8 @@ export class MCPProtocolHandler {
   }
 
   // Tool discovery and execution methods
-  private extractMCPToolsFromTRPC(): Array<{
-    name: string;
-    fullName: string;
-    description: string;
-    inputSchema: any;
-    procedure: any;
-    scopes?: any;
-    category?: string;
-    public?: boolean;
-    requireAdminUser?: boolean;
-  }> {
-    const tools: Array<{
-      name: string;
-      fullName: string;
-      description: string;
-      inputSchema: any;
-      procedure: any;
-      scopes?: any;
-      category?: string;
-      public?: boolean;
-      requireAdminUser?: boolean;
-    }> = [];
+  private extractMCPToolsFromTRPC(): DiscoveredTool[] {
+    const tools: DiscoveredTool[] = [];
 
     try {
       const allProcedures = this.appRouter?._def?.procedures;
@@ -618,7 +610,8 @@ export class MCPProtocolHandler {
         return prompts;
       }
 
-      for (const [fullName, procedure] of Object.entries(allProcedures)) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for (const [_, procedure] of Object.entries(allProcedures)) {
         const procedureAny = procedure as any;
         const meta = procedureAny?._def?.meta;
 
@@ -717,6 +710,54 @@ export class MCPProtocolHandler {
     return sanitized;
   }
 
+  /**
+   * Normalize arguments for remote MCP tools by stripping runtime metadata and
+   * flattening common wrappers (e.g. { context: {...} }) that AI providers add.
+   */
+  private normalizeRemoteToolArguments(args: any, inputSchema?: any): Record<string, any> {
+    if (!args || typeof args !== 'object') {
+      return args ?? {};
+    }
+
+    const extrasToStrip = new Set(['runId', 'runtimeContext', 'writer']);
+    const contextArgs = args.context && typeof args.context === 'object'
+      ? args.context
+      : undefined;
+
+    const mergedArgs: Record<string, any> = {};
+
+    if (contextArgs) {
+      Object.assign(mergedArgs, contextArgs);
+    }
+
+    for (const [key, value] of Object.entries(args)) {
+      if (key === 'context' || extrasToStrip.has(key)) {
+        continue;
+      }
+      mergedArgs[key] = value;
+    }
+
+    const schemaProperties = inputSchema?.properties;
+    if (schemaProperties && typeof schemaProperties === 'object') {
+      const allowedKeys = new Set(Object.keys(schemaProperties));
+
+      if (allowedKeys.size > 0) {
+        const filteredArgs: Record<string, any> = {};
+        for (const [key, value] of Object.entries(mergedArgs)) {
+          if (allowedKeys.has(key)) {
+            filteredArgs[key] = value;
+          }
+        }
+
+        if (Object.keys(filteredArgs).length > 0) {
+          return filteredArgs;
+        }
+      }
+    }
+
+    return mergedArgs;
+  }
+
   // MCP handler implementations
   private async handleToolsList(request: any, req?: AuthenticatedRequest): Promise<any> {
     try {
@@ -736,6 +777,7 @@ export class MCPProtocolHandler {
 
       // Get all available MCP tools from tRPC procedures
       const mcpTools = this.extractMCPToolsFromTRPC();
+      console.log(`🔍 [MCP] Found ${mcpTools.length} local tRPC MCP tools`);
 
       // Get remote MCP tools if available
       let remoteTools: any[] = [];
@@ -743,37 +785,56 @@ export class MCPProtocolHandler {
         try {
           console.log(`🔍 [MCP] Fetching remote tools from remoteMcpManager...`);
           const toolsByServer = await this.remoteMcpManager.listAllTools();
+          console.log(`📡 [MCP] Retrieved tools from ${toolsByServer.size} remote servers`, Array.from(toolsByServer.keys()));
+          
           // Flatten tools from all servers
           for (const [serverName, tools] of toolsByServer) {
-            remoteTools.push(...tools.map(tool => ({ ...tool, serverName })));
+            if (tools.length > 0) {
+              console.log(`📦 [MCP] Found ${tools.length} tools from server ${serverName}`);
+              remoteTools.push(...tools.map(tool => ({ ...tool, serverName })));
+            } else {
+              console.log(`📦 [MCP] No tools found (or connection failed) from server ${serverName}`);
+            }
           }
-          console.log(`📦 [MCP] Found ${remoteTools.length} remote tools from ${toolsByServer.size} servers`);
+          console.log(`📦 [MCP] Found ${remoteTools.length} total remote tools from ${toolsByServer.size} servers`);
         } catch (err) {
-          console.warn('⚠️ Failed to list remote MCP tools:', err instanceof Error ? err.message : String(err));
+          console.error('❌ Failed to list remote MCP tools:', err instanceof Error ? err.message : String(err));
+          // Log the specific error for debugging
+          console.error('🔍 [MCP] Remote tools listing error details:', err);
         }
+      } else {
+        console.log('📡 [MCP] No remoteMcpManager available, skipping remote tools');
       }
 
       // Combine local tRPC tools and remote MCP tools
+      const remoteToolEntries: DiscoveredTool[] = remoteTools.map((tool: any) => {
+        // Prefix remote tool names to avoid collisions and provide transparency
+        // Can be disabled per-server with prefixToolNames: false
+        const shouldPrefix = tool.prefixToolNames !== false;  // Default: true
+        const toolName = shouldPrefix ? `${tool.serverName}__${tool.name}` : tool.name;
+        const description = shouldPrefix 
+          ? `[${tool.serverName}] ${tool.description || 'Remote MCP tool'}`
+          : tool.description || 'Remote MCP tool';
+
+        return {
+          name: toolName,
+          fullName: toolName,
+          description,
+          inputSchema: tool.inputSchema || { type: 'object', properties: {}, required: [] },
+          procedure: null as any,
+          scopes: null,
+          serverName: tool.serverName,
+          originalName: tool.name
+        };
+      });
+
+      if (remoteToolEntries.length > 0) {
+        logger.debug(`📦 [MCP] Remote tools discovered: ${remoteToolEntries.map(tool => tool.name).join(', ')}`);
+      }
+
       const allTools = [
         ...mcpTools,
-        ...remoteTools.map((tool: any) => {
-          // Prefix remote tool names to avoid collisions and provide transparency
-          // Can be disabled per-server with prefixToolNames: false
-          const shouldPrefix = tool.prefixToolNames !== false;  // Default: true
-          const toolName = shouldPrefix ? `${tool.serverName}__${tool.name}` : tool.name;
-          const description = shouldPrefix 
-            ? `[${tool.serverName}] ${tool.description || 'Remote MCP tool'}`
-            : tool.description || 'Remote MCP tool';
-
-          return {
-            name: toolName,
-            fullName: toolName,
-            description,
-            inputSchema: tool.inputSchema || { type: 'object', properties: {}, required: [] },
-            procedure: null as any,
-            scopes: null
-          };
-        })
+        ...remoteToolEntries
       ];
 
       // Filter tools based on auth and visibility rules
@@ -856,27 +917,30 @@ export class MCPProtocolHandler {
 
       // Find the requested tool (check both local and remote)
       const mcpTools = this.extractMCPToolsFromTRPC();
-      let tool = mcpTools.find(t => t.name === name || t.fullName === name);
+      let tool: DiscoveredTool | undefined = mcpTools.find(t => t.name === name || t.fullName === name);
       let isRemoteTool = false;
 
       // If not found locally, check remote tools
       if (!tool && this.remoteMcpManager) {
         try {
           const toolsByServer = await this.remoteMcpManager.listAllTools();
+          const normalizedName = typeof name === 'string' && name.includes('__')
+            ? name.split('__').pop()
+            : name;
           // Flatten and search for tool
           for (const [serverName, tools] of toolsByServer) {
-            const remoteTool = tools.find((t: any) => t.name === name);
+            const remoteTool = tools.find((t: any) => t.name === name || t.name === normalizedName);
             if (remoteTool) {
               tool = {
-                name: remoteTool.name,
-                fullName: remoteTool.name,
+                name,
+                fullName: name,
                 description: remoteTool.description || 'Remote MCP tool',
                 inputSchema: remoteTool.inputSchema || { type: 'object', properties: {}, required: [] },
                 procedure: null as any,
-                scopes: null
+                scopes: null,
+                serverName,
+                originalName: remoteTool.name
               };
-              // Store serverName separately since it's not in the type
-              (tool as any).serverName = serverName;
               isRemoteTool = true;
               break;
             }
@@ -970,7 +1034,9 @@ export class MCPProtocolHandler {
         // Execute remote MCP tool
         logger.debug(`Executing remote tool ${name} on server ${(tool as any).serverName}`);
         try {
-          result = await this.remoteMcpManager.callTool((tool as any).serverName, name, args || {});
+          const remoteToolName = (tool as any).originalName || name;
+          const normalizedArgs = this.normalizeRemoteToolArguments(args || {}, tool.inputSchema);
+          result = await this.remoteMcpManager.callTool((tool as any).serverName, remoteToolName, normalizedArgs);
           logger.debug(`Remote tool ${name} executed successfully`);
         } catch (error) {
           logger.error(`Remote tool ${name} execution failed:`, error);
@@ -1376,86 +1442,6 @@ export class MCPProtocolHandler {
     }
   }
 
-  private async handleLegacyPromptsList(request: any, req?: AuthenticatedRequest): Promise<any> {
-    // Legacy implementation for extension-based prompts
-    try {
-      const prompts = [];
-
-      if (this.extensionsConfig?.prompts) {
-        const promptsConfig = this.extensionsConfig.prompts;
-
-        // Add custom prompts
-        if (promptsConfig.customPrompts) {
-          for (const prompt of promptsConfig.customPrompts) {
-            prompts.push({
-              name: prompt.name,
-              description: prompt.description || `Custom prompt: ${prompt.name}`,
-              arguments: prompt.arguments || []
-            });
-          }
-        }
-
-        // Note: Built-in prompts are no longer automatically included
-        // Add them manually via customPrompts if needed
-        if (false) { // Disabled - only custom prompts are supported
-          prompts.push(
-            {
-              name: "code-review",
-              description: "Comprehensive code review analysis with security, performance, and maintainability insights",
-              arguments: [
-                {
-                  name: "code",
-                  description: "The code to review",
-                  required: true
-                },
-                {
-                  name: "language",
-                  description: "Programming language (optional)",
-                  required: false
-                }
-              ]
-            },
-            {
-              name: "api-documentation",
-              description: "Generate comprehensive API documentation from code",
-              arguments: [
-                {
-                  name: "code",
-                  description: "The API code to document",
-                  required: true
-                },
-                {
-                  name: "format",
-                  description: "Documentation format (markdown, json, yaml)",
-                  required: false
-                }
-              ]
-            }
-          );
-        }
-      }
-
-      logger.debug(`MCP prompts/list (legacy): ${prompts.length} prompts available`);
-
-      return {
-        jsonrpc: '2.0',
-        id: request.id,
-        result: {
-          prompts
-        }
-      };
-
-    } catch (error) {
-      console.error('❌ Error in handleLegacyPromptsList:', error);
-      return this.createErrorResponse(
-        request.id,
-        ErrorCode.InternalError,
-        'Failed to list prompts',
-        error instanceof Error ? error.message : String(error)
-      );
-    }
-  }
-
   private async handleResourcesList(request: any, req?: AuthenticatedRequest): Promise<any> {
     try {
       // Check auth requirements if enabled
@@ -1646,7 +1632,7 @@ export class MCPProtocolHandler {
     }
   }
 
-  private async handleRootsList(request: any, req?: AuthenticatedRequest): Promise<any> {
+  private async handleRootsList(request: any/*, req?: AuthenticatedRequest*/): Promise<any> {
     try {
       // Check if client has indicated roots capability during initialization
       const hasClientRootsCapability = this.clientCapabilities?.roots?.listChanged === true;
@@ -1710,7 +1696,7 @@ export class MCPProtocolHandler {
     };
   }
 
-  private handleRootsListChanged(request: any) {
+  private handleRootsListChanged(/*request: any*/) {
     console.log('🗂️ MCP notification/roots/list_changed received');
     console.log('📋 Client has updated their exposed workspace roots');
 

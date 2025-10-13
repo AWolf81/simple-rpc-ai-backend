@@ -118,7 +118,36 @@ async function startServer() {
         auth: {
           requireAuthForToolsList: false,
           requireAuthForToolsCall: false,
-          publicTools: ['add', 'multiply', 'calculate', 'greeting', 'status', 'readFile', 'listFiles', 'getFileInfo', 'getPrompts', 'getPromptTemplate', 'explainConcept']
+          publicTools: [
+            // Local sample tools exposed publicly
+            'add',
+            'multiply',
+            'calculate',
+            'greeting',
+            'status',
+            'readFile',
+            'listFiles',
+            'getFileInfo',
+            'getPrompts',
+            'getPromptTemplate',
+            'explainConcept',
+            // Remote DuckDuckGo tools (prefix comes from remote server namespace, take the tool names from the terminal log)            
+            'duckduckgo-search__search',
+            'duckduckgo-search__fetch_content',
+            'context7__resolve-library-id', 
+            'context7__get-library-docs',
+            'timestamp__get_current_time', 
+            'timestamp__convert_time',
+            'git-mcp__git_status', 
+            'git-mcp__git_add',
+            'git-mcp__git_commit',
+            'git-mcp__git_log',
+            'git-mcp__git_diff',
+            'git-mcp__git_create_branch',
+            'git-mcp__git_checkout',
+            'git-mcp__git_diff'
+            // other git tools --> git_diff_unstaged, git_diff_staged, git_reset, git_create_branch, git_show, git_init
+          ], // To allow every discovered tool without enumerating, set publicTools to 'default'
         },
         extensions: {
           // Legacy prompt system removed - use tRPC-based MCP prompts instead
@@ -379,17 +408,53 @@ Format: ${format}`;
       },
 
       // Remote MCP Servers - External MCP servers for additional tools
-      // Smithery provides hosted MCP servers via SSE (Server-Sent Events)
+      // Smithery provides hosted MCP servers via Streamable HTTP connections
       // Requires both api_key and profile parameters
       remoteMcpServers: {
-        enabled: false,  // Disabled for testing - SSE connection issues
+        enabled: true,  // Enable remote tool discovery
+        containerOptions: {
+          namePrefix: '',
+          reuse: false,
+          removeOnExit: true
+        },
         servers: [
           {
             name: 'duckduckgo-search',
-            transport: 'sse',  // Use SSE for stateful Smithery connections
+            transport: 'streamableHttp',  // Use official streamable HTTP MCP transport
             url: `https://server.smithery.ai/@nickclyde/duckduckgo-mcp-server/mcp?api_key=${process.env.SMITHERY_API_KEY}&profile=${process.env.SMITHERY_PROFILE}`,
-            autoStart: false,  // SSE connections are established in connect()
+            autoStart: false,  // Streamable HTTP connections are established in connect()
             timeout: 30000
+          },
+          {
+            name: 'timestamp',
+            transport: 'uvx',
+            command: 'mcp-server-time',
+            autoStart: true,
+            timeout: 120000
+          },
+          {
+            name: 'context7',
+            transport: 'npx',
+            command: '@upstash/context7-mcp',
+            runnerArgs: ['-y'], // Auto-confirm installation prompt
+            args: [
+              '--api-key',
+              process.env.CONTEXT7_API_KEY || ''
+            ],
+            autoStart: true,
+            timeout: 30000
+          },
+          {
+            name: 'git-mcp',
+            transport: 'docker',
+            image: 'mcp/git',
+            containerArgs: [
+              '--mount', `type=bind,src=${process.env.GIT_MCP_HOST_DIR || path.resolve(__dirname, 'data/git-workspace')},dst=/workspace`
+            ],
+            autoStart: true,
+            timeout: 45000,
+            reuseContainer: process.env.GIT_MCP_REUSE === 'true',
+            removeOnExit: process.env.GIT_MCP_REUSE === 'true' ? false : undefined
           }
         ]
       }
