@@ -97,7 +97,7 @@ curl -X POST http://localhost:8000/rpc \
   }'
 ```
 
-For local development inside this repository (contributors/maintainers), see the **[Developer Guide](https://awolf81.github.io/simple-rpc-ai-backend/developer/)**.
+For local development inside this repository (contributors/maintainers), see the **[Documentation](https://awolf81.github.io/simple-rpc-ai-backend/)**.
 
 ---
 
@@ -157,7 +157,7 @@ Full guides, API reference, and examples hosted on GitHub Pages. Includes:
 - **[Getting Started](https://awolf81.github.io/simple-rpc-ai-backend/getting-started/)** – Installation, quick start, and basic usage
 - **[Server API Reference](https://awolf81.github.io/simple-rpc-ai-backend/server-api/)** – Complete API documentation with examples
 - **[Common Configurations](https://awolf81.github.io/simple-rpc-ai-backend/common-configurations/)** – Recipes for typical use cases
-- **[Developer Guide](https://awolf81.github.io/simple-rpc-ai-backend/getting-started/installation.html)** – Contributing, architecture, and internals
+- **[Developer Installation Guide](https://awolf81.github.io/simple-rpc-ai-backend/getting-started/installation.html)** – Contributing, architecture, and internals
 
 **💻 Sample Projects**
 Working examples in the [`examples/`](examples/) directory:
