@@ -56,7 +56,7 @@ async function startServer() {
       },
 
       // AI Provider Configuration (minimal for task management)
-      serverProviders: ['anthropic'],
+      providers: ['anthropic'],
       systemPrompts: {
         default: 'You are a task management assistant helping with task scheduling, monitoring, and lifecycle management.'
       },

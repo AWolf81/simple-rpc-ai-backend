@@ -6,14 +6,12 @@ import { ScopeValidator } from '../../../auth/scopes';
 import { JWTMiddleware, type AuthenticatedRequest } from '../../../auth/jwt-middleware';
 import { MCPRateLimiter, getDefaultRateLimiter } from '../../../security/rate-limiter';
 import { SecurityLogger, getDefaultSecurityLogger } from '../../../security/security-logger';
-import { AuthEnforcer, getDefaultAuthEnforcer } from '../../../security/auth-enforcer';
+import { AuthEnforcer } from '../../../security/auth-enforcer';
 import { MCPRouterConfig, MCPAuthConfig } from './types.js';
 import { mcpResourceRegistry } from '../../../services/resources/mcp/mcp-resource-registry.js';
 import { logger } from '../../../utils/logger.js';
 import { redactEmail } from '../../../utils/redact.js';
 import { zodSchemaToJson } from '../../../utils/zod-json-schema.js';
-import fs from 'fs';
-import path from 'path';
 
 /**
  * MCP Protocol implementation for tRPC router
@@ -31,6 +29,20 @@ export interface DNSRebindingConfig {
   enableDnsRebindingProtection?: boolean;
 }
 
+type DiscoveredTool = {
+  name: string;
+  fullName: string;
+  description: string;
+  inputSchema: any;
+  procedure: any;
+  scopes?: any;
+  category?: string;
+  public?: boolean;
+  requireAdminUser?: boolean;
+  serverName?: string;
+  originalName?: string;
+};
+
 export class MCPProtocolHandler {
   private appRouter: any;
   private adminUsers: string[];
@@ -46,9 +58,11 @@ export class MCPProtocolHandler {
   private aiEnabled: boolean;
   private namespaceWhitelist?: string[];
   private remoteMcpManager?: any; // Remote MCP manager for external tools
+  private config?: MCPRouterConfig;
 
   constructor(appRouter: any, config?: MCPRouterConfig, remoteMcpManager?: any) {
     this.appRouter = appRouter;
+    this.config = config;
     this.adminUsers = config?.adminUsers || [];
     this.jwtMiddleware = config?.jwtMiddleware;
     this.aiEnabled = config?.ai?.enabled || false;
@@ -188,16 +202,20 @@ export class MCPProtocolHandler {
   /**
    * Determine if a tool should be public based on hybrid configuration
    */
-  private isToolPublic(tool: { name: string; category?: string; public?: boolean }): boolean {
+  private isToolPublic(tool: { name: string; fullName?: string; originalName?: string; category?: string; public?: boolean }): boolean {
     // 1. Explicit deny always wins (security override)
-    if (this.authConfig.denyPublicTools?.includes(tool.name)) {
+    const denyList = this.authConfig.denyPublicTools || [];
+    if (denyList.includes(tool.name) || (tool.fullName && denyList.includes(tool.fullName)) || (tool.originalName && denyList.includes(tool.originalName))) {
       return false;
     }
 
     // 2. Explicit allow list (array of tool names)
-    if (Array.isArray(this.authConfig.publicTools)) {
-      return this.authConfig.publicTools.includes(tool.name);
-    }
+   if (Array.isArray(this.authConfig.publicTools)) {
+     if (this.authConfig.publicTools.includes(tool.name)) {
+       return true;
+     }
+     return false;
+   }
 
     // 3. 'default' means use tool metadata + category filtering
     if (this.authConfig.publicTools === 'default') {
@@ -210,9 +228,9 @@ export class MCPProtocolHandler {
     }
 
     // 4. Legacy support
-    if (this.authConfig._legacyPublicTools?.includes(tool.name)) {
-      return true;
-    }
+   if (this.authConfig._legacyPublicTools?.includes(tool.name) || (tool.fullName && this.authConfig._legacyPublicTools?.includes(tool.fullName))) {
+     return true;
+   }
 
     // 5. Default: tool metadata
     return tool.public === true;
@@ -357,7 +375,7 @@ export class MCPProtocolHandler {
       res.header('Content-Type', 'application/json');
 
       const mcpRequest = req.body;
-      const requestId = mcpRequest.id || 'unknown';
+      // const requestId = mcpRequest.id || 'unknown';
 
       let response;
 
@@ -390,7 +408,7 @@ export class MCPProtocolHandler {
           response = await this.handleResourcesTemplatesList(mcpRequest, req);
           break;
         case 'roots/list':
-          response = await this.handleRootsList(mcpRequest, req);
+          response = await this.handleRootsList(mcpRequest); //, req);
           break;
         case 'notifications/cancelled':
           response = this.handleCancellation(mcpRequest);
@@ -399,7 +417,7 @@ export class MCPProtocolHandler {
           response = this.handleNotificationInitialized(mcpRequest);
           break;
         case 'notifications/roots/list_changed':
-          response = this.handleRootsListChanged(mcpRequest);
+          response = this.handleRootsListChanged(/*mcpRequest*/);
           break;
         default:
           response = this.createErrorResponse(
@@ -511,28 +529,8 @@ export class MCPProtocolHandler {
   }
 
   // Tool discovery and execution methods
-  private extractMCPToolsFromTRPC(): Array<{
-    name: string;
-    fullName: string;
-    description: string;
-    inputSchema: any;
-    procedure: any;
-    scopes?: any;
-    category?: string;
-    public?: boolean;
-    requireAdminUser?: boolean;
-  }> {
-    const tools: Array<{
-      name: string;
-      fullName: string;
-      description: string;
-      inputSchema: any;
-      procedure: any;
-      scopes?: any;
-      category?: string;
-      public?: boolean;
-      requireAdminUser?: boolean;
-    }> = [];
+  private extractMCPToolsFromTRPC(): DiscoveredTool[] {
+    const tools: DiscoveredTool[] = [];
 
     try {
       const allProcedures = this.appRouter?._def?.procedures;
@@ -618,7 +616,8 @@ export class MCPProtocolHandler {
         return prompts;
       }
 
-      for (const [fullName, procedure] of Object.entries(allProcedures)) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for (const [_, procedure] of Object.entries(allProcedures)) {
         const procedureAny = procedure as any;
         const meta = procedureAny?._def?.meta;
 
@@ -717,6 +716,303 @@ export class MCPProtocolHandler {
     return sanitized;
   }
 
+  /**
+   * Normalize arguments for remote MCP tools by stripping runtime metadata and
+   * flattening common wrappers (e.g. { context: {...} }) that AI providers add.
+   * Also coerces simple scalar inputs into the required object shape when the
+   * remote tool expects a structured payload (e.g. timezone strings).
+   */
+  private normalizeRemoteToolArguments(args: any, inputSchema?: any): Record<string, any> {
+    const schemaProperties = inputSchema?.properties;
+    const schemaKeys = schemaProperties && typeof schemaProperties === 'object'
+      ? Object.keys(schemaProperties)
+      : [];
+    const requiredKeys = Array.isArray(inputSchema?.required)
+      ? inputSchema.required.filter((key: unknown): key is string => typeof key === 'string')
+      : [];
+    const primaryKey = requiredKeys[0] || schemaKeys[0];
+
+    // Handle scalar/array payloads by coercing into schema shape
+    if (args === null || args === undefined) {
+      return {};
+    }
+
+    if (typeof args !== 'object' || Array.isArray(args)) {
+      if (primaryKey) {
+        const scalar = this.extractScalarValue(args);
+        if (scalar !== undefined) {
+          return { [primaryKey]: scalar };
+        }
+      }
+      return typeof args === 'object' ? args ?? {} : (primaryKey ? { [primaryKey]: args } : { value: args });
+    }
+
+    const extrasToStrip = new Set(['runId', 'runtimeContext', 'writer']);
+    const contextArgs = args.context && typeof args.context === 'object'
+      ? args.context
+      : undefined;
+
+    const mergedArgs: Record<string, any> = {};
+
+    if (contextArgs) {
+      Object.assign(mergedArgs, contextArgs);
+    }
+
+    for (const [key, value] of Object.entries(args)) {
+      if (key === 'context' || extrasToStrip.has(key)) {
+        continue;
+      }
+      mergedArgs[key] = value;
+    }
+
+    let candidateArgs = { ...mergedArgs };
+    if (schemaKeys.length > 0) {
+      const allowedKeys = new Set(schemaKeys);
+      const filteredArgs: Record<string, any> = {};
+      for (const [key, value] of Object.entries(mergedArgs)) {
+        if (allowedKeys.has(key)) {
+          filteredArgs[key] = value;
+        }
+      }
+
+      if (Object.keys(filteredArgs).length > 0) {
+        candidateArgs = filteredArgs;
+      } else if (primaryKey) {
+        // Attempt to map single-value payloads (e.g. { value: 'Europe/Berlin' })
+        const scalarFromMerged = this.extractScalarValue(mergedArgs);
+        if (scalarFromMerged !== undefined) {
+          candidateArgs = { [primaryKey]: scalarFromMerged };
+        }
+      }
+    }
+
+    if (primaryKey && candidateArgs[primaryKey] === undefined) {
+      const fallbackValue = this.extractScalarValue(args);
+      if (fallbackValue !== undefined) {
+        candidateArgs[primaryKey] = fallbackValue;
+      }
+    }
+
+    // Ensure required properties are populated when possible
+    for (const requiredKey of requiredKeys) {
+      if (candidateArgs[requiredKey] === undefined) {
+        const aliasValue = this.extractValueFromAliases(args, ['value', 'input', 'text', 'content']);
+        if (aliasValue !== undefined) {
+          candidateArgs[requiredKey] = aliasValue;
+        }
+      }
+    }
+
+    // Coerce values to expected primitive types when schema provides hints
+    if (schemaProperties && typeof schemaProperties === 'object') {
+      for (const [key, schema] of Object.entries(schemaProperties as Record<string, any>)) {
+        if (!(key in candidateArgs)) {
+          continue;
+        }
+
+        const expectedType = Array.isArray(schema?.type) ? schema.type[0] : schema?.type;
+        const currentValue = candidateArgs[key];
+
+        if (expectedType === 'string' && typeof currentValue !== 'string') {
+          const scalar = this.extractScalarValue(currentValue);
+          if (scalar !== undefined) {
+            candidateArgs[key] = String(scalar);
+          }
+        } else if ((expectedType === 'number' || expectedType === 'integer') && typeof currentValue !== 'number') {
+          const scalar = this.extractScalarValue(currentValue);
+          const parsed = scalar !== undefined ? Number(scalar) : NaN;
+          if (!Number.isNaN(parsed)) {
+            candidateArgs[key] = parsed;
+          }
+        } else if (expectedType === 'boolean' && typeof currentValue !== 'boolean') {
+          const scalar = this.extractScalarValue(currentValue);
+          if (typeof scalar === 'string') {
+            const normalized = scalar.trim().toLowerCase();
+            if (normalized === 'true' || normalized === '1') {
+              candidateArgs[key] = true;
+            } else if (normalized === 'false' || normalized === '0') {
+              candidateArgs[key] = false;
+            }
+          } else if (typeof scalar === 'number') {
+            candidateArgs[key] = scalar !== 0;
+          }
+        }
+      }
+    }
+
+    return candidateArgs;
+  }
+
+  private extractScalarValue(value: any): any | undefined {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const scalar = this.extractScalarValue(item);
+        if (scalar !== undefined) {
+          return scalar;
+        }
+      }
+      return undefined;
+    }
+    if (typeof value === 'object') {
+      if (typeof value.text === 'string') {
+        return value.text;
+      }
+      if (typeof value.value === 'string' || typeof value.value === 'number' || typeof value.value === 'boolean') {
+        return value.value;
+      }
+      if (typeof value.input === 'string' || typeof value.input === 'number' || typeof value.input === 'boolean') {
+        return value.input;
+      }
+      if (Array.isArray(value.content)) {
+        return this.extractScalarValue(value.content);
+      }
+    }
+    return undefined;
+  }
+
+  private extractValueFromAliases(source: any, aliases: string[]): any | undefined {
+    if (!source || typeof source !== 'object') {
+      return undefined;
+    }
+
+    for (const alias of aliases) {
+      if (Object.prototype.hasOwnProperty.call(source, alias)) {
+        const value = (source as Record<string, any>)[alias];
+        const scalar = this.extractScalarValue(value);
+        if (scalar !== undefined) {
+          return scalar;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private stripHtmlPayload(message: string): string {
+    const htmlIndex = message.search(/<\s*(?:!doctype|html|head|body|div|span|p)[\s>]/i);
+    if (htmlIndex !== -1) {
+      const prefix = message.slice(0, htmlIndex).replace(/\s*[:\-–]+\s*$/, '');
+      return `${prefix || 'Received HTML response'} (response body omitted)`;
+    }
+
+    if (message.length > 500) {
+      return `${message.slice(0, 500)}…`;
+    }
+
+    return message;
+  }
+
+  private formatErrorMessage(error: unknown): string {
+    if (!error) {
+      return 'Unknown error';
+    }
+
+    if (error instanceof Error) {
+      const sanitized = error.message?.trim();
+      if (sanitized) {
+        return this.stripHtmlPayload(sanitized);
+      }
+    }
+
+    if (typeof error === 'string') {
+      return this.stripHtmlPayload(error.trim());
+    }
+
+    if (typeof error === 'object') {
+      const maybeMessage = (error as any).message || (error as any).error;
+      if (typeof maybeMessage === 'string') {
+        return this.stripHtmlPayload(maybeMessage.trim());
+      }
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return 'Remote tool execution failed';
+      }
+    }
+
+    return 'Remote tool execution failed';
+  }
+
+  private validateRemoteToolArguments(args: Record<string, any>, inputSchema?: any): { valid: boolean; message?: string } {
+    if (!inputSchema || typeof inputSchema !== 'object') {
+      return { valid: true };
+    }
+
+    const requiredKeys = Array.isArray(inputSchema.required)
+      ? inputSchema.required.filter((key: unknown): key is string => typeof key === 'string')
+      : [];
+    const properties = inputSchema.properties && typeof inputSchema.properties === 'object'
+      ? (inputSchema.properties as Record<string, any>)
+      : {};
+
+    const missingKeys: string[] = [];
+    for (const key of requiredKeys) {
+      const value = args[key];
+      const isEmptyString = typeof value === 'string' && value.trim().length === 0;
+      if (value === undefined || value === null || isEmptyString) {
+        missingKeys.push(key);
+      }
+    }
+
+    if (missingKeys.length > 0) {
+      return {
+        valid: false,
+        message: `Missing required argument${missingKeys.length > 1 ? 's' : ''}: ${missingKeys.join(', ')}`
+      };
+    }
+
+    for (const [key, schema] of Object.entries(properties)) {
+      if (!(key in args)) {
+        continue;
+      }
+
+      const expectedType = Array.isArray(schema?.type) ? schema.type[0] : schema?.type;
+      const value = args[key];
+
+      if (!expectedType || value === null || value === undefined) {
+        continue;
+      }
+
+      switch (expectedType) {
+        case 'string':
+          if (typeof value !== 'string') {
+            return { valid: false, message: `Argument '${key}' must be a string` };
+          }
+          break;
+        case 'number':
+        case 'integer':
+          if (typeof value !== 'number' || Number.isNaN(value)) {
+            return { valid: false, message: `Argument '${key}' must be a number` };
+          }
+          break;
+        case 'boolean':
+          if (typeof value !== 'boolean') {
+            return { valid: false, message: `Argument '${key}' must be a boolean` };
+          }
+          break;
+        case 'object':
+          if (typeof value !== 'object' || Array.isArray(value)) {
+            return { valid: false, message: `Argument '${key}' must be an object` };
+          }
+          break;
+        case 'array':
+          if (!Array.isArray(value)) {
+            return { valid: false, message: `Argument '${key}' must be an array` };
+          }
+          break;
+        default:
+          break;
+      }
+    }
+
+    return { valid: true };
+  }
+
   // MCP handler implementations
   private async handleToolsList(request: any, req?: AuthenticatedRequest): Promise<any> {
     try {
@@ -736,6 +1032,7 @@ export class MCPProtocolHandler {
 
       // Get all available MCP tools from tRPC procedures
       const mcpTools = this.extractMCPToolsFromTRPC();
+      console.log(`🔍 [MCP] Found ${mcpTools.length} local tRPC MCP tools`);
 
       // Get remote MCP tools if available
       let remoteTools: any[] = [];
@@ -743,45 +1040,63 @@ export class MCPProtocolHandler {
         try {
           console.log(`🔍 [MCP] Fetching remote tools from remoteMcpManager...`);
           const toolsByServer = await this.remoteMcpManager.listAllTools();
+          console.log(`📡 [MCP] Retrieved tools from ${toolsByServer.size} remote servers`, Array.from(toolsByServer.keys()));
+          
           // Flatten tools from all servers
           for (const [serverName, tools] of toolsByServer) {
-            remoteTools.push(...tools.map(tool => ({ ...tool, serverName })));
+            if (tools.length > 0) {
+              console.log(`📦 [MCP] Found ${tools.length} tools from server ${serverName}`);
+              remoteTools.push(...tools.map(tool => ({ ...tool, serverName })));
+            } else {
+              console.log(`📦 [MCP] No tools found (or connection failed) from server ${serverName}`);
+            }
           }
-          console.log(`📦 [MCP] Found ${remoteTools.length} remote tools from ${toolsByServer.size} servers`);
+          console.log(`📦 [MCP] Found ${remoteTools.length} total remote tools from ${toolsByServer.size} servers`);
         } catch (err) {
-          console.warn('⚠️ Failed to list remote MCP tools:', err instanceof Error ? err.message : String(err));
+          console.error('❌ Failed to list remote MCP tools:', err instanceof Error ? err.message : String(err));
+          // Log the specific error for debugging
+          console.error('🔍 [MCP] Remote tools listing error details:', err);
         }
+      } else {
+        console.log('📡 [MCP] No remoteMcpManager available, skipping remote tools');
       }
 
       // Combine local tRPC tools and remote MCP tools
-      const allTools = [
-        ...mcpTools,
-        ...remoteTools.map((tool: any) => {
-          // Prefix remote tool names to avoid collisions and provide transparency
-          // Can be disabled per-server with prefixToolNames: false
-          const shouldPrefix = tool.prefixToolNames !== false;  // Default: true
-          const toolName = shouldPrefix ? `${tool.serverName}__${tool.name}` : tool.name;
-          const description = shouldPrefix 
-            ? `[${tool.serverName}] ${tool.description || 'Remote MCP tool'}`
-            : tool.description || 'Remote MCP tool';
+      const remoteToolEntries: DiscoveredTool[] = remoteTools.map((tool: any) => {
+        // Prefix remote tool names to avoid collisions and provide transparency
+        // Can be disabled per-server with prefixToolNames: false
+        const globalPrefix = this.config?.remoteMcpServers?.prefixToolNames ?? true;
+        const canonicalName = `${tool.serverName}__${tool.name}`;
+        const shouldPrefix = tool.prefixToolNames ?? globalPrefix;  // Default: true
+        const toolName = tool.displayName ?? (shouldPrefix ? canonicalName : tool.name);
+        const description = shouldPrefix 
+          ? `[${tool.serverName}] ${tool.description || 'Remote MCP tool'}`
+          : tool.description || 'Remote MCP tool';
 
-          return {
-            name: toolName,
-            fullName: toolName,
-            description,
-            inputSchema: tool.inputSchema || { type: 'object', properties: {}, required: [] },
-            procedure: null as any,
-            scopes: null
-          };
-        })
-      ];
+        return {
+          name: toolName,
+          fullName: canonicalName,
+          description,
+          inputSchema: tool.inputSchema || { type: 'object', properties: {}, required: [] },
+          procedure: null as any,
+          scopes: null,
+          serverName: tool.serverName,
+          originalName: tool.originalName || tool.name
+        };
+      });
+
+      if (remoteToolEntries.length > 0) {
+        logger.debug(`📦 [MCP] Remote tools discovered: ${remoteToolEntries.map(tool => tool.name).join(', ')}`);
+      }
 
       // Filter tools based on auth and visibility rules
-      const availableTools = allTools
+      const availableTools = [...mcpTools, ...remoteToolEntries]
         .map(tool => {
           // Check if tool should be public
           const isPublic = this.isToolPublic({
             name: tool.name,
+            fullName: tool.fullName,
+            originalName: (tool as any).originalName,
             public: true // Default to public for tRPC MCP tools
           });
 
@@ -856,27 +1171,30 @@ export class MCPProtocolHandler {
 
       // Find the requested tool (check both local and remote)
       const mcpTools = this.extractMCPToolsFromTRPC();
-      let tool = mcpTools.find(t => t.name === name || t.fullName === name);
+      let tool: DiscoveredTool | undefined = mcpTools.find(t => t.name === name || t.fullName === name);
       let isRemoteTool = false;
 
       // If not found locally, check remote tools
       if (!tool && this.remoteMcpManager) {
         try {
           const toolsByServer = await this.remoteMcpManager.listAllTools();
+          const normalizedName = typeof name === 'string' && name.includes('__')
+            ? name.split('__').pop()
+            : name;
           // Flatten and search for tool
           for (const [serverName, tools] of toolsByServer) {
-            const remoteTool = tools.find((t: any) => t.name === name);
+            const remoteTool = tools.find((t: any) => t.displayName === name || t.fullName === name || t.name === name);
             if (remoteTool) {
               tool = {
-                name: remoteTool.name,
-                fullName: remoteTool.name,
+                name: remoteTool.displayName || remoteTool.name,
+                fullName: remoteTool.fullName || `${serverName}__${remoteTool.name}`,
                 description: remoteTool.description || 'Remote MCP tool',
                 inputSchema: remoteTool.inputSchema || { type: 'object', properties: {}, required: [] },
                 procedure: null as any,
-                scopes: null
+                scopes: null,
+                serverName,
+                originalName: remoteTool.originalName || remoteTool.name
               };
-              // Store serverName separately since it's not in the type
-              (tool as any).serverName = serverName;
               isRemoteTool = true;
               break;
             }
@@ -970,11 +1288,27 @@ export class MCPProtocolHandler {
         // Execute remote MCP tool
         logger.debug(`Executing remote tool ${name} on server ${(tool as any).serverName}`);
         try {
-          result = await this.remoteMcpManager.callTool((tool as any).serverName, name, args || {});
+          const remoteToolName = (tool as any).originalName || name;
+          const normalizedArgs = this.normalizeRemoteToolArguments(args || {}, tool.inputSchema);
+          const validationResult = this.validateRemoteToolArguments(normalizedArgs, tool.inputSchema);
+          if (!validationResult.valid) {
+            return this.createErrorResponse(
+              request.id,
+              ErrorCode.InvalidParams,
+              validationResult.message || 'Invalid arguments for remote tool'
+            );
+          }
+          result = await this.remoteMcpManager.callTool((tool as any).serverName, remoteToolName, normalizedArgs);
           logger.debug(`Remote tool ${name} executed successfully`);
         } catch (error) {
-          logger.error(`Remote tool ${name} execution failed:`, error);
-          throw error;
+          logger.error(
+            `Remote tool ${name} execution failed: ${this.formatErrorMessage(error)}`
+          );
+          return this.createErrorResponse(
+            request.id,
+            ErrorCode.InternalError,
+            this.formatErrorMessage(error)
+          );
         }
       } else {
         // Execute local tRPC procedure
@@ -1376,86 +1710,6 @@ export class MCPProtocolHandler {
     }
   }
 
-  private async handleLegacyPromptsList(request: any, req?: AuthenticatedRequest): Promise<any> {
-    // Legacy implementation for extension-based prompts
-    try {
-      const prompts = [];
-
-      if (this.extensionsConfig?.prompts) {
-        const promptsConfig = this.extensionsConfig.prompts;
-
-        // Add custom prompts
-        if (promptsConfig.customPrompts) {
-          for (const prompt of promptsConfig.customPrompts) {
-            prompts.push({
-              name: prompt.name,
-              description: prompt.description || `Custom prompt: ${prompt.name}`,
-              arguments: prompt.arguments || []
-            });
-          }
-        }
-
-        // Note: Built-in prompts are no longer automatically included
-        // Add them manually via customPrompts if needed
-        if (false) { // Disabled - only custom prompts are supported
-          prompts.push(
-            {
-              name: "code-review",
-              description: "Comprehensive code review analysis with security, performance, and maintainability insights",
-              arguments: [
-                {
-                  name: "code",
-                  description: "The code to review",
-                  required: true
-                },
-                {
-                  name: "language",
-                  description: "Programming language (optional)",
-                  required: false
-                }
-              ]
-            },
-            {
-              name: "api-documentation",
-              description: "Generate comprehensive API documentation from code",
-              arguments: [
-                {
-                  name: "code",
-                  description: "The API code to document",
-                  required: true
-                },
-                {
-                  name: "format",
-                  description: "Documentation format (markdown, json, yaml)",
-                  required: false
-                }
-              ]
-            }
-          );
-        }
-      }
-
-      logger.debug(`MCP prompts/list (legacy): ${prompts.length} prompts available`);
-
-      return {
-        jsonrpc: '2.0',
-        id: request.id,
-        result: {
-          prompts
-        }
-      };
-
-    } catch (error) {
-      console.error('❌ Error in handleLegacyPromptsList:', error);
-      return this.createErrorResponse(
-        request.id,
-        ErrorCode.InternalError,
-        'Failed to list prompts',
-        error instanceof Error ? error.message : String(error)
-      );
-    }
-  }
-
   private async handleResourcesList(request: any, req?: AuthenticatedRequest): Promise<any> {
     try {
       // Check auth requirements if enabled
@@ -1646,7 +1900,7 @@ export class MCPProtocolHandler {
     }
   }
 
-  private async handleRootsList(request: any, req?: AuthenticatedRequest): Promise<any> {
+  private async handleRootsList(request: any/*, req?: AuthenticatedRequest*/): Promise<any> {
     try {
       // Check if client has indicated roots capability during initialization
       const hasClientRootsCapability = this.clientCapabilities?.roots?.listChanged === true;
@@ -1710,7 +1964,7 @@ export class MCPProtocolHandler {
     };
   }
 
-  private handleRootsListChanged(request: any) {
+  private handleRootsListChanged(/*request: any*/) {
     console.log('🗂️ MCP notification/roots/list_changed received');
     console.log('📋 Client has updated their exposed workspace roots');
 

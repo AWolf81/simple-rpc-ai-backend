@@ -43,7 +43,8 @@ console.log("config", port)
 // Start the server with minimal configuration
 const server = createRpcAiServer({
   port: port,
-  serverProviders: [ 'anthropic', 'openai', 'google', 'openrouter' ],
+  // Provider configuration (new API - both 'providers' and 'serverProviders' work)
+  providers: [ 'anthropic', 'openai', 'google', 'openrouter' ],
   protocols: {
     jsonRpc: true,  // Keep JSON-RPC for compatibility
     tRpc: true      // Enable tRPC for development panel

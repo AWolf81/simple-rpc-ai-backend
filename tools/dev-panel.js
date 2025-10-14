@@ -6,6 +6,7 @@
  */
 
 import express from 'express';
+import net from 'net';
 import { readFileSync, existsSync, statSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -22,6 +23,7 @@ const args = process.argv.slice(2);
 let serverPort = null;
 let devPanelPort = null;
 let skipServerCheck = false;
+let waitForReadySignal = false;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -33,6 +35,8 @@ for (let i = 0; i < args.length; i++) {
   } else if (arg === '--port') {
     devPanelPort = parseInt(args[i + 1]);
     i++;
+  } else if (arg === '--wait-for-ready-signal') {
+    waitForReadySignal = true;
   } else if (arg === '--help') {
     console.log(`
 🚀 Simple RPC AI Backend Dev Panel
@@ -44,6 +48,7 @@ Options:
   --server-port <number>   Backend server port (default: auto-discover 8001, 8000, ...)
   --skip-server-check      Skip backend server health check (dev-panel only mode)
   --help                   Show this help message
+  --wait-for-ready-signal  Defer backend health checks until stdout contains "READY"
 
 Examples:
   # Basic usage (auto-discovers server on 8001, 8000, etc.)
@@ -75,6 +80,8 @@ Readiness Detection (Always Available):
   }
 }
 
+let readySignalObserved = !waitForReadySignal;
+
 const app = express();
 const port = devPanelPort || process.env.DEV_PANEL_PORT || 8080;
 const openBrowser = process.env.DEV_PANEL_OPEN_BROWSER !== 'false';
@@ -93,6 +100,8 @@ let mcpInspectorStatus = { running: false, token: null };
 let mcpJamProcess = null;
 let mcpJamStatus = { running: false, port: 4000 };
 let mcpJamStartLogged = false;
+const SERVER_FAILURE_LOG_INTERVAL = 15000;
+let lastServerHealthFailure = 0;
 
 function logMcpJamStarted(message = '✅ MCP JAM started successfully') {
   if (mcpJamStartLogged) {
@@ -100,6 +109,34 @@ function logMcpJamStarted(message = '✅ MCP JAM started successfully') {
   }
   console.log(message);
   mcpJamStartLogged = true;
+}
+
+function parseServerTarget(config) {
+  try {
+    const baseUrl = new URL(config.baseUrl || `http://localhost:${config.port || 8001}`);
+    const port = Number(baseUrl.port || config.port || 8001);
+    const host = baseUrl.hostname || '127.0.0.1';
+    return { host, port };
+  } catch {
+    return { host: '127.0.0.1', port: config.port || 8001 };
+  }
+}
+
+async function isPortReachable(port, host, timeout = 500) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ port, host }, () => {
+      socket.end();
+      resolve(true);
+    });
+
+    const finalize = () => {
+      socket.destroy();
+      resolve(false);
+    };
+
+    socket.setTimeout(timeout, finalize);
+    socket.once('error', finalize);
+  });
 }
 
 // Check if MCP Inspector is running and get auth token
@@ -295,7 +332,12 @@ async function checkServerHealth() {
       config.endpoints.jsonRpc
     ].filter(url => url && url !== config.endpoints.health);
 
-    console.log(`⚠️  Backend server health check failed: ${error.message} (trying ${config.endpoints.health})`);
+    const now = Date.now();
+    const shouldLog = now - lastServerHealthFailure > SERVER_FAILURE_LOG_INTERVAL;
+
+    if (shouldLog) {
+      console.log(`⚠️  Backend server health check failed: ${error.message} (trying ${config.endpoints.health})`);
+    }
 
     // Try alternative endpoints to see if server is running
     for (const altUrl of alternativeEndpoints) {
@@ -315,7 +357,10 @@ async function checkServerHealth() {
     }
 
     // If all endpoints fail, server is likely not running
-    console.log(`💡 Backend server not detected on port ${config.port}. Is it running?`);
+    if (shouldLog) {
+      console.log(`💡 Backend server not detected on port ${config.port}. Is it running?`);
+      lastServerHealthFailure = now;
+    }
     if (serverConfig && serverConfig.detected) {
       serverConfig = { ...serverConfig, detected: false };
     }
@@ -350,14 +395,19 @@ async function checkDevPanelHealth() {
 async function waitForServicesReady() {
   console.log('🔄 Waiting for services to be ready...');
 
-  const maxWaitTime = 30000; // 30 seconds (reduced from 60)
+  const maxWaitTime = 120000; // 2 minutes max wait
   const pollInterval = 1000; // 1 second
-  const serverMaxWaitTime = 10000; // Only wait 10 seconds for server
+  const serverInitialDelay = 10000; // Wait 10 seconds before first backend check
+  const serverMaxWaitTime = 90000; // Allow backend up to 90 seconds
   const startTime = Date.now();
+  const readySignalTimeout = Date.now() + serverMaxWaitTime;
 
   let serverReady = false;
   let mcpJamReady = false;
   let devPanelReady = false;
+  let serverDelayLogged = false;
+  let backendPortLogged = false;
+  let waitingForPortLogTime = 0;
 
   while (Date.now() - startTime < maxWaitTime) {
     // Check server health with shorter timeout
@@ -365,14 +415,56 @@ async function waitForServicesReady() {
       if (skipServerCheck) {
         serverReady = true; // Skip server check
         console.log('⏭️  Backend server check skipped');
-      } else if (Date.now() - startTime > serverMaxWaitTime) {
-        // After 10 seconds, give up on server and continue with dev-panel only
-        console.log('⚠️  Backend server timeout after 10s - continuing with dev-panel only mode');
-        serverReady = true; // Continue without server
       } else {
-        serverReady = await checkServerHealth();
-        if (serverReady) {
-          console.log('✅ Backend server is ready');
+        let allowHealthCheck = true;
+
+        if (!readySignalObserved) {
+          if (Date.now() > readySignalTimeout) {
+            console.warn('⚠️  Backend READY signal not observed within expected window; performing health checks anyway.');
+            readySignalObserved = true;
+          } else {
+            allowHealthCheck = false;
+          }
+        }
+
+        if (allowHealthCheck) {
+          const config = getServerConfig();
+          const { host, port } = parseServerTarget(config);
+          let portReachable = true;
+
+          if (!backendPortLogged) {
+            portReachable = await isPortReachable(port, host);
+
+            if (!portReachable) {
+              allowHealthCheck = false;
+              const now = Date.now();
+              if (now - waitingForPortLogTime > 10000) {
+                console.log(`⏳ Waiting for backend server to accept connections on ${host}:${port}...`);
+                waitingForPortLogTime = now;
+              }
+            } else {
+              console.log(`🔌 Backend server port ${host}:${port} is reachable. Starting health checks...`);
+              backendPortLogged = true;
+            }
+          }
+        }
+
+        if (!allowHealthCheck) {
+          // Skip this iteration but continue monitoring other services
+        } else if (Date.now() - startTime < serverInitialDelay) {
+          if (!serverDelayLogged) {
+            console.log('⏳ Waiting a moment before checking backend server health...');
+            serverDelayLogged = true;
+          }
+        } else if (Date.now() - startTime > serverMaxWaitTime) {
+          // After serverMaxWaitTime, give up on server and continue with dev-panel only
+          console.log(`⚠️  Backend server timeout after ${serverMaxWaitTime / 1000}s - continuing with dev-panel only mode`);
+          serverReady = true; // Continue without server
+        } else {
+          serverReady = await checkServerHealth();
+          if (serverReady) {
+            console.log('✅ Backend server is ready');
+          }
         }
       }
     }
@@ -422,6 +514,17 @@ async function waitForServicesReady() {
   return false;
 }
 
+// Listen for READY signal on stdin to reduce noise while server is booting
+if (waitForReadySignal) {
+  process.stdin.setEncoding('utf8');
+  process.stdin.resume();
+  process.stdin.on('data', (chunk) => {
+    if (chunk.includes('READY')) {
+      waitForReadySignal = false;
+      readySignalObserved = true;
+    }
+  });
+}
 
 // Initialize server configuration
 (async () => {

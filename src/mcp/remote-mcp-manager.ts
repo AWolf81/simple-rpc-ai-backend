@@ -13,6 +13,7 @@ export interface RemoteMCPManagerConfig {
   retryOnFailure?: boolean;
   retryDelay?: number;
   maxRetries?: number;
+  prefixToolNames?: boolean;
 }
 
 export interface RemoteServerStatus {
@@ -36,7 +37,8 @@ export class RemoteMCPManager extends EventEmitter {
       autoConnect: config.autoConnect ?? true,
       retryOnFailure: config.retryOnFailure ?? true,
       retryDelay: config.retryDelay ?? 5000,
-      maxRetries: config.maxRetries ?? 3
+      maxRetries: config.maxRetries ?? 3,
+      prefixToolNames: config.prefixToolNames ?? true
     };
   }
 
@@ -46,7 +48,11 @@ export class RemoteMCPManager extends EventEmitter {
   async initialize(): Promise<void> {
     for (const serverConfig of this.config.servers) {
       try {
-        await this.addServer(serverConfig);
+        const mergedConfig = {
+          ...serverConfig,
+          prefixToolNames: serverConfig.prefixToolNames ?? this.config.prefixToolNames
+        };
+        await this.addServer(mergedConfig);
       } catch (error) {
         this.emit('serverError', {
           server: serverConfig.name,
@@ -96,7 +102,7 @@ export class RemoteMCPManager extends EventEmitter {
       this.emit('serverError', { server: config.name, error });
     });
 
-    this.clients.set(config.name, client);
+    this.clients.set(config.name, client);    
 
     // Initialize status
     this.serverStatus.set(config.name, {
@@ -107,7 +113,12 @@ export class RemoteMCPManager extends EventEmitter {
     });
 
     // Connect if auto-connect is enabled
-    if (this.config.autoConnect && config.autoStart !== false) {
+    // For HTTP/HTTPS/streamable HTTP transports, autoStart=false just means "don't spawn a process" - still connect
+    // For stdio-based (npx, docker), autoStart=false means "don't connect yet"
+    const isHttpTransport = config.transport === 'http' || config.transport === 'https' || config.transport === 'streamableHttp';
+    const shouldConnect = this.config.autoConnect && (isHttpTransport || config.autoStart !== false);
+
+    if (shouldConnect) {
       try {
         await client.connect();
 
@@ -115,6 +126,8 @@ export class RemoteMCPManager extends EventEmitter {
         const tools = await client.listTools();
         this.updateServerStatus(config.name, { tools: tools.tools || [] });
       } catch (error) {
+        // Disconnect the client on failure
+        await client.disconnect().catch(() => {});
         this.updateServerStatus(config.name, {
           connected: false,
           lastError: error instanceof Error ? error.message : 'Failed to connect'
@@ -150,10 +163,13 @@ export class RemoteMCPManager extends EventEmitter {
     }
 
     try {
+      console.log(`🔄 [RemoteMCPManager] Attempting to reconnect to server ${name} (attempt ${attempt})`);
       await client.connect();
       const tools = await client.listTools();
       this.updateServerStatus(name, { tools: tools.tools || [] });
+      console.log(`✅ [RemoteMCPManager] Successfully reconnected to server ${name} and fetched ${tools.tools?.length || 0} tools (attempt ${attempt})`);
     } catch (error) {
+      console.error(`❌ [RemoteMCPManager] Failed to reconnect to server ${name} (attempt ${attempt}):`, error instanceof Error ? error.message : String(error));
       if (attempt < this.config.maxRetries) {
         setTimeout(() => {
           this.reconnectServer(name, attempt + 1).catch(() => {
@@ -214,17 +230,39 @@ export class RemoteMCPManager extends EventEmitter {
   async listAllTools(): Promise<Map<string, any[]>> {
     const toolsByServer = new Map<string, any[]>();
 
-    for (const [name, client] of this.clients) {
-      if (client.isConnected()) {
-        try {
-          const result = await client.listTools();
-          toolsByServer.set(name, result.tools || []);
+   for (const [name, client] of this.clients) {
+     if (client.isConnected()) {
+       try {
+         console.log(`📡 [RemoteMCPManager] Attempting to retrieve tools from server ${name}`);
+         const result = await client.listTools();
+         const serverConfig = client.getConfig();
+          const shouldPrefix = serverConfig.prefixToolNames ?? this.config.prefixToolNames;
+
+          const decoratedTools = (result.tools || []).map((tool: any) => {
+            const canonicalName = `${name}__${tool.name}`;
+            return {
+              ...tool,
+              prefixToolNames: shouldPrefix,
+              fullName: canonicalName,
+              originalName: tool.name,
+              displayName: shouldPrefix ? canonicalName : tool.name
+            };
+          });
+
+          toolsByServer.set(name, decoratedTools);
+          console.log(`📡 [RemoteMCPManager] Successfully retrieved ${result.tools?.length || 0} tools from server ${name}`);
         } catch (error) {
+          console.error(`❌ [RemoteMCPManager] Failed to list tools from server ${name}:`, error instanceof Error ? error.message : String(error));
+          console.error(`📋 [RemoteMCPManager] Server ${name} status: ${client.isConnected() ? 'CONNECTED' : 'DISCONNECTED'}`);
           this.emit('serverError', {
             server: name,
             error: error instanceof Error ? error.message : 'Failed to list tools'
           });
+          // Still add an empty array so the server is marked as attempted
+          toolsByServer.set(name, []);
         }
+      } else {
+        console.log(`📡 [RemoteMCPManager] Server ${name} is disconnected, skipping tool listing`);
       }
     }
 

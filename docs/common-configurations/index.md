@@ -19,3 +19,4 @@ Configure the backend for your environment by fine-tuning server options, provid
 - [Authentication]({% link common-configurations/authentication.md %}) - OAuth and JWT setup
 - [CORS]({% link common-configurations/cors.md %}) - Cross-origin request configuration
 - [Workspaces]({% link common-configurations/workspaces.md %}) - Server workspace configuration
+- [Remote MCP Servers]({% link common-configurations/mcp-remote.md %}) - Configure external MCP providers across transports

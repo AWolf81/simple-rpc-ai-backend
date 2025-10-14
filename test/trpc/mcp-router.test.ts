@@ -181,6 +181,340 @@ describe('MCP Router handleMCPRequest', () => {
     });
   });
 
+  describe('Remote MCP integration', () => {
+    it('should expose unprefixed remote tools when prefixToolNames=false', async () => {
+      const remoteTools = new Map([
+        ['git-mcp', [
+          {
+            name: 'git_status',
+            fullName: 'git-mcp__git_status',
+            originalName: 'git_status',
+            displayName: 'git_status',
+            description: 'Show git status',
+            inputSchema: {
+              type: 'object',
+              properties: { repo_path: { type: 'string' } }
+            },
+            prefixToolNames: false
+          }
+        ]]
+      ]);
+
+      const remoteMcpManager = {
+        listAllTools: vi.fn().mockResolvedValue(remoteTools),
+        callTool: vi.fn().mockResolvedValue({ ok: true })
+      };
+
+      mcpHandler = new MCPProtocolHandler(
+        { _def: { procedures: {} } },
+        {
+          remoteMcpServers: { prefixToolNames: false },
+          auth: {
+            requireAuthForToolsList: false,
+            requireAuthForToolsCall: false,
+            publicTools: ['git_status']
+          }
+        },
+        remoteMcpManager
+      );
+
+      mockReq.body = {
+        jsonrpc: '2.0',
+        method: 'tools/list',
+        id: 1
+      };
+
+      await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
+      const listResponse = jsonSpy.mock.calls[0][0];
+      expect(listResponse.result.tools[0].name).toBe('git_status');
+
+      jsonSpy.mockClear();
+
+      mockReq.body = {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        id: 2,
+        params: {
+          name: 'git_status',
+          arguments: { repo_path: '/workspace' }
+        }
+      };
+
+      await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
+      expect(remoteMcpManager.callTool).toHaveBeenCalledWith('git-mcp', 'git_status', { repo_path: '/workspace' });
+    });
+
+    it('should merge remote tools with server prefix by default', async () => {
+      const remoteMcpManager = {
+        listAllTools: vi.fn().mockResolvedValue(new Map([
+          ['duckduckgo-search', [
+            {
+              name: 'search',
+              description: 'Remote DuckDuckGo search',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  query: { type: 'string' }
+                }
+              },
+              prefixToolNames: true
+            }
+          ]]
+        ])),
+        callTool: vi.fn()
+      };
+
+      mcpHandler = new MCPProtocolHandler(
+        { _def: { procedures: {} } },
+        {
+          auth: {
+            requireAuthForToolsList: false,
+            requireAuthForToolsCall: false,
+            publicTools: ['duckduckgo-search__search']
+          }
+        },
+        remoteMcpManager
+      );
+
+      mockReq.body = {
+        jsonrpc: '2.0',
+        method: 'tools/list',
+        id: 1
+      };
+
+      await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
+
+      expect(remoteMcpManager.listAllTools).toHaveBeenCalled();
+      const response = jsonSpy.mock.calls[0][0];
+      expect(response.result.tools).toContainEqual(
+        expect.objectContaining({ name: 'duckduckgo-search__search' })
+      );
+    });
+
+    it('should call remote tools using original name and normalized arguments', async () => {
+      const remoteTools = new Map([
+        ['duckduckgo-search', [
+          {
+            name: 'search',
+            description: 'Remote DuckDuckGo search',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                query: { type: 'string' },
+                max_results: { type: 'integer' }
+              }
+            },
+            prefixToolNames: true
+          }
+        ]]
+      ]);
+
+      const remoteMcpManager = {
+        listAllTools: vi.fn().mockResolvedValue(remoteTools),
+        callTool: vi.fn().mockResolvedValue({ data: 'ok' })
+      };
+
+      mcpHandler = new MCPProtocolHandler(
+        { _def: { procedures: {} } },
+        {
+          auth: {
+            requireAuthForToolsList: false,
+            requireAuthForToolsCall: false,
+            publicTools: ['duckduckgo-search__search']
+          }
+        },
+        remoteMcpManager
+      );
+
+      mockReq.body = {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'duckduckgo-search__search',
+          arguments: {
+            context: {
+              query: 'latest AI news',
+              max_results: 5
+            },
+            runId: 'abc-123',
+            extra: 'ignore-me'
+          }
+        }
+      };
+
+      await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
+
+      expect(remoteMcpManager.callTool).toHaveBeenCalledWith(
+        'duckduckgo-search',
+        'search',
+        {
+          query: 'latest AI news',
+          max_results: 5
+        }
+      );
+    });
+
+    it('should respect prefixToolNames=false when merging remote tools', async () => {
+      const remoteMcpManager = {
+        listAllTools: vi.fn().mockResolvedValue(new Map([
+          ['time-server', [
+            {
+              name: 'now',
+              description: 'Returns current time',
+              inputSchema: {
+                type: 'object',
+                properties: {}
+              },
+              prefixToolNames: false
+            }
+          ]]
+        ])),
+        callTool: vi.fn()
+      };
+
+      mcpHandler = new MCPProtocolHandler(
+        { _def: { procedures: {} } },
+        {
+          auth: {
+            requireAuthForToolsList: false,
+            requireAuthForToolsCall: false,
+            publicTools: ['now']
+          }
+        },
+        remoteMcpManager
+      );
+
+      mockReq.body = {
+        jsonrpc: '2.0',
+        method: 'tools/list',
+        id: 1
+      };
+
+      await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
+
+      const response = jsonSpy.mock.calls[0][0];
+      const toolNames = response.result.tools.map((tool: any) => tool.name);
+      expect(toolNames).toContain('now');
+      expect(toolNames).not.toContain('time-server__now');
+    });
+
+    it('should call remote tool without prefix when server opts out', async () => {
+      const remoteTools = new Map([
+        ['time-server', [
+          {
+            name: 'now',
+            description: 'Returns current time',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                timezone: { type: 'string' }
+              }
+            },
+            prefixToolNames: false
+          }
+        ]]
+      ]);
+
+      const remoteMcpManager = {
+        listAllTools: vi.fn().mockResolvedValue(remoteTools),
+        callTool: vi.fn().mockResolvedValue({ now: '2024-01-01T00:00:00Z' })
+      };
+
+      mcpHandler = new MCPProtocolHandler(
+        { _def: { procedures: {} } },
+        {
+          auth: {
+            requireAuthForToolsList: false,
+            requireAuthForToolsCall: false,
+            publicTools: ['now']
+          }
+        },
+        remoteMcpManager
+      );
+
+      mockReq.body = {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'now',
+          arguments: {
+            context: {
+              timezone: 'UTC'
+            },
+            runtimeContext: { ignored: true }
+          }
+        }
+      };
+
+      await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
+
+      expect(remoteMcpManager.callTool).toHaveBeenCalledWith(
+        'time-server',
+        'now',
+        { timezone: 'UTC' }
+      );
+    });
+
+    it('should return error response when remote call fails', async () => {
+      const remoteTools = new Map([
+        ['duckduckgo-search', [
+          {
+            name: 'search',
+            description: 'Remote DuckDuckGo search',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                query: { type: 'string' }
+              }
+            },
+            prefixToolNames: true
+          }
+        ]]
+      ]);
+
+      const remoteMcpManager = {
+        listAllTools: vi.fn().mockResolvedValue(remoteTools),
+        callTool: vi.fn().mockRejectedValue(new Error('network failure'))
+      };
+
+      mcpHandler = new MCPProtocolHandler(
+        { _def: { procedures: {} } },
+        {
+          auth: {
+            requireAuthForToolsList: false,
+            requireAuthForToolsCall: false,
+            publicTools: ['duckduckgo-search__search']
+          }
+        },
+        remoteMcpManager
+      );
+
+      mockReq.body = {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'duckduckgo-search__search',
+          arguments: {
+            context: {
+              query: 'AI safety'
+            }
+          }
+        }
+      };
+
+      await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
+
+      expect(remoteMcpManager.callTool).toHaveBeenCalled();
+      const response = jsonSpy.mock.calls[0][0];
+      expect(response.error.code).toBe(ErrorCode.InternalError);
+      expect(response.error.message).toBe('network failure');
+      expect(response.error.data).toBeUndefined();
+    });
+  });
+
   describe('Prompts/List Method', () => {
     it('should handle prompts/list method correctly', async () => {
       mockReq.body = {

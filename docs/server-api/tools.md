@@ -11,23 +11,33 @@ The recommended way to expose AI tooling is through the bundled tRPC routers. Th
 
 ## Use the AI Router in a Custom Server
 
-The quickest path is to reuse the exported `createAppRouter` helper. It wires up the AI router, MCP router, and supporting services so you can mount everything under a single namespace.
+Always bootstrap the backend with `createRpcAiServer`. It wires up the AI router, MCP router, security middleware, and transports in one place, so you don’t have to juggle individual factory helpers.
 
 ```typescript
-import { createAppRouter } from 'simple-rpc-ai-backend';
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
 
-export const appRouter = createAppRouter(
-  {
-    config: {
-      tokens: { defaultMaxTokens: 4096 },
-      systemPrompt: { maxLength: 25_000 }
-    }
+const server = createRpcAiServer({
+  ai: {
+    enabled: true,
+    providers: ['anthropic', 'openai'],
+    byokProviders: ['anthropic', 'openai', 'google']
   },
-  /* tokenTrackingEnabled */ false,
-  /* dbAdapter */ undefined,
-  /* serverProviders */ ['anthropic', 'openai'],
-  /* byokProviders */ ['anthropic', 'openai', 'google']
-);
+  tokens: {
+    defaultMaxTokens: 4096,
+    systemPrompt: { maxLength: 25_000 }
+  },
+  mcp: {
+    enabled: true
+  },
+  tokenTracking: {
+    enabled: false
+  }
+});
+
+await server.start();
+
+// Access the bundled tRPC router if you need to mount it manually
+export const appRouter = server.router;
 ```
 
 Client code can then call the generated procedures through tRPC:

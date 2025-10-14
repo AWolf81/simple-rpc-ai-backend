@@ -37,7 +37,7 @@ jobs:
           working-directory: docs
 
       - name: Build site
-        run: bundle exec jekyll build
+        run: bundle exec jekyll build --config _config.yml,_config_preview.yml
         env:
           JEKYLL_ENV: production
 

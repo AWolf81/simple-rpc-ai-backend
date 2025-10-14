@@ -81,6 +81,7 @@ const client = createTRPCClient({
 // Execute AI request with token tracking
 const result = await client.ai.generateText.mutate({
   content: 'Explain quantum computing',
+  systemPrompt: 'default', // Optional - defaults to "default"
   provider: 'anthropic'
 });
 ```
@@ -157,6 +158,135 @@ Access the dev panel for monitoring:
 npm run dev:panel
 
 # Open http://localhost:8080
+```
+
+## Web Search Testing
+
+This server supports two types of web search:
+
+### 1. Anthropic Native Web Search
+
+Uses Claude's built-in `web_search_20250305` tool for fast, provider-native execution.
+
+```bash
+# Test Anthropic native web search via JSON-RPC endpoint
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "ai.generateText",
+    "params": {
+      "content": "What are the latest developments in AI from the past week?",
+      "systemPrompt": "default",
+      "provider": "anthropic",
+      "metadata": {
+        "useWebSearch": true,
+        "webSearchPreference": "ai-web-search",
+        "maxWebSearches": 3
+      }
+    },
+    "id": 1
+  }'
+```
+
+**How it works:**
+- ✅ Single API call to Claude
+- ✅ Claude executes web search internally
+- ✅ Results incorporated into response automatically
+- ⚡ Fastest option (~2-4 seconds)
+
+### 2. DuckDuckGo MCP Web Search
+
+Uses MCP server with DuckDuckGo for custom, provider-agnostic search.
+
+**Prerequisites:**
+```bash
+# Install and start DuckDuckGo MCP server
+npx @modelcontextprotocol/server-duckduckgo
+```
+
+**Configure MCP in server:**
+```javascript
+// In server.js, add mcpConfig:
+mcp: {
+  enabled: true,
+  mcpConfig: {
+    enableWebSearch: true
+  }
+}
+```
+
+**Test MCP web search:**
+```bash
+# Test DuckDuckGo MCP search via JSON-RPC endpoint
+curl -X POST http://localhost:8000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "ai.generateText",
+    "params": {
+      "content": "What are the latest developments in AI from the past week?",
+      "systemPrompt": "default",
+      "provider": "anthropic",
+      "metadata": {
+        "useWebSearch": true,
+        "webSearchPreference": "mcp",
+        "maxWebSearches": 3
+      }
+    },
+    "id": 1
+  }'
+```
+
+**How it works:**
+1. AI receives tool schema and decides to search
+2. Our server intercepts tool call request
+3. MCP server executes DuckDuckGo search
+4. Results sent back to AI for final response
+⏱️ Slower but flexible (~4-8 seconds)
+
+### Comparison
+
+| Feature | Anthropic Native | DuckDuckGo MCP |
+|---------|-----------------|----------------|
+| **Speed** | ~2-4 seconds | ~4-8 seconds |
+| **API Calls** | 1 | 2 |
+| **Providers** | Anthropic only | Any provider |
+| **Customization** | Limited | Full control |
+| **Best for** | Fast responses | Custom searches |
+
+### Direct tRPC Testing
+
+For type-safe testing with the tRPC client:
+
+```typescript
+import { createTRPCClient } from '@trpc/client';
+
+const client = createTRPCClient({
+  url: 'http://localhost:8000/trpc'
+});
+
+// Anthropic native search
+const nativeResult = await client.ai.generateText.mutate({
+  content: 'Latest AI news',
+  systemPrompt: 'default',
+  provider: 'anthropic',
+  metadata: {
+    useWebSearch: true,
+    webSearchPreference: 'ai-web-search'
+  }
+});
+
+// MCP search
+const mcpResult = await client.ai.generateText.mutate({
+  content: 'Latest AI news',
+  systemPrompt: 'default',
+  provider: 'anthropic',
+  metadata: {
+    useWebSearch: true,
+    webSearchPreference: 'mcp'
+  }
+});
 ```
 
 ## Production Deployment

@@ -75,6 +75,53 @@ export interface CustomProvider {
 export interface RpcAiServerConfig {
   // Basic settings
   port?: number;
+
+  remoteMcpServers?: {
+    enabled?: boolean;
+    servers?: Array<{
+      name: string;
+      transport: 'uvx' | 'npx' | 'docker' | 'http' | 'https' | 'streamableHttp';
+      command?: string;
+      args?: string[];
+      runnerArgs?: string[];
+      env?: Record<string, string>;
+      image?: string;
+      containerArgs?: string[];
+      containerName?: string;
+      reuseContainer?: boolean;
+      removeOnExit?: boolean;
+      dockerCommand?: string[];
+      url?: string;
+      headers?: Record<string, string>;
+      auth?: {
+        type: 'bearer' | 'basic' | 'none';
+        token?: string;
+        username?: string;
+        password?: string;
+      };
+      autoStart?: boolean;
+      timeout?: number;
+      retries?: number;
+      startupDelayMs?: number;
+      startupRetries?: number;
+      prefixToolNames?: boolean;
+    }>;
+    containerOptions?: {
+      namePrefix?: string;
+      reuse?: boolean;
+      removeOnExit?: boolean;
+    };
+    security?: {
+      enableStartupScan?: boolean;
+      blockOnHighRisk?: boolean;
+      trustAnthropicServers?: boolean;
+      packageOverrides?: Record<string, 'GREEN' | 'YELLOW' | 'RED' | 'SKIP'>;
+    };
+    autoReconnect?: boolean;
+    reconnectDelay?: number;
+    maxReconnectAttempts?: number;
+    prefixToolNames?: boolean;
+  };
   
   // AI Configuration
   aiLimits?: AIRouterConfig;
@@ -312,83 +359,6 @@ export interface RpcAiServerConfig {
     }>;
   };
 
-  /**
-   * Remote MCP Server Configuration
-   *
-   * Configure external MCP servers to connect to via different transports.
-   * Supports uvx (Python), npx (Node.js), docker, and HTTP/HTTPS.
-   */
-  remoteMcpServers?: {
-    /** Enable remote MCP server connections */
-    enabled?: boolean;
-
-    /** List of remote servers to connect to */
-    servers?: Array<{
-      /** Unique identifier for this server */
-      name: string;
-
-      /** Transport method */
-      transport: 'uvx' | 'npx' | 'docker' | 'http' | 'https';
-
-      /** For uvx/npx: package name to run */
-      command?: string;
-
-      /** For uvx/npx: additional command line arguments */
-      args?: string[];
-
-      /** For uvx/npx/docker: environment variables */
-      env?: Record<string, string>;
-
-      /** For docker: docker image name */
-      image?: string;
-
-      /** For docker: additional container arguments */
-      containerArgs?: string[];
-
-      /** For http/https: remote server URL */
-      url?: string;
-
-      /** For http/https: custom headers */
-      headers?: Record<string, string>;
-
-      /** Authentication configuration */
-      auth?: {
-        type: 'bearer' | 'basic' | 'none';
-        token?: string;
-        username?: string;
-        password?: string;
-      };
-
-      /** Auto-start on server initialization */
-      autoStart?: boolean;
-
-      /** Request timeout in milliseconds */
-      timeout?: number;
-
-      /** Number of retries on connection failure */
-      retries?: number;
-    }>;
-
-    /** Security scanning configuration */
-    security?: {
-      /** Enable security scanning on startup (default: true) */
-      enableStartupScan?: boolean;
-
-      /** Block server start if high-risk packages detected (default: false) */
-      blockOnHighRisk?: boolean;
-
-      /** Downgrade security level for official Anthropic servers (default: true) */
-      trustAnthropicServers?: boolean;
-
-      /** Custom package security overrides */
-      packageOverrides?: Record<string, 'GREEN' | 'YELLOW' | 'RED' | 'SKIP'>;
-    };
-
-    /** Auto-reconnect settings */
-    autoReconnect?: boolean;
-    reconnectDelay?: number;
-    maxReconnectAttempts?: number;
-  };
 }
 
 /**
@@ -556,17 +526,24 @@ export class RpcAiServer {
 
       // Remote MCP servers configuration
       remoteMcpServers: {
-        enabled: false,
-        servers: [],
+        enabled: config.remoteMcpServers?.enabled ?? false,
+        servers: config.remoteMcpServers?.servers ?? [],
         security: {
           enableStartupScan: true,
           blockOnHighRisk: false,
           trustAnthropicServers: true,
+          ...(config.remoteMcpServers?.security || {})
         },
-        autoReconnect: true,
-        reconnectDelay: 5000,
-        maxReconnectAttempts: 3,
-        ...config.remoteMcpServers
+        prefixToolNames: config.remoteMcpServers?.prefixToolNames ?? true,
+        autoReconnect: config.remoteMcpServers?.autoReconnect ?? true,
+        reconnectDelay: config.remoteMcpServers?.reconnectDelay ?? 5000,
+        maxReconnectAttempts: config.remoteMcpServers?.maxReconnectAttempts ?? 3,
+        containerOptions: {
+          namePrefix: 'mcp',
+          reuse: false,
+          removeOnExit: true,
+          ...(config.remoteMcpServers?.containerOptions || {})
+        }
       },
 
       customRouters: config.customRouters || {},  // Default: no custom routers
@@ -753,8 +730,8 @@ export class RpcAiServer {
         apiKey: apiKey || null,
         appRouter: this.router, // Add router to context for prompt access tools
       };
-    };
-  }
+    }
+  };
 
   // Provider validation removed - now handled in AIService.execute()
 
@@ -1590,26 +1567,50 @@ export class RpcAiServer {
     try {
       const { RemoteMCPManager } = await import('./mcp/remote-mcp-manager.js');
 
+      const containerDefaults = config.containerOptions || {};
+
       this.remoteMcpManager = new RemoteMCPManager({
-        servers: config.servers.map(server => ({
-          name: server.name,
-          transport: server.transport,
-          command: server.command,
-          args: server.args,
-          env: server.env,
-          image: server.image,
-          containerArgs: server.containerArgs,
-          url: server.url,
-          headers: server.headers,
-          auth: server.auth,
-          autoStart: server.autoStart,
-          timeout: server.timeout,
-          retries: server.retries
-        })),
+        servers: config.servers.map(server => {
+          const isDocker = server.transport === 'docker';
+          const reuseContainer = server.reuseContainer ?? (isDocker ? containerDefaults.reuse ?? false : undefined);
+          const removeOnExit = server.removeOnExit ?? (isDocker ? containerDefaults.removeOnExit ?? !(reuseContainer ?? false) : undefined);
+          const namePrefix = isDocker ? containerDefaults.namePrefix ?? '' : undefined;
+          const derivedContainerName = isDocker
+            ? (namePrefix && namePrefix.trim().length > 0
+                ? `${namePrefix.trim()}-${server.name}`
+                : server.name)
+            : undefined;
+          const containerName = server.containerName ?? derivedContainerName;
+
+         return {
+            name: server.name,
+            transport: server.transport,
+            command: server.command,
+            runnerArgs: server.runnerArgs,
+            args: server.args,
+            env: server.env,
+            image: server.image,
+            containerArgs: server.containerArgs,
+            containerName,
+            reuseContainer,
+            removeOnExit,
+            dockerCommand: server.dockerCommand,
+            url: server.url,
+            headers: server.headers,
+            auth: server.auth,
+            autoStart: server.autoStart,
+            timeout: server.timeout,
+            retries: server.retries,
+            startupDelayMs: server.startupDelayMs,
+            startupRetries: server.startupRetries,
+            prefixToolNames: server.prefixToolNames
+          };
+        }),
         autoConnect: true, // Auto-connect on init
         retryOnFailure: config.autoReconnect !== false,
         retryDelay: config.reconnectDelay || 5000,
-        maxRetries: config.maxReconnectAttempts || 3
+        maxRetries: config.maxReconnectAttempts || 3,
+        prefixToolNames: config.prefixToolNames ?? true
       });
 
       // Setup event handlers

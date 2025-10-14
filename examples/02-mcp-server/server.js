@@ -12,17 +12,25 @@
  * - OAuth2, token tracking, and production features
  */
 
-import { createRpcAiServer, PostgreSQLAdapter } from 'simple-rpc-ai-backend';
+// Load environment variables FIRST before any imports that need them
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Get the directory of this file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load .env from the same directory as this script
+dotenv.config({ path: join(__dirname, '.env') });
+
+import { createRpcAiServer, PostgreSQLAdapter } from 'simple-rpc-ai-backend';
 import path from 'path';
 
 // Import modular components
 import { getCustomRouters } from './methods/index.js';
 import { setupAllResources } from './resources/index.js';
 import { setupPrompts } from './prompts/index.js';
-
-// Load environment variables
-dotenv.config();
 
 // ============================================================================
 // Server Configuration and Startup
@@ -98,9 +106,8 @@ async function startServer() {
         }
       },
 
-      // AI Provider Configuration
-      serverProviders: ['anthropic', 'openai', 'google'],
-      byokProviders: ['anthropic', 'openai', 'google'],
+      // AI Provider Configuration (unified format)
+      providers: ['anthropic', 'openai', 'google'],
       systemPrompts: {
         default: 'You are a helpful AI assistant with access to mathematical calculations, utility functions, and secure file operations.'
       },
@@ -111,7 +118,39 @@ async function startServer() {
         auth: {
           requireAuthForToolsList: false,
           requireAuthForToolsCall: false,
-          publicTools: ['add', 'multiply', 'calculate', 'greeting', 'status', 'readFile', 'listFiles', 'getFileInfo', 'getPrompts', 'getPromptTemplate', 'explainConcept']
+          publicTools: [
+            // Local sample tools exposed publicly
+            'add',
+            'multiply',
+            'calculate',
+            'greeting',
+            'status',
+            'readFile',
+            'listFiles',
+            'getFileInfo',
+            'getPrompts',
+            'getPromptTemplate',
+            'explainConcept',
+            // Remote DuckDuckGo tools (prefix comes from remote server namespace, take the tool names from the terminal log)
+            'duckduckgo-search__search',
+            // 'search',
+            'duckduckgo-search__fetch_content',
+            'context7__resolve-library-id', 
+            'context7__get-library-docs',
+            'timestamp__get_current_time', 
+            'timestamp__convert_time',
+            // Docker-based MCP server examples (uncomment if using the docker servers below)
+            //'time-mcp__get_current_time' // e.g. mcp/time
+            // 'git-mcp__git_status', 
+            // 'git-mcp__git_add',
+            // 'git-mcp__git_commit',
+            // 'git-mcp__git_log',
+            // 'git-mcp__git_diff',
+            // 'git-mcp__git_create_branch',
+            // 'git-mcp__git_checkout',
+            // 'git-mcp__git_diff',
+            // other git tools --> git_diff_unstaged, git_diff_staged, git_reset, git_create_branch, git_show, git_init
+          ], // To allow every discovered tool without enumerating, set publicTools to 'default'
         },
         extensions: {
           // Legacy prompt system removed - use tRPC-based MCP prompts instead
@@ -309,7 +348,7 @@ Format: ${format}`;
       // Server Workspace Configuration (for server-managed file access)
       // Note: This is separate from MCP client roots (which are client-managed)
       serverWorkspaces: {
-        enabled: true,
+        enabled: true,  // Persistent SSE connection now implemented
         additionalWorkspaces: {
           projectRoot: {
             path: path.resolve(import.meta.dirname, '../..'),  // Resolve relative to this file's directory
@@ -369,6 +408,70 @@ Format: ${format}`;
           level: process.env.LOG_LEVEL || 'info',
           format: 'pretty'
         }
+      },
+
+      // Remote MCP Servers - External MCP servers for additional tools
+      // Smithery provides hosted MCP servers via Streamable HTTP connections
+      // Requires both api_key and profile parameters
+      remoteMcpServers: {
+        enabled: true,  // Enable remote tool discovery
+        // prefixToolNames: true, // default is true - prefixes tool names with server name and __
+        containerOptions: {
+          namePrefix: '',
+          reuse: false,
+          removeOnExit: true
+        },
+        servers: [
+          {
+            name: 'duckduckgo-search',
+            transport: 'streamableHttp',  // Use official streamable HTTP MCP transport
+            url: `https://server.smithery.ai/@nickclyde/duckduckgo-mcp-server/mcp?api_key=${process.env.SMITHERY_API_KEY}&profile=${process.env.SMITHERY_PROFILE}`,
+            autoStart: false,  // Streamable HTTP connections are established in connect()
+            timeout: 30000,
+            // prefixToolNames: false // individual override, defaults to server-level setting
+          },
+          {
+            name: 'timestamp',
+            transport: 'uvx',
+            command: 'mcp-server-time',
+            autoStart: true,
+            timeout: 120000
+          },
+          {
+            name: 'context7',
+            transport: 'npx',
+            command: '@upstash/context7-mcp',
+            runnerArgs: ['-y'], // Auto-confirm installation prompt
+            args: [
+              '--api-key',
+              process.env.CONTEXT7_API_KEY || ''
+            ],
+            autoStart: true,
+            timeout: 30000
+          },
+          // Docker-based MCP server examples (uncomment to use - requires Docker installed and running)
+          // {
+          //   name: 'time-mcp',
+          //   transport: 'docker',
+          //   image: 'mcp/time',
+          //   autoStart: true,            
+          //   timeout: 30000,
+          //   reuseContainer: true,
+          //   removeOnExit: false
+          // }
+          // {
+          //   name: 'git-mcp',
+          //   transport: 'docker',
+          //   image: 'mcp/git',            
+          //   containerArgs: [
+          //     '--mount', `type=bind,src=${process.env.GIT_MCP_HOST_DIR || path.resolve(__dirname, '..', '..')},dst=/workspace`
+          //   ],
+          //   dockerCommand: ['--repository', '/workspace', '--verbose'],            
+          //   startupRetries: 5,
+          //   startupDelayMs: 5000,  // wait 5 seconds after the first output before handshake
+          //   timeout: 15000         // give initialize/tools.list 15 seconds to complete            
+          // }
+        ]
       }
     };
 

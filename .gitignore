@@ -108,3 +108,4 @@ auth-tokens*
 
 # Local Netlify folder
 .netlify
+examples/02-mcp-server/data/git-workspace/
