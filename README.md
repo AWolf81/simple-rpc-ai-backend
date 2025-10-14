@@ -157,7 +157,7 @@ Full guides, API reference, and examples hosted on GitHub Pages. Includes:
 - **[Getting Started](https://awolf81.github.io/simple-rpc-ai-backend/getting-started/)** – Installation, quick start, and basic usage
 - **[Server API Reference](https://awolf81.github.io/simple-rpc-ai-backend/server-api/)** – Complete API documentation with examples
 - **[Common Configurations](https://awolf81.github.io/simple-rpc-ai-backend/common-configurations/)** – Recipes for typical use cases
-- **[Developer Guide](https://awolf81.github.io/simple-rpc-ai-backend/developer/)** – Contributing, architecture, and internals
+- **[Developer Guide](https://awolf81.github.io/simple-rpc-ai-backend/getting-started/installation.html)** – Contributing, architecture, and internals
 
 **💻 Sample Projects**
 Working examples in the [`examples/`](examples/) directory:
@@ -210,3 +210,14 @@ pnpm jekyll:deploy  # Build and push to gh-pages branch
 - [ ] Test examples 03 to 07 - mainly worked with example 02-mcp-server
 - [ ] Test coverage increase (→ 60% - 80%+)
 - [ ] API stability for 1.0.0 release
+
+## 🤝 Contributing & Feedback
+
+Contributions are always welcome!  
+If you have ideas, improvements, or find any issues, feel free to open an [issue](https://github.com/AWolf81/simple-rpc-ai-backend/issues) — your feedback is greatly appreciated.
+
+## License
+
+MIT
+
+see [License.md](https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/LICENSE.md)
