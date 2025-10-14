@@ -90,14 +90,7 @@ for (const status of serverStatus) {
 const server = createRpcAiServer({
   port: 8001,
 
-  ai: {
-    providers: {
-      anthropic: {
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        enabled: !!process.env.ANTHROPIC_API_KEY
-      }
-    }
-  },
+  serverProviders: ['anthropic'],
 
   mcp: {
     enabled: true,

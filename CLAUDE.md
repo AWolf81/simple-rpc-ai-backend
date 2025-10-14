@@ -25,18 +25,16 @@ LOG_LEVEL=info pnpm dev   # Quiet logs (debug/warn/error/silent)
 ```typescript
 import { createRpcAiServer } from 'simple-rpc-ai-backend';
 const server = createRpcAiServer({
-  ai: {
-    providers: {
-      anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
-      openai: { apiKey: process.env.OPENAI_API_KEY }
+  serverProviders: ['anthropic', 'openai'],
+  serverWorkspaces: {
+    enabled: true,
+    defaultWorkspace: {
+      path: '/home/user/project',
+      readOnly: false
     }
   },
-  serverWorkspaces: {
-    project: { path: '/home/user/project', name: 'Project Files', readOnly: false }
-  },
   mcp: {
-    enabled: true,
-    ai: { enabled: true, useServerConfig: true, restrictToSampling: true }
+    enabled: true
   }
 });
 server.start();
@@ -68,6 +66,44 @@ const mathRouter = router({
 
 const server = createRpcAiServer({ customRouters: { math: mathRouter } });
 ```
+
+## Configuration Structure
+
+**IMPORTANT**: AI provider configuration is at the **root level**, NOT nested under an `ai` property.
+
+### ✅ Correct Configuration
+```typescript
+const server = createRpcAiServer({
+  // AI configuration - at root level
+  serverProviders: ['anthropic', 'openai'],      // Server-managed providers
+  byokProviders: ['anthropic', 'openai'],        // Bring-your-own-key providers
+  systemPrompts: { default: '...' },             // System prompts
+  modelRestrictions: { anthropic: {...} },       // Model allow/block lists
+
+  // MCP configuration
+  mcp: {
+    enabled: true,
+    ai: {                                         // MCP-specific AI config (optional)
+      enabled: true,
+      useServerConfig: true                       // Use serverProviders above
+    }
+  }
+});
+```
+
+### ❌ Incorrect Configuration (Don't Use)
+```typescript
+const server = createRpcAiServer({
+  // ❌ WRONG - Don't nest providers under 'ai'
+  ai: {
+    providers: {
+      anthropic: { apiKey: '...' }
+    }
+  }
+});
+```
+
+**See**: [Configuration Documentation](docs/server-api/configuration.md) for complete reference.
 
 ## Key Methods
 
@@ -231,7 +267,7 @@ If you overload the word "roots" to mean both "client-exposed folders" and "serv
 
 **📚 References**:
 - [Model Context Protocol - Roots](https://modelcontextprotocol.io/docs/concepts/roots)
-- [Complete Guide: Server Workspaces vs MCP Roots](./docs/SERVER_WORKSPACES_VS_MCP_ROOTS.md)
+- [Complete Guide: Server Workspaces vs MCP Roots](./docs/common-configurations/server-workspaces-vs-mcp-roots.md)
 - [Quick Reference: Workspace Concepts](./docs/WORKSPACE_QUICK_REFERENCE.md)
 
 #### 🏷️ Configuration Example
@@ -296,7 +332,7 @@ newTool: publicProcedure
 
 #### **Technical Implementation**
 - **Discovery Method**: `discoverMCPToolsFromTRPC()` scans `router._def.procedures`
-- **Schema Conversion**: Uses `zod-to-json-schema` for proper constraint handling
+- **Schema Conversion**: Uses Zod's built-in `z.toJSONSchema` for proper constraint handling
 - **Execution Path**: `procedure._def.resolver()` with input validation
 - **Error Handling**: Zod validation errors → proper MCP error responses
 
@@ -394,12 +430,10 @@ mcp: {
 // Independent MCP AI configuration - separate from main server
 const server = createRpcAiServer({
   // Main server AI configuration (e.g., for ai.generateText)
-  ai: {
-    providers: {
-      anthropic: {
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        models: ['claude-3-5-sonnet-20241022'] // Premium model
-      }
+  serverProviders: ['anthropic'],  // Premium provider for main API
+  modelRestrictions: {
+    anthropic: {
+      allowedModels: ['claude-3-5-sonnet-20241022'] // Premium model
     }
   },
 

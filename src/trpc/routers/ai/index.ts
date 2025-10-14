@@ -18,8 +18,8 @@ export function createAIRouter(factoryConfig: AIRouterFactoryConfig = {}): Retur
     tokenTrackingEnabled = false,
     dbAdapter,
     serverProviders = ['anthropic'],
-    byokProviders = ['anthropic'], // where is it used?
-    postgresRPCMethods, // where is it used?
+    //byokProviders = ['anthropic'], // where is it used?
+    //postgresRPCMethods, // where is it used?
     modelRestrictions
   } = factoryConfig;
 
@@ -58,8 +58,7 @@ export function createAIRouter(factoryConfig: AIRouterFactoryConfig = {}): Retur
   );
 
   const providerProcedures = createProviderProcedures(
-    aiService,
-    modelRestrictions
+    aiService
   );
 
   return router({

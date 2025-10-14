@@ -1,3 +1,10 @@
+---
+title: Server Workspaces vs MCP Roots
+parent: Common Configurations
+grand_parent: Documentation
+nav_order: 7
+---
+
 # Server Workspaces vs MCP Roots: Complete Guide
 
 ## Overview
@@ -11,45 +18,27 @@ This guide explains the fundamental distinction between **Server Workspaces** (s
 3. [MCP Roots (Client-Managed)](#mcp-roots-client-managed)
 4. [Configuration Examples](#configuration-examples)
 5. [Security Considerations](#security-considerations)
-6. [Migration Guide](#migration-guide)
-7. [Troubleshooting](#troubleshooting)
+6. [Troubleshooting](#troubleshooting)
 
 ## Architecture Overview
 
-```
-                  Model Context Protocol (MCP)
+```mermaid
+flowchart TD
+  subgraph Client
+    clientRoots[Client-managed directories<br/>e.g. ~/projects,<br/>/mnt/shared]
+  end
 
- ┌─────────────────────────────────────────────────────────────┐
- │                         CLIENT                              │
- │                                                             │
- │   User's local or mounted folders                           │
- │   (e.g. ~/projects, /mnt/shared/projectX)                   │
- │                                                             │
- │   • Client controls what to expose                          │
- │   • Advertises via MCP roots                                │
- │                                                             │
- │   roots/list  ────────────────────────────►                 │
- │                                                             │
- └─────────────────────────────────────────────────────────────┘
-                 ▲
-                 │
-                 │ (MCP spec: server queries roots/list)
-                 ▼
- ┌─────────────────────────────────────────────────────────────┐
- │                         SERVER                              │
- │                                                             │
- │   Server-managed directories                                │
- │   (e.g. /opt/templates, /srv/data, /home/server/project)    │
- │                                                             │
- │   • Configured in server config                             │
- │   • Exposed through tools (listFiles, readFile, etc.)       │
- │   • Not part of MCP roots                                   │
- │                                                             │
- │   serverWorkspaces / managedDirectories                     │
- │   (internal server concept)                                 │
- │                                                             │
- └─────────────────────────────────────────────────────────────┘
+  subgraph Server
+    rpcServer((tRPC / MCP Server))
+    serverWorkspaces[Server Workspaces<br/>Configured via serverWorkspaces]
+  end
+
+  rpcServer -- "roots/list" --> clientRoots
+  clientRoots -- "registerClientWorkspace" --> rpcServer
+  rpcServer -- "listFiles / readFile / writeFile" --> serverWorkspaces
 ```
+
+The direction of each arrow mirrors who initiates the call: the server invokes `roots/list` on the client to discover exposed directories, while the client calls `registerClientWorkspace` on the server to grant access to its folders.
 
 ### 🔑 Key Differences
 
@@ -197,6 +186,60 @@ await client.registerClientWorkspace({
 });
 ```
 
+
+
+### 🔌 Tool Integration Example
+
+Combine server workspaces with MCP tools and custom routers. The snippet below mirrors the structure in [`examples/02-mcp-server/server.js`](https://github.com/AWolf81/simple-rpc-ai-backend/blob/develop/examples/02-mcp-server/server.js), exposing two namespaces (`workspace` and `utility`) through `customRouters` while still benefiting from automatic MCP discovery:
+
+```typescript
+import { router, publicProcedure, createRpcAiServer } from 'simple-rpc-ai-backend';
+import { z } from 'zod';
+
+// Workspace-related procedures
+const workspaceRouter = router({
+  readFile: publicProcedure
+    .input(z.object({ path: z.string() }))
+    .query(async ({ input }) => {
+      // Wrap MCP file read logic here
+      return readWorkspaceFile(input.path);
+    }),
+
+  writeFile: publicProcedure
+    .input(z.object({ path: z.string(), contents: z.string() }))
+    .mutation(async ({ input }) => {
+      await writeWorkspaceFile(input.path, input.contents);
+      return { success: true };
+    })
+});
+
+// Utility procedures (AI helpers, prompts, etc.)
+const utilityRouter = router({
+  summarize: publicProcedure
+    .input(z.object({ text: z.string() }))
+    .mutation(async ({ input }) => summarizeText(input.text)),
+
+  listTools: publicProcedure.query(() => ({
+    workspace: ['readFile', 'writeFile'],
+    utility: ['summarize']
+  }))
+});
+
+const app = createRpcAiServer({
+  serverWorkspaces: {
+    docs: { path: '/opt/docs', readOnly: true },
+    sandbox: { path: '/tmp/sandbox', readOnly: false }
+  },
+  customRouters: {
+    workspace: workspaceRouter,
+    utility: utilityRouter
+  }
+});
+
+app.start();
+```
+
+
 ### 🔐 Client Security
 
 According to MCP specification, clients **MUST**:
@@ -215,29 +258,28 @@ According to MCP specification, clients **MUST**:
 import { createRpcAiServer } from 'simple-rpc-ai-backend';
 
 const server = createRpcAiServer({
-  ai: {
-    providers: {
-      anthropic: { apiKey: process.env.ANTHROPIC_API_KEY }
-    }
-  },
+  serverProviders: ['anthropic'],
 
   // Server-managed directories
   serverWorkspaces: {
-    templates: {
-      path: './templates',
-      name: 'Project Templates',
-      readOnly: true
-    },
-    work: {
-      path: './workspace',
-      name: 'Work Area',
-      readOnly: false
+    enabled: true,
+    additionalWorkspaces: {
+      templates: {
+        path: './templates',
+        name: 'Project Templates',
+        readOnly: true
+      },
+      work: {
+        path: './workspace',
+        name: 'Work Area',
+        readOnly: false
+      }
     }
   },
 
   // MCP configuration for client roots
   mcp: {
-    enableMCP: true,
+    enabled: true,
     auth: {
       requireAuthForToolsList: false,
       requireAuthForToolsCall: false
@@ -245,7 +287,7 @@ const server = createRpcAiServer({
   }
 });
 
-await server.start();
+server.start();
 ```
 
 ### Production Security Setup
@@ -278,7 +320,7 @@ const server = createRpcAiServer({
 
   // Secure MCP configuration
   mcp: {
-    enableMCP: true,
+    enabled: true,
     auth: {
       requireAuthForToolsList: true,   // Require auth
       requireAuthForToolsCall: true,   // Require auth
@@ -312,7 +354,7 @@ const server = createRpcAiServer({
 
   // Liberal MCP settings for development
   mcp: {
-    enableMCP: true,
+    enabled: true,
     auth: {
       requireAuthForToolsList: false,
       requireAuthForToolsCall: false,
@@ -412,57 +454,6 @@ serverWorkspaces: {
   }
 }
 ```
-
-## Migration Guide
-
-### From Legacy `rootFolders` to `serverWorkspaces`
-
-The `rootFolders` configuration is deprecated. Here's how to migrate:
-
-**Old Configuration (Deprecated):**
-```typescript
-const server = createRpcAiServer({
-  rootFolders: {
-    enableAPI: true,
-    defaultFolder: {
-      path: './workspace'
-    },
-    additionalFolders: {
-      templates: {
-        path: './templates',
-        readOnly: true
-      }
-    }
-  }
-});
-```
-
-**New Configuration:**
-```typescript
-const server = createRpcAiServer({
-  serverWorkspaces: {
-    enabled: true,
-    defaultWorkspace: {
-      path: './workspace',
-      name: 'Default Workspace'
-    },
-    additionalWorkspaces: {
-      templates: {
-        path: './templates',
-        name: 'Templates',
-        readOnly: true
-      }
-    }
-  }
-});
-```
-
-### Backward Compatibility
-
-The server maintains backward compatibility:
-- Old `rootFolders` configuration still works
-- New `serverWorkspaces` takes precedence if both are defined
-- Deprecation warnings are logged for `rootFolders`
 
 ## Troubleshooting
 

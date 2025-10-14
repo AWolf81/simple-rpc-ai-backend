@@ -4,7 +4,7 @@
  * Handles optional dependency failures and ensures build succeeds
  */
 
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -40,6 +40,46 @@ function runCommand(command, args, options = {}) {
   });
 }
 
+let cachedRunner = null;
+
+function resolveNodePackageRunner(preferred) {
+  if (cachedRunner && !preferred) {
+    return cachedRunner;
+  }
+
+  const check = (cmd, args = ['--version']) => {
+    const result = spawnSync(cmd, args, {
+      stdio: 'ignore',
+      shell: true
+    });
+    return !result.error && result.status === 0;
+  };
+
+  const hasNpx = check('npx');
+  const hasNpm = check('npm');
+
+  if (preferred === 'npx' && hasNpx) {
+    cachedRunner = { command: 'npx', args: [] };
+    return cachedRunner;
+  }
+
+  if (preferred === 'npm-exec' && hasNpm) {
+    return { command: 'npm', args: ['exec'] };
+  }
+
+  if (hasNpx) {
+    cachedRunner = { command: 'npx', args: [] };
+    return cachedRunner;
+  }
+
+  if (hasNpm) {
+    cachedRunner = { command: 'npm', args: ['exec'] };
+    return cachedRunner;
+  }
+
+  throw new Error('Neither npx nor npm exec is available on PATH.');
+}
+
 async function copyAssets() {
   console.log('📁 Copying assets...');
   try {
@@ -54,7 +94,8 @@ async function copyAssets() {
 async function runTypeScript() {
   console.log('🔨 Running TypeScript compilation...');
   try {
-    await runCommand('npx', ['tsc']);
+    const runner = resolveNodePackageRunner();
+    await runCommand(runner.command, [...runner.args, 'tsc']);
     console.log('✅ TypeScript compilation successful');
   } catch (error) {
     console.error('❌ TypeScript compilation failed:', error.message);
@@ -65,7 +106,8 @@ async function runTypeScript() {
 async function runTscAlias() {
   console.log('🔗 Running tsc-alias...');
   try {
-    await runCommand('npx', ['tsc-alias']);
+    const runner = resolveNodePackageRunner();
+    await runCommand(runner.command, [...runner.args, 'tsc-alias']);
     console.log('✅ tsc-alias successful');
   } catch (error) {
     console.log('⚠️  tsc-alias failed, continuing without aliases...');

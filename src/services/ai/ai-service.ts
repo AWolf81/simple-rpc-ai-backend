@@ -9,6 +9,7 @@ import { generateText } from 'ai';
 import { createAnthropic, anthropic } from '@ai-sdk/anthropic';
 import { createOpenAI, openai } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { InferenceClient } from '@huggingface/inference';
 import crypto from 'crypto';
 import { LanguageModel } from 'ai';
@@ -48,10 +49,10 @@ function createHuggingFaceModel(modelId: string, config: string | HuggingFaceMod
   const hf = new InferenceClient(apiKey);
 
   return {
-    specificationVersion: 'v1',
+    specificationVersion: 'v2',
     modelId,
     provider: 'huggingface',
-    defaultObjectGenerationMode: 'json',
+    supportedUrls: {},
     async doGenerate(options) {
       try {
         // Convert messages to HF format
@@ -77,8 +78,8 @@ function createHuggingFaceModel(modelId: string, config: string | HuggingFaceMod
             model: modelId,
             inputs: prompt,
             parameters: {
-              max_new_tokens: options.maxTokens || 4000,
-              temperature: options.temperature || 0.7,
+              max_new_tokens: (options as any).maxTokens || 4000,
+              temperature: (options as any).temperature || 0.7,
               return_full_text: false,
             },
           });
@@ -95,8 +96,8 @@ function createHuggingFaceModel(modelId: string, config: string | HuggingFaceMod
           response = await hf.chatCompletion({
             model: modelId,
             messages: messages,
-            max_tokens: options.maxTokens || 4000,
-            temperature: options.temperature || 0.7,
+            max_tokens: (options as any).maxTokens || 4000,
+            temperature: (options as any).temperature || 0.7,
           });
 
           return response.choices?.[0]?.message?.content || '';
@@ -123,17 +124,26 @@ function createHuggingFaceModel(modelId: string, config: string | HuggingFaceMod
           }
         }
 
+        const generatedText = text || '';
+        const inputTokens = Math.ceil(prompt.length / 4);
+        const outputTokens = Math.ceil(generatedText.length / 4);
+        const totalTokens = inputTokens + outputTokens;
+
         return {
-          text: text || '',
-          usage: {
-            promptTokens: Math.ceil(prompt.length / 4), // Rough estimate
-            completionTokens: Math.ceil((text || '').length / 4),
-          },
+          content: generatedText
+            ? [{ type: 'text' as const, text: generatedText }]
+            : [],
           finishReason: 'stop' as const,
-          logprobs: undefined,
-          rawCall: { rawPrompt: prompt, rawSettings: options },
-          rawResponse: { headers: {} },
-          warnings: undefined,
+          usage: {
+            inputTokens,
+            outputTokens,
+            totalTokens,
+          },
+          providerMetadata: undefined,
+          response: {
+            modelId,
+          },
+          warnings: [],
         };
       } catch (error: any) {
         throw new Error(`Hugging Face API error: ${error.message}`);
@@ -361,7 +371,9 @@ export class AIService {
     // Initialize model restrictions
     this.modelRestrictions = config.modelRestrictions;
     if(config.serviceProviders) {
+      logger.debug(`🔍 AIService received serviceProviders config:`, JSON.stringify(config.serviceProviders, null, 2));
       this.providers = normalizeServiceProviders(config.serviceProviders);
+      logger.debug(`🔍 Normalized providers:`, this.providers.map(p => `${p.name} (hasKey: ${!!p.apiKey})`));
       if (this.providers.length === 0) {
         throw new Error('No valid AI service providers configured.');
       }
@@ -505,6 +517,9 @@ export class AIService {
       console.log('🚀 About to call generateText with:');
       console.log(`   Model type: ${typeof model}`);
       console.log(`   Model constructor: ${model.constructor?.name}`);
+      console.log(`   Model ID: ${(model as any)?.modelId || 'unknown'}`);
+      console.log(`   Model spec:`, (model as any)?.specificationVersion);
+      console.log(`   Model provider: ${(model as any)?.provider}`);
       console.log(`   Generate options keys: ${Object.keys(generateOptions)}`);
       console.log(`   Max tokens: ${generateOptions.maxTokens}`);
 
@@ -531,14 +546,18 @@ export class AIService {
 
       timing.end();
 
+      const promptTokens = result.usage.inputTokens ?? (result.usage as any).promptTokens ?? 0;
+      const completionTokens = result.usage.outputTokens ?? (result.usage as any).completionTokens ?? 0;
+      const totalTokens = result.usage.totalTokens ?? (promptTokens + completionTokens);
+
       return {
         content: result.text,
         usage: {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          totalTokens: result.usage.totalTokens
+          promptTokens,
+          completionTokens,
+          totalTokens
         },
-        model: model.modelId,
+        model: typeof model === 'string' ? model : model.modelId,
         provider: executionConfig.provider,
         requestId: crypto.randomUUID(),
         finishReason: result.finishReason
@@ -558,8 +577,8 @@ export class AIService {
         resolvedModel: resolvedModelName,
         message: error.message,
         statusCode,
-        apiKeyLength: apiKey ? apiKey.length : 0,
-        apiKeyPrefix: apiKey ? apiKey.substring(0, 8) + '...' : 'none'
+        responseBody: error.responseBody || error.body || 'N/A',
+        responseText: typeof error.text === 'string' ? error.text.substring(0, 500) : 'N/A'
       });
       
       // Generate user-friendly error message
@@ -583,7 +602,7 @@ export class AIService {
 
     // Debug logging to see what we receive
     logger.debug(`🔧 getModel() called with: modelOverride='${modelOverride}', provider='${provider}'`);
-    logger.debug(`🔧 apiKey parameter: ${apiKey ? `provided (${apiKey.length} chars)` : 'none'}`);
+    logger.debug(`🔧 apiKey parameter: ${apiKey ? 'provided' : 'none'}`);
     logger.debug(`🔧 Available providers: ${JSON.stringify(this.providers.map(p => ({ name: p.name, hasKey: !!p.apiKey })))}`);
 
     // Handle 'auto' and 'default' as special cases that should trigger default model selection
@@ -626,9 +645,8 @@ export class AIService {
         anthropic: (name, key) => createAnthropic({ apiKey: key })(name),
         openai: (name, key) => createOpenAI({ apiKey: key })(name),
         google: (name, key) => createGoogleGenerativeAI({ apiKey: key })(name),
-        openrouter: (name, key) => createOpenAI({
-          apiKey: key,
-          baseURL: 'https://openrouter.ai/api/v1'
+        openrouter: (name, key) => createOpenRouter({
+          apiKey: key
         })(name),
         huggingface: (name, key) => createHuggingFaceModel(name, key)
       };
@@ -651,9 +669,8 @@ export class AIService {
         anthropic: (name) => createAnthropic({ apiKey: providerApiKey })(name),
         openai: (name) => createOpenAI({ apiKey: providerApiKey })(name),
         google: (name) => createGoogleGenerativeAI({ apiKey: providerApiKey })(name),
-        openrouter: (name) => createOpenAI({
-          apiKey: providerApiKey,
-          baseURL: 'https://openrouter.ai/api/v1'
+        openrouter: (name) => createOpenRouter({
+          apiKey: providerApiKey
         })(name),
         huggingface: (name) => createHuggingFaceModel(name, {
           apiKey: providerApiKey,
@@ -683,13 +700,12 @@ export class AIService {
       openai: (name) => openai(name),
       google: (name) => google(name),
       openrouter: (name) => {
-        const openrouterApiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+        const openrouterApiKey = process.env.OPENROUTER_API_KEY;
         if (!openrouterApiKey) {
-          throw new Error('OPENROUTER_API_KEY or OPENAI_API_KEY environment variable is required for OpenRouter provider');
+          throw new Error('OPENROUTER_API_KEY environment variable is required for OpenRouter provider');
         }
-        return createOpenAI({
-          apiKey: openrouterApiKey,
-          baseURL: 'https://openrouter.ai/api/v1'
+        return createOpenRouter({
+          apiKey: openrouterApiKey
         })(name);
       },
       huggingface: (name) => {
@@ -1100,14 +1116,18 @@ The tools will be available during our conversation. Call them when needed to ga
    * Format execute result with tool call information
    */
   private formatExecuteResult(result: any, executionConfig: any): ExecuteResult {
+    const promptTokens = result.usage.inputTokens ?? (result.usage as any).promptTokens ?? 0;
+    const completionTokens = result.usage.outputTokens ?? (result.usage as any).completionTokens ?? 0;
+    const totalTokens = result.usage.totalTokens ?? (promptTokens + completionTokens);
+
     return {
       content: result.text,
       usage: {
-        promptTokens: result.usage.promptTokens,
-        completionTokens: result.usage.completionTokens,
-        totalTokens: result.usage.totalTokens
+        promptTokens,
+        completionTokens,
+        totalTokens
       },
-      model: result.model || 'unknown',
+      model: result.response?.modelId || executionConfig.model || 'unknown',
       provider: executionConfig.provider,
       requestId: crypto.randomUUID(),
       finishReason: result.finishReason

@@ -76,6 +76,9 @@ temp/
 # Local development
 .cache/
 .parcel-cache/
+docs/.bundle/
+docs/_site/
+docs/vendor/
 
 # Session logs
 last-session-*.txt
@@ -102,3 +105,6 @@ auth-tokens*
 .oauth-tokens.json
 .oauth-tokens.encrypted
 .oauth-tokens-debug.json
+
+# Local Netlify folder
+.netlify

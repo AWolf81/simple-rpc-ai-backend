@@ -128,6 +128,12 @@ export function createServiceProvidersConfig(providers: string[]): Record<string
       case 'google':
         apiKey = process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         break;
+      case 'openrouter':
+        apiKey = process.env.OPENROUTER_API_KEY;
+        break;
+      case 'huggingface':
+        apiKey = process.env.HUGGINGFACE_API_KEY;
+        break;
     }
 
     config[provider] = {

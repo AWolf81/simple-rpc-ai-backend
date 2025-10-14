@@ -81,7 +81,7 @@ ${this.config.useRegistry ? `
    ${env === 'development' ? '🔒 For production, set: MODEL_REGISTRY_MODE=production' : ''}
 ` : `
    🔒 Using cached/validated models for safety
-   🔄 Run: pnpm models:check to update
+   📦 Update cached data by editing src/data/* or bumping @anolilab/ai-model-registry
 `}
     `.trim());
   }
@@ -188,12 +188,11 @@ ${this.config.useRegistry ? `
 
         // Special handling for OpenRouter - prefer Claude 3.7 Sonnet for best cost/performance
         if (provider === 'openrouter') {
-          // Look for Claude 3.7 Sonnet models first
+          // Look for Claude 3.7 Sonnet models first (registry uses dots, not hyphens)
           const preferredModels = [
             'anthropic/claude-3.7-sonnet',
-            'anthropic/claude-3-7-sonnet-20250115',
-            'claude-3.7-sonnet',
-            'claude-3-7-sonnet'
+            'anthropic/claude-3.5-sonnet',
+            'anthropic/claude-3-opus'
           ];
 
           for (const preferred of preferredModels) {
@@ -259,8 +258,8 @@ ${this.config.useRegistry ? `
     // Note: Anthropic no longer uses fallbacks - uses registry conversion instead
     const fallbacks: Record<string, string> = {
       'openai': 'gpt-4o',
-      'google': 'gemini-1.5-flash',
-      'openrouter': 'anthropic/claude-3.7-sonnet',
+      'google': 'gemini-2.0-flash',
+      'openrouter': 'anthropic/claude-3.7-sonnet',  // Registry uses dots, not hyphens
       'huggingface': 'qwen-qwen-2-5-14b-instruct'  // Best coding model available in registry
     };
 

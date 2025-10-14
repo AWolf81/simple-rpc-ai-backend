@@ -52,7 +52,7 @@ export function createUserRouter(
       .input(z.object({
         consumptionOrder: z.array(z.enum(['subscription', 'one_time', 'byok'])).optional(),
         byokEnabled: z.boolean().optional(),
-        byokProviders: z.record(z.object({
+        byokProviders: z.record(z.string(), z.object({
           enabled: z.boolean(),
           apiKey: z.string().optional()
         })).optional(),
@@ -77,7 +77,7 @@ export function createUserRouter(
      */
     configureBYOK: protectedProcedure
       .input(z.object({
-        providers: z.record(z.object({
+        providers: z.record(z.string(), z.object({
           enabled: z.boolean(),
           apiKey: z.string().optional() // This will be encrypted and stored securely
         })),

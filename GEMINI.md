@@ -384,7 +384,7 @@ newTool: publicProcedure
 
 #### **Technical Implementation**
 - **Discovery Method**: `discoverMCPToolsFromTRPC()` scans `router._def.procedures`
-- **Schema Conversion**: Uses `zod-to-json-schema` for proper constraint handling
+- **Schema Conversion**: Uses Zod's built-in `z.toJSONSchema` for proper constraint handling
 - **Execution Path**: `procedure._def.resolver()` with input validation
 - **Error Handling**: Zod validation errors → proper MCP error responses
 
