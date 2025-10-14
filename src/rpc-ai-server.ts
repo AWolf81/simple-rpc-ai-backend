@@ -102,6 +102,8 @@ export interface RpcAiServerConfig {
       autoStart?: boolean;
       timeout?: number;
       retries?: number;
+      startupDelayMs?: number;
+      startupRetries?: number;
     }>;
     containerOptions?: {
       namePrefix?: string;
@@ -1595,7 +1597,9 @@ export class RpcAiServer {
             auth: server.auth,
             autoStart: server.autoStart,
             timeout: server.timeout,
-            retries: server.retries
+            retries: server.retries,
+            startupDelayMs: server.startupDelayMs,
+            startupRetries: server.startupRetries
           };
         }),
         autoConnect: true, // Auto-connect on init

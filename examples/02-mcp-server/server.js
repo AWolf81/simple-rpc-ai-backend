@@ -138,6 +138,7 @@ async function startServer() {
             'context7__get-library-docs',
             'timestamp__get_current_time', 
             'timestamp__convert_time',
+            //'time-mcp__get_current_time' // e.g. mcp/time
             'git-mcp__git_status', 
             'git-mcp__git_add',
             'git-mcp__git_commit',
@@ -145,7 +146,7 @@ async function startServer() {
             'git-mcp__git_diff',
             'git-mcp__git_create_branch',
             'git-mcp__git_checkout',
-            'git-mcp__git_diff'
+            'git-mcp__git_diff',
             // other git tools --> git_diff_unstaged, git_diff_staged, git_reset, git_create_branch, git_show, git_init
           ], // To allow every discovered tool without enumerating, set publicTools to 'default'
         },
@@ -444,17 +445,26 @@ Format: ${format}`;
             autoStart: true,
             timeout: 30000
           },
+          // {
+          //   name: 'time-mcp',
+          //   transport: 'docker',
+          //   image: 'mcp/time',
+          //   autoStart: true,            
+          //   timeout: 30000,
+          //   reuseContainer: true,
+          //   removeOnExit: false
+          // }
           {
             name: 'git-mcp',
             transport: 'docker',
-            image: 'mcp/git',
+            image: 'mcp/git',            
             containerArgs: [
-              '--mount', `type=bind,src=${process.env.GIT_MCP_HOST_DIR || path.resolve(__dirname, 'data/git-workspace')},dst=/workspace`
+              '--mount', `type=bind,src=${process.env.GIT_MCP_HOST_DIR || path.resolve(__dirname, '..', '..')},dst=/workspace`
             ],
-            autoStart: true,
-            timeout: 45000,
-            reuseContainer: process.env.GIT_MCP_REUSE === 'true',
-            removeOnExit: process.env.GIT_MCP_REUSE === 'true' ? false : undefined
+            dockerCommand: ['--repository', '/workspace', '--verbose'],            
+            startupRetries: 5,
+            startupDelayMs: 5000,  // wait 5 seconds after the first output before handshake
+            timeout: 15000        // give initialize/tools.list 15 seconds to complete
           }
         ]
       }

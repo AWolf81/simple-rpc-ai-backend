@@ -9,11 +9,14 @@
  */
 
 import { spawn, ChildProcess } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
 import { createHash } from 'crypto';
+import { homedir } from 'os';
+import path from 'path';
 import Docker from 'dockerode';
+import type { DockerOptions } from 'dockerode';
 import { resolveNodePackageRunner } from '../utils/node-package-runner.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -52,7 +55,10 @@ export interface RemoteMCPServerConfig {
   containerName?: string;     // Friendly name for docker containers (default: mcp-<name>)
   dockerCommand?: string[];   // Override command when running Docker image
   reuseContainer?: boolean;   // Attempt to reuse existing Docker container (default: false)
+  dockerHost?: string;        // Preferred Docker host/socket (e.g. unix:///path/to/docker.sock)
   removeOnExit?: boolean;     // Remove Docker container on exit (default: !reuseContainer)
+  startupDelayMs?: number;    // Optional delay before performing handshake (useful for slow-starting servers)
+  startupRetries?: number;    // Number of handshake retries after delay
   autoStart?: boolean;
   timeout?: number;
   retries?: number;
@@ -78,12 +84,22 @@ export interface MCPMessage {
   };
 }
 
+type DockerCandidateSource = 'config' | 'env' | 'detected' | 'default';
+
+interface DockerCandidate {
+  options?: DockerOptions;
+  description: string;
+  source: DockerCandidateSource;
+}
+
 export class RemoteMCPClient extends EventEmitter {
   private config: RemoteMCPServerConfig;
-  private process: ChildProcess | DockerContainerProcess | null = null;
+  private process: (ChildProcess & { dispose?: () => Promise<void> }) | null = null;
   private connected = false;
   private containerId: string | null = null;
   private dockerClient: Docker | null = null;
+  private dockerCandidates: DockerCandidate[] | null = null;
+  private dockerCandidateIndex = 0;
   private messageId = 0;
   private pendingRequests = new Map<string | number, {
     resolve: (value: any) => void;
@@ -91,6 +107,7 @@ export class RemoteMCPClient extends EventEmitter {
     timeout: NodeJS.Timeout;
   }>();
   private cachedTools: any = null;  // Cached tools list from initialization
+  private cachedToolsTimestamp = 0;
   private mcpClient: Client | null = null;  // Official MCP SDK client for SSE transport
 
   constructor(config: RemoteMCPServerConfig) {
@@ -217,6 +234,7 @@ export class RemoteMCPClient extends EventEmitter {
     });
 
     this.cachedTools = tools;
+    this.cachedToolsTimestamp = Date.now();
     const toolNames = Array.isArray(tools?.tools) ? tools.tools.map((tool: any) => tool.name).filter(Boolean) : [];
     logger.debug(`📋 [${label} ${this.config.name}] tools/list returned ${toolNames.length} tool(s)${toolNames.length ? `: ${toolNames.join(', ')}` : ''}`);
   }
@@ -355,10 +373,206 @@ export class RemoteMCPClient extends EventEmitter {
   }
 
   private getDockerClient(): Docker {
+    this.ensureDockerCandidates();
     if (!this.dockerClient) {
-      this.dockerClient = new Docker();
+      const candidate = this.getCurrentDockerCandidate();
+      if (candidate?.options) {
+        this.dockerClient = new Docker(candidate.options);
+      } else {
+        this.dockerClient = new Docker();
+      }
+
+      if (candidate) {
+        logger.debug(`🛠️  [Docker ${this.config.name}] Using Docker host ${candidate.description}`);
+      }
     }
     return this.dockerClient;
+  }
+
+  private ensureDockerCandidates(): void {
+    if (!this.dockerCandidates) {
+      this.dockerCandidates = this.buildDockerClientCandidates();
+      if (this.dockerCandidates.length === 0) {
+        this.dockerCandidates.push({
+          description: 'dockerode default context',
+          source: 'default'
+        });
+      }
+      this.dockerCandidateIndex = 0;
+    }
+  }
+
+  private getCurrentDockerCandidate(): DockerCandidate | null {
+    if (!this.dockerCandidates || this.dockerCandidateIndex >= this.dockerCandidates.length) {
+      return null;
+    }
+    return this.dockerCandidates[this.dockerCandidateIndex];
+  }
+
+  private buildDockerClientCandidates(): DockerCandidate[] {
+    const candidates: DockerCandidate[] = [];
+
+    const explicitHost = this.config.dockerHost?.trim();
+    if (explicitHost) {
+      candidates.push({
+        options: this.parseDockerHost(explicitHost),
+        description: explicitHost,
+        source: 'config'
+      });
+      return candidates;
+    }
+
+    const envHost = process.env.DOCKER_HOST?.trim();
+    if (envHost) {
+      candidates.push({
+        options: this.parseDockerHost(envHost),
+        description: envHost,
+        source: 'env'
+      });
+      return candidates;
+    }
+
+    const discoveredSockets = this.getDefaultDockerSocketCandidates();
+    for (const raw of discoveredSockets) {
+      const options = this.parseDockerHost(raw);
+      if (options.socketPath && existsSync(options.socketPath)) {
+        candidates.push({
+          options,
+          description: raw,
+          source: 'detected'
+        });
+      }
+    }
+
+    const defaultSocket = 'unix:///var/run/docker.sock';
+    if (!candidates.some((candidate) => candidate.description === defaultSocket)) {
+      const options = this.parseDockerHost(defaultSocket);
+      candidates.push({
+        options,
+        description: defaultSocket,
+        source: 'detected'
+      });
+    }
+
+    candidates.push({
+      description: 'dockerode default context',
+      source: 'default'
+    });
+
+    return candidates;
+  }
+
+  private getDefaultDockerSocketCandidates(): string[] {
+    const sockets = new Set<string>();
+    const home = homedir();
+    const addSocket = (socketPath: string | null | undefined) => {
+      if (!socketPath) {
+        return;
+      }
+      if (socketPath.startsWith('unix://')) {
+        sockets.add(socketPath);
+      } else if (socketPath.startsWith('/')) {
+        sockets.add(`unix://${socketPath}`);
+      }
+    };
+
+    if (home) {
+      addSocket(path.join(home, '.docker', 'desktop', 'docker.sock'));
+      addSocket(path.join(home, '.docker', 'run', 'docker.sock'));
+      addSocket(path.join(home, '.docker', 'docker.sock'));
+    }
+
+    if (typeof process.getuid === 'function') {
+      const uid = process.getuid();
+      addSocket(`/run/user/${uid}/docker.sock`);
+    }
+
+    addSocket('/var/run/docker.sock');
+
+    return Array.from(sockets);
+  }
+
+  private parseDockerHost(host: string): DockerOptions {
+    const trimmed = host.trim();
+    if (trimmed.startsWith('unix://')) {
+      return { socketPath: trimmed.replace('unix://', '') };
+    }
+    if (trimmed.startsWith('npipe://')) {
+      return { socketPath: trimmed };
+    }
+    if (
+      trimmed.startsWith('tcp://') ||
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('ssh://')
+    ) {
+      try {
+        const url = new URL(trimmed);
+        const rawProtocol = url.protocol.replace(':', '');
+        let protocol: 'http' | 'https' | 'ssh' | undefined;
+
+        switch (rawProtocol) {
+          case 'tcp':
+          case 'http':
+            protocol = 'http';
+            break;
+          case 'https':
+            protocol = 'https';
+            break;
+          case 'ssh':
+            protocol = 'ssh';
+            break;
+          default:
+            protocol = undefined;
+        }
+
+        return {
+          protocol,
+          host: url.hostname,
+          port: url.port ? Number(url.port) : undefined
+        };
+      } catch {
+        // Fall through to default handling
+      }
+    }
+    if (trimmed.startsWith('/')) {
+      return { socketPath: trimmed };
+    }
+    return { socketPath: trimmed };
+  }
+
+  private tryAdvanceDockerCandidate(error: unknown): boolean {
+    if (!this.dockerCandidates) {
+      return false;
+    }
+
+    const current = this.getCurrentDockerCandidate();
+    if (!current) {
+      return false;
+    }
+
+    if (current.source === 'config' || current.source === 'env') {
+      return false;
+    }
+
+    if (this.dockerCandidateIndex >= this.dockerCandidates.length - 1) {
+      return false;
+    }
+
+    const errno = (error as NodeJS.ErrnoException)?.code;
+    const retryableCodes = new Set(['ENOENT', 'ECONNREFUSED', 'ECONNRESET', 'EPERM', 'EACCES']);
+    if (errno && !retryableCodes.has(errno)) {
+      return false;
+    }
+
+    const next = this.dockerCandidates[this.dockerCandidateIndex + 1];
+    logger.info(
+      `♻️  [Docker ${this.config.name}] Unable to reach Docker host ${current.description}: ${this.formatErrorForLogging(error)}. Trying ${next.description}`
+    );
+
+    this.dockerCandidateIndex += 1;
+    this.dockerClient = null;
+    return true;
   }
 
   /**
@@ -377,9 +591,11 @@ export class RemoteMCPClient extends EventEmitter {
     }
 
     const removeOnExit = this.config.removeOnExit ?? !reuse;
-    const docker = this.getDockerClient();
+    let docker = this.getDockerClient();
 
     await this.ensureDockerAccessibility(docker);
+    docker = this.getDockerClient(); // ensure we use any socket fallback the accessibility check selected
+    await this.ensureDockerImageAvailable(docker);
 
     const parseResult = this.buildDockerCreateOptions({
       containerArgs: this.config.containerArgs || [],
@@ -436,15 +652,20 @@ export class RemoteMCPClient extends EventEmitter {
 
     this.containerId = container.id;
 
+    logger.debug(`🧲 [Docker ${this.config.name}] Attaching to container IO streams`);
     const attachStream = await container.attach({
       stream: true,
       stdin: true,
       stdout: true,
-      stderr: true
+      stderr: true,
+      hijack: true
     });
-
+    logger.debug(`🧲 [Docker ${this.config.name}] Attach established`);
+    
     try {
+      logger.debug(`🚀 [Docker ${this.config.name}] Starting container ${containerName || container.id}`);
       await container.start();
+      logger.info(`🚀 [Docker ${this.config.name}] Container ${containerName || container.id} started`);
     } catch (error) {
       if (typeof (attachStream as any)?.destroy === 'function') {
         (attachStream as any).destroy();
@@ -460,23 +681,210 @@ export class RemoteMCPClient extends EventEmitter {
       );
     }
 
-    const dockerProcess = new DockerContainerProcess(container, attachStream, {
-      autoRemove,
-      removeAfterStop: removeOnExit,
-      loggerPrefix: `Docker ${this.config.name}`
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+
+    if (typeof (container.modem as any)?.demuxStream === 'function') {
+      container.modem.demuxStream(attachStream, stdout, stderr);
+    } else {
+      attachStream.on('data', (chunk: Buffer) => stdout.write(chunk));
+      attachStream.on('end', () => {
+        stdout.end();
+        stderr.end();
+      });
+    }
+
+    const dockerProcess = Object.assign(new EventEmitter(), {
+      stdin: attachStream as NodeJS.WritableStream,
+      stdout,
+      stderr,
+      kill: () => {
+        void cleanupDocker(true);
+        return true;
+      },
+      dispose: async () => {
+        await cleanupDocker(false);
+      }
+    }) as unknown as ChildProcess & {
+      stdout: PassThrough;
+      stderr: PassThrough;
+      dispose?: () => Promise<void>;
+    };
+
+    attachStream.on('error', (error) => {
+      (dockerProcess as unknown as EventEmitter).emit('error', error);
+    });
+
+    const cleanupDocker = async (fromKill: boolean): Promise<void> => {
+      if (typeof (attachStream as any)?.destroy === 'function') {
+        (attachStream as any).destroy();
+      } else {
+        attachStream.end();
+      }
+      try {
+        await this.stopAndCleanupDockerContainer(container, {
+          remove: removeOnExit,
+          autoRemove
+        });
+      } catch (error) {
+        if (!fromKill) {
+          throw error;
+        }
+      }
+    };
+
+    void container.wait()
+      .then((result) => {
+        stdout.end();
+        stderr.end();
+        const status = result?.StatusCode ?? 0;
+        (dockerProcess as unknown as EventEmitter).emit('exit', status);
+        (dockerProcess as unknown as EventEmitter).emit('close', status);
+        return cleanupDocker(false);
+      })
+      .catch((error) => {
+        (dockerProcess as unknown as EventEmitter).emit('error', error);
+      });
+
+    logger.debug(`[Docker ${this.config.name}] stdin writable:`, dockerProcess.stdin.writable);
+    logger.debug(`[Docker ${this.config.name}] stdin destroyed:`, (dockerProcess.stdin as any).destroyed);
+    
+    const dockerLogBuffer: string[] = [];
+    const maxLogEntries = 20;
+    const pushDockerLog = (stream: 'stdout' | 'stderr', chunk: string) => {
+      const lines = chunk.split(/\r?\n/).filter(Boolean);
+      for (const line of lines) {
+        const entry = `${stream}> ${line}`;
+        dockerLogBuffer.push(entry.length > 500 ? `${entry.slice(0, 500)}…` : entry);
+        if (dockerLogBuffer.length > maxLogEntries) {
+          dockerLogBuffer.shift();
+        }
+        if (stream === 'stderr') {
+          logger.debug(`🪵 [Docker ${this.config.name}] ${stream}: ${line}`);
+        }
+      }
+    };
+
+    dockerProcess.stdout.on('data', (data: Buffer) => {
+      const text = data.toString();
+      if (text.trim()) {
+        pushDockerLog('stdout', text);
+      }
+    });
+
+    dockerProcess.stderr.on('data', (data: Buffer) => {
+      const text = data.toString();
+      if (text.trim()) {
+        pushDockerLog('stderr', text);
+      }
     });
 
     this.process = dockerProcess;
     this.setupProcessHandlers();
 
+    const startupDelay = Math.max(0, this.config.startupDelayMs ?? 0);
+    const startupRetries = Math.max(1, this.config.startupRetries ?? 3);
+
     try {
-      await this.postStdioHandshake('Docker');
+      let attempt = 0;
+      await this.delay(startupDelay);
+      while (attempt < startupRetries) {
+        attempt += 1;
+        const attemptLabel = `${attempt}/${startupRetries}`;
+        logger.debug(`🤝 [Docker ${this.config.name}] Starting handshake attempt ${attemptLabel}`);
+
+        try {
+          if (attempt > 1) {
+            await this.waitForReady(this.config.timeout);
+          }
+          await this.postStdioHandshake('Docker');
+          logger.info(`✅ [Docker ${this.config.name}] Handshake succeeded on attempt ${attemptLabel}`);
+          break;
+        } catch (handshakeError) {
+          const formatted = this.formatErrorForLogging(handshakeError);
+          if (attempt >= startupRetries) {
+            logger.error(`❌ [Docker ${this.config.name}] Handshake failed after ${attemptLabel} attempts: ${formatted}`);
+            throw handshakeError;
+          }
+
+          const retryDelay = Math.max(startupDelay, 1000);
+          logger.warn(
+            `⚠️  [Docker ${this.config.name}] Handshake attempt ${attemptLabel} failed: ${formatted}. Retrying in ${retryDelay}ms...`
+          );
+          await this.delay(retryDelay);
+        }
+      }
     } catch (error) {
-      await dockerProcess.dispose();
+      if (dockerLogBuffer.length) {
+        logger.warn(
+          `📄 [Docker ${this.config.name}] Recent container output before failure:\n${dockerLogBuffer.join('\n')}`
+        );
+      }
+      await cleanupDocker(false).catch(() => {});
       this.process = null;
       this.containerId = null;
       throw error;
     }
+  }
+
+  /**
+   * Ensure the Docker image exists locally; pull it when missing.
+   */
+  private async ensureDockerImageAvailable(docker: Docker): Promise<void> {
+    const imageName = this.config.image!;
+    try {
+      await docker.getImage(imageName).inspect();
+      return;
+    } catch (error: any) {
+      const formatted = this.formatErrorForLogging(error);
+      const notFound =
+        (typeof error?.statusCode === 'number' && error.statusCode === 404) ||
+        /not\s+found/i.test(formatted) ||
+        /no such image/i.test(formatted);
+      if (!notFound) {
+        throw new Error(`Unable to inspect Docker image ${imageName}: ${formatted}`);
+      }
+    }
+
+    logger.info(`⬇️  [Docker ${this.config.name}] Pulling image ${imageName} (not found locally)`);
+
+    await new Promise<void>((resolve, reject) => {
+      docker.pull(imageName, (err, stream) => {
+        if (err || !stream) {
+          reject(
+            new Error(
+              `Failed to pull Docker image ${imageName}: ${this.formatErrorForLogging(err)}`
+            )
+          );
+          return;
+        }
+
+        docker.modem.followProgress(
+          stream,
+          (pullErr) => {
+            if (pullErr) {
+              reject(
+                new Error(
+                  `Failed to pull Docker image ${imageName}: ${this.formatErrorForLogging(pullErr)}`
+                )
+              );
+            } else {
+              logger.info(`✅ [Docker ${this.config.name}] Pulled image ${imageName}`);
+              resolve();
+            }
+          },
+          (event) => {
+            if (event?.status) {
+              logger.debug(
+                `⬇️  [Docker ${this.config.name}] ${imageName}: ${event.status}${
+                  event.progress ? ` ${event.progress}` : ''
+                }`
+              );
+            }
+          }
+        );
+      });
+    });
   }
 
   private buildDockerCreateOptions(params: {
@@ -1039,25 +1447,41 @@ export class RemoteMCPClient extends EventEmitter {
     options: { remove: boolean; autoRemove: boolean }
   ): Promise<void> {
     await this.safeStopContainer(container);
-    if (options.remove && !options.autoRemove) {
+    if (options.remove) {
       await this.safeRemoveContainer(container);
     }
   }
 
   private async ensureDockerAccessibility(docker: Docker): Promise<void> {
-    try {
-      await docker.ping();
-    } catch (error) {
-      const errno = (error as NodeJS.ErrnoException)?.code;
-      const formatted = this.formatErrorForLogging(error);
-      if (errno === 'EACCES') {
-        const socketPath = await this.resolveDockerSocketPath(docker) || process.env.DOCKER_HOST || '/var/run/docker.sock';
-        throw new Error(
-          `Permission denied accessing Docker socket (${socketPath}). Add the current user to the Docker group or adjust permissions. Details: ${formatted}`
-        );
+    // Attempt to ping the daemon; on failure fall back through detected sockets.
+    /* eslint-disable no-constant-condition */
+    while (true) {
+      try {
+        await docker.ping();
+        return;
+      } catch (error) {
+        if (this.tryAdvanceDockerCandidate(error)) {
+          docker = this.getDockerClient();
+          continue;
+        }
+
+        const errno = (error as NodeJS.ErrnoException)?.code;
+        const formatted = this.formatErrorForLogging(error);
+        if (errno === 'EACCES') {
+          const candidate = this.getCurrentDockerCandidate();
+          const socketPath =
+            (await this.resolveDockerSocketPath(docker)) ||
+            candidate?.description ||
+            process.env.DOCKER_HOST ||
+            '/var/run/docker.sock';
+          throw new Error(
+            `Permission denied accessing Docker socket (${socketPath}). Add the current user to the Docker group or adjust permissions. Details: ${formatted}`
+          );
+        }
+        throw new Error(`Unable to reach Docker daemon: ${formatted}`);
       }
-      throw new Error(`Unable to reach Docker daemon: ${formatted}`);
     }
+    /* eslint-enable no-constant-condition */
   }
 
   private async resolveDockerSocketPath(docker: Docker): Promise<string | null> {
@@ -1496,9 +1920,24 @@ export class RemoteMCPClient extends EventEmitter {
    */
   private async sendStdioRequest(message: MCPMessage): Promise<any> {
     return new Promise((resolve, reject) => {
+      const payload = JSON.stringify(message) + '\n';
+      const stdin = this.process?.stdin;
+
+      if (!stdin || !stdin.writable) {
+        reject(new Error('Stdin stream is not writable'));
+        return;
+      }
+
       if (message.id === undefined || message.id === null) {
-        this.process?.stdin?.write(JSON.stringify(message) + '\n');
-        resolve(undefined);
+        this.writeToProcessStdin(payload)
+          .then(() => resolve(undefined))
+          .catch((error) => {
+            const formatted = this.formatErrorForLogging(error);
+            logger.warn(
+              `⚠️  [${this.getTransportLabel()} ${this.config.name}] Fire-and-forget write failed: ${formatted}`
+            );
+            reject(error);
+          });
         return;
       }
 
@@ -1508,9 +1947,63 @@ export class RemoteMCPClient extends EventEmitter {
       }, this.config.timeout || 30000);
 
       this.pendingRequests.set(message.id!, { resolve, reject, timeout });
+      this.writeToProcessStdin(payload).catch((error) => {
+        clearTimeout(timeout);
+        this.pendingRequests.delete(message.id!);
+        reject(error);
+      });
+    });
+  }
 
-      // Send message as line-delimited JSON
-      this.process?.stdin?.write(JSON.stringify(message) + '\n');
+  /**
+   * Write to the underlying stdio stream, handling backpressure and errors.
+   */
+  private writeToProcessStdin(payload: string): Promise<void> {
+    const stdin = this.process?.stdin;
+    if (!stdin || !stdin.writable) {
+      return Promise.reject(new Error('Stdin stream is not writable'));
+    }
+
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        stdin.removeListener('error', onError);
+        stdin.removeListener('drain', onDrain);
+      };
+
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+
+      const onDrain = () => {
+        cleanup();
+        resolve();
+      };
+
+      stdin.once('error', onError);
+
+      const flushed = stdin.write(payload, (err) => {
+        if (err) {
+          cleanup();
+          reject(err);
+        }
+      });
+
+      if (flushed) {
+        cleanup();
+        resolve();
+      } else {
+        stdin.once('drain', onDrain);
+      }
+    });
+  }
+
+  private async delay(ms: number): Promise<void> {
+    if (ms <= 0) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, ms);
     });
   }
 
@@ -1527,12 +2020,34 @@ export class RemoteMCPClient extends EventEmitter {
     return this.request('tools/call', { name, arguments: args });
   }
 
+  private getTransportLabel(): string {
+    switch (this.config.transport) {
+      case 'docker':
+        return 'Docker';
+      case 'npx':
+      case 'npm-exec':
+        return 'NodePkg';
+      case 'uvx':
+        return 'UVX';
+      case 'streamableHttp':
+        return 'StreamHTTP';
+      default:
+        return 'Process';
+    }
+  }
+
   /**
    * List available tools
    * For streamable HTTP transport, returns cached tools from initialization
    */
   async listTools(): Promise<any> {
     // For streamable HTTP, return cached tools from initialization
+    const cacheIsFresh = this.cachedTools && (Date.now() - this.cachedToolsTimestamp) < 1000;
+    if (cacheIsFresh) {
+      logger.debug(`📋 [${this.getTransportLabel()} ${this.config.name}] Returning cached tools list (${this.cachedTools.tools?.length || 0} tools)`);
+      return this.cachedTools;
+    }
+
     if (this.config.transport === 'streamableHttp' && this.cachedTools) {
       logger.debug(`📋 [StreamHTTP ${this.config.name}] Returning cached tools list (${this.cachedTools.tools?.length || 0} tools)`);
       return this.cachedTools;
@@ -1544,6 +2059,8 @@ export class RemoteMCPClient extends EventEmitter {
       const toolNames = result.tools.map((tool: any) => tool.name).filter(Boolean);
       logger.debug(`📋 [NodePkg ${this.config.name}] tools/list returned ${toolNames.length} tool(s)${toolNames.length ? `: ${toolNames.join(', ')}` : ''}`);
     }
+    this.cachedTools = result;
+    this.cachedToolsTimestamp = Date.now();
     return result;
   }
 
@@ -1556,8 +2073,9 @@ export class RemoteMCPClient extends EventEmitter {
     }
 
     if (this.process) {
-      if (this.process instanceof DockerContainerProcess) {
-        await this.process.dispose();
+      const processAny = this.process as any;
+      if (typeof processAny.dispose === 'function') {
+        await processAny.dispose();
       } else {
         this.process.kill();
       }
@@ -1587,112 +2105,4 @@ export class RemoteMCPClient extends EventEmitter {
  */
 export function createRemoteMCPClient(config: RemoteMCPServerConfig): RemoteMCPClient {
   return new RemoteMCPClient(config);
-}
-
-class DockerContainerProcess extends EventEmitter {
-  public readonly stdin: NodeJS.WritableStream;
-  public readonly stdout: PassThrough;
-  public readonly stderr: PassThrough;
-  public readonly pid: number | undefined;
-
-  private readonly container: Docker.Container;
-  private readonly attachStream: NodeJS.ReadWriteStream;
-  private readonly autoRemove: boolean;
-  private pendingRemoval: boolean;
-  private stopping = false;
-  private readonly loggerPrefix: string;
-
-  constructor(
-    container: Docker.Container,
-    attachStream: NodeJS.ReadWriteStream,
-    options: { autoRemove: boolean; removeAfterStop: boolean; loggerPrefix: string }
-  ) {
-    super();
-    this.container = container;
-    this.attachStream = attachStream;
-    this.autoRemove = options.autoRemove;
-    this.pendingRemoval = options.removeAfterStop && !options.autoRemove;
-    this.loggerPrefix = options.loggerPrefix;
-    this.stdin = attachStream;
-    this.stdout = new PassThrough();
-    this.stderr = new PassThrough();
-    this.pid = undefined;
-
-    if (typeof (container.modem as any)?.demuxStream === 'function') {
-      container.modem.demuxStream(attachStream, this.stdout, this.stderr);
-    } else {
-      attachStream.on('data', (chunk: Buffer) => {
-        this.stdout.write(chunk);
-      });
-      attachStream.on('end', () => {
-        this.stdout.end();
-        this.stderr.end();
-      });
-    }
-
-    attachStream.on('error', (error) => {
-      this.emit('error', error);
-    });
-
-    container.wait()
-      .then((result) => {
-        this.stdout.end();
-        this.stderr.end();
-        const status = result?.StatusCode ?? 0;
-        this.emit('exit', status);
-        this.emit('close', status);
-        void this.finalizeRemoval();
-      })
-      .catch((error) => {
-        this.emit('error', error);
-      });
-  }
-
-  kill(): boolean {
-    void this.stop(true);
-    return true;
-  }
-
-  async dispose(): Promise<void> {
-    await this.stop(true);
-  }
-
-  private async stop(force: boolean): Promise<void> {
-    if (this.stopping) {
-      return;
-    }
-    this.stopping = true;
-    try {
-      await this.container.stop({ t: force ? 0 : 10 });
-    } catch (error) {
-      const rawStatus = (error as any)?.statusCode;
-      const statusCode = typeof rawStatus === 'number' ? rawStatus : undefined;
-      if (statusCode !== 304 && statusCode !== 404) {
-        logger.debug(
-          `ℹ️  [${this.loggerPrefix}] Failed to stop container ${this.container.id}: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    } finally {
-      await this.finalizeRemoval();
-    }
-  }
-
-  private async finalizeRemoval(): Promise<void> {
-    if (!this.pendingRemoval || this.autoRemove) {
-      this.pendingRemoval = false;
-      return;
-    }
-    this.pendingRemoval = false;
-    try {
-      await this.container.remove({ force: true });
-    } catch (error) {
-      const rawStatus = (error as any)?.statusCode;
-      const statusCode = typeof rawStatus === 'number' ? rawStatus : undefined;
-      if (statusCode !== 404) {
-        logger.debug(
-          `ℹ️  [${this.loggerPrefix}] Failed to remove container ${this.container.id}: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    }
-  }
 }
