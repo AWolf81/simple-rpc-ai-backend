@@ -2,7 +2,11 @@
 title: MCP OAuth Authentication
 parent: Common Configurations
 grand_parent: Documentation
+<<<<<<< HEAD
 nav_order: 9
+=======
+nav_order: 6
+>>>>>>> master
 ---
 
 # MCP OAuth Authentication Configuration Guide

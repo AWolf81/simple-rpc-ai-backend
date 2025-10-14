@@ -101,10 +101,10 @@ const server = createRpcAiServer({
 });
 ```
 
-### ✅ Legacy Configuration (Still Supported)
+### ✅ Correct Configuration
 ```typescript
 const server = createRpcAiServer({
-  // Legacy split configuration
+  // AI configuration - at root level
   serverProviders: ['anthropic', 'openai'],      // Server-managed providers
   byokProviders: ['anthropic', 'openai'],        // Bring-your-own-key providers
   systemPrompts: { default: '...' },             // System prompts
@@ -113,9 +113,9 @@ const server = createRpcAiServer({
   // MCP configuration
   mcp: {
     enabled: true,
-    ai: {
+    ai: {                                         // MCP-specific AI config (optional)
       enabled: true,
-      useServerConfig: true
+      useServerConfig: true                       // Use serverProviders above
     }
   }
 });
@@ -133,7 +133,7 @@ const server = createRpcAiServer({
 });
 ```
 
-**See**: [Provider Configuration](docs/common-configurations/provider-configuration.md) for detailed guide and [Server Configuration](docs/common-configurations/configuration.md) for complete reference.
+**See**: [Configuration Documentation](docs/server-api/configuration.md) for complete reference.
 
 ## Key Methods
 

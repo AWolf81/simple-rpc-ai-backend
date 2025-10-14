@@ -9,6 +9,7 @@ has_toc: true
 # Server API
 
 Dive into the transport and resource layers that power the Simple RPC AI Backend. These guides document endpoints, schemas, and workflows for tools and registry integrations.
+<<<<<<< HEAD
 
 ## API Topics
 
@@ -19,3 +20,5 @@ Dive into the transport and resource layers that power the Simple RPC AI Backend
 - [Methods]({% link server-api/methods.md %}) - Complete tRPC/JSON-RPC method reference
 
 For configuration options, see [Common Configurations]({% link common-configurations/index.md %}).
+=======
+>>>>>>> master

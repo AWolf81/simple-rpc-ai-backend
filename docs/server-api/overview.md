@@ -51,9 +51,17 @@ A complete list of procedures, grouped by namespace, is available inside the dev
 
 Review the sections below for implementation details and integration examples:
 
+<<<<<<< HEAD
 - [Resources]({{ site.baseurl }}{% link server-api/resources.md %})
 - [Tools]({{ site.baseurl }}{% link server-api/tools.md %})
 - [Registry]({{ site.baseurl }}{% link server-api/registry.md %})
 - [Methods]({{ site.baseurl }}{% link server-api/methods.md %})
 
 For configuration options, see [Common Configurations]({{ site.baseurl }}{% link common-configurations/index.md %}).
+=======
+- [Configuration]({{ site.baseurl }}{% link server-api/configuration.md %})
+- [Resources]({{ site.baseurl }}{% link server-api/resources.md %})
+- [Tools]({{ site.baseurl }}{% link server-api/tools.md %})
+- [Registry]({{ site.baseurl }}{% link server-api/registry.md %})
+- [Methods]({{ site.baseurl }}{% link server-api/methods.md %})
+>>>>>>> master

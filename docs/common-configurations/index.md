@@ -8,6 +8,7 @@ has_toc: true
 
 # Common Configurations
 
+<<<<<<< HEAD
 Configure the backend for your environment by fine-tuning server options, provider credentials, authentication callbacks, and workspace defaults. The sections below outline the most frequently adjusted settings.
 
 ## Configuration Topics
@@ -19,3 +20,6 @@ Configure the backend for your environment by fine-tuning server options, provid
 - [Authentication]({% link common-configurations/authentication.md %}) - OAuth and JWT setup
 - [CORS]({% link common-configurations/cors.md %}) - Cross-origin request configuration
 - [Workspaces]({% link common-configurations/workspaces.md %}) - Server workspace configuration
+=======
+Configure the backend for your environment by fine-tuning provider credentials, authentication callbacks, and workspace defaults. The sections below outline the most frequently adjusted settings.
+>>>>>>> master

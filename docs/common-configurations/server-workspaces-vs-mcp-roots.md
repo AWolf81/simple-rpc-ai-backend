@@ -2,7 +2,11 @@
 title: Server Workspaces vs MCP Roots
 parent: Common Configurations
 grand_parent: Documentation
+<<<<<<< HEAD
 nav_order: 10
+=======
+nav_order: 7
+>>>>>>> master
 ---
 
 # Server Workspaces vs MCP Roots: Complete Guide
