@@ -386,15 +386,9 @@ export class AIService {
     // Initialize model restrictions
     this.modelRestrictions = config.modelRestrictions;
     if(config.serviceProviders) {
-<<<<<<< HEAD
       // Parse and normalize provider configuration (no logging of API keys)
       this.providers = normalizeServiceProviders(config.serviceProviders);
       logger.debug(`🔍 Configured providers:`, this.providers.map(p => `${p.name} (hasKey: ${!!p.apiKey})`));
-=======
-      logger.debug(`🔍 AIService received serviceProviders config:`, JSON.stringify(config.serviceProviders, null, 2));
-      this.providers = normalizeServiceProviders(config.serviceProviders);
-      logger.debug(`🔍 Normalized providers:`, this.providers.map(p => `${p.name} (hasKey: ${!!p.apiKey})`));
->>>>>>> master
       if (this.providers.length === 0) {
         throw new Error('No valid AI service providers configured.');
       }
