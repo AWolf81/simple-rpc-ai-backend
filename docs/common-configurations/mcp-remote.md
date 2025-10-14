@@ -26,7 +26,7 @@ Before enabling remote MCP servers:
   - `uvx`: Install [uv](https://github.com/astral-sh/uv) and verify `uvx --help`.
   - `docker`: Install Docker Desktop/daemon and verify `docker ps` works.
 - Add any API keys (e.g. `SMITHERY_API_KEY`, `CONTEXT7_API_KEY`) to your `.env` or deployment secrets.
-- For Docker transports, define host bind paths ahead of time and ensure Docker has access permissions.
+- For Docker transports, no extra backend configuration is required—the manager reuses the same Docker socket your user already uses (e.g. Docker Desktop). Configure bind mounts only if your remote tool needs files from the host.
 
 ## Configuration Templates
 
@@ -92,22 +92,22 @@ Each example below maps directly to the `remoteMcpServers.servers` array.
 
 ### Docker permissions checklist
 
-Most Docker MCP failures originate from missing socket permissions. Before enabling a Docker transport:
+By default the backend uses whatever Docker socket your current user already has access to (e.g. Docker Desktop’s user-level socket), so you typically do **not** need to tweak permissions or set `DOCKER_HOST`. Containers launched by the manager will show up in Docker Desktop automatically. Double-check only when you intentionally switch to a protected system socket such as `/var/run/docker.sock`:
 
 - Confirm the daemon responds without sudo:
   ```bash
   docker ps
   ```
-- Verify your account is part of the `docker` group:
+- If you change `DOCKER_HOST` to point at a root-owned socket (`/var/run/docker.sock`), make sure your user belongs to the `docker` group:
   ```bash
   groups | grep docker
   ```
-  If the command prints nothing, run `sudo usermod -aG docker $USER` and log out/in (or reboot) so the new group membership takes effect.
+  Missing output means you should run `sudo usermod -aG docker $USER` and then log out/in (or reboot) to refresh group membership.
 - When permissions are missing, the backend logs:
   ```
   ❌ Remote MCP server error (git-mcp): Permission denied accessing Docker socket (/var/run/docker.sock)…
   ```
-  Use it as a signal to revisit the group membership or socket configuration (for Docker Desktop set `DOCKER_HOST` accordingly).
+  Treat that as a hint to revert to the default socket or adjust group membership/`DOCKER_HOST` accordingly.
 
 ## Operational Tips
 
@@ -116,6 +116,7 @@ Most Docker MCP failures originate from missing socket permissions. Before enabl
 - **Reconnection:** `RemoteMCPManager` automatically retries when `autoStart` is true; tune `retryDelay` and `maxRetries` in `remoteMcpServers` if needed.
 - **Tool discovery:** Both the manager and protocol handler log discovered tools; verify that `tools/list` shows your remote abilities inside the dev panel.
 - **Namespacing:** Remote tools are automatically prefixed with their server name (e.g. `context7__search`). Keep prefixes enabled to avoid collisions and to make origin obvious.
+- **Tool naming:** Use `remoteMcpServers.prefixToolNames=false` to disable prefixes globally, or set `prefixToolNames: false` on individual servers for selective overrides.
 - **Public access:** Remote tools currently require inclusion in `mcp.auth.publicTools` to be callable (`context7__resolve-library-id`, `timestamp__get_current_time`, etc.). Authenticated-only remote tools are on the roadmap but not yet supported.
 
 Need more? Check the [Remote MCP Integrations]({{ site.baseurl }}{% link getting-started/remote-mcp.md %}) guide for step-by-step instructions.

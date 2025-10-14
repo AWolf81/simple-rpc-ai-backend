@@ -145,6 +145,40 @@ describe('RemoteMCPManager', () => {
     });
   });
 
+  it('should respect global prefixToolNames configuration', async () => {
+    const { createRemoteMCPManager } = await import('../../src/mcp/remote-mcp-manager');
+    const manager = createRemoteMCPManager({ servers: [], prefixToolNames: false });
+
+    (manager as any).clients.set('global', {
+      isConnected: () => true,
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'foo' }] }),
+      getConfig: () => ({ prefixToolNames: false })
+    });
+
+    const tools = await manager.listAllTools();
+    const toolList = tools.get('global');
+    expect(toolList?.[0].prefixToolNames).toBe(false);
+    expect(toolList?.[0].displayName).toBe('foo');
+    expect(toolList?.[0].fullName).toBe('global__foo');
+  });
+
+  it('should allow per-server prefixToolNames override', async () => {
+    const { createRemoteMCPManager } = await import('../../src/mcp/remote-mcp-manager');
+    const manager = createRemoteMCPManager({ servers: [], prefixToolNames: false });
+
+    (manager as any).clients.set('override', {
+      isConnected: () => true,
+      listTools: vi.fn().mockResolvedValue({ tools: [{ name: 'bar' }] }),
+      getConfig: () => ({ prefixToolNames: true })
+    });
+
+    const tools = await manager.listAllTools();
+    const toolList = tools.get('override');
+    expect(toolList?.[0].prefixToolNames).toBe(true);
+    expect(toolList?.[0].displayName).toBe('override__bar');
+    expect(toolList?.[0].fullName).toBe('override__bar');
+  });
+
   it('should expose server status snapshot', async () => {
     const { createRemoteMCPManager } = await import('../../src/mcp/remote-mcp-manager');
     const manager = createRemoteMCPManager({ servers: [] });

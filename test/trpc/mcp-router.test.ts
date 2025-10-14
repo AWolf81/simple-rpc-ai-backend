@@ -182,6 +182,68 @@ describe('MCP Router handleMCPRequest', () => {
   });
 
   describe('Remote MCP integration', () => {
+    it('should expose unprefixed remote tools when prefixToolNames=false', async () => {
+      const remoteTools = new Map([
+        ['git-mcp', [
+          {
+            name: 'git_status',
+            fullName: 'git-mcp__git_status',
+            originalName: 'git_status',
+            displayName: 'git_status',
+            description: 'Show git status',
+            inputSchema: {
+              type: 'object',
+              properties: { repo_path: { type: 'string' } }
+            },
+            prefixToolNames: false
+          }
+        ]]
+      ]);
+
+      const remoteMcpManager = {
+        listAllTools: vi.fn().mockResolvedValue(remoteTools),
+        callTool: vi.fn().mockResolvedValue({ ok: true })
+      };
+
+      mcpHandler = new MCPProtocolHandler(
+        { _def: { procedures: {} } },
+        {
+          remoteMcpServers: { prefixToolNames: false },
+          auth: {
+            requireAuthForToolsList: false,
+            requireAuthForToolsCall: false,
+            publicTools: ['git_status']
+          }
+        },
+        remoteMcpManager
+      );
+
+      mockReq.body = {
+        jsonrpc: '2.0',
+        method: 'tools/list',
+        id: 1
+      };
+
+      await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
+      const listResponse = jsonSpy.mock.calls[0][0];
+      expect(listResponse.result.tools[0].name).toBe('git_status');
+
+      jsonSpy.mockClear();
+
+      mockReq.body = {
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        id: 2,
+        params: {
+          name: 'git_status',
+          arguments: { repo_path: '/workspace' }
+        }
+      };
+
+      await mcpHandler.handleMCPRequest(mockReq as AuthenticatedRequest, mockRes as Response);
+      expect(remoteMcpManager.callTool).toHaveBeenCalledWith('git-mcp', 'git_status', { repo_path: '/workspace' });
+    });
+
     it('should merge remote tools with server prefix by default', async () => {
       const remoteMcpManager = {
         listAllTools: vi.fn().mockResolvedValue(new Map([
@@ -448,8 +510,8 @@ describe('MCP Router handleMCPRequest', () => {
       expect(remoteMcpManager.callTool).toHaveBeenCalled();
       const response = jsonSpy.mock.calls[0][0];
       expect(response.error.code).toBe(ErrorCode.InternalError);
-      expect(response.error.message).toBe('Failed to execute tool');
-      expect(response.error.data).toBe('network failure');
+      expect(response.error.message).toBe('network failure');
+      expect(response.error.data).toBeUndefined();
     });
   });
 

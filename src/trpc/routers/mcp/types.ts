@@ -17,6 +17,11 @@ export interface MCPAuthConfig {
   // Legacy support (deprecated - use publicTools instead)
   _legacyPublicTools?: string[];
 
+  remoteMcpServers?: {
+    enabled?: boolean;
+    prefixToolNames?: boolean;
+  };
+
   // New authentication type configuration
   authType?: MCPAuthType; // Default: 'oauth' for backward compatibility
 
@@ -47,6 +52,10 @@ export interface MCPRouterConfig {
   securityLogging?: SecurityLoggerConfig;
   authEnforcement?: AuthEnforcementConfig;
   auth?: MCPAuthConfig;
+  remoteMcpServers?: {
+    enabled?: boolean;
+    prefixToolNames?: boolean;
+  };
   ai?: {
     enabled?: boolean; // Default: false - explicit opt-in required
     useServerConfig?: boolean; // Default: true - use same config as ai.generateText

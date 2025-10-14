@@ -2,6 +2,28 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import * as childProcess from 'child_process';
 import { RemoteMCPClient, createRemoteMCPClient } from '../../src/mcp/remote-mcp-client';
+import * as nodePackageRunner from '../../src/utils/node-package-runner';
+
+vi.mock('child_process', async () => {
+  const actual = await vi.importActual<typeof import('child_process')>('child_process');
+  return {
+    ...actual,
+    spawn: vi.fn(),
+    spawnSync: vi.fn()
+  };
+});
+
+function createMockProcess(overrides: Record<string, unknown> = {}) {
+  const mockProcess: any = new EventEmitter();
+  mockProcess.stdout = new EventEmitter();
+  mockProcess.stderr = new EventEmitter();
+  mockProcess.stdin = Object.assign(new EventEmitter(), {
+    write: vi.fn().mockReturnValue(true),
+    writable: true
+  });
+  mockProcess.kill = vi.fn();
+  return Object.assign(mockProcess, overrides);
+}
 
 describe('RemoteMCPClient', () => {
   beforeEach(() => {
@@ -9,6 +31,7 @@ describe('RemoteMCPClient', () => {
   });
 
   afterEach(() => {
+    vi.clearAllMocks();
     vi.restoreAllMocks();
   });
 
@@ -189,13 +212,14 @@ describe('RemoteMCPClient', () => {
   });
 
   it('should connect via npx transport with runnerArgs', async () => {
-    vi.spyOn(childProcess, 'spawnSync').mockReturnValue({ status: 0 } as any);
-    const mockProcess: any = new EventEmitter();
-    mockProcess.stdout = new EventEmitter();
-    mockProcess.stderr = new EventEmitter();
-    mockProcess.stdin = { write: vi.fn() };
-    mockProcess.kill = vi.fn();
-    const spawnSpy = vi.spyOn(childProcess, 'spawn').mockReturnValue(mockProcess);
+    vi.spyOn(nodePackageRunner, 'resolveNodePackageRunner').mockReturnValue({
+      command: 'npx',
+      args: [],
+      runner: 'npx'
+    });
+    const mockProcess = createMockProcess();
+    const spawnMock = vi.mocked(childProcess.spawn);
+    spawnMock.mockReturnValue(mockProcess);
 
     const client = new RemoteMCPClient({
       name: 'npx-client',
@@ -206,13 +230,17 @@ describe('RemoteMCPClient', () => {
       timeout: 5000
     });
 
+    (client as any).waitForReady = vi.fn().mockResolvedValue(undefined);
+    (client as any).postStdioHandshake = vi.fn().mockResolvedValue(undefined);
+
     const connectPromise = client.connect();
-    mockProcess.stdout.emit('data', Buffer.from('ready'));
     await connectPromise;
 
-    expect(spawnSpy).toHaveBeenCalled();
-    const spawnArgs = spawnSpy.mock.calls[0][1];
+    expect(spawnMock).toHaveBeenCalled();
+    const spawnArgs = spawnMock.mock.calls[0][1];
     expect(spawnArgs.slice(0, 3)).toEqual(['-y', '@upstash/context7-mcp', '--api-key']);
+    expect((client as any).waitForReady).toHaveBeenCalled();
+    expect((client as any).postStdioHandshake).toHaveBeenCalledWith('NodePkg');
     expect(client.isConnected()).toBe(true);
   });
 
@@ -223,7 +251,7 @@ describe('RemoteMCPClient', () => {
       command: 'mcp-cli'
     });
 
-    (client as any).process = { stdin: { write: vi.fn() } };
+    (client as any).process = { stdin: createMockProcess().stdin };
 
     const promise = (client as any).sendStdioRequest({
       jsonrpc: '2.0',

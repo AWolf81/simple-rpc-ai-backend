@@ -745,9 +745,6 @@ export class RemoteMCPClient extends EventEmitter {
       .catch((error) => {
         (dockerProcess as unknown as EventEmitter).emit('error', error);
       });
-
-    logger.debug(`[Docker ${this.config.name}] stdin writable:`, dockerProcess.stdin.writable);
-    logger.debug(`[Docker ${this.config.name}] stdin destroyed:`, (dockerProcess.stdin as any).destroyed);
     
     const dockerLogBuffer: string[] = [];
     const maxLogEntries = 20;

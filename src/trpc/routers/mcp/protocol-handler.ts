@@ -58,9 +58,11 @@ export class MCPProtocolHandler {
   private aiEnabled: boolean;
   private namespaceWhitelist?: string[];
   private remoteMcpManager?: any; // Remote MCP manager for external tools
+  private config?: MCPRouterConfig;
 
   constructor(appRouter: any, config?: MCPRouterConfig, remoteMcpManager?: any) {
     this.appRouter = appRouter;
+    this.config = config;
     this.adminUsers = config?.adminUsers || [];
     this.jwtMiddleware = config?.jwtMiddleware;
     this.aiEnabled = config?.ai?.enabled || false;
@@ -200,16 +202,20 @@ export class MCPProtocolHandler {
   /**
    * Determine if a tool should be public based on hybrid configuration
    */
-  private isToolPublic(tool: { name: string; category?: string; public?: boolean }): boolean {
+  private isToolPublic(tool: { name: string; fullName?: string; originalName?: string; category?: string; public?: boolean }): boolean {
     // 1. Explicit deny always wins (security override)
-    if (this.authConfig.denyPublicTools?.includes(tool.name)) {
+    const denyList = this.authConfig.denyPublicTools || [];
+    if (denyList.includes(tool.name) || (tool.fullName && denyList.includes(tool.fullName)) || (tool.originalName && denyList.includes(tool.originalName))) {
       return false;
     }
 
     // 2. Explicit allow list (array of tool names)
-    if (Array.isArray(this.authConfig.publicTools)) {
-      return this.authConfig.publicTools.includes(tool.name);
-    }
+   if (Array.isArray(this.authConfig.publicTools)) {
+     if (this.authConfig.publicTools.includes(tool.name)) {
+       return true;
+     }
+     return false;
+   }
 
     // 3. 'default' means use tool metadata + category filtering
     if (this.authConfig.publicTools === 'default') {
@@ -222,9 +228,9 @@ export class MCPProtocolHandler {
     }
 
     // 4. Legacy support
-    if (this.authConfig._legacyPublicTools?.includes(tool.name)) {
-      return true;
-    }
+   if (this.authConfig._legacyPublicTools?.includes(tool.name) || (tool.fullName && this.authConfig._legacyPublicTools?.includes(tool.fullName))) {
+     return true;
+   }
 
     // 5. Default: tool metadata
     return tool.public === true;
@@ -1059,21 +1065,23 @@ export class MCPProtocolHandler {
       const remoteToolEntries: DiscoveredTool[] = remoteTools.map((tool: any) => {
         // Prefix remote tool names to avoid collisions and provide transparency
         // Can be disabled per-server with prefixToolNames: false
-        const shouldPrefix = tool.prefixToolNames !== false;  // Default: true
-        const toolName = shouldPrefix ? `${tool.serverName}__${tool.name}` : tool.name;
+        const globalPrefix = this.config?.remoteMcpServers?.prefixToolNames ?? true;
+        const canonicalName = `${tool.serverName}__${tool.name}`;
+        const shouldPrefix = tool.prefixToolNames ?? globalPrefix;  // Default: true
+        const toolName = tool.displayName ?? (shouldPrefix ? canonicalName : tool.name);
         const description = shouldPrefix 
           ? `[${tool.serverName}] ${tool.description || 'Remote MCP tool'}`
           : tool.description || 'Remote MCP tool';
 
         return {
           name: toolName,
-          fullName: toolName,
+          fullName: canonicalName,
           description,
           inputSchema: tool.inputSchema || { type: 'object', properties: {}, required: [] },
           procedure: null as any,
           scopes: null,
           serverName: tool.serverName,
-          originalName: tool.name
+          originalName: tool.originalName || tool.name
         };
       });
 
@@ -1081,17 +1089,14 @@ export class MCPProtocolHandler {
         logger.debug(`📦 [MCP] Remote tools discovered: ${remoteToolEntries.map(tool => tool.name).join(', ')}`);
       }
 
-      const allTools = [
-        ...mcpTools,
-        ...remoteToolEntries
-      ];
-
       // Filter tools based on auth and visibility rules
-      const availableTools = allTools
+      const availableTools = [...mcpTools, ...remoteToolEntries]
         .map(tool => {
           // Check if tool should be public
           const isPublic = this.isToolPublic({
             name: tool.name,
+            fullName: tool.fullName,
+            originalName: (tool as any).originalName,
             public: true // Default to public for tRPC MCP tools
           });
 
@@ -1178,17 +1183,17 @@ export class MCPProtocolHandler {
             : name;
           // Flatten and search for tool
           for (const [serverName, tools] of toolsByServer) {
-            const remoteTool = tools.find((t: any) => t.name === name || t.name === normalizedName);
+            const remoteTool = tools.find((t: any) => t.displayName === name || t.fullName === name || t.name === name);
             if (remoteTool) {
               tool = {
-                name,
-                fullName: name,
+                name: remoteTool.displayName || remoteTool.name,
+                fullName: remoteTool.fullName || `${serverName}__${remoteTool.name}`,
                 description: remoteTool.description || 'Remote MCP tool',
                 inputSchema: remoteTool.inputSchema || { type: 'object', properties: {}, required: [] },
                 procedure: null as any,
                 scopes: null,
                 serverName,
-                originalName: remoteTool.name
+                originalName: remoteTool.originalName || remoteTool.name
               };
               isRemoteTool = true;
               break;

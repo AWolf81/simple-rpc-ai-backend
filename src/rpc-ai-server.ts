@@ -104,6 +104,7 @@ export interface RpcAiServerConfig {
       retries?: number;
       startupDelayMs?: number;
       startupRetries?: number;
+      prefixToolNames?: boolean;
     }>;
     containerOptions?: {
       namePrefix?: string;
@@ -119,6 +120,7 @@ export interface RpcAiServerConfig {
     autoReconnect?: boolean;
     reconnectDelay?: number;
     maxReconnectAttempts?: number;
+    prefixToolNames?: boolean;
   };
   
   // AI Configuration
@@ -532,6 +534,7 @@ export class RpcAiServer {
           trustAnthropicServers: true,
           ...(config.remoteMcpServers?.security || {})
         },
+        prefixToolNames: config.remoteMcpServers?.prefixToolNames ?? true,
         autoReconnect: config.remoteMcpServers?.autoReconnect ?? true,
         reconnectDelay: config.remoteMcpServers?.reconnectDelay ?? 5000,
         maxReconnectAttempts: config.remoteMcpServers?.maxReconnectAttempts ?? 3,
@@ -1579,7 +1582,7 @@ export class RpcAiServer {
             : undefined;
           const containerName = server.containerName ?? derivedContainerName;
 
-          return {
+         return {
             name: server.name,
             transport: server.transport,
             command: server.command,
@@ -1599,13 +1602,15 @@ export class RpcAiServer {
             timeout: server.timeout,
             retries: server.retries,
             startupDelayMs: server.startupDelayMs,
-            startupRetries: server.startupRetries
+            startupRetries: server.startupRetries,
+            prefixToolNames: server.prefixToolNames
           };
         }),
         autoConnect: true, // Auto-connect on init
         retryOnFailure: config.autoReconnect !== false,
         retryDelay: config.reconnectDelay || 5000,
-        maxRetries: config.maxReconnectAttempts || 3
+        maxRetries: config.maxReconnectAttempts || 3,
+        prefixToolNames: config.prefixToolNames ?? true
       });
 
       // Setup event handlers

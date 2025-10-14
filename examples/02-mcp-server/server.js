@@ -131,22 +131,24 @@ async function startServer() {
             'getPrompts',
             'getPromptTemplate',
             'explainConcept',
-            // Remote DuckDuckGo tools (prefix comes from remote server namespace, take the tool names from the terminal log)            
+            // Remote DuckDuckGo tools (prefix comes from remote server namespace, take the tool names from the terminal log)
             'duckduckgo-search__search',
+            // 'search',
             'duckduckgo-search__fetch_content',
             'context7__resolve-library-id', 
             'context7__get-library-docs',
             'timestamp__get_current_time', 
             'timestamp__convert_time',
+            // Docker-based MCP server examples (uncomment if using the docker servers below)
             //'time-mcp__get_current_time' // e.g. mcp/time
-            'git-mcp__git_status', 
-            'git-mcp__git_add',
-            'git-mcp__git_commit',
-            'git-mcp__git_log',
-            'git-mcp__git_diff',
-            'git-mcp__git_create_branch',
-            'git-mcp__git_checkout',
-            'git-mcp__git_diff',
+            // 'git-mcp__git_status', 
+            // 'git-mcp__git_add',
+            // 'git-mcp__git_commit',
+            // 'git-mcp__git_log',
+            // 'git-mcp__git_diff',
+            // 'git-mcp__git_create_branch',
+            // 'git-mcp__git_checkout',
+            // 'git-mcp__git_diff',
             // other git tools --> git_diff_unstaged, git_diff_staged, git_reset, git_create_branch, git_show, git_init
           ], // To allow every discovered tool without enumerating, set publicTools to 'default'
         },
@@ -413,6 +415,7 @@ Format: ${format}`;
       // Requires both api_key and profile parameters
       remoteMcpServers: {
         enabled: true,  // Enable remote tool discovery
+        // prefixToolNames: true, // default is true - prefixes tool names with server name and __
         containerOptions: {
           namePrefix: '',
           reuse: false,
@@ -424,7 +427,8 @@ Format: ${format}`;
             transport: 'streamableHttp',  // Use official streamable HTTP MCP transport
             url: `https://server.smithery.ai/@nickclyde/duckduckgo-mcp-server/mcp?api_key=${process.env.SMITHERY_API_KEY}&profile=${process.env.SMITHERY_PROFILE}`,
             autoStart: false,  // Streamable HTTP connections are established in connect()
-            timeout: 30000
+            timeout: 30000,
+            // prefixToolNames: false // individual override, defaults to server-level setting
           },
           {
             name: 'timestamp',
@@ -445,6 +449,7 @@ Format: ${format}`;
             autoStart: true,
             timeout: 30000
           },
+          // Docker-based MCP server examples (uncomment to use - requires Docker installed and running)
           // {
           //   name: 'time-mcp',
           //   transport: 'docker',
@@ -454,18 +459,18 @@ Format: ${format}`;
           //   reuseContainer: true,
           //   removeOnExit: false
           // }
-          {
-            name: 'git-mcp',
-            transport: 'docker',
-            image: 'mcp/git',            
-            containerArgs: [
-              '--mount', `type=bind,src=${process.env.GIT_MCP_HOST_DIR || path.resolve(__dirname, '..', '..')},dst=/workspace`
-            ],
-            dockerCommand: ['--repository', '/workspace', '--verbose'],            
-            startupRetries: 5,
-            startupDelayMs: 5000,  // wait 5 seconds after the first output before handshake
-            timeout: 15000        // give initialize/tools.list 15 seconds to complete
-          }
+          // {
+          //   name: 'git-mcp',
+          //   transport: 'docker',
+          //   image: 'mcp/git',            
+          //   containerArgs: [
+          //     '--mount', `type=bind,src=${process.env.GIT_MCP_HOST_DIR || path.resolve(__dirname, '..', '..')},dst=/workspace`
+          //   ],
+          //   dockerCommand: ['--repository', '/workspace', '--verbose'],            
+          //   startupRetries: 5,
+          //   startupDelayMs: 5000,  // wait 5 seconds after the first output before handshake
+          //   timeout: 15000         // give initialize/tools.list 15 seconds to complete            
+          // }
         ]
       }
     };

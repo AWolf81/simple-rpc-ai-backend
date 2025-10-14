@@ -13,6 +13,7 @@ export interface RemoteMCPManagerConfig {
   retryOnFailure?: boolean;
   retryDelay?: number;
   maxRetries?: number;
+  prefixToolNames?: boolean;
 }
 
 export interface RemoteServerStatus {
@@ -36,7 +37,8 @@ export class RemoteMCPManager extends EventEmitter {
       autoConnect: config.autoConnect ?? true,
       retryOnFailure: config.retryOnFailure ?? true,
       retryDelay: config.retryDelay ?? 5000,
-      maxRetries: config.maxRetries ?? 3
+      maxRetries: config.maxRetries ?? 3,
+      prefixToolNames: config.prefixToolNames ?? true
     };
   }
 
@@ -46,7 +48,11 @@ export class RemoteMCPManager extends EventEmitter {
   async initialize(): Promise<void> {
     for (const serverConfig of this.config.servers) {
       try {
-        await this.addServer(serverConfig);
+        const mergedConfig = {
+          ...serverConfig,
+          prefixToolNames: serverConfig.prefixToolNames ?? this.config.prefixToolNames
+        };
+        await this.addServer(mergedConfig);
       } catch (error) {
         this.emit('serverError', {
           server: serverConfig.name,
@@ -224,18 +230,24 @@ export class RemoteMCPManager extends EventEmitter {
   async listAllTools(): Promise<Map<string, any[]>> {
     const toolsByServer = new Map<string, any[]>();
 
-    for (const [name, client] of this.clients) {
-      if (client.isConnected()) {
-        try {
-          console.log(`📡 [RemoteMCPManager] Attempting to retrieve tools from server ${name}`);
-          const result = await client.listTools();
-          const serverConfig = client.getConfig();
-          const shouldPrefix = serverConfig.prefixToolNames !== false;
+   for (const [name, client] of this.clients) {
+     if (client.isConnected()) {
+       try {
+         console.log(`📡 [RemoteMCPManager] Attempting to retrieve tools from server ${name}`);
+         const result = await client.listTools();
+         const serverConfig = client.getConfig();
+          const shouldPrefix = serverConfig.prefixToolNames ?? this.config.prefixToolNames;
 
-          const decoratedTools = (result.tools || []).map((tool: any) => ({
-            ...tool,
-            prefixToolNames: shouldPrefix
-          }));
+          const decoratedTools = (result.tools || []).map((tool: any) => {
+            const canonicalName = `${name}__${tool.name}`;
+            return {
+              ...tool,
+              prefixToolNames: shouldPrefix,
+              fullName: canonicalName,
+              originalName: tool.name,
+              displayName: shouldPrefix ? canonicalName : tool.name
+            };
+          });
 
           toolsByServer.set(name, decoratedTools);
           console.log(`📡 [RemoteMCPManager] Successfully retrieved ${result.tools?.length || 0} tools from server ${name}`);
