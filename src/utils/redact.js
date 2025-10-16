@@ -1,6 +1,9 @@
+"use strict";
 /**
  * Redacts sensitive information for logging purposes
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.redactEmail = redactEmail;
 /**
  * Redacts an email address to show only first and last characters before @
  * Examples:
@@ -9,7 +12,7 @@
  * - "a@example.com" -> "a***@example.com"
  * - null/undefined -> "anonymous"
  */
-export function redactEmail(email) {
+function redactEmail(email) {
     if (!email)
         return 'anonymous';
     const atIndex = email.indexOf('@');

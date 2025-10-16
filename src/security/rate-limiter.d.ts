@@ -103,7 +103,7 @@ export declare class MCPRateLimiter {
         memory: number;
         loadLevel: number;
         status: string;
-        recommendations: string[] | never[];
+        recommendations: any[] | string[];
         thresholds: {
             cpu: number;
             memory: number;

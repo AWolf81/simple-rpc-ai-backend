@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Extension OAuth - Simplified OAuth flow for browser extensions and VS Code extensions
  *
@@ -7,11 +8,15 @@
  * - Sends postMessage to opener window
  * - Allows custom state data and callbacks
  */
-import { redactEmail } from '../utils/redact.js';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.decodeOAuthState = decodeOAuthState;
+exports.encodeOAuthState = encodeOAuthState;
+exports.createExtensionOAuthHandler = createExtensionOAuthHandler;
+const redact_js_1 = require("../utils/redact.js");
 /**
  * Decode OAuth state parameter
  */
-export function decodeOAuthState(state) {
+function decodeOAuthState(state) {
     if (!state)
         return null;
     try {
@@ -26,7 +31,7 @@ export function decodeOAuthState(state) {
 /**
  * Encode OAuth state
  */
-export function encodeOAuthState(data) {
+function encodeOAuthState(data) {
     return Buffer.from(JSON.stringify(data)).toString('base64');
 }
 /**
@@ -206,7 +211,7 @@ function defaultIsExtensionOAuth(stateData) {
 /**
  * Create extension OAuth callback middleware
  */
-export function createExtensionOAuthHandler(config = {}) {
+function createExtensionOAuthHandler(config = {}) {
     const { enabled = false, isExtensionOAuth = defaultIsExtensionOAuth, onUserAuthenticated, tokenExchangeHandlers = {}, successTemplate = defaultSuccessTemplate, errorTemplate = defaultErrorTemplate, customizePostMessage } = config;
     if (!enabled) {
         // Return passthrough middleware
@@ -260,7 +265,7 @@ export function createExtensionOAuthHandler(config = {}) {
             // Exchange code for user info
             const userInfo = await exchangeHandler(code, callbackUrl);
             const { userId, email, ...extraInfo } = userInfo;
-            console.log(`[Extension OAuth] User authenticated: ${redactEmail(email)} (provider: ${provider})`);
+            console.log(`[Extension OAuth] User authenticated: ${(0, redact_js_1.redactEmail)(email)} (provider: ${provider})`);
             // Store in session if available
             const session = req.session;
             if (session) {

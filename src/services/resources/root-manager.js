@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Root Manager - Server and Client Root Folder Configuration
  *
@@ -5,10 +6,16 @@
  * Provides secure file access, path validation, and cross-platform compatibility.
  * Supports VS Code extensions, web applications, and CLI tools.
  */
-import fs from 'fs';
-import path from 'path';
-import { EventEmitter } from 'events';
-export class RootManager extends EventEmitter {
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.defaultRootManager = exports.RootManager = void 0;
+exports.createRootManager = createRootManager;
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const events_1 = require("events");
+class RootManager extends events_1.EventEmitter {
     config;
     roots = new Map();
     watchers = new Map();
@@ -44,8 +51,8 @@ export class RootManager extends EventEmitter {
     addRoot(id, config) {
         // Validate root path exists and is accessible
         try {
-            const resolvedPath = path.resolve(config.path);
-            const stats = fs.statSync(resolvedPath);
+            const resolvedPath = path_1.default.resolve(config.path);
+            const stats = fs_1.default.statSync(resolvedPath);
             if (!stats.isDirectory()) {
                 throw new Error(`Root path is not a directory: ${resolvedPath}`);
             }
@@ -53,7 +60,7 @@ export class RootManager extends EventEmitter {
             const normalizedConfig = {
                 ...config,
                 path: resolvedPath,
-                name: config.name || path.basename(resolvedPath),
+                name: config.name || path_1.default.basename(resolvedPath),
                 readOnly: config.readOnly ?? false,
                 allowedPaths: config.allowedPaths || ['**/*'],
                 blockedPaths: config.blockedPaths || ['node_modules/**', '.git/**', '*.log'],
@@ -103,7 +110,7 @@ export class RootManager extends EventEmitter {
                 const stats = this.getRootStats(config.path);
                 clientRoots[id] = {
                     id,
-                    name: config.name || path.basename(config.path),
+                    name: config.name || path_1.default.basename(config.path),
                     description: config.description,
                     accessible: true,
                     lastAccessed: new Date(),
@@ -118,7 +125,7 @@ export class RootManager extends EventEmitter {
             catch (error) {
                 clientRoots[id] = {
                     id,
-                    name: config.name || path.basename(config.path),
+                    name: config.name || path_1.default.basename(config.path),
                     description: config.description,
                     accessible: false
                 };
@@ -135,20 +142,20 @@ export class RootManager extends EventEmitter {
             throw new Error(`Root folder '${rootId}' not found`);
         }
         // Resolve the path
-        const fullPath = path.resolve(rootConfig.path, relativePath);
+        const fullPath = path_1.default.resolve(rootConfig.path, relativePath);
         // Security check: ensure path is within root directory
         if (!fullPath.startsWith(rootConfig.path)) {
             throw new Error(`Path '${relativePath}' is outside root directory`);
         }
         // Check against blocked paths
-        const relativeFromRoot = path.relative(rootConfig.path, fullPath);
+        const relativeFromRoot = path_1.default.relative(rootConfig.path, fullPath);
         for (const blockedPattern of rootConfig.blockedPaths || []) {
             if (this.matchesPattern(relativeFromRoot, blockedPattern)) {
                 throw new Error(`Path '${relativePath}' is blocked by security policy`);
             }
         }
         // Check file extension if restricted
-        const ext = path.extname(fullPath).slice(1).toLowerCase();
+        const ext = path_1.default.extname(fullPath).slice(1).toLowerCase();
         if (rootConfig.blockedExtensions?.includes(ext)) {
             throw new Error(`File extension '.${ext}' is not allowed`);
         }
@@ -168,10 +175,10 @@ export class RootManager extends EventEmitter {
         const fullPath = this.validatePath(rootId, relativePath);
         try {
             const files = [];
-            const entries = await fs.promises.readdir(fullPath, { withFileTypes: true });
+            const entries = await fs_1.default.promises.readdir(fullPath, { withFileTypes: true });
             for (const entry of entries) {
-                const entryPath = path.join(fullPath, entry.name);
-                const relativeEntryPath = path.relative(rootConfig.path, entryPath);
+                const entryPath = path_1.default.join(fullPath, entry.name);
+                const relativeEntryPath = path_1.default.relative(rootConfig.path, entryPath);
                 // Skip blocked paths
                 if (this.isPathBlocked(rootConfig, relativeEntryPath)) {
                     continue;
@@ -210,7 +217,7 @@ export class RootManager extends EventEmitter {
         }
         const fullPath = this.validatePath(rootId, relativePath);
         try {
-            const stats = await fs.promises.stat(fullPath);
+            const stats = await fs_1.default.promises.stat(fullPath);
             if (!stats.isFile()) {
                 throw new Error(`Path '${relativePath}' is not a file`);
             }
@@ -218,7 +225,7 @@ export class RootManager extends EventEmitter {
             if (stats.size > (rootConfig.maxFileSize || 10 * 1024 * 1024)) {
                 throw new Error(`File '${relativePath}' exceeds maximum size limit`);
             }
-            const content = await fs.promises.readFile(fullPath, options.encoding || 'utf8');
+            const content = await fs_1.default.promises.readFile(fullPath, options.encoding || 'utf8');
             this.emit('fileRead', { rootId, path: relativePath, size: stats.size });
             return content;
         }
@@ -240,9 +247,9 @@ export class RootManager extends EventEmitter {
         const fullPath = this.validatePath(rootId, relativePath);
         try {
             // Ensure directory exists
-            const dir = path.dirname(fullPath);
-            await fs.promises.mkdir(dir, { recursive: true });
-            await fs.promises.writeFile(fullPath, content);
+            const dir = path_1.default.dirname(fullPath);
+            await fs_1.default.promises.mkdir(dir, { recursive: true });
+            await fs_1.default.promises.writeFile(fullPath, content);
             this.emit('fileWritten', { rootId, path: relativePath, size: content.length });
         }
         catch (error) {
@@ -267,7 +274,7 @@ export class RootManager extends EventEmitter {
     async pathExists(rootId, relativePath) {
         try {
             const fullPath = this.validatePath(rootId, relativePath);
-            await fs.promises.access(fullPath);
+            await fs_1.default.promises.access(fullPath);
             return true;
         }
         catch {
@@ -283,15 +290,15 @@ export class RootManager extends EventEmitter {
                 followSymlinks: config.followSymlinks
             });
             watcher.on('add', (filePath) => {
-                const relativePath = path.relative(config.path, filePath);
+                const relativePath = path_1.default.relative(config.path, filePath);
                 this.emit('fileAdded', { rootId: id, path: relativePath });
             });
             watcher.on('change', (filePath) => {
-                const relativePath = path.relative(config.path, filePath);
+                const relativePath = path_1.default.relative(config.path, filePath);
                 this.emit('fileChanged', { rootId: id, path: relativePath });
             });
             watcher.on('unlink', (filePath) => {
-                const relativePath = path.relative(config.path, filePath);
+                const relativePath = path_1.default.relative(config.path, filePath);
                 this.emit('fileRemoved', { rootId: id, path: relativePath });
             });
             this.watchers.set(id, watcher);
@@ -303,7 +310,7 @@ export class RootManager extends EventEmitter {
     }
     getRootStats(rootPath) {
         try {
-            const stats = fs.statSync(rootPath);
+            const stats = fs_1.default.statSync(rootPath);
             return {
                 totalFiles: 0, // Would need recursive scan for accurate count
                 totalSize: 0, // Would need recursive scan for accurate size
@@ -319,23 +326,23 @@ export class RootManager extends EventEmitter {
         }
     }
     async getFileInfo(rootConfig, fullPath) {
-        const stats = await fs.promises.stat(fullPath);
-        const relativePath = path.relative(rootConfig.path, fullPath);
-        const extension = path.extname(fullPath).slice(1).toLowerCase();
+        const stats = await fs_1.default.promises.stat(fullPath);
+        const relativePath = path_1.default.relative(rootConfig.path, fullPath);
+        const extension = path_1.default.extname(fullPath).slice(1).toLowerCase();
         // Determine MIME type
         const mimeType = this.getMimeType(extension);
         // Check read/write permissions
         let readable = true;
         let writable = !rootConfig.readOnly;
         try {
-            await fs.promises.access(fullPath, fs.constants.R_OK);
+            await fs_1.default.promises.access(fullPath, fs_1.default.constants.R_OK);
         }
         catch {
             readable = false;
         }
         if (!rootConfig.readOnly) {
             try {
-                await fs.promises.access(fullPath, fs.constants.W_OK);
+                await fs_1.default.promises.access(fullPath, fs_1.default.constants.W_OK);
             }
             catch {
                 writable = false;
@@ -344,7 +351,7 @@ export class RootManager extends EventEmitter {
         return {
             path: fullPath,
             relativePath,
-            name: path.basename(fullPath),
+            name: path_1.default.basename(fullPath),
             extension,
             size: stats.size,
             lastModified: stats.mtime,
@@ -410,10 +417,11 @@ export class RootManager extends EventEmitter {
         this.removeAllListeners();
     }
 }
+exports.RootManager = RootManager;
 // Export a default instance for simple use cases
-export const defaultRootManager = new RootManager();
+exports.defaultRootManager = new RootManager();
 // Export factory function for custom configurations
-export function createRootManager(config) {
+function createRootManager(config) {
     return new RootManager(config);
 }
 //# sourceMappingURL=root-manager.js.map

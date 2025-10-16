@@ -1,19 +1,25 @@
+"use strict";
 /**
  * Handlebars-based Template Engine for OAuth Pages
  *
  * Cleaner, more maintainable templating using express-handlebars
  * with customizable branding and styling for OAuth authentication pages.
  */
-import { create } from 'express-handlebars';
-import path from 'path';
-import { fileURLToPath } from 'url';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.HANDLEBARS_DEFAULT_TEMPLATES = exports.HANDLEBARS_PROVIDER_ICONS = exports.HandlebarsTemplateEngine = void 0;
+const express_handlebars_1 = require("express-handlebars");
+const path_1 = __importDefault(require("path"));
+const url_1 = require("url");
 // Get directory path for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = (0, url_1.fileURLToPath)(import.meta.url);
+const __dirname = path_1.default.dirname(__filename);
 /**
  * Handlebars template engine with OAuth-specific helpers
  */
-export class HandlebarsTemplateEngine {
+class HandlebarsTemplateEngine {
     hbs;
     config;
     constructor(config = {}) {
@@ -35,8 +41,8 @@ export class HandlebarsTemplateEngine {
             darkMode: config.darkMode ?? false
         };
         // Initialize Handlebars with custom helpers
-        this.hbs = create({
-            layoutsDir: path.join(__dirname, '../views/layouts'),
+        this.hbs = (0, express_handlebars_1.create)({
+            layoutsDir: path_1.default.join(__dirname, '../views/layouts'),
             defaultLayout: 'main',
             extname: '.hbs',
             helpers: {
@@ -85,8 +91,8 @@ export class HandlebarsTemplateEngine {
      * Render a template with data
      */
     async render(templateName, data) {
-        const viewsDir = path.join(__dirname, '../views');
-        const templatePath = path.join(viewsDir, `${templateName}.hbs`);
+        const viewsDir = path_1.default.join(__dirname, '../views');
+        const templatePath = path_1.default.join(viewsDir, `${templateName}.hbs`);
         const brandingFooterText = this.config.branding?.hideFooter
             ? null
             : (this.config.branding?.footerText ?? 'Powered by Simple RPC AI Backend');
@@ -139,10 +145,11 @@ export class HandlebarsTemplateEngine {
         return this.config;
     }
 }
+exports.HandlebarsTemplateEngine = HandlebarsTemplateEngine;
 /**
  * Provider icons for common identity providers (now using SVG icons)
  */
-export const HANDLEBARS_PROVIDER_ICONS = {
+exports.HANDLEBARS_PROVIDER_ICONS = {
     google: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -171,7 +178,7 @@ export const HANDLEBARS_PROVIDER_ICONS = {
 /**
  * Default template configurations
  */
-export const HANDLEBARS_DEFAULT_TEMPLATES = {
+exports.HANDLEBARS_DEFAULT_TEMPLATES = {
     // Corporate theme
     corporate: {
         branding: {

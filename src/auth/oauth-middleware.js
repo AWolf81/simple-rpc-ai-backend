@@ -1,26 +1,48 @@
+"use strict";
 /**
  * OAuth 2.0 Server Implementation using @node-oauth/express-oauth-server
  *
  * Provides proper OAuth 2.0 server functionality for MCP Jam integration.
  * Uses RFC 6749 & RFC 6750 compliant implementation with PKCE support.
  */
-import ExpressOAuthServer from '@node-oauth/express-oauth-server';
-import { randomPKCECodeVerifier, calculatePKCECodeChallenge } from 'openid-client';
-import crypto from 'crypto';
-import { createSessionStorage } from './session-storage.js';
-import { HandlebarsTemplateEngine, HANDLEBARS_PROVIDER_ICONS } from './handlebars-template-engine.js';
-import winston from 'winston';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getIdentityProviders = exports.ExpressOAuthServer = void 0;
+exports.createOAuthServer = createOAuthServer;
+exports.registerClient = registerClient;
+exports.initializeOAuthServer = initializeOAuthServer;
+exports.getSessionStorage = getSessionStorage;
+exports.getOAuthStats = getOAuthStats;
+exports.clearOAuthData = clearOAuthData;
+exports.closeOAuthServer = closeOAuthServer;
+exports.handleProviderLogin = handleProviderLogin;
+exports.handleProviderCallback = handleProviderCallback;
+exports.createAuthenticateHandler = createAuthenticateHandler;
+exports.handleProviderSelection = handleProviderSelection;
+exports.configureOAuthTemplates = configureOAuthTemplates;
+exports.getTemplateEngine = getTemplateEngine;
+exports.createOAuthModel = createOAuthModel;
+exports.normalizeUserProfile = normalizeUserProfile;
+const express_oauth_server_1 = __importDefault(require("@node-oauth/express-oauth-server"));
+exports.ExpressOAuthServer = express_oauth_server_1.default;
+const openid_client_1 = require("openid-client");
+const crypto_1 = __importDefault(require("crypto"));
+const session_storage_js_1 = require("./session-storage.js");
+const handlebars_template_engine_js_1 = require("./handlebars-template-engine.js");
+const winston_1 = __importDefault(require("winston"));
 // Session storage instance (will be set during initialization)
 let sessionStorage;
 // Template engine instance for OAuth pages
 let templateEngine;
 // Logger instance for structured logging
-const logger = winston.createLogger({
+const logger = winston_1.default.createLogger({
     level: 'info',
-    format: winston.format.combine(winston.format.timestamp(), winston.format.errors({ stack: true }), winston.format.json()),
+    format: winston_1.default.format.combine(winston_1.default.format.timestamp(), winston_1.default.format.errors({ stack: true }), winston_1.default.format.json()),
     transports: [
-        new winston.transports.Console({
-            format: winston.format.combine(winston.format.colorize(), winston.format.simple())
+        new winston_1.default.transports.Console({
+            format: winston_1.default.format.combine(winston_1.default.format.colorize(), winston_1.default.format.simple())
         })
     ],
     defaultMeta: { service: 'oauth-middleware' }
@@ -57,10 +79,11 @@ const getIdentityProviders = () => {
         }
     };
 };
+exports.getIdentityProviders = getIdentityProviders;
 // Default MCP client for testing
 const getDefaultClient = () => ({
     id: process.env.MCP_CLIENT_ID || 'mcp-client',
-    clientSecret: process.env.MCP_CLIENT_SECRET || crypto.randomBytes(32).toString('hex'),
+    clientSecret: process.env.MCP_CLIENT_SECRET || crypto_1.default.randomBytes(32).toString('hex'),
     grants: ['authorization_code', 'refresh_token'],
     redirectUris: process.env.MCP_REDIRECT_URIS
         ? process.env.MCP_REDIRECT_URIS.split(',').map(uri => uri.trim())
@@ -297,20 +320,20 @@ function createOAuthModel(storage, adminUsers = []) {
 /**
  * Create OAuth 2.0 server instance with configurable session storage and templating
  */
-export function createOAuthServer(storageConfig = { type: 'memory' }, adminUsers = [], templateConfig) {
+function createOAuthServer(storageConfig = { type: 'memory' }, adminUsers = [], templateConfig) {
     logger.info('Creating OAuth 2.0 server', { storageType: storageConfig.type });
     // Initialize session storage - ensure it's the same instance used globally
     if (!sessionStorage) {
-        sessionStorage = createSessionStorage(storageConfig);
+        sessionStorage = (0, session_storage_js_1.createSessionStorage)(storageConfig);
     }
     // Initialize template engine with provided configuration
     if (!templateEngine) {
-        templateEngine = new HandlebarsTemplateEngine(templateConfig);
+        templateEngine = new handlebars_template_engine_js_1.HandlebarsTemplateEngine(templateConfig);
         console.log(`✅ OAuth Handlebars template engine initialized with ${templateConfig ? 'custom' : 'default'} configuration`);
     }
     // Create OAuth model with session storage and admin users
     const oauthModel = createOAuthModel(sessionStorage, adminUsers);
-    const oauth = new ExpressOAuthServer({
+    const oauth = new express_oauth_server_1.default({
         model: oauthModel,
         requireClientAuthentication: {
             authorization_code: false // PKCE doesn't require client secret
@@ -329,11 +352,11 @@ export function createOAuthServer(storageConfig = { type: 'memory' }, adminUsers
 /**
  * Register a new OAuth client
  */
-export async function registerClient(clientData, storage) {
+async function registerClient(clientData, storage) {
     console.log(`📝 Registering OAuth client: ${clientData.id}`);
     const client = {
         id: clientData.id,
-        clientSecret: crypto.randomBytes(32).toString('hex'),
+        clientSecret: crypto_1.default.randomBytes(32).toString('hex'),
         grants: clientData.grants || ['authorization_code', 'refresh_token'],
         redirectUris: clientData.redirectUris,
         accessTokenLifetime: 3600,
@@ -348,7 +371,7 @@ export async function registerClient(clientData, storage) {
 /**
  * Initialize OAuth server with default client and user
  */
-export async function initializeOAuthServer() {
+async function initializeOAuthServer() {
     if (!sessionStorage) {
         throw new Error('OAuth server not initialized. Call createOAuthServer first.');
     }
@@ -362,13 +385,13 @@ export async function initializeOAuthServer() {
 /**
  * Get the current session storage instance
  */
-export function getSessionStorage() {
+function getSessionStorage() {
     return sessionStorage;
 }
 /**
  * Get OAuth server statistics (for debugging)
  */
-export function getOAuthStats() {
+function getOAuthStats() {
     return {
         storageType: sessionStorage ? sessionStorage.constructor.name : 'none',
         initialized: !!sessionStorage
@@ -377,7 +400,7 @@ export function getOAuthStats() {
 /**
  * Clear all OAuth data (for testing)
  */
-export async function clearOAuthData() {
+async function clearOAuthData() {
     if (!sessionStorage) {
         console.warn(`⚠️ OAuth server not initialized`);
         return;
@@ -393,7 +416,7 @@ export async function clearOAuthData() {
 /**
  * Close OAuth server and clean up resources
  */
-export async function closeOAuthServer() {
+async function closeOAuthServer() {
     if (sessionStorage) {
         await sessionStorage.close();
         console.log(`✅ OAuth server closed`);
@@ -402,7 +425,7 @@ export async function closeOAuthServer() {
 /**
  * Handle identity provider login initiation
  */
-export async function handleProviderLogin(req, res) {
+async function handleProviderLogin(req, res) {
     const provider = req.params.provider;
     const identityProviders = getIdentityProviders();
     const config = identityProviders[provider];
@@ -421,9 +444,9 @@ export async function handleProviderLogin(req, res) {
     }
     try {
         // Store OAuth state for security
-        const state = crypto.randomBytes(32).toString('hex');
-        const codeVerifier = randomPKCECodeVerifier();
-        const codeChallenge = await calculatePKCECodeChallenge(codeVerifier);
+        const state = crypto_1.default.randomBytes(32).toString('hex');
+        const codeVerifier = (0, openid_client_1.randomPKCECodeVerifier)();
+        const codeChallenge = await (0, openid_client_1.calculatePKCECodeChallenge)(codeVerifier);
         // Extract original OAuth parameters from redirect_uri if provided
         // When user clicks on a provider from /login page, the original OAuth params are in redirect_uri
         let originalQuery = {};
@@ -487,7 +510,7 @@ export async function handleProviderLogin(req, res) {
 /**
  * Handle identity provider callback
  */
-export async function handleProviderCallback(req, res) {
+async function handleProviderCallback(req, res) {
     const provider = req.params.provider;
     const { code, state, error } = req.query;
     if (error) {
@@ -613,7 +636,7 @@ export async function handleProviderCallback(req, res) {
 /**
  * Create authentication handler for OAuth authorize endpoint
  */
-export function createAuthenticateHandler() {
+function createAuthenticateHandler() {
     return {
         handle: async (req) => {
             // Check if user was just authenticated via federated login
@@ -642,7 +665,7 @@ export function createAuthenticateHandler() {
 /**
  * Handle provider selection page using Handlebars templates
  */
-export async function handleProviderSelection(req, res) {
+async function handleProviderSelection(req, res) {
     const identityProviders = getIdentityProviders();
     const availableProviders = Object.keys(identityProviders).filter(provider => {
         const config = identityProviders[provider];
@@ -658,7 +681,7 @@ export async function handleProviderSelection(req, res) {
             name: provider,
             displayName: provider.charAt(0).toUpperCase() + provider.slice(1),
             loginUrl: `${baseUrl}/login/${provider}${redirectParam}`,
-            icon: HANDLEBARS_PROVIDER_ICONS[provider] || '🔑'
+            icon: handlebars_template_engine_js_1.HANDLEBARS_PROVIDER_ICONS[provider] || '🔑'
         })),
         context: {
             redirectUri,
@@ -669,7 +692,7 @@ export async function handleProviderSelection(req, res) {
     // Use Handlebars template engine to render the page
     if (!templateEngine) {
         // Fallback to default template engine if not initialized
-        templateEngine = new HandlebarsTemplateEngine();
+        templateEngine = new handlebars_template_engine_js_1.HandlebarsTemplateEngine();
     }
     try {
         const html = await templateEngine.render('oauth/login', templateData);
@@ -684,9 +707,9 @@ export async function handleProviderSelection(req, res) {
 /**
  * Configure OAuth template engine
  */
-export function configureOAuthTemplates(config) {
+function configureOAuthTemplates(config) {
     if (!templateEngine) {
-        templateEngine = new HandlebarsTemplateEngine(config);
+        templateEngine = new handlebars_template_engine_js_1.HandlebarsTemplateEngine(config);
     }
     else {
         // Update existing configuration
@@ -697,8 +720,7 @@ export function configureOAuthTemplates(config) {
 /**
  * Get the current template engine instance
  */
-export function getTemplateEngine() {
+function getTemplateEngine() {
     return templateEngine;
 }
-export { ExpressOAuthServer, getIdentityProviders, createOAuthModel, normalizeUserProfile };
 //# sourceMappingURL=oauth-middleware.js.map

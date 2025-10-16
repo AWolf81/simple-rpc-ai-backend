@@ -1,11 +1,15 @@
+"use strict";
 /**
  * tRPC to JSON-RPC Bridge
  *
  * Automatically generates JSON-RPC handlers from tRPC routers to eliminate code duplication.
  * This allows us to maintain a single source of truth in tRPC while supporting JSON-RPC protocol.
  */
-import { createTRPCContext, t } from './index';
-import { TimingLogger } from '../utils/timing';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TRPCToJSONRPCBridge = void 0;
+exports.createTRPCToJSONRPCBridge = createTRPCToJSONRPCBridge;
+const index_1 = require("./index");
+const timing_1 = require("../utils/timing");
 /**
  * Maps tRPC error codes to JSON-RPC error codes
  */
@@ -30,7 +34,7 @@ function mapTRPCErrorToJSONRPC(error) {
 /**
  * Bridge class that converts tRPC router to JSON-RPC handler
  */
-export class TRPCToJSONRPCBridge {
+class TRPCToJSONRPCBridge {
     router;
     contextCreator;
     callerFactory; // TODO: Fix type - should be ReturnType<ReturnType<typeof createCallerFactory>>
@@ -39,21 +43,21 @@ export class TRPCToJSONRPCBridge {
         this.contextCreator = contextCreator;
         // Create the caller factory once during initialization (tRPC v11 API)
         // t.createCallerFactory(router) returns a function that accepts context
-        this.callerFactory = t.createCallerFactory(this.router);
+        this.callerFactory = index_1.t.createCallerFactory(this.router);
     }
     /**
      * Create Express middleware that handles JSON-RPC requests using tRPC procedures
      */
     createHandler() {
         return async (req, res) => {
-            const timing = new TimingLogger('RPC'); // Auto-detects nesting level
+            const timing = new timing_1.TimingLogger('RPC'); // Auto-detects nesting level
             try {
                 const { method, params, id } = req.body;
                 let t1 = timing.checkpoint('Request parsed');
                 // Create tRPC context
                 const ctx = this.contextCreator
                     ? await this.contextCreator({ req, res, info: {} })
-                    : await createTRPCContext({ req, res, info: {} });
+                    : await (0, index_1.createTRPCContext)({ req, res, info: {} });
                 let t2 = timing.checkpoint('Context created', t1);
                 try {
                     // Parse nested method path (e.g., "ai.listAllowedModels" -> caller.ai.listAllowedModels)
@@ -346,10 +350,11 @@ export class TRPCToJSONRPCBridge {
         }
     }
 }
+exports.TRPCToJSONRPCBridge = TRPCToJSONRPCBridge;
 /**
  * Factory function to create the bridge
  */
-export function createTRPCToJSONRPCBridge(router, contextCreator) {
+function createTRPCToJSONRPCBridge(router, contextCreator) {
     return new TRPCToJSONRPCBridge(router, contextCreator);
 }
 //# sourceMappingURL=trpc-to-jsonrpc-bridge.js.map

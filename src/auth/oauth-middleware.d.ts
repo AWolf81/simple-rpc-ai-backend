@@ -34,7 +34,7 @@ declare function normalizeUserProfile(provider: string, profile: any): {
  * Uses the configured session storage backend for persistence
  */
 declare function createOAuthModel(storage: SessionStorage, adminUsers?: string[]): {
-    getClient(clientId: string, clientSecret?: string): Promise<OAuth2Server.Client | null>;
+    getClient(clientId: string, clientSecret?: string): Promise<OAuth2Server.Client>;
     saveAuthorizationCode(code: any, client: any, user: any): Promise<{
         authorizationCode: any;
         expiresAt: any;
@@ -48,7 +48,7 @@ declare function createOAuthModel(storage: SessionStorage, adminUsers?: string[]
     getAuthorizationCode(authorizationCode: string): Promise<any>;
     revokeAuthorizationCode(authorizationCode: any): Promise<boolean>;
     saveToken(token: any, client: any, user: any): Promise<any>;
-    getAccessToken(accessToken: string): Promise<OAuth2Server.Token | null>;
+    getAccessToken(accessToken: string): Promise<OAuth2Server.Token>;
     validateScope(user: any, client: any, scope?: any): Promise<string[]>;
 };
 /**
@@ -104,11 +104,11 @@ export declare function closeOAuthServer(): Promise<void>;
 /**
  * Handle identity provider login initiation
  */
-export declare function handleProviderLogin(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function handleProviderLogin(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
 /**
  * Handle identity provider callback
  */
-export declare function handleProviderCallback(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function handleProviderCallback(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
 /**
  * Create authentication handler for OAuth authorize endpoint
  */

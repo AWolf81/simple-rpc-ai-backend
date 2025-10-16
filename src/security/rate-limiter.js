@@ -1,3 +1,4 @@
+"use strict";
 /**
  * MCP Security: Rate Limiting System (Day 1)
  *
@@ -12,10 +13,17 @@
  * - For monitoring external/child processes, consider using 'pidusage' library
  * - Current implementation monitors this Node.js process only
  */
-import rateLimit from 'express-rate-limit';
-import os from 'os';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MCPRateLimiter = exports.DEFAULT_MCP_RATE_LIMITS = void 0;
+exports.getDefaultRateLimiter = getDefaultRateLimiter;
+exports.createMCPRateLimit = createMCPRateLimit;
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const os_1 = __importDefault(require("os"));
 // Default rate limit configurations
-export const DEFAULT_MCP_RATE_LIMITS = {
+exports.DEFAULT_MCP_RATE_LIMITS = {
     enabled: true,
     global: {
         windowMs: 15 * 60 * 1000, // 15 minutes
@@ -78,7 +86,7 @@ export const DEFAULT_MCP_RATE_LIMITS = {
  * Rate Limiter Service
  * Manages all rate limiting logic for MCP endpoints
  */
-export class MCPRateLimiter {
+class MCPRateLimiter {
     config;
     globalLimiter;
     authenticatedLimiter;
@@ -94,7 +102,7 @@ export class MCPRateLimiter {
     lastCpuUsage = null;
     lastCpuMeasurementTime = 0;
     constructor(config = {}) {
-        this.config = { ...DEFAULT_MCP_RATE_LIMITS, ...config };
+        this.config = { ...exports.DEFAULT_MCP_RATE_LIMITS, ...config };
         this.initializeLimiters();
         this.startSystemMonitoring();
     }
@@ -103,7 +111,7 @@ export class MCPRateLimiter {
      */
     initializeLimiters() {
         // Global rate limiter (for anonymous users)
-        this.globalLimiter = rateLimit({
+        this.globalLimiter = (0, express_rate_limit_1.default)({
             ...this.config.global,
             keyGenerator: (req) => {
                 const authReq = req;
@@ -119,7 +127,7 @@ export class MCPRateLimiter {
             }
         });
         // Authenticated user limiter (higher limits)
-        this.authenticatedLimiter = rateLimit({
+        this.authenticatedLimiter = (0, express_rate_limit_1.default)({
             ...this.config.authenticated,
             keyGenerator: (req) => {
                 const authReq = req;
@@ -135,7 +143,7 @@ export class MCPRateLimiter {
             }
         });
         // Admin user limiter (highest limits)
-        this.adminLimiter = rateLimit({
+        this.adminLimiter = (0, express_rate_limit_1.default)({
             ...this.config.admin,
             keyGenerator: (req) => {
                 const authReq = req;
@@ -152,7 +160,7 @@ export class MCPRateLimiter {
         });
         // Burst protection limiter
         if (this.config.burst.enabled) {
-            this.burstLimiter = rateLimit({
+            this.burstLimiter = (0, express_rate_limit_1.default)({
                 windowMs: this.config.burst.windowMs,
                 max: this.config.burst.max,
                 standardHeaders: true,
@@ -174,7 +182,7 @@ export class MCPRateLimiter {
         for (const [toolName, toolConfig] of Object.entries(this.config.toolLimits)) {
             // Store original max value for throttling
             this.toolLimiterConfigs[toolName] = { originalMax: toolConfig.max };
-            this.toolLimiters[toolName] = rateLimit({
+            this.toolLimiters[toolName] = (0, express_rate_limit_1.default)({
                 ...toolConfig,
                 keyGenerator: (req) => {
                     const authReq = req;
@@ -238,8 +246,8 @@ export class MCPRateLimiter {
             // Get memory usage using Node.js built-in process.memoryUsage()
             const memUsage = process.memoryUsage();
             // Option 1: System-wide memory percentage (recommended for system load monitoring)
-            const totalSystemMemory = os.totalmem();
-            const freeSystemMemory = os.freemem();
+            const totalSystemMemory = os_1.default.totalmem();
+            const freeSystemMemory = os_1.default.freemem();
             const usedSystemMemory = totalSystemMemory - freeSystemMemory;
             this.systemStats.memory = (usedSystemMemory / totalSystemMemory) * 100;
             // Option 2: Process-specific memory (uncomment if you prefer process-level monitoring)
@@ -318,7 +326,7 @@ export class MCPRateLimiter {
                 const newMax = Math.floor(originalMax * multipliers[loadLevel]);
                 console.log(`🔄 Rate limiting: Load level ${loadLevel} - throttling tool '${toolName}' from ${originalMax} to ${newMax} requests`);
                 // Create a new rate limiter with throttled limits
-                const throttledLimiter = rateLimit({
+                const throttledLimiter = (0, express_rate_limit_1.default)({
                     ...this.config.toolLimits[toolName],
                     max: newMax,
                     keyGenerator: (req) => {
@@ -456,6 +464,7 @@ export class MCPRateLimiter {
         console.log('✅ Rate limiting: Configuration updated');
     }
 }
+exports.MCPRateLimiter = MCPRateLimiter;
 /**
  * Default instance for easy use
  */
@@ -463,7 +472,7 @@ let defaultRateLimiter = null;
 /**
  * Get or create default rate limiter instance
  */
-export function getDefaultRateLimiter(config) {
+function getDefaultRateLimiter(config) {
     if (!defaultRateLimiter) {
         defaultRateLimiter = new MCPRateLimiter(config);
     }
@@ -472,7 +481,7 @@ export function getDefaultRateLimiter(config) {
 /**
  * Express middleware factory for MCP rate limiting
  */
-export function createMCPRateLimit(config) {
+function createMCPRateLimit(config) {
     const rateLimiter = new MCPRateLimiter(config);
     return rateLimiter.createMCPToolMiddleware();
 }

@@ -1,3 +1,4 @@
+"use strict";
 /**
  * MCP Security: Security Logging + Network Filtering (Day 2)
  *
@@ -7,12 +8,19 @@
  * - Anomaly detection and alerting
  * - Integration with SIEM systems
  */
-import winston from 'winston';
-import fs from 'fs/promises';
-import path from 'path';
-import { logger as appLogger } from '../utils/logger.js';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SecurityLogger = exports.DEFAULT_SECURITY_CONFIG = exports.SecuritySeverity = exports.SecurityEventType = void 0;
+exports.getDefaultSecurityLogger = getDefaultSecurityLogger;
+exports.createSecurityLoggingMiddleware = createSecurityLoggingMiddleware;
+const winston_1 = __importDefault(require("winston"));
+const promises_1 = __importDefault(require("fs/promises"));
+const path_1 = __importDefault(require("path"));
+const logger_js_1 = require("../utils/logger.js");
 // Security event types
-export var SecurityEventType;
+var SecurityEventType;
 (function (SecurityEventType) {
     SecurityEventType["AUTH_SUCCESS"] = "auth_success";
     SecurityEventType["AUTH_FAILURE"] = "auth_failure";
@@ -34,17 +42,17 @@ export var SecurityEventType;
     SecurityEventType["MCP_SUSPICIOUS_TOOL_CALL"] = "mcp_suspicious_tool_call";
     SecurityEventType["MCP_TOOL_EXECUTION_TIMEOUT"] = "mcp_tool_execution_timeout";
     SecurityEventType["MCP_RESOURCE_ACCESS_VIOLATION"] = "mcp_resource_access_violation";
-})(SecurityEventType || (SecurityEventType = {}));
+})(SecurityEventType || (exports.SecurityEventType = SecurityEventType = {}));
 // Security event severity levels
-export var SecuritySeverity;
+var SecuritySeverity;
 (function (SecuritySeverity) {
     SecuritySeverity["LOW"] = "low";
     SecuritySeverity["MEDIUM"] = "medium";
     SecuritySeverity["HIGH"] = "high";
     SecuritySeverity["CRITICAL"] = "critical";
-})(SecuritySeverity || (SecuritySeverity = {}));
+})(SecuritySeverity || (exports.SecuritySeverity = SecuritySeverity = {}));
 // Default configuration
-export const DEFAULT_SECURITY_CONFIG = {
+exports.DEFAULT_SECURITY_CONFIG = {
     enabled: true,
     logLevel: 'info',
     logFile: './logs/security.log',
@@ -90,7 +98,7 @@ export const DEFAULT_SECURITY_CONFIG = {
 /**
  * Security Logger and Network Filter Service
  */
-export class SecurityLogger {
+class SecurityLogger {
     config;
     logger;
     blockedIPs = new Map();
@@ -98,33 +106,33 @@ export class SecurityLogger {
     alertCounters = new Map();
     anomalyData = new Map();
     constructor(config = {}) {
-        this.config = { ...DEFAULT_SECURITY_CONFIG, ...config };
+        this.config = { ...exports.DEFAULT_SECURITY_CONFIG, ...config };
         this.initializeLogger();
         this.initializeAlertCounters();
         this.startAnomalyDetection();
-        appLogger.debug('✅ Security logging: Security logger and network filter initialized');
+        logger_js_1.logger.debug('✅ Security logging: Security logger and network filter initialized');
     }
     /**
      * Initialize Winston logger
      */
     initializeLogger() {
         // Ensure log directory exists
-        const logDir = path.dirname(this.config.logFile);
-        fs.mkdir(logDir, { recursive: true }).catch(console.error);
-        this.logger = winston.createLogger({
+        const logDir = path_1.default.dirname(this.config.logFile);
+        promises_1.default.mkdir(logDir, { recursive: true }).catch(console.error);
+        this.logger = winston_1.default.createLogger({
             level: this.config.logLevel,
-            format: winston.format.combine(winston.format.timestamp(), winston.format.errors({ stack: true }), winston.format.json()),
+            format: winston_1.default.format.combine(winston_1.default.format.timestamp(), winston_1.default.format.errors({ stack: true }), winston_1.default.format.json()),
             transports: [
                 // File transport for security logs
-                new winston.transports.File({
+                new winston_1.default.transports.File({
                     filename: this.config.logFile,
                     maxsize: parseInt(this.config.maxFileSize) || 50000000,
                     maxFiles: this.config.maxFiles,
-                    format: winston.format.combine(winston.format.timestamp(), winston.format.json())
+                    format: winston_1.default.format.combine(winston_1.default.format.timestamp(), winston_1.default.format.json())
                 }),
                 // Console transport for development
-                new winston.transports.Console({
-                    format: winston.format.combine(winston.format.colorize(), winston.format.simple(), winston.format.printf((info) => {
+                new winston_1.default.transports.Console({
+                    format: winston_1.default.format.combine(winston_1.default.format.colorize(), winston_1.default.format.simple(), winston_1.default.format.printf((info) => {
                         const { timestamp, level, message, eventType, severity, source } = info;
                         if (eventType) {
                             return `${timestamp} [${level}] 🔒 ${eventType} (${severity}) from ${source?.ip || 'unknown'}: ${message}`;
@@ -922,6 +930,7 @@ export class SecurityLogger {
         return wasBlocked;
     }
 }
+exports.SecurityLogger = SecurityLogger;
 /**
  * Default instance for easy use
  */
@@ -929,7 +938,7 @@ let defaultSecurityLogger = null;
 /**
  * Get or create default security logger instance
  */
-export function getDefaultSecurityLogger(config) {
+function getDefaultSecurityLogger(config) {
     if (!defaultSecurityLogger) {
         defaultSecurityLogger = new SecurityLogger(config);
     }
@@ -938,7 +947,7 @@ export function getDefaultSecurityLogger(config) {
 /**
  * Express middleware factory for security logging
  */
-export function createSecurityLoggingMiddleware(config) {
+function createSecurityLoggingMiddleware(config) {
     const logger = new SecurityLogger(config);
     return {
         networkFilter: logger.createNetworkFilterMiddleware(),

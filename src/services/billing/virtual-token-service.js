@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Virtual Token Service
  *
@@ -7,8 +8,10 @@
  * - Tracks actual AI provider token usage
  * - Source of truth for user token balances
  */
-import { v4 as uuidv4 } from 'uuid';
-export class VirtualTokenService {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.VirtualTokenService = void 0;
+const uuid_1 = require("uuid");
+class VirtualTokenService {
     db;
     constructor(db) {
         this.db = db;
@@ -92,7 +95,7 @@ export class VirtualTokenService {
              updated_at = CURRENT_TIMESTAMP
          WHERE user_id = $4`, [newBalance, actualTokens, platformFeeTokens, userId]);
             // Log the usage
-            const usageLogId = uuidv4();
+            const usageLogId = (0, uuid_1.v4)();
             await client.query(`INSERT INTO token_usage_log 
          (id, user_id, request_id, provider, model, input_tokens, output_tokens, 
           total_tokens, virtual_tokens_deducted, platform_fee_tokens, method)
@@ -133,7 +136,7 @@ export class VirtualTokenService {
              updated_at = CURRENT_TIMESTAMP
          WHERE user_id = $3`, [usableTokens, tokensPurchased, userId]);
             // Log the top-up
-            const topupId = uuidv4();
+            const topupId = (0, uuid_1.v4)();
             await client.query(`INSERT INTO token_topups 
          (id, user_id, payment_id, variant_id, tokens_purchased, usable_tokens, 
           platform_fee_tokens, amount_paid_cents, currency, lemonsqueezy_data)
@@ -219,4 +222,5 @@ export class VirtualTokenService {
         return parseInt(result[0].count) > 0;
     }
 }
+exports.VirtualTokenService = VirtualTokenService;
 //# sourceMappingURL=virtual-token-service.js.map

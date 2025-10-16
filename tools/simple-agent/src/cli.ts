@@ -335,9 +335,15 @@ program
     });
   });
 
-// Default action: show help
-program.action(() => {
-  program.help();
+// Default action: start chat if no command specified
+program.action(async () => {
+  // If no command specified, default to chat
+  if (process.argv.length === 2) {
+    // Run chat command
+    await program.parseAsync(['node', 'cli.ts', 'chat']);
+  } else {
+    program.help();
+  }
 });
 
 // Parse arguments

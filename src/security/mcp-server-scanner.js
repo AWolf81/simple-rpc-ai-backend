@@ -1,3 +1,4 @@
+"use strict";
 /**
  * MCP Server Security Scanner
  *
@@ -9,10 +10,17 @@
  * - YELLOW: Suspicious patterns found, manual review recommended
  * - RED: High-risk patterns found, use with extreme caution
  */
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import { execSync } from 'child_process';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.scanMCPServerPackage = scanMCPServerPackage;
+exports.scanMCPServerConfig = scanMCPServerConfig;
+exports.formatScanResult = formatScanResult;
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const os_1 = __importDefault(require("os"));
+const child_process_1 = require("child_process");
 // Official Anthropic MCP servers (downgrade RED → YELLOW for these)
 const OFFICIAL_SERVERS = [
     'mcp-server-time',
@@ -194,8 +202,8 @@ async function fetchNpmMetadata(packageName) {
  * Returns: { scanPath: directory to scan, cleanupPath: directory to remove }
  */
 async function downloadAndExtract(downloadUrl, lang) {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-scan-'));
-    const archivePath = path.join(tmpDir, 'package.tar.gz');
+    const tmpDir = fs_1.default.mkdtempSync(path_1.default.join(os_1.default.tmpdir(), 'mcp-scan-'));
+    const archivePath = path_1.default.join(tmpDir, 'package.tar.gz');
     // Download package
     const response = await fetch(downloadUrl);
     if (!response.ok) {
@@ -204,30 +212,30 @@ async function downloadAndExtract(downloadUrl, lang) {
     // Save to file
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    fs.writeFileSync(archivePath, buffer);
+    fs_1.default.writeFileSync(archivePath, buffer);
     // Extract archive using system tar command
     // Both PyPI and npm use standard tar.gz format
     // PyPI packages may have gzip metadata that causes warnings, but extraction still works
     try {
-        execSync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { stdio: 'ignore' });
+        (0, child_process_1.execSync)(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { stdio: 'ignore' });
     }
     catch (error) {
         // Gzip warnings cause non-zero exit but extraction may still succeed
         // Check if any files were extracted
-        const entries = fs.readdirSync(tmpDir).filter(f => f !== 'package.tar.gz' && f !== 'package.tar');
+        const entries = fs_1.default.readdirSync(tmpDir).filter(f => f !== 'package.tar.gz' && f !== 'package.tar');
         if (entries.length === 0) {
             throw error;
         }
         // Files were extracted despite warnings, continue
     }
     // Find the actual extracted directory (packages create a subdirectory)
-    const entries = fs.readdirSync(tmpDir);
+    const entries = fs_1.default.readdirSync(tmpDir);
     const packageDir = entries.find(entry => {
-        const fullPath = path.join(tmpDir, entry);
-        const stat = fs.statSync(fullPath);
+        const fullPath = path_1.default.join(tmpDir, entry);
+        const stat = fs_1.default.statSync(fullPath);
         return stat.isDirectory() && entry !== 'package.tar.gz';
     });
-    const scanPath = packageDir ? path.join(tmpDir, packageDir) : tmpDir;
+    const scanPath = packageDir ? path_1.default.join(tmpDir, packageDir) : tmpDir;
     return { scanPath, cleanupPath: tmpDir };
 }
 /**
@@ -241,14 +249,14 @@ function scanDirectory(dir, lang) {
     function walk(currentPath) {
         let entries = [];
         try {
-            entries = fs.readdirSync(currentPath, { withFileTypes: true });
+            entries = fs_1.default.readdirSync(currentPath, { withFileTypes: true });
         }
         catch (error) {
             // Silently skip directories that can't be read
             return;
         }
         for (const entry of entries) {
-            const fullPath = path.join(currentPath, entry.name);
+            const fullPath = path_1.default.join(currentPath, entry.name);
             if (entry.isDirectory()) {
                 // Skip common non-code directories
                 // Note: We scan 'dist' and 'build' for published packages (contains compiled output)
@@ -257,11 +265,11 @@ function scanDirectory(dir, lang) {
                 }
             }
             else if (entry.isFile()) {
-                const ext = path.extname(entry.name);
+                const ext = path_1.default.extname(entry.name);
                 if (extensions.includes(ext)) {
                     fileCount++;
-                    const content = fs.readFileSync(fullPath, 'utf-8');
-                    const relativePath = path.relative(dir, fullPath);
+                    const content = fs_1.default.readFileSync(fullPath, 'utf-8');
+                    const relativePath = path_1.default.relative(dir, fullPath);
                     const matches = scanFileContent(content, relativePath, lang);
                     red.push(...matches.red);
                     yellow.push(...matches.yellow);
@@ -320,7 +328,7 @@ function classifySecurityLevel(metadata, redFlags, yellowFlags, isOfficial) {
 /**
  * Scan an MCP server package for security issues
  */
-export async function scanMCPServerPackage(packageName, command) {
+async function scanMCPServerPackage(packageName, command) {
     const isOfficial = OFFICIAL_SERVERS.includes(packageName);
     try {
         // Fetch metadata
@@ -366,7 +374,7 @@ export async function scanMCPServerPackage(packageName, command) {
 /**
  * Scan MCP server configuration (for Claude config format)
  */
-export async function scanMCPServerConfig(serverConfig) {
+async function scanMCPServerConfig(serverConfig) {
     const packageName = resolvePackageName(serverConfig);
     if (!packageName) {
         return {
@@ -425,7 +433,7 @@ export async function scanMCPServerConfig(serverConfig) {
 /**
  * Format scan result for console output
  */
-export function formatScanResult(result) {
+function formatScanResult(result) {
     const levelEmoji = {
         GREEN: '✅',
         YELLOW: '⚠️',

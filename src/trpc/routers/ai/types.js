@@ -1,12 +1,17 @@
+"use strict";
 /**
  * Shared types and configurations for AI router
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DEFAULT_CONFIG = exports.AI_LIMIT_PRESETS = void 0;
+exports.createMCPServiceProvidersConfig = createMCPServiceProvidersConfig;
+exports.createServiceProvidersConfig = createServiceProvidersConfig;
 // Predefined configurations for common use cases
 // ⚠️ IMPORTANT: These are suggested defaults. Always validate against:
 //   - Your AI provider's token limits (Claude: 200k, GPT-4: 8k-128k, Gemini: 1M)
 //   - Your cost budget and usage patterns
 //   - Your application's specific requirements
-export const AI_LIMIT_PRESETS = {
+exports.AI_LIMIT_PRESETS = {
     // Conservative limits for production environments
     conservative: {
         content: { maxLength: 100_000, minLength: 1 }, // 100KB (~20k words)
@@ -49,23 +54,23 @@ export const AI_LIMIT_PRESETS = {
     },
 };
 // Default configuration (same as standard)
-export const DEFAULT_CONFIG = {
+exports.DEFAULT_CONFIG = {
     content: {
-        maxLength: AI_LIMIT_PRESETS.standard.content.maxLength,
-        minLength: AI_LIMIT_PRESETS.standard.content.minLength,
+        maxLength: exports.AI_LIMIT_PRESETS.standard.content.maxLength,
+        minLength: exports.AI_LIMIT_PRESETS.standard.content.minLength,
     },
     tokens: {
-        defaultMaxTokens: AI_LIMIT_PRESETS.standard.tokens.defaultMaxTokens,
-        maxTokenLimit: AI_LIMIT_PRESETS.standard.tokens.maxTokenLimit,
-        minTokens: AI_LIMIT_PRESETS.standard.tokens.minTokens,
+        defaultMaxTokens: exports.AI_LIMIT_PRESETS.standard.tokens.defaultMaxTokens,
+        maxTokenLimit: exports.AI_LIMIT_PRESETS.standard.tokens.maxTokenLimit,
+        minTokens: exports.AI_LIMIT_PRESETS.standard.tokens.minTokens,
     },
     systemPrompt: {
-        maxLength: AI_LIMIT_PRESETS.standard.systemPrompt.maxLength,
-        minLength: AI_LIMIT_PRESETS.standard.systemPrompt.minLength,
+        maxLength: exports.AI_LIMIT_PRESETS.standard.systemPrompt.maxLength,
+        minLength: exports.AI_LIMIT_PRESETS.standard.systemPrompt.minLength,
     },
 };
 // Helper to create service providers config from MCP provider configuration
-export function createMCPServiceProvidersConfig(mcpProviders) {
+function createMCPServiceProvidersConfig(mcpProviders) {
     const config = {};
     let defaultPriority = 1;
     Object.entries(mcpProviders).forEach(([provider, settings]) => {
@@ -79,7 +84,7 @@ export function createMCPServiceProvidersConfig(mcpProviders) {
     return config;
 }
 // Helper to create service providers config from array
-export function createServiceProvidersConfig(providers) {
+function createServiceProvidersConfig(providers) {
     const config = {};
     providers.forEach((provider, index) => {
         // Get API key from environment variables for built-in providers

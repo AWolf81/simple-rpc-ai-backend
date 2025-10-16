@@ -1,5 +1,13 @@
-import jwt from 'jsonwebtoken';
-export class JWTMiddleware {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DEFAULT_TIER_CONFIGS = exports.JWTMiddleware = void 0;
+exports.getTierConfig = getTierConfig;
+exports.mergeWithDefaultTiers = mergeWithDefaultTiers;
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+class JWTMiddleware {
     config;
     constructor(config) {
         this.config = config;
@@ -83,7 +91,7 @@ export class JWTMiddleware {
      */
     validateToken(token) {
         try {
-            const payload = jwt.verify(token, this.config.opensaasPublicKey, {
+            const payload = jsonwebtoken_1.default.verify(token, this.config.opensaasPublicKey, {
                 audience: this.config.audience,
                 issuer: this.config.issuer,
                 algorithms: ['RS256'], // OpenSaaS should use RS256
@@ -165,10 +173,11 @@ export class JWTMiddleware {
         return req.authContext?.quotaInfo || null;
     }
 }
+exports.JWTMiddleware = JWTMiddleware;
 /**
  * Default subscription tier limits for fallback scenarios
  */
-export const DEFAULT_TIER_CONFIGS = {
+exports.DEFAULT_TIER_CONFIGS = {
     starter: {
         name: 'Starter',
         monthlyTokenQuota: 10000,
@@ -197,16 +206,16 @@ export const DEFAULT_TIER_CONFIGS = {
 /**
  * Utility function to get tier configuration (custom or default)
  */
-export function getTierConfig(tier, customTiers) {
+function getTierConfig(tier, customTiers) {
     if (customTiers && customTiers[tier]) {
         return customTiers[tier];
     }
-    return DEFAULT_TIER_CONFIGS[tier] || null;
+    return exports.DEFAULT_TIER_CONFIGS[tier] || null;
 }
 /**
  * Utility function to merge custom tiers with defaults
  */
-export function mergeWithDefaultTiers(customTiers) {
-    return { ...DEFAULT_TIER_CONFIGS, ...customTiers };
+function mergeWithDefaultTiers(customTiers) {
+    return { ...exports.DEFAULT_TIER_CONFIGS, ...customTiers };
 }
 //# sourceMappingURL=jwt-middleware.js.map

@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Session Storage Implementations
  *
@@ -36,15 +37,21 @@
  * });
  * ```
  */
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
-import Redis from 'ioredis';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RedisSessionStorage = exports.FileSessionStorage = exports.InMemorySessionStorage = void 0;
+exports.createSessionStorage = createSessionStorage;
+const fs_1 = require("fs");
+const path_1 = require("path");
+const crypto_1 = require("crypto");
+const ioredis_1 = __importDefault(require("ioredis"));
 /**
  * In-Memory Session Storage
  * Fast and simple, but data is lost on server restart
  */
-export class InMemorySessionStorage {
+class InMemorySessionStorage {
     clients = new Map();
     tokens = new Map();
     authorizationCodes = new Map();
@@ -123,6 +130,7 @@ export class InMemorySessionStorage {
         return this.items.delete(key);
     }
 }
+exports.InMemorySessionStorage = InMemorySessionStorage;
 /**
  * File-based Session Storage
  * Persistent across restarts, good for development
@@ -130,7 +138,7 @@ export class InMemorySessionStorage {
  * Security: Uses AES-256-GCM encryption by default to protect OAuth tokens and user data.
  * The encryption key is derived from a master password or generated randomly.
  */
-export class FileSessionStorage {
+class FileSessionStorage {
     filePath;
     encryptionEnabled;
     encryptionKey;
@@ -172,7 +180,7 @@ export class FileSessionStorage {
      */
     deriveEncryptionKey(password) {
         const salt = 'oauth-session-salt'; // Static salt for consistent key derivation
-        return createHash('sha256').update(password + salt).digest();
+        return (0, crypto_1.createHash)('sha256').update(password + salt).digest();
     }
     /**
      * Encrypt data using AES-256-GCM
@@ -181,8 +189,8 @@ export class FileSessionStorage {
         if (!this.encryptionEnabled || !this.encryptionKey) {
             return data; // Return plaintext if encryption disabled
         }
-        const iv = randomBytes(16); // 16 bytes IV for GCM
-        const cipher = createCipheriv('aes-256-gcm', this.encryptionKey, iv);
+        const iv = (0, crypto_1.randomBytes)(16); // 16 bytes IV for GCM
+        const cipher = (0, crypto_1.createCipheriv)('aes-256-gcm', this.encryptionKey, iv);
         let encrypted = cipher.update(data, 'utf8', 'hex');
         encrypted += cipher.final('hex');
         const authTag = cipher.getAuthTag();
@@ -204,7 +212,7 @@ export class FileSessionStorage {
             const iv = Buffer.from(parts[0], 'hex');
             const authTag = Buffer.from(parts[1], 'hex');
             const encrypted = parts[2];
-            const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
+            const decipher = (0, crypto_1.createDecipheriv)('aes-256-gcm', this.encryptionKey, iv);
             decipher.setAuthTag(authTag);
             let decrypted = decipher.update(encrypted, 'hex', 'utf8');
             decrypted += decipher.final('utf8');
@@ -218,13 +226,13 @@ export class FileSessionStorage {
     async initialize() {
         try {
             // Ensure directory exists
-            const dir = join(this.filePath, '..');
-            if (!existsSync(dir)) {
-                mkdirSync(dir, { recursive: true });
+            const dir = (0, path_1.join)(this.filePath, '..');
+            if (!(0, fs_1.existsSync)(dir)) {
+                (0, fs_1.mkdirSync)(dir, { recursive: true });
             }
             // Load existing data if file exists
-            if (existsSync(this.filePath)) {
-                const rawData = readFileSync(this.filePath, 'utf8');
+            if ((0, fs_1.existsSync)(this.filePath)) {
+                const rawData = (0, fs_1.readFileSync)(this.filePath, 'utf8');
                 let jsonData;
                 // Determine if data is encrypted or plaintext
                 if (rawData.startsWith('{')) {
@@ -296,7 +304,7 @@ export class FileSessionStorage {
             };
             const jsonData = JSON.stringify(data, null, this.encryptionEnabled ? 0 : 2); // Compact JSON if encrypting
             const finalData = this.encryptionEnabled ? this.encryptData(jsonData) : jsonData;
-            writeFileSync(this.filePath, finalData);
+            (0, fs_1.writeFileSync)(this.filePath, finalData);
         }
         catch (error) {
             console.error(`❌ Failed to save session data to file:`, error);
@@ -399,11 +407,12 @@ export class FileSessionStorage {
         return deleted;
     }
 }
+exports.FileSessionStorage = FileSessionStorage;
 /**
  * Redis Session Storage
  * Production-ready, scalable, shared across multiple servers
  */
-export class RedisSessionStorage {
+class RedisSessionStorage {
     redis;
     keyPrefix;
     constructor(options = {}) {
@@ -415,7 +424,7 @@ export class RedisSessionStorage {
         else {
             // Try to create Redis instance (requires redis package)
             try {
-                this.redis = new Redis({
+                this.redis = new ioredis_1.default({
                     host: options.host || 'localhost',
                     port: options.port || 6379,
                     password: options.password,
@@ -529,11 +538,12 @@ export class RedisSessionStorage {
         return result > 0;
     }
 }
+exports.RedisSessionStorage = RedisSessionStorage;
 /**
  * Session Storage Factory
  * Creates the appropriate storage backend based on configuration
  */
-export function createSessionStorage(config) {
+function createSessionStorage(config) {
     switch (config.type) {
         case 'memory':
             return new InMemorySessionStorage();

@@ -1,17 +1,53 @@
+"use strict";
 /**
  * PostgreSQL JSON-RPC Methods
  *
  * Simple, reliable multi-tenant API key management using PostgreSQL
  * Maintains compatibility with existing TokenBasedVaultManager interface
  */
-import { PostgreSQLSecretManager } from '@services/security/PostgreSQLSecretManager';
-import * as winston from 'winston';
-import { redactEmail } from '../utils/redact';
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PostgreSQLRPCMethods = void 0;
+const PostgreSQLSecretManager_1 = require("@services/security/PostgreSQLSecretManager");
+const winston = __importStar(require("winston"));
+const redact_1 = require("../utils/redact");
 /**
  * JSON-RPC Methods for PostgreSQL Secret Management
  * Maintains API compatibility with existing system
  */
-export class PostgreSQLRPCMethods {
+class PostgreSQLRPCMethods {
     secretManager;
     logger;
     constructor(config, encryptionKey, logger) {
@@ -20,7 +56,7 @@ export class PostgreSQLRPCMethods {
             format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
             transports: [new winston.transports.Console()]
         });
-        this.secretManager = new PostgreSQLSecretManager(config, encryptionKey, this.logger);
+        this.secretManager = new PostgreSQLSecretManager_1.PostgreSQLSecretManager(config, encryptionKey, this.logger);
     }
     /**
      * Initialize the RPC methods
@@ -38,11 +74,11 @@ export class PostgreSQLRPCMethods {
     async storeUserKey(params) {
         try {
             const { email, provider, apiKey } = params;
-            this.logger.info('Storing user API key', { email: redactEmail(email), provider });
+            this.logger.info('Storing user API key', { email: (0, redact_1.redactEmail)(email), provider });
             const result = await this.secretManager.storeUserKey(email, provider, apiKey);
             if (result.success) {
                 this.logger.info('User API key stored successfully', {
-                    email: redactEmail(email),
+                    email: (0, redact_1.redactEmail)(email),
                     provider,
                     secretId: result.secretId
                 });
@@ -80,10 +116,10 @@ export class PostgreSQLRPCMethods {
     async getUserKey(params) {
         try {
             const { email, provider } = params;
-            this.logger.info('Retrieving user API key', { email: redactEmail(email), provider });
+            this.logger.info('Retrieving user API key', { email: (0, redact_1.redactEmail)(email), provider });
             const result = await this.secretManager.getUserKey(email, provider);
             if (result.success && result.apiKey) {
-                this.logger.info('User API key retrieved successfully', { email: redactEmail(email), provider });
+                this.logger.info('User API key retrieved successfully', { email: (0, redact_1.redactEmail)(email), provider });
                 return {
                     success: true,
                     // Return the API key (in practice, you might want to validate/decrypt it)
@@ -118,10 +154,10 @@ export class PostgreSQLRPCMethods {
     async getUserProviders(params) {
         try {
             const { email } = params;
-            this.logger.info('Getting user providers', { email: redactEmail(email) });
+            this.logger.info('Getting user providers', { email: (0, redact_1.redactEmail)(email) });
             const result = await this.secretManager.getUserProviders(email);
             if (result.success) {
-                this.logger.info('User providers retrieved', { email: redactEmail(email), providers: result.providers });
+                this.logger.info('User providers retrieved', { email: (0, redact_1.redactEmail)(email), providers: result.providers });
                 return {
                     success: true,
                     providers: result.providers || []
@@ -154,7 +190,7 @@ export class PostgreSQLRPCMethods {
     async validateUserKey(params) {
         try {
             const { email, provider } = params;
-            this.logger.info('Validating user API key', { email: redactEmail(email), provider });
+            this.logger.info('Validating user API key', { email: (0, redact_1.redactEmail)(email), provider });
             const result = await this.secretManager.validateUserKey(email, provider);
             if (result.success) {
                 this.logger.info('User API key validation complete', {
@@ -195,10 +231,10 @@ export class PostgreSQLRPCMethods {
     async deleteUserKey(params) {
         try {
             const { email, provider } = params;
-            this.logger.info('Deleting user API key', { email: redactEmail(email), provider });
+            this.logger.info('Deleting user API key', { email: (0, redact_1.redactEmail)(email), provider });
             const result = await this.secretManager.deleteUserKey(email, provider);
             if (result.success) {
-                this.logger.info('User API key deleted successfully', { email: redactEmail(email), provider });
+                this.logger.info('User API key deleted successfully', { email: (0, redact_1.redactEmail)(email), provider });
                 return {
                     success: true,
                     message: `${provider} API key deleted successfully`
@@ -259,7 +295,7 @@ export class PostgreSQLRPCMethods {
     async rotateUserKey(params) {
         try {
             const { email, provider, newApiKey } = params;
-            this.logger.info('Rotating user API key', { email: redactEmail(email), provider });
+            this.logger.info('Rotating user API key', { email: (0, redact_1.redactEmail)(email), provider });
             // First check if key exists
             const existingResult = await this.secretManager.getUserKey(email, provider);
             if (!existingResult.success) {
@@ -271,7 +307,7 @@ export class PostgreSQLRPCMethods {
             // Store the new key (this will overwrite the existing one)
             const storeResult = await this.secretManager.storeUserKey(email, provider, newApiKey);
             if (storeResult.success) {
-                this.logger.info('User API key rotated successfully', { email: redactEmail(email), provider });
+                this.logger.info('User API key rotated successfully', { email: (0, redact_1.redactEmail)(email), provider });
                 return {
                     success: true,
                     secretId: storeResult.secretId,
@@ -321,4 +357,5 @@ export class PostgreSQLRPCMethods {
         await this.secretManager.cleanup();
     }
 }
+exports.PostgreSQLRPCMethods = PostgreSQLRPCMethods;
 //# sourceMappingURL=PostgreSQLRPCMethods.js.map

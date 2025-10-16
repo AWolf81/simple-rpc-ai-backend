@@ -1,7 +1,10 @@
-import { spawnSync } from 'child_process';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.resolveNodePackageRunner = resolveNodePackageRunner;
+const child_process_1 = require("child_process");
 let cachedRunner = null;
 function commandExists(command, args = ['--version']) {
-    const result = spawnSync(command, args, {
+    const result = (0, child_process_1.spawnSync)(command, args, {
         stdio: 'ignore',
         shell: process.platform === 'win32'
     });
@@ -11,7 +14,7 @@ function commandExists(command, args = ['--version']) {
     // npm exec --version exits with code 0 but prints usage; treat 0 as success
     return result.status === 0;
 }
-export function resolveNodePackageRunner(preferred) {
+function resolveNodePackageRunner(preferred) {
     if (cachedRunner && !preferred) {
         return { ...cachedRunner };
     }

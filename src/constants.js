@@ -1,3 +1,4 @@
+"use strict";
 /**
  * RPC Method Constants
  *
@@ -5,8 +6,10 @@
  * throughout the codebase. These names correspond to the methods defined
  * in openrpc.json schema.
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.isValidAIProvider = exports.isValidSystemPrompt = exports.isValidTRPCMethod = exports.isValidRPCMethod = exports.AUTH_LEVEL_LIST = exports.AI_PROVIDER_LIST = exports.SYSTEM_PROMPT_TYPE_LIST = exports.TRPC_METHOD_LIST = exports.RPC_METHOD_LIST = exports.AUTH_LEVELS = exports.AI_PROVIDERS = exports.SYSTEM_PROMPT_TYPES = exports.TRPC_METHODS = exports.RPC_METHODS = void 0;
 // Core RPC method names from openRPC.json schema
-export const RPC_METHODS = {
+exports.RPC_METHODS = {
     // Core AI Methods
     HEALTH: 'health',
     GENERATE_TEXT: 'ai.generateText',
@@ -30,7 +33,7 @@ export const RPC_METHODS = {
     RPC_DISCOVER: 'rpc.discover'
 };
 // tRPC method names (prefixed with router namespace)
-export const TRPC_METHODS = {
+exports.TRPC_METHODS = {
     // AI Router methods
     AI_HEALTH: 'ai.health',
     AI_GENERATE_TEXT: 'ai.generateText',
@@ -62,40 +65,44 @@ export const TRPC_METHODS = {
     AI_DELETE_USER_KEY: 'ai.deleteUserKey'
 };
 // System prompt types from openRPC schema
-export const SYSTEM_PROMPT_TYPES = {
+exports.SYSTEM_PROMPT_TYPES = {
     SECURITY_REVIEW: 'security_review',
     CODE_QUALITY: 'code_quality',
     ARCHITECTURE_REVIEW: 'architecture_review'
 };
 // AI provider names from openRPC schema
-export const AI_PROVIDERS = {
+exports.AI_PROVIDERS = {
     ANTHROPIC: 'anthropic',
     OPENAI: 'openai',
     GOOGLE: 'google'
 };
 // Authentication levels from openRPC schema
-export const AUTH_LEVELS = {
+exports.AUTH_LEVELS = {
     ANONYMOUS: 'anonymous',
     OAUTH: 'oauth',
     PRO: 'pro'
 };
 // Export type-safe arrays for iteration
-export const RPC_METHOD_LIST = Object.values(RPC_METHODS);
-export const TRPC_METHOD_LIST = Object.values(TRPC_METHODS);
-export const SYSTEM_PROMPT_TYPE_LIST = Object.values(SYSTEM_PROMPT_TYPES);
-export const AI_PROVIDER_LIST = Object.values(AI_PROVIDERS);
-export const AUTH_LEVEL_LIST = Object.values(AUTH_LEVELS);
+exports.RPC_METHOD_LIST = Object.values(exports.RPC_METHODS);
+exports.TRPC_METHOD_LIST = Object.values(exports.TRPC_METHODS);
+exports.SYSTEM_PROMPT_TYPE_LIST = Object.values(exports.SYSTEM_PROMPT_TYPES);
+exports.AI_PROVIDER_LIST = Object.values(exports.AI_PROVIDERS);
+exports.AUTH_LEVEL_LIST = Object.values(exports.AUTH_LEVELS);
 // Helper functions
-export const isValidRPCMethod = (method) => {
-    return RPC_METHOD_LIST.includes(method);
+const isValidRPCMethod = (method) => {
+    return exports.RPC_METHOD_LIST.includes(method);
 };
-export const isValidTRPCMethod = (method) => {
-    return TRPC_METHOD_LIST.includes(method);
+exports.isValidRPCMethod = isValidRPCMethod;
+const isValidTRPCMethod = (method) => {
+    return exports.TRPC_METHOD_LIST.includes(method);
 };
-export const isValidSystemPrompt = (prompt) => {
-    return SYSTEM_PROMPT_TYPE_LIST.includes(prompt);
+exports.isValidTRPCMethod = isValidTRPCMethod;
+const isValidSystemPrompt = (prompt) => {
+    return exports.SYSTEM_PROMPT_TYPE_LIST.includes(prompt);
 };
-export const isValidAIProvider = (provider) => {
-    return AI_PROVIDER_LIST.includes(provider);
+exports.isValidSystemPrompt = isValidSystemPrompt;
+const isValidAIProvider = (provider) => {
+    return exports.AI_PROVIDER_LIST.includes(provider);
 };
+exports.isValidAIProvider = isValidAIProvider;
 //# sourceMappingURL=constants.js.map

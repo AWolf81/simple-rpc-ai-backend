@@ -14,7 +14,7 @@ export declare class TRPCToJSONRPCBridge {
     private router;
     private contextCreator?;
     private callerFactory;
-    constructor(router: AppRouter, contextCreator?: ((opts: CreateExpressContextOptions) => any) | undefined);
+    constructor(router: AppRouter, contextCreator?: (opts: CreateExpressContextOptions) => any);
     /**
      * Create Express middleware that handles JSON-RPC requests using tRPC procedures
      */

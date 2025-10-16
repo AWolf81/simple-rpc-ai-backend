@@ -1,11 +1,21 @@
+"use strict";
 /**
  * Test helpers for disabling security features during testing
  * Provides simple flags to disable rate limiting and security logging
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DISABLED_SECURITY_LOGGING = exports.DISABLED_AUTH_ENFORCEMENT = exports.DISABLED_RATE_LIMITING = void 0;
+exports.createTestMCPConfig = createTestMCPConfig;
+exports.createJWTMCPConfig = createJWTMCPConfig;
+exports.createOAuthMCPConfig = createOAuthMCPConfig;
+exports.createBothAuthMCPConfig = createBothAuthMCPConfig;
+exports.isTestEnvironment = isTestEnvironment;
+exports.shouldDisableSecurity = shouldDisableSecurity;
+exports.getTestSafeConfig = getTestSafeConfig;
 /**
  * Disabled rate limiting configuration for tests
  */
-export const DISABLED_RATE_LIMITING = {
+exports.DISABLED_RATE_LIMITING = {
     enabled: false,
     // Set very high limits as backup
     global: {
@@ -36,7 +46,7 @@ export const DISABLED_RATE_LIMITING = {
 /**
  * Disabled auth enforcement configuration for tests
  */
-export const DISABLED_AUTH_ENFORCEMENT = {
+exports.DISABLED_AUTH_ENFORCEMENT = {
     enabled: false,
     strictMode: false,
     allowedAnonymousEndpoints: ['*'], // Allow all endpoints
@@ -72,7 +82,7 @@ export const DISABLED_AUTH_ENFORCEMENT = {
 /**
  * Disabled security logging configuration for tests
  */
-export const DISABLED_SECURITY_LOGGING = {
+exports.DISABLED_SECURITY_LOGGING = {
     enabled: false,
     logLevel: 'error',
     logFile: '/dev/null', // Discard logs on Unix systems
@@ -118,7 +128,7 @@ export const DISABLED_SECURITY_LOGGING = {
 /**
  * Create a test-friendly MCP configuration with security features disabled
  */
-export function createTestMCPConfig(overrides) {
+function createTestMCPConfig(overrides) {
     return {
         enabled: true,
         transports: {
@@ -142,16 +152,16 @@ export function createTestMCPConfig(overrides) {
                 allowExpiredTokens: false
             }
         },
-        rateLimiting: DISABLED_RATE_LIMITING,
-        securityLogging: DISABLED_SECURITY_LOGGING,
-        authEnforcement: DISABLED_AUTH_ENFORCEMENT,
+        rateLimiting: exports.DISABLED_RATE_LIMITING,
+        securityLogging: exports.DISABLED_SECURITY_LOGGING,
+        authEnforcement: exports.DISABLED_AUTH_ENFORCEMENT,
         ...overrides
     };
 }
 /**
  * Create MCP config for JWT-only authentication
  */
-export function createJWTMCPConfig(overrides) {
+function createJWTMCPConfig(overrides) {
     return createTestMCPConfig({
         auth: {
             requireAuthForToolsList: true,
@@ -174,7 +184,7 @@ export function createJWTMCPConfig(overrides) {
 /**
  * Create MCP config for OAuth-only authentication
  */
-export function createOAuthMCPConfig(overrides) {
+function createOAuthMCPConfig(overrides) {
     return createTestMCPConfig({
         auth: {
             requireAuthForToolsList: true,
@@ -195,7 +205,7 @@ export function createOAuthMCPConfig(overrides) {
 /**
  * Create MCP config for both JWT and OAuth authentication (JWT first, OAuth fallback)
  */
-export function createBothAuthMCPConfig(overrides) {
+function createBothAuthMCPConfig(overrides) {
     return createTestMCPConfig({
         auth: {
             requireAuthForToolsList: true,
@@ -219,7 +229,7 @@ export function createBothAuthMCPConfig(overrides) {
 /**
  * Environment variable to check if we're in test mode
  */
-export function isTestEnvironment() {
+function isTestEnvironment() {
     return process.env.NODE_ENV === 'test' ||
         process.env.VITEST === 'true' ||
         process.env.JEST_WORKER_ID !== undefined ||
@@ -228,7 +238,7 @@ export function isTestEnvironment() {
 /**
  * Check if security features should be disabled via environment variables
  */
-export function shouldDisableSecurity() {
+function shouldDisableSecurity() {
     return process.env.DISABLE_MCP_SECURITY === 'true' ||
         process.env.DISABLE_RATE_LIMITING === 'true' ||
         process.env.DISABLE_SECURITY_LOGGING === 'true';
@@ -236,7 +246,7 @@ export function shouldDisableSecurity() {
 /**
  * Auto-disable security features if in test environment or explicitly disabled
  */
-export function getTestSafeConfig(config) {
+function getTestSafeConfig(config) {
     if (isTestEnvironment() || shouldDisableSecurity()) {
         console.log('🧪 Test mode detected: Disabling ALL security features (rate limiting & security logging)');
         return {
@@ -249,9 +259,9 @@ export function getTestSafeConfig(config) {
             },
             mcp: {
                 ...config?.mcp,
-                rateLimiting: DISABLED_RATE_LIMITING,
-                securityLogging: DISABLED_SECURITY_LOGGING,
-                authEnforcement: DISABLED_AUTH_ENFORCEMENT
+                rateLimiting: exports.DISABLED_RATE_LIMITING,
+                securityLogging: exports.DISABLED_SECURITY_LOGGING,
+                authEnforcement: exports.DISABLED_AUTH_ENFORCEMENT
             }
         };
     }

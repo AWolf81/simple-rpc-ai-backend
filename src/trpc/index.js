@@ -1,16 +1,23 @@
+"use strict";
 /**
  * tRPC Server Setup
  *
  * This file sets up the core tRPC configuration for our AI backend.
  * Following tRPC v10+ best practices for type-safe API development.
  */
-import { initTRPC, TRPCError } from '@trpc/server';
-import superjson from 'superjson';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.tokenProtectedProcedure = exports.protectedProcedure = exports.t = exports.publicProcedure = exports.router = void 0;
+exports.createTRPCContext = createTRPCContext;
+const server_1 = require("@trpc/server");
+const superjson_1 = __importDefault(require("superjson"));
 /**
  * Create context for each request
  * Extracts user information from JWT token if present
  */
-export function createTRPCContext(opts) {
+function createTRPCContext(opts) {
     const authReq = opts.req;
     // Start with JWT middleware user if available
     let user = authReq.user || null;
@@ -84,11 +91,11 @@ export function createTRPCContext(opts) {
 /**
  * Initialize tRPC with context and transformer
  */
-const t = initTRPC
+const t = server_1.initTRPC
     .context()
     .meta()
     .create({
-    transformer: superjson,
+    transformer: superjson_1.default,
     errorFormatter({ shape }) {
         // In production, strip stack traces and internal details
         if (process.env.NODE_ENV === 'production') {
@@ -102,23 +109,19 @@ const t = initTRPC
         return shape;
     },
 });
+exports.t = t;
 /**
  * Export reusable router and procedure helpers
  * These are the building blocks for our API
  */
-export const router = t.router;
-export const publicProcedure = t.procedure;
-/**
- * Export the tRPC instance for advanced usage like createCallerFactory
- * Needed for server-side calls in the JSON-RPC bridge
- */
-export { t };
+exports.router = t.router;
+exports.publicProcedure = t.procedure;
 /**
  * Protected procedure - requires valid JWT authentication
  */
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+exports.protectedProcedure = t.procedure.use(({ ctx, next }) => {
     if (!ctx.user) {
-        throw new TRPCError({
+        throw new server_1.TRPCError({
             code: 'UNAUTHORIZED',
             message: 'Authentication required. Please provide a valid JWT token.',
         });
@@ -133,7 +136,7 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
 /**
  * Token-protected procedure - requires JWT + checks token balance
  */
-export const tokenProtectedProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+exports.tokenProtectedProcedure = exports.protectedProcedure.use(async ({ ctx, next }) => {
     // This will be used in AI router for token balance checking
     // The actual token balance check will be done in the AI router
     return next({

@@ -1,14 +1,21 @@
+"use strict";
 /**
  * Performance Timing Utility
  *
  * Centralized timing configuration and logging for debugging performance issues.
  * Controlled via server config or environment variable.
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TimingLogger = void 0;
+exports.initializeTiming = initializeTiming;
+exports.isTimingEnabled = isTimingEnabled;
+exports.logTiming = logTiming;
+exports.formatTiming = formatTiming;
 let timingEnabled = false;
 /**
  * Initialize timing based on config and environment
  */
-export function initializeTiming(config) {
+function initializeTiming(config) {
     // Environment variable takes precedence
     const envTiming = process.env.ENABLE_TIMING === 'true';
     const configTiming = config?.enableTiming ?? false;
@@ -20,13 +27,13 @@ export function initializeTiming(config) {
 /**
  * Check if timing is enabled
  */
-export function isTimingEnabled() {
+function isTimingEnabled() {
     return timingEnabled;
 }
 /**
  * Log timing information (only if enabled)
  */
-export function logTiming(message) {
+function logTiming(message) {
     if (timingEnabled) {
         console.log(message);
     }
@@ -34,7 +41,7 @@ export function logTiming(message) {
 /**
  * Helper to format timing with tree structure
  */
-export function formatTiming(label, time, total, isLast = false) {
+function formatTiming(label, time, total, isLast = false) {
     const prefix = isLast ? '└─' : '├─';
     const timeStr = time.toFixed(2);
     const totalStr = total ? ` (total: ${total.toFixed(2)}ms)` : '';
@@ -45,7 +52,7 @@ let nestingDepth = 0;
 /**
  * Create a timing logger with context
  */
-export class TimingLogger {
+class TimingLogger {
     startTime;
     context;
     enabled;
@@ -100,4 +107,5 @@ export class TimingLogger {
         return this.enabled;
     }
 }
+exports.TimingLogger = TimingLogger;
 //# sourceMappingURL=timing.js.map

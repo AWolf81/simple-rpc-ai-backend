@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Usage Analytics Service
  *
@@ -5,8 +6,10 @@
  * For subscription users: Used for billing and limiting
  * For BYOK users: Used for analytics and display only (no limiting)
  */
-import { v4 as uuidv4 } from 'uuid';
-export class UsageAnalyticsService {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UsageAnalyticsService = void 0;
+const uuid_1 = require("uuid");
+class UsageAnalyticsService {
     db;
     constructor(db) {
         this.db = db;
@@ -15,7 +18,7 @@ export class UsageAnalyticsService {
      * Record usage for any user (subscription or BYOK)
      */
     async recordUsage(record) {
-        const id = uuidv4();
+        const id = (0, uuid_1.v4)();
         await this.db.query(`INSERT INTO usage_analytics 
        (id, user_id, user_type, provider, model, input_tokens, output_tokens, 
         total_tokens, estimated_cost_usd, request_id, method, metadata)
@@ -127,7 +130,7 @@ export class UsageAnalyticsService {
      * Record a purchase (subscription or one-time)
      */
     async recordPurchase(purchase) {
-        const id = uuidv4();
+        const id = (0, uuid_1.v4)();
         await this.db.query(`INSERT INTO user_purchases 
        (id, user_id, payment_id, purchase_type, variant_id, quantity, 
         amount_paid_cents, currency, lemonsqueezy_data)
@@ -191,4 +194,5 @@ export class UsageAnalyticsService {
         return (inputTokens * rates.input + outputTokens * rates.output) / 1000;
     }
 }
+exports.UsageAnalyticsService = UsageAnalyticsService;
 //# sourceMappingURL=usage-analytics-service.js.map

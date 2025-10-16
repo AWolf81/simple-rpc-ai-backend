@@ -1,29 +1,70 @@
+"use strict";
 /**
  * RPC AI Server
  *
  * One server that supports both JSON-RPC and tRPC endpoints for AI applications.
  * Provides simple configuration for basic use cases and advanced options for complex scenarios.
  */
-import 'dotenv/config';
-import express from 'express';
-import crypto from 'crypto';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import * as trpcExpress from '@trpc/server/adapters/express';
-import { createTRPCContext } from './trpc/index.js';
-import { createAppRouter } from './trpc/root.js';
-import { JWTMiddleware } from './auth/jwt-middleware.js';
-import { PostgreSQLAdapter } from './database/postgres-adapter.js';
-import { VirtualTokenService } from './services/billing/virtual-token-service.js';
-import { UsageAnalyticsService } from './services/billing/usage-analytics-service.js';
-import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods.js';
-import { RPC_METHODS } from './constants.js';
-import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge.js';
-import { createOAuthServer, initializeOAuthServer, closeOAuthServer } from './auth/oauth-middleware.js';
-import { getTestSafeConfig } from './security/test-helpers.js';
-import { initializeTiming } from './utils/timing.js';
-import { logger } from './utils/logger.js';
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RpcAiServer = void 0;
+exports.defineRpcAiServerConfig = defineRpcAiServerConfig;
+exports.createRpcAiServer = createRpcAiServer;
+require("dotenv/config");
+const express_1 = __importDefault(require("express"));
+const crypto_1 = __importDefault(require("crypto"));
+const cors_1 = __importDefault(require("cors"));
+const helmet_1 = __importDefault(require("helmet"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const trpcExpress = __importStar(require("@trpc/server/adapters/express"));
+const index_js_1 = require("./trpc/index.js");
+const root_js_1 = require("./trpc/root.js");
+const jwt_middleware_js_1 = require("./auth/jwt-middleware.js");
+const postgres_adapter_js_1 = require("./database/postgres-adapter.js");
+const virtual_token_service_js_1 = require("./services/billing/virtual-token-service.js");
+const usage_analytics_service_js_1 = require("./services/billing/usage-analytics-service.js");
+const PostgreSQLRPCMethods_js_1 = require("./auth/PostgreSQLRPCMethods.js");
+const constants_js_1 = require("./constants.js");
+const trpc_to_jsonrpc_bridge_js_1 = require("./trpc/trpc-to-jsonrpc-bridge.js");
+const oauth_middleware_js_1 = require("./auth/oauth-middleware.js");
+const test_helpers_js_1 = require("./security/test-helpers.js");
+const timing_js_1 = require("./utils/timing.js");
+const logger_js_1 = require("./utils/logger.js");
 /**
  * Parse CORS origin configuration to support flexible formats:
  * - String: "https://example.com" or "*"
@@ -44,7 +85,7 @@ function parseCorsOrigin(origin) {
     }
     return '*';
 }
-export class RpcAiServer {
+class RpcAiServer {
     app;
     server;
     config;
@@ -94,9 +135,9 @@ export class RpcAiServer {
     providerApiKeys = {};
     constructor(config = {}) {
         // Apply test-safe configuration if in test environment
-        config = getTestSafeConfig(config);
+        config = (0, test_helpers_js_1.getTestSafeConfig)(config);
         // Initialize timing/debug configuration
-        initializeTiming(config.debug);
+        (0, timing_js_1.initializeTiming)(config.debug);
         // Opinionated protocol defaults
         const protocols = this.getOpinionatedProtocols(config.protocols);
         // Set smart defaults
@@ -202,16 +243,16 @@ export class RpcAiServer {
         };
         // Initialize database adapter if token tracking is enabled
         if (this.config.tokenTracking.enabled && this.config.tokenTracking.databaseUrl) {
-            this.dbAdapter = new PostgreSQLAdapter(this.config.tokenTracking.databaseUrl);
-            this.virtualTokenService = new VirtualTokenService(this.dbAdapter);
-            this.usageAnalyticsService = new UsageAnalyticsService(this.dbAdapter);
+            this.dbAdapter = new postgres_adapter_js_1.PostgreSQLAdapter(this.config.tokenTracking.databaseUrl);
+            this.virtualTokenService = new virtual_token_service_js_1.VirtualTokenService(this.dbAdapter);
+            this.usageAnalyticsService = new usage_analytics_service_js_1.UsageAnalyticsService(this.dbAdapter);
         }
         // Initialize PostgreSQL RPC Methods if secret manager is configured
         if (this.config.secretManager && this.config.secretManager.encryptionKey) {
             const { type, host, port, database, user, password, encryptionKey } = this.config.secretManager;
             if (type === 'postgresql' && host && port && database && user && password) {
                 try {
-                    this.postgresRPCMethods = new PostgreSQLRPCMethods({ host, port, database, user, password }, encryptionKey);
+                    this.postgresRPCMethods = new PostgreSQLRPCMethods_js_1.PostgreSQLRPCMethods({ host, port, database, user, password }, encryptionKey);
                 }
                 catch (error) {
                     console.error('❌ Failed to initialize PostgreSQL RPC Methods:', error);
@@ -220,7 +261,7 @@ export class RpcAiServer {
         }
         // Initialize JWT middleware if configured
         if (this.config.jwt.secret) {
-            this.jwtMiddleware = new JWTMiddleware({
+            this.jwtMiddleware = new jwt_middleware_js_1.JWTMiddleware({
                 opensaasPublicKey: this.config.jwt.secret,
                 audience: this.config.jwt.audience || 'rpc-ai-backend',
                 issuer: this.config.jwt.issuer || 'opensaas',
@@ -238,7 +279,7 @@ export class RpcAiServer {
             const resourcesSummary = resourcesInfo?.customResources?.length
                 ? `${resourcesInfo.customResources.length} custom resources`
                 : resourcesInfo ? 'extensions configured' : 'none';
-            logger.debug(`🔍 MCP enabled – prompts: ${promptsSummary}, resources: ${resourcesSummary}`);
+            logger_js_1.logger.debug(`🔍 MCP enabled – prompts: ${promptsSummary}, resources: ${resourcesSummary}`);
         }
         if (config.providers) {
             const providersObj = config.providers;
@@ -266,11 +307,11 @@ export class RpcAiServer {
         if (this.config.serverWorkspaces?.enabled && !workspaceConfig) {
             console.warn('⚠️  serverWorkspaces.enabled is true but no workspace paths are configured. Skipping workspace API initialization.');
         }
-        this.router = createAppRouter(undefined, // aiConfig - handled by separate params below
+        this.router = (0, root_js_1.createAppRouter)(undefined, // aiConfig - handled by separate params below
         this.config.tokenTracking.enabled || false, this.dbAdapter, this.config.serverProviders, this.config.byokProviders, this.postgresRPCMethods, this.config.mcp, this.config.modelRestrictions, workspaceConfig, this.config.customRouters, this.config.agents);
         // Initialize tRPC to JSON-RPC bridge (if JSON-RPC is enabled)
         if (this.config.protocols.jsonRpc) {
-            this.jsonRpcBridge = createTRPCToJSONRPCBridge(this.router, this.createContext(this.providerApiKeys));
+            this.jsonRpcBridge = (0, trpc_to_jsonrpc_bridge_js_1.createTRPCToJSONRPCBridge)(this.router, this.createContext(this.providerApiKeys));
         }
         // Initialize OAuth server (if enabled)
         if (this.config.oauth.enabled) {
@@ -280,22 +321,22 @@ export class RpcAiServer {
                 filePath: this.config.oauth.sessionStorage?.filePath,
                 redis: this.config.oauth.sessionStorage?.redis
             };
-            const { oauth, storage } = createOAuthServer(storageConfig, this.config.mcp?.adminUsers || []);
+            const { oauth, storage } = (0, oauth_middleware_js_1.createOAuthServer)(storageConfig, this.config.mcp?.adminUsers || []);
             this.oauthServer = oauth;
             this.oauthStorage = storage; // Store reference to session storage
             console.log(`✅ OAuth 2.0 server initialized with ${storageConfig.type} storage`);
         }
-        this.app = express();
+        this.app = (0, express_1.default)();
         // Enable trust proxy if configured (for reverse proxies like ngrok, cloudflare, etc.)
         if (this.config.trustProxy) {
             this.app.set('trust proxy', 1);
-            logger.debug(`🔧 Trust proxy enabled for reverse proxy support`);
+            logger_js_1.logger.debug(`🔧 Trust proxy enabled for reverse proxy support`);
         }
         this.setupMiddleware();
     }
     createContext(providerApiKeys) {
         return (opts) => {
-            const baseCtx = createTRPCContext(opts);
+            const baseCtx = (0, index_js_1.createTRPCContext)(opts);
             // Get provider from request, or use first configured provider as default
             // For JSON-RPC requests, provider is in req.body.params.provider
             // For tRPC requests, provider might be in different locations
@@ -319,13 +360,13 @@ export class RpcAiServer {
     }
     setupMiddleware() {
         // Security - with CORS-friendly settings
-        this.app.use(helmet({
+        this.app.use((0, helmet_1.default)({
             crossOriginResourcePolicy: false, // Allow cross-origin for OpenRPC tools
             crossOriginOpenerPolicy: false,
             contentSecurityPolicy: false // Disable CSP for development
         }));
         // CORS - permissive for OpenRPC tools and MCP Jam
-        this.app.use(cors({
+        this.app.use((0, cors_1.default)({
             origin: this.config.cors.origin,
             credentials: this.config.cors.credentials,
             methods: ['GET', 'POST', 'OPTIONS', 'HEAD'],
@@ -342,8 +383,8 @@ export class RpcAiServer {
             optionsSuccessStatus: 200 // Some legacy browsers choke on 204
         }));
         // Body parsing
-        this.app.use(express.json({ limit: '50mb' }));
-        this.app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+        this.app.use(express_1.default.json({ limit: '50mb' }));
+        this.app.use(express_1.default.urlencoded({ extended: true, limit: '50mb' }));
         if (this.oauthStorage) {
             this.app.use(async (req, res, next) => {
                 try {
@@ -351,7 +392,7 @@ export class RpcAiServer {
                     next();
                 }
                 catch (error) {
-                    logger.warn('⚠️ OAuth access token resolution failed', {
+                    logger_js_1.logger.warn('⚠️ OAuth access token resolution failed', {
                         error: error instanceof Error ? error.message : String(error)
                     });
                     next();
@@ -364,7 +405,7 @@ export class RpcAiServer {
         }
         // Rate limiting
         if (this.config.rateLimit.max > 0) {
-            this.app.use(rateLimit({
+            this.app.use((0, express_rate_limit_1.default)({
                 windowMs: this.config.rateLimit.windowMs,
                 max: this.config.rateLimit.max,
                 message: {
@@ -664,14 +705,14 @@ export class RpcAiServer {
         if (this.config.oauth.enabled && this.oauthServer) {
             console.log(`🔗 Setting up OAuth 2.0 functional endpoints...`);
             // Import OAuth route handlers
-            const { handleProviderLogin, handleProviderCallback, createAuthenticateHandler, handleProviderSelection } = await import('./auth/oauth-middleware.js');
+            const { handleProviderLogin, handleProviderCallback, createAuthenticateHandler, handleProviderSelection } = await Promise.resolve().then(() => __importStar(require('./auth/oauth-middleware.js')));
             // Provider selection page
             this.app.get('/login', handleProviderSelection);
             // Identity provider login routes
             this.app.get('/login/:provider', handleProviderLogin);
             // Extension OAuth handler (intercepts before regular callback if enabled)
             if (this.config.extensionOAuth?.enabled) {
-                const { createExtensionOAuthHandler } = await import('./auth/extension-oauth.js');
+                const { createExtensionOAuthHandler } = await Promise.resolve().then(() => __importStar(require('./auth/extension-oauth.js')));
                 const extensionOAuthHandler = createExtensionOAuthHandler(this.config.extensionOAuth);
                 this.app.get('/callback/:provider', extensionOAuthHandler);
             }
@@ -682,7 +723,7 @@ export class RpcAiServer {
                 // Generate a default state parameter if missing (OAuth 2.0 state is optional)
                 if (!req.query.state) {
                     console.log(`⚠️ OAuth: No state parameter provided, generating default state`);
-                    req.query.state = 'auto-generated-state-' + crypto.randomBytes(16).toString('hex');
+                    req.query.state = 'auto-generated-state-' + crypto_1.default.randomBytes(16).toString('hex');
                 }
                 // Pre-check authentication before calling OAuth server
                 const authenticateHandler = createAuthenticateHandler();
@@ -723,7 +764,7 @@ export class RpcAiServer {
                     }
                     // Generate a new client with timestamp-based ID (matching expected format)
                     const clientId = `static_client_${Date.now()}`;
-                    const clientSecret = crypto.randomBytes(32).toString('hex');
+                    const clientSecret = crypto_1.default.randomBytes(32).toString('hex');
                     // Create client object directly in storage to avoid registerClient generating its own secret
                     const client = {
                         id: clientId,
@@ -763,7 +804,7 @@ export class RpcAiServer {
                 onError: ({ path, error }) => {
                     // In production, log only essential info without stack traces
                     if (process.env.NODE_ENV === 'production') {
-                        logger.error(`❌ tRPC failed on ${path ?? "<no-path>"}: ${error.code} - ${error.message}`);
+                        logger_js_1.logger.error(`❌ tRPC failed on ${path ?? "<no-path>"}: ${error.code} - ${error.message}`);
                     }
                     else {
                         // In development, log full error for debugging
@@ -790,7 +831,7 @@ export class RpcAiServer {
                 res.json({
                     message: 'JSON-RPC endpoint - use POST method',
                     endpoint: this.config.paths.jsonRpc,
-                    methods: [RPC_METHODS.HEALTH, RPC_METHODS.GENERATE_TEXT, RPC_METHODS.LIST_PROVIDERS, RPC_METHODS.STORE_USER_KEY, RPC_METHODS.GET_USER_KEY, RPC_METHODS.GET_USER_PROVIDERS, RPC_METHODS.VALIDATE_USER_KEY, RPC_METHODS.ROTATE_USER_KEY, RPC_METHODS.DELETE_USER_KEY],
+                    methods: [constants_js_1.RPC_METHODS.HEALTH, constants_js_1.RPC_METHODS.GENERATE_TEXT, constants_js_1.RPC_METHODS.LIST_PROVIDERS, constants_js_1.RPC_METHODS.STORE_USER_KEY, constants_js_1.RPC_METHODS.GET_USER_KEY, constants_js_1.RPC_METHODS.GET_USER_PROVIDERS, constants_js_1.RPC_METHODS.VALIDATE_USER_KEY, constants_js_1.RPC_METHODS.ROTATE_USER_KEY, constants_js_1.RPC_METHODS.DELETE_USER_KEY],
                     example: {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -881,7 +922,7 @@ export class RpcAiServer {
             const body = JSON.stringify(req.body);
             // Verify webhook signature
             if (this.config.tokenTracking.webhookSecret) {
-                const expectedSignature = crypto
+                const expectedSignature = crypto_1.default
                     .createHmac('sha256', this.config.tokenTracking.webhookSecret)
                     .update(body)
                     .digest('hex');
@@ -954,7 +995,7 @@ export class RpcAiServer {
         if (enableStartupScan) {
             console.log('🔍 Scanning remote MCP packages for security risks...');
             try {
-                const { scanMCPServerPackage } = await import('./security/mcp-server-scanner.js');
+                const { scanMCPServerPackage } = await Promise.resolve().then(() => __importStar(require('./security/mcp-server-scanner.js')));
                 const scanResults = new Map();
                 let hasHighRisk = false;
                 let hasErrors = false;
@@ -1041,7 +1082,7 @@ export class RpcAiServer {
         }
         // Initialize RemoteMCPManager
         try {
-            const { RemoteMCPManager } = await import('./mcp/remote-mcp-manager.js');
+            const { RemoteMCPManager } = await Promise.resolve().then(() => __importStar(require('./mcp/remote-mcp-manager.js')));
             this.remoteMcpManager = new RemoteMCPManager({
                 servers: config.servers.map(server => ({
                     name: server.name,
@@ -1086,7 +1127,7 @@ export class RpcAiServer {
     async start(setupRoutes) {
         // Initialize OAuth server session storage (if enabled)
         if (this.config.oauth.enabled) {
-            await initializeOAuthServer();
+            await (0, oauth_middleware_js_1.initializeOAuthServer)();
         }
         // Initialize remote MCP servers with security scanning
         if (this.config.remoteMcpServers?.enabled && this.config.remoteMcpServers.servers?.length) {
@@ -1098,7 +1139,7 @@ export class RpcAiServer {
         if (this.config.mcp?.enabled) {
             console.log('🚀 Setting up MCP server...');
             // Import and create the protocol handler
-            const { MCPProtocolHandler } = await import('./trpc/routers/mcp/protocol-handler.js');
+            const { MCPProtocolHandler } = await Promise.resolve().then(() => __importStar(require('./trpc/routers/mcp/protocol-handler.js')));
             const protocolHandler = new MCPProtocolHandler(this.router, this.config.mcp);
             const mcpWorkspaceConfig = (this.config.serverWorkspaces && this.config.serverWorkspaces.enabled &&
                 this.hasWorkspaceDefinitions(this.config.serverWorkspaces))
@@ -1109,7 +1150,7 @@ export class RpcAiServer {
             }
             if (mcpWorkspaceConfig) {
                 try {
-                    const { createRootManager } = await import('./services/resources/root-manager.js');
+                    const { createRootManager } = await Promise.resolve().then(() => __importStar(require('./services/resources/root-manager.js')));
                     const rootManagerConfig = {};
                     if (mcpWorkspaceConfig.defaultWorkspace?.path && mcpWorkspaceConfig.defaultWorkspace.path.trim().length > 0) {
                         const normalizedDefault = {
@@ -1210,7 +1251,7 @@ export class RpcAiServer {
     async stop() {
         // Close OAuth server if enabled
         if (this.config.oauth.enabled) {
-            await closeOAuthServer();
+            await (0, oauth_middleware_js_1.closeOAuthServer)();
         }
         return new Promise((resolve) => {
             if (this.server) {
@@ -1297,12 +1338,13 @@ export class RpcAiServer {
         return this.config;
     }
 }
+exports.RpcAiServer = RpcAiServer;
 // Helper function to create type-safe config with const assertions
-export function defineRpcAiServerConfig(config) {
+function defineRpcAiServerConfig(config) {
     return config;
 }
 // Factory function for easy usage
-export function createRpcAiServer(config = {}) {
+function createRpcAiServer(config = {}) {
     return new RpcAiServer(config);
 }
 //# sourceMappingURL=rpc-ai-server.js.map

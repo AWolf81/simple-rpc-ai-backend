@@ -1,14 +1,17 @@
-import { TRPCError } from '@trpc/server';
-import { ErrorCode, LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
-import { ScopeValidator } from '../../../auth/scopes';
-import { MCPRateLimiter, getDefaultRateLimiter } from '../../../security/rate-limiter';
-import { SecurityLogger, getDefaultSecurityLogger } from '../../../security/security-logger';
-import { AuthEnforcer } from '../../../security/auth-enforcer';
-import { mcpResourceRegistry } from '../../../services/resources/mcp/mcp-resource-registry.js';
-import { logger } from '../../../utils/logger.js';
-import { redactEmail } from '../../../utils/redact.js';
-import { zodSchemaToJson } from '../../../utils/zod-json-schema.js';
-export class MCPProtocolHandler {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MCPProtocolHandler = void 0;
+const server_1 = require("@trpc/server");
+const types_js_1 = require("@modelcontextprotocol/sdk/types.js");
+const scopes_1 = require("../../../auth/scopes");
+const rate_limiter_1 = require("../../../security/rate-limiter");
+const security_logger_1 = require("../../../security/security-logger");
+const auth_enforcer_1 = require("../../../security/auth-enforcer");
+const mcp_resource_registry_js_1 = require("../../../services/resources/mcp/mcp-resource-registry.js");
+const logger_js_1 = require("../../../utils/logger.js");
+const redact_js_1 = require("../../../utils/redact.js");
+const zod_json_schema_js_1 = require("../../../utils/zod-json-schema.js");
+class MCPProtocolHandler {
     appRouter;
     adminUsers;
     jwtMiddleware;
@@ -42,14 +45,14 @@ export class MCPProtocolHandler {
         };
         // Initialize security components
         this.rateLimiter = config?.rateLimiting
-            ? new MCPRateLimiter(config.rateLimiting)
-            : getDefaultRateLimiter();
+            ? new rate_limiter_1.MCPRateLimiter(config.rateLimiting)
+            : (0, rate_limiter_1.getDefaultRateLimiter)();
         this.securityLogger = config?.securityLogging
-            ? new SecurityLogger(config.securityLogging)
-            : getDefaultSecurityLogger();
+            ? new security_logger_1.SecurityLogger(config.securityLogging)
+            : (0, security_logger_1.getDefaultSecurityLogger)();
         this.authEnforcer = config?.authEnforcement?.enabled
-            ? new AuthEnforcer(config.authEnforcement)
-            : new AuthEnforcer({ enabled: false });
+            ? new auth_enforcer_1.AuthEnforcer(config.authEnforcement)
+            : new auth_enforcer_1.AuthEnforcer({ enabled: false });
         this.extensionsConfig = config?.extensions;
         this.logInitialization();
     }
@@ -73,18 +76,18 @@ export class MCPProtocolHandler {
         if (hasExtensions) {
             const promptSummary = prompts.length ? `${prompts.length} custom prompts (${prompts.map(p => p.name).join(', ')})` : 'no custom prompts';
             const resourceSummary = resources.length ? `${resources.length} custom resources (${resources.map(r => r.name).join(', ')})` : 'no custom resources';
-            logger.debug(`🔍 MCP extensions – ${promptSummary}; ${resourceSummary}`);
+            logger_js_1.logger.debug(`🔍 MCP extensions – ${promptSummary}; ${resourceSummary}`);
         }
         else {
-            logger.debug('🔍 MCP extensions disabled');
+            logger_js_1.logger.debug('🔍 MCP extensions disabled');
         }
-        logger.debug('✅ Rate limiting: MCP rate limiter initialized');
-        logger.debug('✅ Security logging: MCP security logger initialized');
+        logger_js_1.logger.debug('✅ Rate limiting: MCP rate limiter initialized');
+        logger_js_1.logger.debug('✅ Security logging: MCP security logger initialized');
         if (this.authEnforcer && this.authEnforcer.config?.enabled !== false) {
-            logger.debug('✅ Auth enforcement: MCP auth enforcer initialized');
+            logger_js_1.logger.debug('✅ Auth enforcement: MCP auth enforcer initialized');
         }
         else {
-            logger.debug('ℹ️  Auth enforcement: Disabled (simple mode)');
+            logger_js_1.logger.debug('ℹ️  Auth enforcement: Disabled (simple mode)');
         }
     }
     /**
@@ -335,13 +338,13 @@ export class MCPProtocolHandler {
                     response = this.handleRootsListChanged(mcpRequest);
                     break;
                 default:
-                    response = this.createErrorResponse(mcpRequest.id, ErrorCode.MethodNotFound, `Method '${mcpRequest.method}' not found`);
+                    response = this.createErrorResponse(mcpRequest.id, types_js_1.ErrorCode.MethodNotFound, `Method '${mcpRequest.method}' not found`);
             }
             res.json(response);
         }
         catch (error) {
-            logger.error('MCP Error:', error);
-            const errorResponse = this.createErrorResponse(req.body?.id || null, ErrorCode.InternalError, 'Internal error', 
+            logger_js_1.logger.error('MCP Error:', error);
+            const errorResponse = this.createErrorResponse(req.body?.id || null, types_js_1.ErrorCode.InternalError, 'Internal error', 
             // In production, don't expose error details
             process.env.NODE_ENV === 'production'
                 ? undefined
@@ -386,7 +389,7 @@ export class MCPProtocolHandler {
             jsonrpc: '2.0',
             id: request.id,
             result: {
-                protocolVersion: LATEST_PROTOCOL_VERSION,
+                protocolVersion: types_js_1.LATEST_PROTOCOL_VERSION,
                 capabilities,
                 serverInfo: {
                     name: 'Simple RPC AI Backend MCP',
@@ -510,7 +513,7 @@ export class MCPProtocolHandler {
                     additionalProperties: false
                 };
             }
-            const schema = zodSchemaToJson(inputParser);
+            const schema = (0, zod_json_schema_js_1.zodSchemaToJson)(inputParser);
             if (schema.$ref && (schema.definitions || schema.$defs)) {
                 const defs = schema.definitions || schema.$defs;
                 const refKey = schema.$ref.replace('#/definitions/', '').replace('#/$defs/', '');
@@ -564,7 +567,7 @@ export class MCPProtocolHandler {
         try {
             // Check auth requirements for tools/list
             if (this.authConfig.requireAuthForToolsList && !req?.user) {
-                return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Authentication required for tools/list');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Authentication required for tools/list');
             }
             // Extract user info for authorization checks
             const userInfo = this.extractUserInfo(req);
@@ -583,7 +586,7 @@ export class MCPProtocolHandler {
                 // Check scope requirements if defined
                 let hasRequiredScopes = true;
                 if (tool.scopes && userScopes.length > 0) {
-                    hasRequiredScopes = ScopeValidator.hasScope(userScopes, tool.scopes, userInfo);
+                    hasRequiredScopes = scopes_1.ScopeValidator.hasScope(userScopes, tool.scopes, userInfo);
                 }
                 return {
                     name: tool.name,
@@ -606,7 +609,7 @@ export class MCPProtocolHandler {
                 description: tool.description,
                 inputSchema: tool.inputSchema
             }));
-            logger.debug(`MCP tools/list: ${availableTools.length} tools available (user: ${redactEmail(userInfo?.email)})`);
+            logger_js_1.logger.debug(`MCP tools/list: ${availableTools.length} tools available (user: ${(0, redact_js_1.redactEmail)(userInfo?.email)})`);
             return {
                 jsonrpc: '2.0',
                 id: request.id,
@@ -617,26 +620,26 @@ export class MCPProtocolHandler {
         }
         catch (error) {
             console.error('❌ Error in handleToolsList:', error);
-            return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Failed to list tools', error instanceof Error ? error.message : String(error));
+            return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Failed to list tools', error instanceof Error ? error.message : String(error));
         }
     }
     async handleToolsCall(request, req) {
         try {
             const { name, arguments: args } = request.params || {};
             if (!name) {
-                return this.createErrorResponse(request.id, ErrorCode.InvalidParams, 'Tool name is required');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, 'Tool name is required');
             }
             // Extract user info
             const userInfo = this.extractUserInfo(req);
             const userScopes = this.extractUserScopes(req);
             const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
             // Privacy: Don't log user input - only log tool name and arg count
-            logger.debug(`MCP tools/call: ${name} (${Object.keys(args || {}).length} args)`);
+            logger_js_1.logger.debug(`MCP tools/call: ${name} (${Object.keys(args || {}).length} args)`);
             // Find the requested tool
             const mcpTools = this.extractMCPToolsFromTRPC();
             const tool = mcpTools.find(t => t.name === name || t.fullName === name);
             if (!tool) {
-                return this.createErrorResponse(request.id, ErrorCode.InvalidParams, `Tool '${name}' not found`);
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, `Tool '${name}' not found`);
             }
             // Check if tool is accessible to user
             const isPublic = this.isToolPublic({
@@ -646,7 +649,7 @@ export class MCPProtocolHandler {
             });
             // Check auth requirements for tools/call (but allow public tools)
             if (this.authConfig.requireAuthForToolsCall && !req?.user && !isPublic) {
-                return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Authentication required for tools/call', {
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Authentication required for tools/call', {
                     reason: 'authentication_required',
                     user: 'anonymous',
                     tool: name
@@ -659,9 +662,9 @@ export class MCPProtocolHandler {
                 type: 'none'
             };
             if (tool.scopes) {
-                hasRequiredScopes = ScopeValidator.hasScope(userScopes, tool.scopes, userInfo);
+                hasRequiredScopes = scopes_1.ScopeValidator.hasScope(userScopes, tool.scopes, userInfo);
                 if (!hasRequiredScopes) {
-                    missingScopeInfo = ScopeValidator.getMissingScopes(userScopes, tool.scopes);
+                    missingScopeInfo = scopes_1.ScopeValidator.getMissingScopes(userScopes, tool.scopes);
                 }
             }
             // Authorization check
@@ -688,7 +691,7 @@ export class MCPProtocolHandler {
                         }
                         : {})
                 };
-                return this.createErrorResponse(request.id, ErrorCode.InvalidRequest, responseMessage, errorData);
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidRequest, responseMessage, errorData);
             }
             // Execute the tRPC procedure
             const procedure = tool.procedure;
@@ -707,8 +710,8 @@ export class MCPProtocolHandler {
                         ? error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')
                         : error instanceof Error ? error.message : String(error);
                     // Debug only - MCP clients may send empty args on first call
-                    logger.debug(`Validation failed for ${name}: ${errorSummary}`);
-                    return this.createErrorResponse(request.id, ErrorCode.InvalidParams, `Invalid input parameters: ${error instanceof Error ? error.message : String(error)}`);
+                    logger_js_1.logger.debug(`Validation failed for ${name}: ${errorSummary}`);
+                    return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, `Invalid input parameters: ${error instanceof Error ? error.message : String(error)}`);
                 }
             }
             // Create execution context
@@ -718,7 +721,7 @@ export class MCPProtocolHandler {
                 appRouter: this.appRouter // Add appRouter for tools that need to discover procedures
             };
             // Privacy: Don't log user input - only log tool name
-            logger.debug(`Executing tool ${name}`);
+            logger_js_1.logger.debug(`Executing tool ${name}`);
             // Execute the procedure resolver
             const result = await procedure._def.resolver({
                 input: validatedInput,
@@ -727,7 +730,7 @@ export class MCPProtocolHandler {
                 path: name,
                 getRawInput: () => validatedInput
             });
-            logger.debug(`Tool ${name} executed successfully`);
+            logger_js_1.logger.debug(`Tool ${name} executed successfully`);
             return {
                 jsonrpc: '2.0',
                 id: request.id,
@@ -742,24 +745,24 @@ export class MCPProtocolHandler {
             };
         }
         catch (error) {
-            logger.error(`Error executing tool ${request.params?.name}:`, error);
-            if (error instanceof TRPCError) {
+            logger_js_1.logger.error(`Error executing tool ${request.params?.name}:`, error);
+            if (error instanceof server_1.TRPCError) {
                 const errorCode = error.code === 'FORBIDDEN'
-                    ? ErrorCode.InvalidRequest
-                    : ErrorCode.InternalError;
+                    ? types_js_1.ErrorCode.InvalidRequest
+                    : types_js_1.ErrorCode.InternalError;
                 return this.createErrorResponse(request.id, errorCode, error.message || 'Tool execution failed', {
                     reason: error.code,
                     ...(error.cause ? { cause: String(error.cause) } : {})
                 });
             }
-            return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Failed to execute tool', error instanceof Error ? error.message : String(error));
+            return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Failed to execute tool', error instanceof Error ? error.message : String(error));
         }
     }
     async handlePromptsList(request, req) {
         try {
             // Check auth requirements if enabled
             if (this.authConfig.requireAuthForToolsList && !req?.user) {
-                return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Authentication required for prompts/list');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Authentication required for prompts/list');
             }
             // Extract prompts from tRPC procedures with mcpPrompt metadata
             const mcpPrompts = this.extractMCPPromptsFromTRPC();
@@ -783,7 +786,7 @@ export class MCPProtocolHandler {
                     return false;
                 // Check scope requirements if defined
                 if (prompt.scopes) {
-                    const hasRequiredScopes = ScopeValidator.hasScope(userScopes, prompt.scopes, userInfo);
+                    const hasRequiredScopes = scopes_1.ScopeValidator.hasScope(userScopes, prompt.scopes, userInfo);
                     return hasRequiredScopes;
                 }
                 // Default to allowing if no specific restrictions
@@ -818,7 +821,7 @@ export class MCPProtocolHandler {
                     }
                 }
             }
-            logger.debug(`MCP prompts/list: ${prompts.length} prompts available`);
+            logger_js_1.logger.debug(`MCP prompts/list: ${prompts.length} prompts available`);
             return {
                 jsonrpc: '2.0',
                 id: request.id,
@@ -829,25 +832,25 @@ export class MCPProtocolHandler {
         }
         catch (error) {
             console.error('❌ Error in handlePromptsList:', error);
-            return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Failed to list prompts', error instanceof Error ? error.message : String(error));
+            return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Failed to list prompts', error instanceof Error ? error.message : String(error));
         }
     }
     async handlePromptsGet(request, req) {
         try {
             const { name, arguments: args } = request.params || {};
             if (!name) {
-                return this.createErrorResponse(request.id, ErrorCode.InvalidParams, 'Prompt name is required');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, 'Prompt name is required');
             }
             // Check auth requirements for prompts/get
             const requireAuth = this.authConfig.requireAuthForToolsCall;
             if (requireAuth && !req?.user) {
-                return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Authentication required for prompts/get');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Authentication required for prompts/get');
             }
             // Extract user info
             const userInfo = this.extractUserInfo(req);
             const userScopes = this.extractUserScopes(req);
             const isAdmin = this.isAdminUser(userInfo?.email, userInfo?.id);
-            logger.debug(`MCP prompts/get: ${name} (${Object.keys(args || {}).length} args)`);
+            logger_js_1.logger.debug(`MCP prompts/get: ${name} (${Object.keys(args || {}).length} args)`);
             // Find the requested prompt from MCP prompts
             const mcpPrompts = this.extractMCPPromptsFromTRPC();
             let prompt = mcpPrompts.find(p => p.name === name);
@@ -861,11 +864,11 @@ export class MCPProtocolHandler {
                 }
             }
             if (!prompt && !legacyPrompt) {
-                return this.createErrorResponse(request.id, ErrorCode.InvalidParams, `Prompt '${name}' not found`);
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, `Prompt '${name}' not found`);
             }
             // Handle legacy prompts - return a message directing to the new system
             if (isLegacyPrompt && legacyPrompt) {
-                return this.createErrorResponse(request.id, ErrorCode.InvalidRequest, `Prompt '${name}' is a legacy extension prompt. Please migrate to tRPC-based MCP prompts using createMCPPrompt().`, {
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidRequest, `Prompt '${name}' is a legacy extension prompt. Please migrate to tRPC-based MCP prompts using createMCPPrompt().`, {
                     promptName: name,
                     legacyInfo: {
                         description: legacyPrompt.description,
@@ -885,9 +888,9 @@ export class MCPProtocolHandler {
                 type: 'none'
             };
             if (mcpPrompt.scopes) {
-                hasRequiredScopes = ScopeValidator.hasScope(userScopes, mcpPrompt.scopes, userInfo);
+                hasRequiredScopes = scopes_1.ScopeValidator.hasScope(userScopes, mcpPrompt.scopes, userInfo);
                 if (!hasRequiredScopes) {
-                    missingScopeInfo = ScopeValidator.getMissingScopes(userScopes, mcpPrompt.scopes);
+                    missingScopeInfo = scopes_1.ScopeValidator.getMissingScopes(userScopes, mcpPrompt.scopes);
                 }
             }
             // Authorization check
@@ -907,7 +910,7 @@ export class MCPProtocolHandler {
                         }
                         : {})
                 };
-                return this.createErrorResponse(request.id, ErrorCode.InvalidRequest, responseMessage, errorData);
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidRequest, responseMessage, errorData);
             }
             // Execute the tRPC procedure to get the prompt text
             const procedure = mcpPrompt.procedure;
@@ -919,7 +922,7 @@ export class MCPProtocolHandler {
                     validatedInput = inputParser.parse(args || {});
                 }
                 catch (zodError) {
-                    return this.createErrorResponse(request.id, ErrorCode.InvalidParams, 'Invalid prompt arguments', {
+                    return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, 'Invalid prompt arguments', {
                         validationErrors: zodError.errors || zodError.message,
                         received: args
                     });
@@ -932,7 +935,7 @@ export class MCPProtocolHandler {
                 req,
                 type: procedure._def?.type || 'query'
             };
-            logger.debug(`Executing prompt ${name}`);
+            logger_js_1.logger.debug(`Executing prompt ${name}`);
             const variableDefinitions = this.buildPromptVariableDefinitions(mcpPrompt);
             // Execute the procedure resolver
             const result = await procedure._def.resolver({
@@ -942,7 +945,7 @@ export class MCPProtocolHandler {
                 path: name,
                 getRawInput: () => validatedInput
             });
-            logger.debug(`Prompt ${name} executed successfully`);
+            logger_js_1.logger.debug(`Prompt ${name} executed successfully`);
             // Result should be the prompt text/messages
             const promptText = typeof result === 'string' ? result : result.text || JSON.stringify(result);
             return {
@@ -967,17 +970,17 @@ export class MCPProtocolHandler {
             };
         }
         catch (error) {
-            logger.error(`Error executing prompt ${request.params?.name}:`, error);
-            if (error instanceof TRPCError) {
+            logger_js_1.logger.error(`Error executing prompt ${request.params?.name}:`, error);
+            if (error instanceof server_1.TRPCError) {
                 const errorCode = error.code === 'FORBIDDEN'
-                    ? ErrorCode.InvalidRequest
-                    : ErrorCode.InternalError;
+                    ? types_js_1.ErrorCode.InvalidRequest
+                    : types_js_1.ErrorCode.InternalError;
                 return this.createErrorResponse(request.id, errorCode, error.message || 'Prompt execution failed', {
                     reason: error.code,
                     ...(error.cause ? { cause: String(error.cause) } : {})
                 });
             }
-            return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Failed to execute prompt', error instanceof Error ? error.message : String(error));
+            return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Failed to execute prompt', error instanceof Error ? error.message : String(error));
         }
     }
     async handleLegacyPromptsList(request, req) {
@@ -1032,7 +1035,7 @@ export class MCPProtocolHandler {
                     });
                 }
             }
-            logger.debug(`MCP prompts/list (legacy): ${prompts.length} prompts available`);
+            logger_js_1.logger.debug(`MCP prompts/list (legacy): ${prompts.length} prompts available`);
             return {
                 jsonrpc: '2.0',
                 id: request.id,
@@ -1043,24 +1046,24 @@ export class MCPProtocolHandler {
         }
         catch (error) {
             console.error('❌ Error in handleLegacyPromptsList:', error);
-            return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Failed to list prompts', error instanceof Error ? error.message : String(error));
+            return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Failed to list prompts', error instanceof Error ? error.message : String(error));
         }
     }
     async handleResourcesList(request, req) {
         try {
             // Check auth requirements if enabled
             if (this.authConfig.requireAuthForToolsList && !req?.user) {
-                return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Authentication required for resources/list');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Authentication required for resources/list');
             }
             // Extract user info for permission checks
             const userInfo = this.extractUserInfo(req);
             const userScopes = this.extractUserScopes(req);
             // Get all resources from the flexible registry
-            const allResources = mcpResourceRegistry.getAllResources();
+            const allResources = mcp_resource_registry_js_1.mcpResourceRegistry.getAllResources();
             // Filter resources based on access permissions
             const accessibleResources = allResources
                 .filter(resource => {
-                return mcpResourceRegistry.checkResourceAccess(resource.id, {
+                return mcp_resource_registry_js_1.mcpResourceRegistry.checkResourceAccess(resource.id, {
                     email: userInfo?.email,
                     scopes: userScopes
                 });
@@ -1071,7 +1074,7 @@ export class MCPProtocolHandler {
                 description: resource.description,
                 mimeType: resource.mimeType
             }));
-            logger.debug(`MCP resources/list: ${accessibleResources.length} resources available (${allResources.length} total)`);
+            logger_js_1.logger.debug(`MCP resources/list: ${accessibleResources.length} resources available (${allResources.length} total)`);
             return {
                 jsonrpc: '2.0',
                 id: request.id,
@@ -1082,21 +1085,21 @@ export class MCPProtocolHandler {
         }
         catch (error) {
             console.error('❌ Error in handleResourcesList:', error);
-            return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Failed to list resources', error instanceof Error ? error.message : String(error));
+            return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Failed to list resources', error instanceof Error ? error.message : String(error));
         }
     }
     async handleResourcesRead(request, req) {
         try {
             const { uri } = request.params || {};
             if (!uri) {
-                return this.createErrorResponse(request.id, ErrorCode.InvalidParams, 'Resource URI is required');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, 'Resource URI is required');
             }
             // Check auth requirements (resources are typically more restricted than lists)
             const requireAuth = this.authConfig.requireAuthForToolsCall; // Use tools call auth level for resource reading
             if (requireAuth && !req?.user) {
-                return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Authentication required for resources/read');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Authentication required for resources/read');
             }
-            console.log(`📖 MCP Resource Read: ${uri} (user: ${redactEmail(req?.user?.email)})`);
+            console.log(`📖 MCP Resource Read: ${uri} (user: ${(0, redact_js_1.redactEmail)(req?.user?.email)})`);
             // Extract user info for permission checks
             const userInfo = this.extractUserInfo(req);
             const userScopes = this.extractUserScopes(req);
@@ -1117,20 +1120,20 @@ export class MCPProtocolHandler {
                 }
             }
             else {
-                return this.createErrorResponse(request.id, ErrorCode.InvalidParams, `Unsupported resource URI format: ${uri}`);
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, `Unsupported resource URI format: ${uri}`);
             }
             // Check access permissions using the registry (use base resource ID without parameters)
-            const hasAccess = mcpResourceRegistry.checkResourceAccess(resourceId, {
+            const hasAccess = mcp_resource_registry_js_1.mcpResourceRegistry.checkResourceAccess(resourceId, {
                 email: userInfo?.email,
                 scopes: userScopes
             });
             if (!hasAccess) {
-                return this.createErrorResponse(request.id, ErrorCode.InvalidParams, `Access denied to resource: ${resourceId}`);
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, `Access denied to resource: ${resourceId}`);
             }
             // Get resource content from the flexible registry
             let resourceResult;
             try {
-                resourceResult = await mcpResourceRegistry.getResourceContent(resourceId, {
+                resourceResult = await mcp_resource_registry_js_1.mcpResourceRegistry.getResourceContent(resourceId, {
                     user: userInfo,
                     timestamp: new Date().toISOString(),
                     workspaceManager: this.rootManager, // Pass workspace manager for server workspace access
@@ -1141,11 +1144,11 @@ export class MCPProtocolHandler {
                 // Check if this is a validation error from Template Engine
                 if (error instanceof Error && error.message.includes('Invalid value for')) {
                     // This is a parameter validation error - return as InvalidParams
-                    return this.createErrorResponse(request.id, ErrorCode.InvalidParams, `Parameter validation failed: ${error.message}`);
+                    return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, `Parameter validation failed: ${error.message}`);
                 }
                 else if (error instanceof Error && error.message.includes('Required parameter missing')) {
                     // This is a missing required parameter error
-                    return this.createErrorResponse(request.id, ErrorCode.InvalidParams, `Missing required parameter: ${error.message}`);
+                    return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, `Missing required parameter: ${error.message}`);
                 }
                 else {
                     // Re-throw other errors to be handled by outer catch
@@ -1153,7 +1156,7 @@ export class MCPProtocolHandler {
                 }
             }
             if (!resourceResult) {
-                return this.createErrorResponse(request.id, ErrorCode.InvalidParams, `Resource not found: ${resourceId}`);
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InvalidParams, `Resource not found: ${resourceId}`);
             }
             const { content: resourceContent, mimeType } = resourceResult;
             console.log(`✅ Resource ${uri} read successfully (${resourceContent.length} chars)`);
@@ -1173,7 +1176,7 @@ export class MCPProtocolHandler {
         }
         catch (error) {
             console.error(`❌ Error reading resource ${request.params?.uri}:`, error);
-            return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Failed to read resource', error instanceof Error ? error.message : String(error));
+            return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Failed to read resource', error instanceof Error ? error.message : String(error));
         }
     }
     async handleRootsList(request, req) {
@@ -1183,7 +1186,7 @@ export class MCPProtocolHandler {
             if (!hasClientRootsCapability) {
                 // Client does not support roots capability
                 console.log('❌ MCP roots/list: Client does not support roots capability');
-                return this.createErrorResponse(request.id, ErrorCode.MethodNotFound, 'Roots not supported', 'Client does not have roots capability');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.MethodNotFound, 'Roots not supported', 'Client does not have roots capability');
             }
             // According to MCP spec, roots/list should return client-managed directories
             // In a typical MCP setup, this would be called BY the server TO the client
@@ -1208,7 +1211,7 @@ export class MCPProtocolHandler {
         }
         catch (error) {
             console.error('❌ MCP roots/list error:', error);
-            return this.createErrorResponse(request.id, ErrorCode.InternalError, `Failed to list roots: ${error instanceof Error ? error.message : String(error)}`);
+            return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, `Failed to list roots: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
     handleCancellation(request) {
@@ -1238,23 +1241,23 @@ export class MCPProtocolHandler {
         try {
             // Check auth requirements if enabled
             if (this.authConfig.requireAuthForToolsList && !req?.user) {
-                return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Authentication required for resources/templates/list');
+                return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Authentication required for resources/templates/list');
             }
             // Extract user info for permission checks
             const userInfo = this.extractUserInfo(req);
             const userScopes = this.extractUserScopes(req);
             // Get all registered templates from the resource registry
-            const allTemplates = mcpResourceRegistry.getAllTemplates();
+            const allTemplates = mcp_resource_registry_js_1.mcpResourceRegistry.getAllTemplates();
             // Convert templates to MCP resource template format
             const templateList = [];
             for (const [resourceId, template] of allTemplates.entries()) {
                 // Get the corresponding resource to check access
-                const resource = mcpResourceRegistry.getResource(resourceId);
+                const resource = mcp_resource_registry_js_1.mcpResourceRegistry.getResource(resourceId);
                 if (!resource) {
                     continue; // Skip if resource doesn't exist
                 }
                 // Check if user has access to this resource template
-                const hasAccess = mcpResourceRegistry.checkResourceAccess(resourceId, {
+                const hasAccess = mcp_resource_registry_js_1.mcpResourceRegistry.checkResourceAccess(resourceId, {
                     email: userInfo?.email,
                     scopes: userScopes
                 });
@@ -1331,7 +1334,7 @@ export class MCPProtocolHandler {
                     _meta: templateMeta
                 });
             }
-            console.log(`📋 MCP resources/templates/list: Found ${templateList.length} accessible templates (user: ${redactEmail(userInfo?.email)})`);
+            console.log(`📋 MCP resources/templates/list: Found ${templateList.length} accessible templates (user: ${(0, redact_js_1.redactEmail)(userInfo?.email)})`);
             return {
                 jsonrpc: '2.0',
                 id: request.id,
@@ -1342,8 +1345,9 @@ export class MCPProtocolHandler {
         }
         catch (error) {
             console.error('❌ Error in handleResourcesTemplatesList:', error);
-            return this.createErrorResponse(request.id, ErrorCode.InternalError, 'Failed to list resource templates', error instanceof Error ? error.message : String(error));
+            return this.createErrorResponse(request.id, types_js_1.ErrorCode.InternalError, 'Failed to list resource templates', error instanceof Error ? error.message : String(error));
         }
     }
 }
+exports.MCPProtocolHandler = MCPProtocolHandler;
 //# sourceMappingURL=protocol-handler.js.map

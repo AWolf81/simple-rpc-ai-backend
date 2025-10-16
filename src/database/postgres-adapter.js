@@ -1,10 +1,16 @@
+"use strict";
 /**
  * PostgreSQL Database Adapter
  * Simple adapter for database operations using PostgreSQL
  */
-import { Pool } from 'pg';
-import winston from 'winston';
-export class PostgreSQLAdapter {
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PostgreSQLAdapter = void 0;
+const pg_1 = require("pg");
+const winston_1 = __importDefault(require("winston"));
+class PostgreSQLAdapter {
     pool;
     logger;
     constructor(config, logger) {
@@ -12,12 +18,12 @@ export class PostgreSQLAdapter {
         if (typeof config === 'string') {
             config = this.parseConnectionString(config);
         }
-        this.logger = logger || winston.createLogger({
+        this.logger = logger || winston_1.default.createLogger({
             level: 'info',
-            format: winston.format.simple(),
-            transports: [new winston.transports.Console()]
+            format: winston_1.default.format.simple(),
+            transports: [new winston_1.default.transports.Console()]
         });
-        this.pool = new Pool({
+        this.pool = new pg_1.Pool({
             host: config.host,
             port: config.port,
             database: config.database,
@@ -206,5 +212,6 @@ export class PostgreSQLAdapter {
         }
     }
 }
+exports.PostgreSQLAdapter = PostgreSQLAdapter;
 // PostgreSQL adapter - no aliases to avoid confusion
 //# sourceMappingURL=postgres-adapter.js.map

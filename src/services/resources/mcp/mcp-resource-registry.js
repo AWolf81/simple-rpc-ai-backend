@@ -1,15 +1,21 @@
+"use strict";
 /**
  * MCP Resource Registry - Flexible system for registering and managing MCP resources
  *
  * Allows package users to register custom resources with template helpers and dynamic content.
  */
-import { createMCPResourceHandler } from './mcp-resource-helpers.js';
-import { logger } from '../../../utils/logger.js';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MCPResourceHelpers = exports.GlobalResourceTemplates = exports.mcpResourceRegistry = exports.MCPResourceRegistry = void 0;
+exports.registerMCPResource = registerMCPResource;
+exports.registerMCPTemplate = registerMCPTemplate;
+exports.registerMCPProvider = registerMCPProvider;
+const mcp_resource_helpers_js_1 = require("./mcp-resource-helpers.js");
+const logger_js_1 = require("../../../utils/logger.js");
 /**
  * Flexible MCP Resource Registry
  * Allows registration of resources, providers, and templates
  */
-export class MCPResourceRegistry {
+class MCPResourceRegistry {
     resources = new Map();
     providers = new Map();
     templates = new Map();
@@ -40,21 +46,21 @@ export class MCPResourceRegistry {
         if (provider) {
             this.providers.set(resource.id, provider);
         }
-        logger.debug(`📝 Registered MCP resource: ${resource.id} (${resource.mimeType})`);
+        logger_js_1.logger.debug(`📝 Registered MCP resource: ${resource.id} (${resource.mimeType})`);
     }
     /**
      * Register a resource template for dynamic content generation
      */
     registerTemplate(resourceId, template) {
         this.templates.set(resourceId, template);
-        logger.debug(`📋 Registered MCP template: ${resourceId}`);
+        logger_js_1.logger.debug(`📋 Registered MCP template: ${resourceId}`);
     }
     /**
      * Register a resource provider function
      */
     registerProvider(resourceId, provider) {
         this.providers.set(resourceId, provider);
-        logger.debug(`🏭 Registered MCP provider: ${resourceId}`);
+        logger_js_1.logger.debug(`🏭 Registered MCP provider: ${resourceId}`);
     }
     /**
      * Get all registered resources
@@ -177,7 +183,7 @@ export class MCPResourceRegistry {
         this.providers.delete(resourceId);
         this.templates.delete(resourceId);
         if (removed) {
-            logger.debug(`🗑️ Unregistered MCP resource: ${resourceId}`);
+            logger_js_1.logger.debug(`🗑️ Unregistered MCP resource: ${resourceId}`);
         }
         return removed;
     }
@@ -189,7 +195,7 @@ export class MCPResourceRegistry {
             .filter(r => !r.builtin)
             .map(r => r.id);
         customResources.forEach(id => this.unregisterResource(id));
-        logger.debug(`🧹 Cleared ${customResources.length} custom resources`);
+        logger_js_1.logger.debug(`🧹 Cleared ${customResources.length} custom resources`);
     }
     /**
      * Get resource statistics
@@ -348,31 +354,32 @@ export class MCPResourceRegistry {
         // Log what was registered
         const registeredCount = (apiSchemasEnabled ? 1 : 0) + (securityGuidelinesEnabled ? 1 : 0);
         if (registeredCount > 0) {
-            logger.debug(`✅ Registered ${registeredCount} built-in MCP resource${registeredCount > 1 ? 's' : ''}`);
+            logger_js_1.logger.debug(`✅ Registered ${registeredCount} built-in MCP resource${registeredCount > 1 ? 's' : ''}`);
         }
     }
 }
+exports.MCPResourceRegistry = MCPResourceRegistry;
 // Global registry instance
-export const mcpResourceRegistry = new MCPResourceRegistry();
+exports.mcpResourceRegistry = new MCPResourceRegistry();
 // Helper functions for easy registration
-export function registerMCPResource(resource, provider) {
-    mcpResourceRegistry.registerResource(resource, provider);
+function registerMCPResource(resource, provider) {
+    exports.mcpResourceRegistry.registerResource(resource, provider);
 }
-export function registerMCPTemplate(resourceId, template) {
-    mcpResourceRegistry.registerTemplate(resourceId, template);
+function registerMCPTemplate(resourceId, template) {
+    exports.mcpResourceRegistry.registerTemplate(resourceId, template);
 }
-export function registerMCPProvider(resourceId, provider) {
-    mcpResourceRegistry.registerProvider(resourceId, provider);
+function registerMCPProvider(resourceId, provider) {
+    exports.mcpResourceRegistry.registerProvider(resourceId, provider);
 }
 /**
  * Global Resource Templates - Pre-built resource templates for common use cases
  */
-export class GlobalResourceTemplates {
+class GlobalResourceTemplates {
     /**
      * Create a secure file-reader resource that respects rootsManager
      */
     static createFileReader(rootManager) {
-        mcpResourceRegistry.registerResource({
+        exports.mcpResourceRegistry.registerResource({
             id: 'file-reader',
             name: 'Secure File Reader',
             description: 'Read files securely from configured root folders',
@@ -381,7 +388,7 @@ export class GlobalResourceTemplates {
             requireAuth: false,
             builtin: true
         });
-        mcpResourceRegistry.registerProvider('file-reader', {
+        exports.mcpResourceRegistry.registerProvider('file-reader', {
             generateContent: async (resourceId, context) => {
                 const { rootId, path, encoding = 'utf8' } = context || {};
                 // If no parameters provided, return usage documentation
@@ -435,13 +442,13 @@ export class GlobalResourceTemplates {
                 return true;
             }
         });
-        logger.debug('📁 Registered global file-reader resource with rootsManager integration');
+        logger_js_1.logger.debug('📁 Registered global file-reader resource with rootsManager integration');
     }
     /**
      * Create a root folders listing resource
      */
     static createRootFoldersLister(rootManager) {
-        mcpResourceRegistry.registerResource({
+        exports.mcpResourceRegistry.registerResource({
             id: 'root-folders',
             name: 'Available Root Folders',
             description: 'List all configured root folders and their access permissions',
@@ -450,7 +457,7 @@ export class GlobalResourceTemplates {
             requireAuth: false,
             builtin: true
         });
-        mcpResourceRegistry.registerProvider('root-folders', {
+        exports.mcpResourceRegistry.registerProvider('root-folders', {
             generateContent: async (resourceId, context) => {
                 try {
                     const rootFolders = rootManager.getClientRootFolders();
@@ -468,13 +475,13 @@ export class GlobalResourceTemplates {
                 }
             }
         });
-        logger.debug('📂 Registered global root-folders resource');
+        logger_js_1.logger.debug('📂 Registered global root-folders resource');
     }
     /**
      * Create a directory listing resource
      */
     static createDirectoryLister(rootManager) {
-        mcpResourceRegistry.registerResource({
+        exports.mcpResourceRegistry.registerResource({
             id: 'directory-listing',
             name: 'Directory Contents',
             description: 'List files and directories within configured root folders',
@@ -483,8 +490,8 @@ export class GlobalResourceTemplates {
             requireAuth: false,
             builtin: true
         });
-        mcpResourceRegistry.registerProvider('directory-listing', {
-            generateContent: createMCPResourceHandler({
+        exports.mcpResourceRegistry.registerProvider('directory-listing', {
+            generateContent: (0, mcp_resource_helpers_js_1.createMCPResourceHandler)({
                 id: 'directory-listing',
                 name: 'Directory Contents',
                 description: 'List files and directories within configured root folders',
@@ -544,7 +551,7 @@ export class GlobalResourceTemplates {
                 }
             })
         });
-        logger.debug('📋 Registered global directory-listing resource');
+        logger_js_1.logger.debug('📋 Registered global directory-listing resource');
     }
     /**
      * Register all global resource templates
@@ -553,11 +560,12 @@ export class GlobalResourceTemplates {
         this.createFileReader(rootManager);
         this.createRootFoldersLister(rootManager);
         this.createDirectoryLister(rootManager);
-        logger.debug('✅ Registered all global resource templates');
+        logger_js_1.logger.debug('✅ Registered all global resource templates');
     }
 }
+exports.GlobalResourceTemplates = GlobalResourceTemplates;
 // Export helper for creating resources
-export const MCPResourceHelpers = {
+exports.MCPResourceHelpers = {
     /**
      * Create a simple static text resource
      */
@@ -572,8 +580,8 @@ export const MCPResourceHelpers = {
             scopes: options.scopes || [],
             ...options
         };
-        mcpResourceRegistry.registerResource(resource);
-        mcpResourceRegistry.registerProvider(id, {
+        exports.mcpResourceRegistry.registerResource(resource);
+        exports.mcpResourceRegistry.registerProvider(id, {
             generateContent: () => content
         });
         return resource;
@@ -592,8 +600,8 @@ export const MCPResourceHelpers = {
             scopes: options.scopes || [],
             ...options
         };
-        mcpResourceRegistry.registerResource(resource);
-        mcpResourceRegistry.registerProvider(id, {
+        exports.mcpResourceRegistry.registerResource(resource);
+        exports.mcpResourceRegistry.registerProvider(id, {
             generateContent: generator
         });
         return resource;
@@ -613,8 +621,8 @@ export const MCPResourceHelpers = {
             scopes: resourceOptions.scopes || [],
             ...resourceOptions
         };
-        mcpResourceRegistry.registerResource(resource);
-        mcpResourceRegistry.registerTemplate(id, {
+        exports.mcpResourceRegistry.registerResource(resource);
+        exports.mcpResourceRegistry.registerTemplate(id, {
             template,
             defaultVars
         });

@@ -1,3 +1,4 @@
+"use strict";
 /**
  * MCP Security: Auth Enforcement + Resource Tracking (Day 5)
  *
@@ -7,10 +8,14 @@
  * - Usage quotas and billing integration
  * - Performance metrics tracking
  */
-import { SecurityLogger, SecurityEventType, SecuritySeverity } from './security-logger';
-import { logger as appLogger } from '../utils/logger.js';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AuthEnforcer = exports.DEFAULT_AUTH_ENFORCEMENT_CONFIG = exports.ResourceType = void 0;
+exports.getDefaultAuthEnforcer = getDefaultAuthEnforcer;
+exports.createAuthEnforcementMiddleware = createAuthEnforcementMiddleware;
+const security_logger_1 = require("./security-logger");
+const logger_js_1 = require("../utils/logger.js");
 // Resource types for tracking
-export var ResourceType;
+var ResourceType;
 (function (ResourceType) {
     ResourceType["AI_REQUEST"] = "ai_request";
     ResourceType["MCP_TOOL_CALL"] = "mcp_tool_call";
@@ -18,9 +23,9 @@ export var ResourceType;
     ResourceType["COMPUTATION_TIME"] = "computation_time";
     ResourceType["STORAGE_USAGE"] = "storage_usage";
     ResourceType["API_CALL"] = "api_call";
-})(ResourceType || (ResourceType = {}));
+})(ResourceType || (exports.ResourceType = ResourceType = {}));
 // Default configuration
-export const DEFAULT_AUTH_ENFORCEMENT_CONFIG = {
+exports.DEFAULT_AUTH_ENFORCEMENT_CONFIG = {
     enabled: true,
     strictMode: false,
     allowedAnonymousEndpoints: ['/health', '/mcp', '/trpc/ai.health'],
@@ -56,7 +61,7 @@ export const DEFAULT_AUTH_ENFORCEMENT_CONFIG = {
 /**
  * Authentication Enforcer and Resource Tracker
  */
-export class AuthEnforcer {
+class AuthEnforcer {
     config;
     securityLogger;
     resourceUsageLog = [];
@@ -64,16 +69,16 @@ export class AuthEnforcer {
     userQuotas = new Map(); // userId -> quota info
     performanceMetrics = new Map(); // endpoint -> response times
     constructor(config = {}, securityLogger) {
-        this.config = { ...DEFAULT_AUTH_ENFORCEMENT_CONFIG, ...config };
-        this.securityLogger = securityLogger || new SecurityLogger();
+        this.config = { ...exports.DEFAULT_AUTH_ENFORCEMENT_CONFIG, ...config };
+        this.securityLogger = securityLogger || new security_logger_1.SecurityLogger();
         if (this.config.enabled) {
             this.usageStats = this.initializeUsageStats();
             this.startAggregationProcess();
-            appLogger.debug('✅ Auth enforcement: Authentication enforcer and resource tracker initialized');
+            logger_js_1.logger.debug('✅ Auth enforcement: Authentication enforcer and resource tracker initialized');
         }
         else {
             this.usageStats = this.initializeUsageStats(); // Minimal stats even when disabled
-            appLogger.debug('ℹ️  Auth enforcement: Disabled (simple mode)');
+            logger_js_1.logger.debug('ℹ️  Auth enforcement: Disabled (simple mode)');
         }
     }
     /**
@@ -132,8 +137,8 @@ export class AuthEnforcer {
                     const authResult = await this.enforceAuthentication(req);
                     if (!authResult.success) {
                         await this.securityLogger.logSecurityEvent({
-                            eventType: SecurityEventType.AUTH_FAILURE,
-                            severity: SecuritySeverity.HIGH,
+                            eventType: security_logger_1.SecurityEventType.AUTH_FAILURE,
+                            severity: security_logger_1.SecuritySeverity.HIGH,
                             source: {
                                 ip: this.getClientIP(req),
                                 userAgent: req.get('User-Agent')
@@ -163,8 +168,8 @@ export class AuthEnforcer {
                     const quotaResult = await this.checkUserQuotas(req.user);
                     if (!quotaResult.allowed) {
                         await this.securityLogger.logSecurityEvent({
-                            eventType: SecurityEventType.SUSPICIOUS_REQUEST,
-                            severity: SecuritySeverity.MEDIUM,
+                            eventType: security_logger_1.SecurityEventType.SUSPICIOUS_REQUEST,
+                            severity: security_logger_1.SecuritySeverity.MEDIUM,
                             source: {
                                 ip: this.getClientIP(req),
                                 userAgent: req.get('User-Agent'),
@@ -201,7 +206,7 @@ export class AuthEnforcer {
                 next();
             }
             catch (error) {
-                appLogger.error('❌ Auth enforcement: Middleware error:', error);
+                logger_js_1.logger.error('❌ Auth enforcement: Middleware error:', error);
                 next(); // Don't block requests on enforcement errors
             }
         };
@@ -302,8 +307,8 @@ export class AuthEnforcer {
         const warningThreshold = 100 - this.config.quotaEnforcement.quotaBufferPercent;
         if (quotaUsagePercent >= warningThreshold) {
             await this.securityLogger.logSecurityEvent({
-                eventType: SecurityEventType.SUSPICIOUS_REQUEST,
-                severity: SecuritySeverity.LOW,
+                eventType: security_logger_1.SecurityEventType.SUSPICIOUS_REQUEST,
+                severity: security_logger_1.SecuritySeverity.LOW,
                 source: {
                     ip: 'system',
                     userId: user.userId,
@@ -351,8 +356,8 @@ export class AuthEnforcer {
         // Log high-value resource usage
         if (fullUsage.amount > 1000 || fullUsage.metadata.cost && fullUsage.metadata.cost > 10) {
             await this.securityLogger.logSecurityEvent({
-                eventType: SecurityEventType.ADMIN_ACTION,
-                severity: SecuritySeverity.LOW,
+                eventType: security_logger_1.SecurityEventType.ADMIN_ACTION,
+                severity: security_logger_1.SecuritySeverity.LOW,
                 source: {
                     ip: 'system',
                     userId: fullUsage.userId,
@@ -404,8 +409,8 @@ export class AuthEnforcer {
                 duration > this.config.performanceTracking.slowRequestThresholdMs) {
                 this.usageStats.performance.slowRequests++;
                 this.securityLogger.logSecurityEvent({
-                    eventType: SecurityEventType.ANOMALY_DETECTED,
-                    severity: SecuritySeverity.MEDIUM,
+                    eventType: security_logger_1.SecurityEventType.ANOMALY_DETECTED,
+                    severity: security_logger_1.SecuritySeverity.MEDIUM,
                     source: {
                         ip: this.getClientIP(req),
                         userAgent: req.get('User-Agent'),
@@ -513,7 +518,7 @@ export class AuthEnforcer {
         // Only log if there are actual entries to aggregate
         if (this.resourceUsageLog.length > 0) {
             // This could store aggregated data to database for long-term storage
-            appLogger.debug(`📊 Auth enforcement: Aggregated ${this.resourceUsageLog.length} usage entries`);
+            logger_js_1.logger.debug(`📊 Auth enforcement: Aggregated ${this.resourceUsageLog.length} usage entries`);
         }
     }
     /**
@@ -528,7 +533,7 @@ export class AuthEnforcer {
         this.resourceUsageLog = this.resourceUsageLog.filter(entry => entry.timestamp >= cutoffDate);
         const cleaned = initialCount - this.resourceUsageLog.length;
         if (cleaned > 0) {
-            appLogger.debug(`🧹 Auth enforcement: Cleaned up ${cleaned} old usage entries`);
+            logger_js_1.logger.debug(`🧹 Auth enforcement: Cleaned up ${cleaned} old usage entries`);
         }
     }
     /**
@@ -639,8 +644,8 @@ export class AuthEnforcer {
         const removed = initialCount - this.resourceUsageLog.length;
         if (removed > 0) {
             this.securityLogger.logSecurityEvent({
-                eventType: SecurityEventType.ADMIN_ACTION,
-                severity: SecuritySeverity.MEDIUM,
+                eventType: security_logger_1.SecurityEventType.ADMIN_ACTION,
+                severity: security_logger_1.SecuritySeverity.MEDIUM,
                 source: {
                     ip: 'admin-system',
                     userId: 'admin'
@@ -655,6 +660,7 @@ export class AuthEnforcer {
         return removed > 0;
     }
 }
+exports.AuthEnforcer = AuthEnforcer;
 /**
  * Default instance for easy use
  */
@@ -662,7 +668,7 @@ let defaultAuthEnforcer = null;
 /**
  * Get or create default auth enforcer instance
  */
-export function getDefaultAuthEnforcer(config, securityLogger) {
+function getDefaultAuthEnforcer(config, securityLogger) {
     if (!defaultAuthEnforcer) {
         defaultAuthEnforcer = new AuthEnforcer(config, securityLogger);
     }
@@ -671,7 +677,7 @@ export function getDefaultAuthEnforcer(config, securityLogger) {
 /**
  * Express middleware factory for auth enforcement
  */
-export function createAuthEnforcementMiddleware(config, securityLogger) {
+function createAuthEnforcementMiddleware(config, securityLogger) {
     const enforcer = new AuthEnforcer(config, securityLogger);
     return {
         middleware: enforcer.createAuthEnforcementMiddleware(),

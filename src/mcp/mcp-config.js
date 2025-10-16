@@ -1,12 +1,15 @@
+"use strict";
 /**
  * MCP Configuration Interface
  * Allows customization of prompts and resources in Simple RPC AI Backend
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MCPExtensionManager = void 0;
 /**
  * MCP Extension Manager
  * Handles merging of default and custom prompts/resources
  */
-export class MCPExtensionManager {
+class MCPExtensionManager {
     promptsConfig;
     resourcesConfig;
     constructor(config = {}) {
@@ -66,4 +69,5 @@ export class MCPExtensionManager {
         return this.resourcesConfig.templateHandlers || {};
     }
 }
+exports.MCPExtensionManager = MCPExtensionManager;
 //# sourceMappingURL=mcp-config.js.map

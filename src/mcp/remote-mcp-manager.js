@@ -1,11 +1,15 @@
+"use strict";
 /**
  * Remote MCP Server Manager
  *
  * Manages connections to multiple remote MCP servers and proxies requests.
  */
-import { EventEmitter } from 'events';
-import { createRemoteMCPClient } from './remote-mcp-client.js';
-export class RemoteMCPManager extends EventEmitter {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RemoteMCPManager = void 0;
+exports.createRemoteMCPManager = createRemoteMCPManager;
+const events_1 = require("events");
+const remote_mcp_client_js_1 = require("./remote-mcp-client.js");
+class RemoteMCPManager extends events_1.EventEmitter {
     clients = new Map();
     config;
     serverStatus = new Map();
@@ -42,7 +46,7 @@ export class RemoteMCPManager extends EventEmitter {
         if (this.clients.has(config.name)) {
             throw new Error(`Server ${config.name} already exists`);
         }
-        const client = createRemoteMCPClient(config);
+        const client = (0, remote_mcp_client_js_1.createRemoteMCPClient)(config);
         // Setup event handlers
         client.on('connected', () => {
             this.updateServerStatus(config.name, { connected: true, lastError: undefined });
@@ -217,10 +221,11 @@ export class RemoteMCPManager extends EventEmitter {
         return client?.isConnected() ?? false;
     }
 }
+exports.RemoteMCPManager = RemoteMCPManager;
 /**
  * Create a remote MCP manager
  */
-export function createRemoteMCPManager(config) {
+function createRemoteMCPManager(config) {
     return new RemoteMCPManager(config);
 }
 //# sourceMappingURL=remote-mcp-manager.js.map

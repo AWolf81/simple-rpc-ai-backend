@@ -56,7 +56,7 @@ declare const t: import("@trpc/server").TRPCRootObject<{
             res: Response;
             user: OpenSaaSJWTPayload | null;
             apiKey: string | null;
-        } | undefined;
+        };
         shape: import("@trpc/server").TRPCDefaultErrorShape;
     }): {
         data: {
@@ -74,15 +74,8 @@ declare const t: import("@trpc/server").TRPCRootObject<{
         apiKey: string | null;
     };
     meta: ExtendedMeta;
-    errorShape: {
-        data: {
-            code: import("@trpc/server").TRPC_ERROR_CODE_KEY;
-            httpStatus: number;
-        };
-        message: string;
-        code: import("@trpc/server").TRPC_ERROR_CODE_NUMBER;
-    };
-    transformer: true;
+    errorShape: import("@trpc/server").TRPCDefaultErrorShape;
+    transformer: false;
 }>;
 /**
  * Export reusable router and procedure helpers

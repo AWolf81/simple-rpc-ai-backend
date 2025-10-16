@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Remote MCP Client - Connect to external MCP servers
  *
@@ -7,10 +8,13 @@
  * - docker: Containerized servers
  * - http/https: Remote web servers
  */
-import { spawn } from 'child_process';
-import { EventEmitter } from 'events';
-import { resolveNodePackageRunner } from '../utils/node-package-runner.js';
-export class RemoteMCPClient extends EventEmitter {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RemoteMCPClient = void 0;
+exports.createRemoteMCPClient = createRemoteMCPClient;
+const child_process_1 = require("child_process");
+const events_1 = require("events");
+const node_package_runner_js_1 = require("../utils/node-package-runner.js");
+class RemoteMCPClient extends events_1.EventEmitter {
     config;
     process = null;
     connected = false;
@@ -56,7 +60,7 @@ export class RemoteMCPClient extends EventEmitter {
             throw new Error('uvx transport requires command');
         }
         const args = ['uvx', this.config.command, ...(this.config.args || [])];
-        this.process = spawn(args[0], args.slice(1), {
+        this.process = (0, child_process_1.spawn)(args[0], args.slice(1), {
             env: { ...process.env, ...this.config.env },
             stdio: ['pipe', 'pipe', 'pipe']
         });
@@ -70,9 +74,9 @@ export class RemoteMCPClient extends EventEmitter {
         if (!this.config.command) {
             throw new Error(`${preference} transport requires command`);
         }
-        const runner = resolveNodePackageRunner(preference);
+        const runner = (0, node_package_runner_js_1.resolveNodePackageRunner)(preference);
         const args = [...runner.args, this.config.command, ...(this.config.args || [])];
-        this.process = spawn(runner.command, args, {
+        this.process = (0, child_process_1.spawn)(runner.command, args, {
             env: { ...process.env, ...this.config.env },
             stdio: ['pipe', 'pipe', 'pipe']
         });
@@ -92,7 +96,7 @@ export class RemoteMCPClient extends EventEmitter {
             ...(this.config.containerArgs || []),
             this.config.image
         ];
-        this.process = spawn(args[0], args.slice(1), {
+        this.process = (0, child_process_1.spawn)(args[0], args.slice(1), {
             env: { ...process.env, ...this.config.env },
             stdio: ['pipe', 'pipe', 'pipe']
         });
@@ -327,10 +331,11 @@ export class RemoteMCPClient extends EventEmitter {
         return this.connected;
     }
 }
+exports.RemoteMCPClient = RemoteMCPClient;
 /**
  * Create a remote MCP client from config
  */
-export function createRemoteMCPClient(config) {
+function createRemoteMCPClient(config) {
     return new RemoteMCPClient(config);
 }
 //# sourceMappingURL=remote-mcp-client.js.map

@@ -53,7 +53,8 @@
   "bin": {
     "simple-rpc-dev-panel": "./dist/tools/dev-panel.js",
     "simple-rpc-gen-methods": "./dist/tools/bin/generate-trpc-methods.js",
-    "check-mcp-security": "./dist/tools/check-mcp-security.js"
+    "check-mcp-security": "./dist/tools/check-mcp-security.js",
+    "simple-agent": "./tools/simple-agent/src/cli.ts"
   },
   "exports": {
     ".": {

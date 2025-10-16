@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Centralized logging utility with configurable log levels
  *
@@ -8,14 +9,16 @@
  * - 'info': Errors, warnings, and info (default for production)
  * - 'debug': All logs including debug messages (default for development)
  */
-export var LogLevel;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.logger = exports.LogLevel = void 0;
+var LogLevel;
 (function (LogLevel) {
     LogLevel[LogLevel["SILENT"] = 0] = "SILENT";
     LogLevel[LogLevel["ERROR"] = 1] = "ERROR";
     LogLevel[LogLevel["WARN"] = 2] = "WARN";
     LogLevel[LogLevel["INFO"] = 3] = "INFO";
     LogLevel[LogLevel["DEBUG"] = 4] = "DEBUG";
-})(LogLevel || (LogLevel = {}));
+})(LogLevel || (exports.LogLevel = LogLevel = {}));
 class Logger {
     level;
     constructor() {
@@ -82,5 +85,5 @@ class Logger {
     }
 }
 // Export singleton instance
-export const logger = new Logger();
+exports.logger = new Logger();
 //# sourceMappingURL=logger.js.map

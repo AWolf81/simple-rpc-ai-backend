@@ -1,9 +1,12 @@
-import { z } from 'zod';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.zodSchemaToJson = zodSchemaToJson;
+const zod_1 = require("zod");
 /**
  * Convert a Zod schema to a JSON Schema representation using Zod's built-in generator.
  * Normalizes root $ref structures so consumers can rely on standard object shapes.
  */
-export function zodSchemaToJson(schema) {
+function zodSchemaToJson(schema) {
     // In Zod 4, _def.typeName is not available. Check by constructor name instead
     const constructorName = schema?.constructor?.name;
     // Handle void/undefined schemas (return empty object)
@@ -15,7 +18,7 @@ export function zodSchemaToJson(schema) {
             description: 'No parameters required.',
         };
     }
-    const jsonSchema = z.toJSONSchema(schema, { target: 'draft-7' });
+    const jsonSchema = zod_1.z.toJSONSchema(schema, { target: 'draft-7' });
     return normalizeRootSchema(jsonSchema);
 }
 function normalizeRootSchema(schema) {

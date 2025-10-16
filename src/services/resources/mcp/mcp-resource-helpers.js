@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Common Error Handlers and Utilities for MCP Resources
  *
@@ -5,10 +6,16 @@
  * for MCP resources, making it easy for package users to create
  * resources that provide helpful error messages instead of cryptic errors.
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.validateMCPParameters = validateMCPParameters;
+exports.generateMCPHelpText = generateMCPHelpText;
+exports.handleMCPResourceParameters = handleMCPResourceParameters;
+exports.createMissingParameterError = createMissingParameterError;
+exports.createMCPResourceHandler = createMCPResourceHandler;
 /**
  * Common parameter validation logic that ignores system metadata
  */
-export function validateMCPParameters(context, parameterSchema) {
+function validateMCPParameters(context, parameterSchema) {
     // System metadata properties to ignore
     const systemProperties = ['user', 'timestamp', 'auth', 'session'];
     // Extract user-provided parameters only
@@ -36,7 +43,7 @@ export function validateMCPParameters(context, parameterSchema) {
 /**
  * Generate comprehensive help text for an MCP resource
  */
-export function generateMCPHelpText(helpConfig) {
+function generateMCPHelpText(helpConfig) {
     const { id, name, description, parameters, additionalData = {} } = helpConfig;
     // Generate URI template
     const paramNames = Object.keys(parameters);
@@ -190,7 +197,7 @@ export function generateMCPHelpText(helpConfig) {
  * });
  * ```
  */
-export function handleMCPResourceParameters(context, helpConfig) {
+function handleMCPResourceParameters(context, helpConfig) {
     const validation = validateMCPParameters(context, helpConfig.parameters);
     return {
         showHelp: validation.showHelp,
@@ -202,7 +209,7 @@ export function handleMCPResourceParameters(context, helpConfig) {
 /**
  * Utility to create consistent error messages for missing parameters
  */
-export function createMissingParameterError(missingParams) {
+function createMissingParameterError(missingParams) {
     const paramList = missingParams.join(', ');
     const message = missingParams.length === 1
         ? `Required parameter missing: ${paramList}`
@@ -212,7 +219,7 @@ export function createMissingParameterError(missingParams) {
 /**
  * Quick helper for simple parameter validation with automatic help text
  */
-export function createMCPResourceHandler(helpConfig, implementation) {
+function createMCPResourceHandler(helpConfig, implementation) {
     return async (resourceId, context) => {
         const result = handleMCPResourceParameters(context, helpConfig);
         // Show help if any required parameters are missing
