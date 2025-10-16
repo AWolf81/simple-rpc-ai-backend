@@ -4,10 +4,10 @@
  * Manages configuration file in ~/.simple-agent/config.json
  */
 
-const Conf = require('conf');
-const os = require('os');
-const path = require('path');
-const fs = require('fs');
+import Conf from 'conf';
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
 
 export interface AgentConfig {
   // Server configuration
@@ -282,6 +282,4 @@ export class ConfigManager {
 }
 
 // Singleton instance
-const configManager = new ConfigManager();
-
-module.exports = { ConfigManager, configManager };
+export const configManager = new ConfigManager();

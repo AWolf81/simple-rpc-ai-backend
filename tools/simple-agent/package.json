@@ -1,6 +1,7 @@
 {
   "name": "simple-agent",
   "version": "0.1.0",
+  "type": "module",
   "description": "Terminal-based AI coding agent powered by simple-rpc-ai-backend",
   "main": "dist/index.js",
   "bin": {
@@ -9,7 +10,11 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.js"
+    "start": "tsx src/cli.ts",
+    "chat": "tsx src/cli.ts chat",
+    "exec": "tsx src/cli.ts exec",
+    "config": "tsx src/cli.ts config",
+    "providers": "tsx src/cli.ts providers"
   },
   "keywords": [
     "ai",

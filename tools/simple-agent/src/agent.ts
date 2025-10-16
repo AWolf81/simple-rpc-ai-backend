@@ -6,12 +6,12 @@
 
 import { configManager } from './config.js';
 
-export interface AgentMessage {
+interface AgentMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
-export interface AgentResponse {
+interface AgentResponse {
   content: string;
   usage: {
     promptTokens: number;
@@ -22,7 +22,7 @@ export interface AgentResponse {
   provider: string;
 }
 
-export class AgentClient {
+class AgentClient {
   private serverUrl: string;
   private conversationHistory: AgentMessage[] = [];
 
@@ -120,3 +120,5 @@ export class AgentClient {
     }
   }
 }
+
+export { AgentClient, AgentMessage, AgentResponse };

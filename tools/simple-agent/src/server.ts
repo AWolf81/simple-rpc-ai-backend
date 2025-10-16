@@ -4,7 +4,7 @@
  * Manages the simple-rpc-ai-backend server instance
  */
 
-const { configManager } = require('./config');
+import { configManager } from './config.js';
 
 // We'll import from the parent package
 type RpcAiServer = any;
@@ -139,6 +139,4 @@ export class ServerManager {
   }
 }
 
-const serverManager = new ServerManager();
-
-module.exports = { ServerManager, serverManager };
+export const serverManager = new ServerManager();
