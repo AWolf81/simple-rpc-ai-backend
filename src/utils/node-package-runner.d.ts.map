@@ -1,0 +1,1 @@
+{"version":3,"file":"node-package-runner.d.ts","sourceRoot":"","sources":["node-package-runner.ts"],"names":[],"mappings":"AAEA,MAAM,MAAM,iBAAiB,GAAG;IAC9B,OAAO,EAAE,MAAM,CAAC;IAChB,IAAI,EAAE,MAAM,EAAE,CAAC;IACf,MAAM,EAAE,KAAK,GAAG,UAAU,CAAC;CAC5B,CAAC;AAkBF,wBAAgB,wBAAwB,CAAC,SAAS,CAAC,EAAE,KAAK,GAAG,UAAU,GAAG,iBAAiB,CA4B1F"}
