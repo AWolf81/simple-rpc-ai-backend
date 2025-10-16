@@ -69,7 +69,35 @@ export interface RpcAiServerConfig {
     allowedPatterns?: string[];                      // Glob patterns allowed (e.g., "anthropic/*")
     blockedModels?: string[];                        // Specific models to block
   }>;
-  
+
+  // Agent Configuration (Claude Code SDK & OpenAI Agents SDK)
+  agents?: {
+    enabled?: boolean;                               // Enable agent functionality (default: false)
+    defaultSDK?: 'claude-code' | 'openai';          // Default agent SDK to use (default: 'claude-code')
+    enableClaudeCode?: boolean;                      // Enable Claude Code SDK adapter (default: true)
+    enableOpenAI?: boolean;                          // Enable OpenAI Agents SDK adapter (default: true)
+    claudeCode?: {
+      enableSkills?: boolean;                        // Enable skills support (default: true)
+      skillsDirectory?: string;                      // Directory containing SKILL.md files
+      defaultSkills?: Array<{                        // Pre-configured skills
+        id: string;
+        name: string;                                // Max 64 chars
+        description: string;                         // Max 1024 chars
+        level: 1 | 2 | 3;                           // Progressive disclosure level
+        instructions?: string;                       // Level 2 instructions (<5k tokens)
+        resources?: Array<{                          // Level 3 resources
+          type: 'file' | 'script' | 'reference';
+          path: string;
+          content?: string;
+        }>;
+      }>;
+    };
+    openai?: {
+      assistantId?: string;                          // OpenAI Assistant ID to use
+      instructions?: string;                         // Default instructions for agent
+    };
+  };
+
   // Secret Manager Configuration (for BYOK key storage)
   secretManager?: {
     type?: 'postgresql';
@@ -396,6 +424,7 @@ export class RpcAiServer {
   private oauthServer?: ReturnType<typeof createOAuthServer>['oauth'];
   private oauthStorage?: SessionStorage;
   private remoteMcpManager?: any; // RemoteMCPManager type
+  private agentService?: any; // AgentService type
 
   /**
    * Opinionated protocol configuration:
@@ -516,6 +545,15 @@ export class RpcAiServer {
       },
       modelRestrictions: config.modelRestrictions || {},  // Default: no model restrictions
 
+      // Agent configuration (disabled by default)
+      agents: {
+        enabled: false,
+        defaultSDK: 'claude-code',
+        enableClaudeCode: true,
+        enableOpenAI: true,
+        ...config.agents
+      },
+
       // Server workspace configuration (disabled by default)
       serverWorkspaces: config.serverWorkspaces
         ? {
@@ -628,7 +666,8 @@ export class RpcAiServer {
       this.config.mcp,
       this.config.modelRestrictions,
       workspaceConfig,
-      this.config.customRouters
+      this.config.customRouters,
+      this.config.agents
     );
 
     // Initialize tRPC to JSON-RPC bridge (if JSON-RPC is enabled)

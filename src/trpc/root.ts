@@ -16,6 +16,9 @@ import { createUserRouter } from '@src-trpc/routers/user';
 import { createBillingRouter } from '@src-trpc/routers/billing';
 import { createAuthRouter } from '@src-trpc/routers/auth';
 import { createAdminRouter } from '@src-trpc/routers/admin';
+import { createAgentRouter } from '@src-trpc/routers/agents';
+import { AgentService } from '@services/agents/agent-service';
+import type { AgentConfig } from '@services/agents/types';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { PostgreSQLAdapter } from '@database/postgres-adapter';
 import type { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
@@ -72,7 +75,15 @@ export function createAppRouter(
       watchIgnore?: string[];
     }>;
   },
-  customRouters?: { [namespace: string]: any }
+  customRouters?: { [namespace: string]: any },
+  agentConfig?: {
+    enabled?: boolean;
+    defaultSDK?: 'claude-code' | 'openai';
+    enableClaudeCode?: boolean;
+    enableOpenAI?: boolean;
+    claudeCode?: AgentConfig['claudeCode'];
+    openai?: AgentConfig['openai'];
+  }
 ): ReturnType<typeof router> {
   // Initialize services if database is available
   let virtualTokenService: VirtualTokenService | null = null;
@@ -136,8 +147,9 @@ export function createAppRouter(
     }
   }
 
-  // Create shared AI service instance only if MCP AI is enabled
-  const sharedAIService = mcpConfig?.ai?.enabled
+  // Create shared AI service instance for MCP and Agents
+  const needsSharedAIService = mcpConfig?.ai?.enabled || agentConfig?.enabled;
+  const sharedAIService = needsSharedAIService
     ? (() => {
         // Use MCP-specific configuration if useServerConfig is false
         if (mcpConfig.ai.useServerConfig === false) {
@@ -184,6 +196,27 @@ export function createAppRouter(
     modelRestrictions
   } as any);
 
+  // Initialize Agent Service if enabled
+  let agentService: AgentService | undefined;
+  if (agentConfig?.enabled && sharedAIService) {
+    try {
+      agentService = new AgentService(sharedAIService, {
+        defaultSDK: agentConfig.defaultSDK,
+        enableClaudeCode: agentConfig.enableClaudeCode,
+        enableOpenAI: agentConfig.enableOpenAI,
+        claudeCode: agentConfig.claudeCode,
+        openai: agentConfig.openai
+      });
+      // Initialize asynchronously - services should handle this
+      agentService.initialize().catch(error => {
+        logger.error('Failed to initialize agent service:', error);
+      });
+      logger.debug(`🤖 Agent service initialized`);
+    } catch (error) {
+      logger.error('Failed to create agent service:', error);
+    }
+  }
+
   // Build base routers object
   const baseRouters: Record<string, any> = {
     ai: aiRouter,
@@ -206,6 +239,20 @@ export function createAppRouter(
     logger.debug(`🔧 MCP router included`);
   } else {
     logger.debug(`🔧 MCP router excluded (disabled in config)`);
+  }
+
+  // Only include Agents router if enabled and agent service is available
+  if (agentConfig?.enabled && agentService) {
+    const agentsRouter = createAgentRouter({
+      agentService,
+      agentConfig
+    });
+    baseRouters.agents = agentsRouter;
+    logger.debug(`🤖 Agents router included`);
+  } else if (agentConfig?.enabled) {
+    logger.warn(`⚠️  Agents enabled but agent service not available (AI service may be missing)`);
+  } else {
+    logger.debug(`🤖 Agents router excluded (disabled in config)`);
   }
 
   // Merge custom routers if provided
