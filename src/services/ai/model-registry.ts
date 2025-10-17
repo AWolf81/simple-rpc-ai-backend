@@ -28,7 +28,7 @@ try {
   const openaiDataPath = path.resolve(__dirname, '../../data/openai-models.json');
   openaiModelsData = require(openaiDataPath);
 } catch (error) {
-  console.warn('OpenAI models data not found, using empty fallback');
+  logger.warn('OpenAI models data not found, using empty fallback');
   openaiModelsData = {};
 }
 
@@ -38,7 +38,7 @@ try {
   const huggingfaceDataPath = path.resolve(__dirname, '../../data/huggingface-models.json');
   huggingfaceModelsData = require(huggingfaceDataPath);
 } catch (error) {
-  console.warn('HuggingFace models data not found, using empty fallback');
+  logger.warn('HuggingFace models data not found, using empty fallback');
   huggingfaceModelsData = {};
 }
 
@@ -94,7 +94,7 @@ ${this.config.useRegistry ? `
         return await this.getCachedDefaultModel(provider);
       }
     } catch (error) {
-      console.warn('Failed to get default model for ' + provider + ':', error instanceof Error ? error.message : String(error));
+      logger.warn('Failed to get default model for ' + provider + ':', error instanceof Error ? error.message : String(error));
       return this.getFallbackDefaultModel(provider);
     }
   }
@@ -107,7 +107,7 @@ ${this.config.useRegistry ? `
         return await this.getCachedModels(provider);
       }
     } catch (error) {
-      console.warn('Failed to get models for ' + provider + ':', error instanceof Error ? error.message : String(error));
+      logger.warn('Failed to get models for ' + provider + ':', error instanceof Error ? error.message : String(error));
       return this.getFallbackModels(provider);
     }
   }
@@ -126,7 +126,7 @@ ${this.config.useRegistry ? `
         }
         
         if (!validation.valid && this.config.validationMode === 'warn') {
-          console.warn('⚠️ Model validation warnings for ' + provider + ':', validation.errors);
+          logger.warn('⚠️ Model validation warnings for ' + provider + ':', validation.errors);
         }
         
         // Special handling for Google - curated models with stable versions added
@@ -135,12 +135,12 @@ ${this.config.useRegistry ? `
           const curatedModels = await this.getCuratedGoogleModels(models);
           if (curatedModels.length > 0) {
             const selectedModel = curatedModels[0]; // Already sorted by priority
-            console.log('📡 Using curated Google model from registry: google/' + selectedModel);
+            logger.debug('📡 Using curated Google model from registry: google/' + selectedModel);
             return selectedModel;
           }
-          
+
           // If no curated models found, use fallback
-          console.log('📡 No curated Google models found, using fallback: google/gemini-2.0-flash');
+          logger.debug('📡 No curated Google models found, using fallback: google/gemini-2.0-flash');
           return 'gemini-2.0-flash';
         }
         
@@ -150,7 +150,7 @@ ${this.config.useRegistry ? `
           // Use the release date to construct the proper model ID
           const properModelId = await this.convertAnthropicModelId(models);
           if (properModelId) {
-            console.log('📡 Converted Anthropic model ID using release date:', properModelId);
+            logger.debug('📡 Converted Anthropic model ID using release date:', properModelId);
             return properModelId;
           } else {
             throw new Error('Could not convert Anthropic model ID from registry - no fallback available');
@@ -163,12 +163,12 @@ ${this.config.useRegistry ? `
           const curatedModels = await this.getCuratedOpenAIModels(models);
           if (curatedModels.length > 0) {
             const selectedModel = curatedModels[0]; // Already sorted by priority
-            console.log('📡 Using curated OpenAI model from registry: openai/' + selectedModel);
+            logger.debug('📡 Using curated OpenAI model from registry: openai/' + selectedModel);
             return selectedModel;
           }
-          
+
           // If no curated models found, use fallback
-          console.log('📡 No curated OpenAI models found, using fallback: openai/gpt-4o');
+          logger.debug('📡 No curated OpenAI models found, using fallback: openai/gpt-4o');
           return 'gpt-4o';
         }
         
@@ -177,12 +177,12 @@ ${this.config.useRegistry ? `
           const curatedModels = await this.getCuratedHuggingFaceModels(models);
           if (curatedModels.length > 0) {
             const selectedModel = curatedModels[0]; // Already sorted by priority
-            console.log('📡 Using curated Hugging Face model: huggingface/' + selectedModel);
+            logger.debug('📡 Using curated Hugging Face model: huggingface/' + selectedModel);
             return selectedModel;
           }
 
           // If no curated models found, use fallback
-          console.log('📡 No curated Hugging Face models found, using fallback: huggingface/qwen-qwen-2-5-14b-instruct');
+          logger.debug('📡 No curated Hugging Face models found, using fallback: huggingface/qwen-qwen-2-5-14b-instruct');
           return 'qwen-qwen-2-5-14b-instruct';
         }
 
@@ -199,24 +199,24 @@ ${this.config.useRegistry ? `
             const found = models.find(m => (m.id || m.name) === preferred);
             if (found) {
               const selectedModel = found.id || found.name;
-              console.log('📡 Using preferred OpenRouter model: openrouter/' + selectedModel);
+              logger.debug('📡 Using preferred OpenRouter model: openrouter/' + selectedModel);
               return selectedModel;
             }
           }
 
           // If no Claude 3.7 Sonnet found, use first available model
           const defaultModel = models[0]?.id || models[0]?.name;
-          console.log('📡 Using first available OpenRouter model: openrouter/' + defaultModel);
+          logger.debug('📡 Using first available OpenRouter model: openrouter/' + defaultModel);
           return defaultModel;
         }
         
         // For other providers, use the first model
         const defaultModel = models[0]?.id || models[0]?.name;
-        console.log('📡 Using live model from registry: ' + provider + '/' + defaultModel);
+        logger.debug('📡 Using live model from registry: ' + provider + '/' + defaultModel);
         return defaultModel;
       }
     } catch (error) {
-      console.warn('Registry unavailable for ' + provider + ', using fallback:', error instanceof Error ? error.message : String(error));
+      logger.warn('Registry unavailable for ' + provider + ', using fallback:', error instanceof Error ? error.message : String(error));
     }
     
     return this.getFallbackDefaultModel(provider);
@@ -245,7 +245,7 @@ ${this.config.useRegistry ? `
         this.cache.set(cacheKey, { data: productionModel.productionId, timestamp: Date.now() });
         return productionModel.productionId;
       } catch (error) {
-        console.warn('⚠️ Failed to get cached Anthropic model from hybrid registry:', error instanceof Error ? error.message : String(error));
+        logger.warn('⚠️ Failed to get cached Anthropic model from hybrid registry:', error instanceof Error ? error.message : String(error));
         throw new Error('Anthropic models require hybrid registry - cache miss and no fallback available');
       }
     }
@@ -269,7 +269,7 @@ ${this.config.useRegistry ? `
     }
 
     const fallback = fallbacks[provider] || 'unknown-model';
-    console.log('🔄 Using built-in fallback model: ' + provider + '/' + fallback);
+    logger.debug('🔄 Using built-in fallback model: ' + provider + '/' + fallback);
     return fallback;
   }
   
@@ -278,9 +278,9 @@ ${this.config.useRegistry ? `
       const registry = await import('@anolilab/ai-model-registry' as any);
       const providerName = this.mapProviderName(provider);
 
-      console.log('🔍 Fetching live models for provider:', providerName);
+      logger.debug('🔍 Fetching live models for provider:', providerName);
       const models = registry.getModelsByProvider?.(providerName) || [];
-      console.log('📊 Found', models.length, 'models for', providerName);
+      logger.debug('📊 Found', models.length, 'models for', providerName);
 
       // Special handling for Hugging Face - use curation system even with live models
       if (provider === 'huggingface') {
@@ -288,7 +288,7 @@ ${this.config.useRegistry ? `
       }
 
       if (models.length === 0) {
-        console.warn('⚠️ No models found for', providerName, '- falling back to built-in models');
+        logger.warn('⚠️ No models found for', providerName, '- falling back to built-in models');
         return this.getFallbackModels(provider);
       }
       
@@ -348,10 +348,10 @@ ${this.config.useRegistry ? `
           source: 'registry' as const
         }));
       
-      console.log('📡 Using live models from registry for', provider);
+      logger.debug('📡 Using live models from registry for', provider);
       return mappedModels;
     } catch (error) {
-      console.warn('❌ Error fetching live models for', provider + ':', error instanceof Error ? error.message : String(error));
+      logger.warn('❌ Error fetching live models for', provider + ':', error instanceof Error ? error.message : String(error));
       return this.getFallbackModels(provider);
     }
   }
@@ -465,7 +465,7 @@ ${this.config.useRegistry ? `
       ]
     };
 
-    console.log('🔄 Using built-in fallback models for ' + provider);
+    logger.debug('🔄 Using built-in fallback models for ' + provider);
     return fallbacks[provider] || [];
   }
   
@@ -493,7 +493,7 @@ ${this.config.useRegistry ? `
    * Returns production-safe versioned model ID for consistent behavior
    */
   private async convertAnthropicModelId(models: any[]): Promise<string | null> {
-    console.log('🔄 Using hybrid registry for production-safe model selection');
+    logger.debug('🔄 Using hybrid registry for production-safe model selection');
     
     try {
       // Use hybrid registry for production-safe model selection
@@ -504,36 +504,37 @@ ${this.config.useRegistry ? `
       });
       
       const productionModel = await hybridRegistry.getProductionModel('anthropic', 'balanced');
-      
-      console.log(`📡 Selected hybrid model: "${productionModel.id}" → "${productionModel.productionId}"`);
-      console.log(`📅 Release: ${productionModel.production.releaseDate}, Status: ${productionModel.production.status}`);
+
+      logger.debug(`📡 Selected hybrid model: "${productionModel.id}" → "${productionModel.productionId}"`);
+      logger.debug(`📅 Release: ${productionModel.production.releaseDate}, Status: ${productionModel.production.status}`);
       
       return productionModel.productionId;
-      
+
     } catch (error) {
-      console.warn('⚠️ Hybrid registry fallback failed, using legacy selection:', error.message);
+      logger.warn('⚠️ Hybrid registry fallback failed, using legacy selection:', error.message);
       
       // Fallback to legacy logic - only look for models we have production mappings for
-      const preferredModel = models.find(m => 
+      // Prefer newest stable models first, avoid deprecated models
+      const preferredModel = models.find(m =>
+        m.id === 'claude-sonnet-4-5' && !m.id.includes('deprecated')
+      ) || models.find(m =>
         m.id === 'claude-opus-4-1' && !m.id.includes('deprecated')
-      ) || models.find(m => 
+      ) || models.find(m =>
         m.id === 'claude-sonnet-4' && !m.id.includes('deprecated')
-      ) || models.find(m => 
+      ) || models.find(m =>
         m.id === 'claude-sonnet-3-7' && !m.id.includes('deprecated')
-      ) || models.find(m => 
+      ) || models.find(m =>
         m.id === 'claude-haiku-3-5' && !m.id.includes('deprecated')
-      ) || models.find(m => 
+      ) || models.find(m =>
         m.id === 'claude-haiku-3' && !m.id.includes('deprecated')
-      ) || models.find(m => 
-        m.id === 'claude-sonnet-3-5' && !m.id.includes('deprecated')  // Add as last resort (deprecated)
-      ) || models[0];
+      ) || models[0]; // Removed claude-sonnet-3-5 (deprecated)
       
       if (!preferredModel) {
         throw new Error('No Anthropic models found in registry');
       }
-      
+
       const cleanId = preferredModel.id.replace('-(deprecated)', '');
-      console.log(`📡 Legacy fallback: "${cleanId}"`);
+      logger.debug(`📡 Legacy fallback: "${cleanId}"`);
       return cleanId;
     }
     
@@ -577,9 +578,9 @@ ${this.config.useRegistry ? `
    */
   private async getCuratedOpenAIModels(models: any[]): Promise<string[]> {
     const openaiConfig = openaiModelsData;
-    
+
     if (!openaiConfig) {
-      console.warn('⚠️ No OpenAI curation config found, using fallback logic');
+      logger.warn('⚠️ No OpenAI curation config found, using fallback logic');
       return models
         .filter(m => {
           const id = m.id || m.name || '';
@@ -604,7 +605,7 @@ ${this.config.useRegistry ? `
         // Check if it's in excluded models
         const isExcluded = openaiConfig.excludedModels?.[modelId];
         if (isExcluded) {
-          console.warn(`🚫 Excluding OpenAI model "${modelId}": ${isExcluded.reason}`);
+          logger.warn(`🚫 Excluding OpenAI model "${modelId}": ${isExcluded.reason}`);
         }
       }
     }
@@ -614,7 +615,7 @@ ${this.config.useRegistry ? `
       .sort((a, b) => a.priority - b.priority)
       .map(m => m.id);
 
-    console.log(`📋 Curated OpenAI models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
+    logger.debug(`📋 Curated OpenAI models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
     return sortedModels;
   }
 
@@ -626,7 +627,7 @@ ${this.config.useRegistry ? `
     const huggingfaceConfig = huggingfaceModelsData;
 
     if (!huggingfaceConfig) {
-      console.warn('⚠️ No Hugging Face curation config found, using fallback logic');
+      logger.warn('⚠️ No Hugging Face curation config found, using fallback logic');
       return models
         .filter(m => {
           const id = m.id || m.name || '';
@@ -652,7 +653,7 @@ ${this.config.useRegistry ? `
         // Check if it's in excluded models
         const isExcluded = huggingfaceConfig.excludedModels?.[modelId];
         if (isExcluded) {
-          console.warn(`🚫 Excluding Hugging Face model "${modelId}": ${isExcluded.reason}`);
+          logger.warn(`🚫 Excluding Hugging Face model "${modelId}": ${isExcluded.reason}`);
         }
       }
     }
@@ -669,7 +670,7 @@ ${this.config.useRegistry ? `
             priority: modelConfig.priority || 999,
             source: 'extension'
           });
-          console.log(`➕ Adding extension Hugging Face model: ${modelId} (priority ${modelConfig.priority})`);
+          logger.debug(`➕ Adding extension Hugging Face model: ${modelId} (priority ${modelConfig.priority})`);
         }
       }
     }
@@ -679,9 +680,9 @@ ${this.config.useRegistry ? `
       .sort((a, b) => a.priority - b.priority)
       .map(m => m.id);
 
-    console.log(`📋 Curated Hugging Face models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
-    console.log(`🔧 Extension models: ${curatedModels.filter(m => m.source === 'extension').length}`);
-    console.log(`📡 Registry models: ${curatedModels.filter(m => m.source === 'registry').length}`);
+    logger.debug(`📋 Curated Hugging Face models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
+    logger.debug(`🔧 Extension models: ${curatedModels.filter(m => m.source === 'extension').length}`);
+    logger.debug(`📡 Registry models: ${curatedModels.filter(m => m.source === 'registry').length}`);
 
     return sortedModels;
   }
@@ -726,7 +727,7 @@ ${this.config.useRegistry ? `
       }
     }
 
-    console.log(`📋 Created ${detailedModels.length} detailed Hugging Face models`);
+    logger.debug(`📋 Created ${detailedModels.length} detailed Hugging Face models`);
     return detailedModels;
   }
 
@@ -756,7 +757,7 @@ ${this.config.useRegistry ? `
       if (curatedInfo) {
         // If it's experimental and has a stable equivalent, add the stable one instead
         if (curatedInfo.source === 'experimental' && 'stableEquivalent' in curatedInfo && curatedInfo.stableEquivalent) {
-          console.log(`🔄 Adding stable equivalent for experimental model: ${modelId} → ${curatedInfo.stableEquivalent}`);
+          logger.debug(`🔄 Adding stable equivalent for experimental model: ${modelId} → ${curatedInfo.stableEquivalent}`);
           curatedModels.push({
             id: curatedInfo.stableEquivalent,
             priority: curatedInfo.priority - 5 // Give stable version higher priority
@@ -777,7 +778,7 @@ ${this.config.useRegistry ? `
       if (!exists) {
         const curatedInfo = curatedGoogleModels[stableModel as keyof typeof curatedGoogleModels];
         if (curatedInfo) {
-          console.log(`➕ Adding missing stable Google model: ${stableModel}`);
+          logger.debug(`➕ Adding missing stable Google model: ${stableModel}`);
           curatedModels.push({
             id: stableModel,
             priority: curatedInfo.priority
@@ -791,7 +792,7 @@ ${this.config.useRegistry ? `
       .sort((a, b) => a.priority - b.priority)
       .map(m => m.id);
 
-    console.log(`📋 Curated Google models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
+    logger.debug(`📋 Curated Google models (${sortedModels.length}):`, sortedModels.slice(0, 3).join(', ') + '...');
     return sortedModels;
   }
   
@@ -804,7 +805,7 @@ ${this.config.useRegistry ? `
       // Parse the release date
       const date = new Date(releaseDate);
       if (isNaN(date.getTime())) {
-        console.warn('Invalid release date for Anthropic model:', releaseDate);
+        logger.warn('Invalid release date for Anthropic model:', releaseDate);
         return null;
       }
       
@@ -833,12 +834,12 @@ ${this.config.useRegistry ? `
       if (sdkFormat) {
         return `${sdkFormat}-${formattedDate}`;
       } else {
-        console.warn('Unknown Anthropic model format:', registryId);
+        logger.warn('Unknown Anthropic model format:', registryId);
         return null;
       }
-      
+
     } catch (error) {
-      console.warn('Error formatting Anthropic model ID:', error);
+      logger.warn('Error formatting Anthropic model ID:', error);
       return null;
     }
   }
@@ -886,7 +887,7 @@ ${this.config.useRegistry ? `
         changes
       };
     } catch (error) {
-      console.error('Failed to check for updates:', error);
+      logger.error('Failed to check for updates:', error);
       return { hasUpdates: false, changes: [] };
     }
   }

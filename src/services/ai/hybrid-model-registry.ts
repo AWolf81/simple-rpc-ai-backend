@@ -1,12 +1,13 @@
 /**
  * Hybrid Model Registry
- * 
+ *
  * Combines @anolilab/ai-model-registry metadata with production-safe versioned model IDs.
  * Provides DX-friendly interface with production guarantees.
  */
 
 import { getModelsByProvider } from '@anolilab/ai-model-registry';
 import productionModelsData from '../../data/production-models.json' with { type: 'json' };
+import { logger } from '../../utils/logger.js';
 
 interface ProductionModelData {
   productionId: string;
@@ -303,20 +304,20 @@ export class HybridModelRegistry {
 
     // Handle deprecated models
     if (this.config.warnOnDeprecated) {
-      console.warn(`⚠️ Deprecated model detected: ${model.id}`);
+      logger.warn(`⚠️ Deprecated model detected: ${model.id}`);
       if (model.production.recommendedReplacement) {
-        console.warn(`   📋 Recommended replacement: ${model.production.recommendedReplacement}`);
+        logger.warn(`   📋 Recommended replacement: ${model.production.recommendedReplacement}`);
       }
       if (model.production.deprecationReason) {
-        console.warn(`   📝 Reason: ${model.production.deprecationReason}`);
+        logger.warn(`   📝 Reason: ${model.production.deprecationReason}`);
       }
       if (model.production.deprecatedSince) {
-        console.warn(`   📅 Deprecated since: ${model.production.deprecatedSince}`);
+        logger.warn(`   📅 Deprecated since: ${model.production.deprecatedSince}`);
       }
     }
 
     if (!this.config.allowDeprecatedModels) {
-      console.warn(`❌ Excluding deprecated model: ${model.id}`);
+      logger.warn(`❌ Excluding deprecated model: ${model.id}`);
       return false;
     }
 

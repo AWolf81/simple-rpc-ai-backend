@@ -8,6 +8,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from './utils/logger.js';
 
 export interface DevPanelConfig {
   port?: number;
@@ -55,7 +56,7 @@ export async function startDevPanel(config: DevPanelConfig = {}): Promise<{
     // Handle stdout to detect when the panel is ready
     child.stdout?.on('data', (data: Buffer) => {
       const output = data.toString();
-      console.log(`[Dev Panel] ${output.trim()}`);
+      logger.debug(`[Dev Panel] ${output.trim()}`);
 
       // Look for the ready message
       if (output.includes('Development Panel ready') && !resolved) {
@@ -64,7 +65,7 @@ export async function startDevPanel(config: DevPanelConfig = {}): Promise<{
 
         // Auto-open browser if requested
         if (autoOpen) {
-          console.log(`💡 Open your browser to: ${url}`);
+          logger.info(`💡 Open your browser to: ${url}`);
           // Note: Browser auto-open disabled to avoid TypeScript module resolution errors
           // Package consumers can install 'open' package and customize this behavior
         }
@@ -80,7 +81,7 @@ export async function startDevPanel(config: DevPanelConfig = {}): Promise<{
 
     // Handle stderr
     child.stderr?.on('data', (data: Buffer) => {
-      console.error(`[Dev Panel Error] ${data.toString().trim()}`);
+      logger.error(`[Dev Panel Error] ${data.toString().trim()}`);
     });
 
     // Handle process exit
@@ -117,31 +118,27 @@ export async function createServerWithDevPanel(
   serverFactory: () => Promise<{ start: () => Promise<void>; stop: () => Promise<void> }>,
   devPanelConfig: DevPanelConfig = {}
 ) {
-  console.log('🚀 Starting RPC AI server...');
+  logger.info('🚀 Starting RPC AI server and dev panel...');
   const server = await serverFactory();
   await server.start();
 
-  console.log('🎛️ Starting development panel...');
   const devPanel = await startDevPanel({
     autoOpen: true,
     ...devPanelConfig
   });
 
-  console.log(`✅ Server and dev panel ready!`);
-  console.log(`   • Server: http://localhost:${devPanelConfig.serverPort || 8000}`);
-  console.log(`   • Dev Panel: ${devPanel.url}`);
+  logger.info(`✅ Server and dev panel ready!`);
+  logger.info(`   • Server: http://localhost:${devPanelConfig.serverPort || 8000}`);
+  logger.info(`   • Dev Panel: ${devPanel.url}`);
 
   return {
     server,
     devPanel,
     async stop() {
-      console.log('🛑 Stopping dev panel...');
+      logger.info('🛑 Stopping dev panel and server...');
       devPanel.stop();
-
-      console.log('🛑 Stopping server...');
       await server.stop();
-
-      console.log('✅ Everything stopped cleanly');
+      logger.info('✅ Everything stopped cleanly');
     }
   };
 }

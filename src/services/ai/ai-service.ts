@@ -116,7 +116,7 @@ function createHuggingFaceModel(modelId: string, config: string | HuggingFaceMod
             text = await tryTextGeneration();
           } catch (textGenError: any) {
             if (enableFallback && textGenError.message?.includes('conversational')) {
-              console.log('🔄 Switching to chat completion API for model:', modelId);
+              logger.debug('🔄 Switching to chat completion API for model:', modelId);
               text = await tryChatCompletion();
             } else {
               throw textGenError;
@@ -402,7 +402,7 @@ export class AIService {
     // Initialize MCP service if web search config is provided
     if (config.mcpConfig) {
       this.mcpService = new MCPService(config.mcpConfig);
-      console.log("service", this.mcpService)
+      logger.debug("service", this.mcpService)
     } else if (config.systemPrompts) {
       // If system prompts are configured, enable MCP for potential web search
       this.mcpService = new MCPService({ enableWebSearch: true });
@@ -433,7 +433,7 @@ export class AIService {
     if (modelToUse && providerToUse) {
       const deprecationCheck = this.modelRegistry.checkModelDeprecation(providerToUse, modelToUse);
       if (deprecationCheck.deprecated && deprecationCheck.warning) {
-        console.warn(deprecationCheck.warning);
+        logger.warn(deprecationCheck.warning);
       }
     }
 
@@ -514,14 +514,14 @@ export class AIService {
         }
       }
 
-      console.log('🚀 About to call generateText with:');
-      console.log(`   Model type: ${typeof model}`);
-      console.log(`   Model constructor: ${model.constructor?.name}`);
-      console.log(`   Model ID: ${(model as any)?.modelId || 'unknown'}`);
-      console.log(`   Model spec:`, (model as any)?.specificationVersion);
-      console.log(`   Model provider: ${(model as any)?.provider}`);
-      console.log(`   Generate options keys: ${Object.keys(generateOptions)}`);
-      console.log(`   Max tokens: ${generateOptions.maxTokens}`);
+      logger.debug('🚀 About to call generateText with:');
+      logger.debug(`   Model type: ${typeof model}`);
+      logger.debug(`   Model constructor: ${model.constructor?.name}`);
+      logger.debug(`   Model ID: ${(model as any)?.modelId || 'unknown'}`);
+      logger.debug(`   Model spec:`, (model as any)?.specificationVersion);
+      logger.debug(`   Model provider: ${(model as any)?.provider}`);
+      logger.debug(`   Generate options keys: ${Object.keys(generateOptions)}`);
+      logger.debug(`   Max tokens: ${generateOptions.maxTokens}`);
 
       let t4 = timing.checkpoint('Calling generateText (Vercel AI SDK)', t3);
       const result = await generateText(generateOptions);
@@ -570,7 +570,7 @@ export class AIService {
       const statusCode = error.statusCode || error.status;
       
       // Log detailed error for debugging
-      console.error(`🚨 ${provider.toUpperCase()} API Error:`, {
+      logger.error(`🚨 ${provider.toUpperCase()} API Error:`, {
         provider,
         model: modelForError,
         originalModel: executionConfig.model,
@@ -661,7 +661,7 @@ export class AIService {
         streamOptions.toolChoice = 'auto';
       }
 
-      console.log('🌊 Starting stream with model:', (model as any).modelId || 'unknown');
+      logger.debug('🌊 Starting stream with model:', (model as any).modelId || 'unknown');
 
       const result = await streamText(streamOptions);
 
@@ -715,7 +715,7 @@ export class AIService {
     // For OpenRouter, modify model name to enable web search if requested
     if (provider === 'openrouter' && enableWebSearch) {
       modelName = this.getOpenRouterWebSearchModel(modelName, true);
-      console.log(`🌐 Using OpenRouter web search model: ${modelName}`);
+      logger.debug(`🌐 Using OpenRouter web search model: ${modelName}`);
     }
 
     // If user provides API key (BYOK), create provider instance with their key
@@ -821,7 +821,7 @@ export class AIService {
   private async performMCPWebSearch(query: string): Promise<string> {
     try {
       logger.debug(`🔍 Starting MCP web search with query: "${query}"`);
-      console.log(`🕐 Search initiated at: ${new Date().toISOString()}`);
+      logger.debug(`🕐 Search initiated at: ${new Date().toISOString()}`);
 
       // For now, we'll implement a simple HTTP client to the MCP server
       // Later this can be integrated with the MCP service directly
@@ -834,11 +834,11 @@ export class AIService {
 
       logger.debug(`🔍 Formatting ${searchResult.length} search results...`);
       const formattedResults = this.formatMCPSearchResults(query, searchResult);
-      console.log(`✅ MCP web search completed successfully with ${formattedResults.length} characters of context`);
+      logger.debug(`✅ MCP web search completed successfully with ${formattedResults.length} characters of context`);
       return formattedResults;
       
     } catch (error: any) {
-      console.error('🚨 MCP web search failed:', {
+      logger.error('🚨 MCP web search failed:', {
         message: error.message,
         name: error.name
       });
@@ -852,7 +852,7 @@ export class AIService {
    */
   private async callMCPWebSearchServer(query: string): Promise<SearchResult[]> {
     try {
-      console.log(`📡 Calling MCP web search server with query: "${query}"`);
+      logger.debug(`📡 Calling MCP web search server with query: "${query}"`);
       
       if (!this.mcpService) {
         throw new Error('MCP service not initialized for web search');
@@ -870,7 +870,7 @@ export class AIService {
       );
 
       if (!webSearchTool) {
-        console.warn('No web search tool found in MCP servers');
+        logger.warn('No web search tool found in MCP servers');
         return [];
       }
 
@@ -892,11 +892,11 @@ export class AIService {
       
       // Convert MCP tool response to SearchResult format
       const results = this.convertMCPResultsToSearchResults(toolResponse.result);
-      console.log(`📡 MCP server returned ${results.length} results`);
+      logger.debug(`📡 MCP server returned ${results.length} results`);
       return results;
       
     } catch (error: any) {
-      console.error('📡 MCP web search server call failed:', {
+      logger.error('📡 MCP web search server call failed:', {
         message: error.message,
         name: error.name
       });
@@ -931,8 +931,8 @@ export class AIService {
       }
       formattedResults += '\n';
     });
-    
-    console.log(`✅ Formatted ${topResults.length} MCP search results`);
+
+    logger.debug(`✅ Formatted ${topResults.length} MCP search results`);
     return formattedResults;
   }
 
@@ -950,7 +950,7 @@ export class AIService {
     if (executionConfig.useWebSearch && executionConfig.webSearchPreference !== 'never') {
       if (executionConfig.webSearchPreference === 'ai-web-search') {
         // Use AI provider's native web search capabilities
-        console.log('🌐 Using AI provider native web search');
+        logger.debug('🌐 Using AI provider native web search');
         const webSearchConfig = {
           maxSearches: executionConfig.maxWebSearches || 5,
           allowedDomains: executionConfig.allowedDomains,
@@ -1140,7 +1140,7 @@ The tools will be available during our conversation. Call them when needed to ga
         });
         
       } catch (error) {
-        console.error(`🚨 Tool execution failed for ${toolCall.toolName}:`, error);
+        logger.error(`🚨 Tool execution failed for ${toolCall.toolName}:`, error);
         toolResults.push({
           toolCallId: toolCall.toolCallId,
           toolName: toolCall.toolName,
@@ -1229,7 +1229,7 @@ The tools will be available during our conversation. Call them when needed to ga
     } else if (mcpResults.data && Array.isArray(mcpResults.data)) {
       results = mcpResults.data;
     } else {
-      console.warn('Unexpected MCP results format:', mcpResults);
+      logger.warn('Unexpected MCP results format:', mcpResults);
       return [];
     }
     
@@ -1263,7 +1263,7 @@ The tools will be available during our conversation. Call them when needed to ga
     // Try to find in configured system prompts
     const configuredPrompt = this.systemPrompts[promptId.toLowerCase()];
     if (configuredPrompt) {
-      console.log(`📋 Using configured prompt: ${promptId}`);
+      logger.debug(`📋 Using configured prompt: ${promptId}`);
       return configuredPrompt;
     }
 
@@ -1386,7 +1386,7 @@ The tools will be available during our conversation. Call them when needed to ga
 
     // If no mapping found and it doesn't look like a valid model, use default
     if (!modelName.includes('gemini') && !modelName.includes('palm')) {
-      console.warn(`⚠️ Unknown Google model '${modelName}', using default 'models/gemini-2.0-flash'`);
+      logger.warn(`⚠️ Unknown Google model '${modelName}', using default 'models/gemini-2.0-flash'`);
       return 'models/gemini-2.0-flash';
     }
 
@@ -1598,7 +1598,7 @@ The tools will be available during our conversation. Call them when needed to ga
     try {
       return hybridRegistry.getProductionModelId(modelId, provider);
     } catch (error) {
-      console.warn('Failed to resolve production model id', {
+      logger.warn('Failed to resolve production model id', {
         provider,
         modelId,
         error: error instanceof Error ? error.message : String(error)

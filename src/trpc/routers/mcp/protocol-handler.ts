@@ -147,7 +147,7 @@ export class MCPProtocolHandler {
       const isWhitelisted = this.namespaceWhitelist!.includes(namespace);
 
       if (!isWhitelisted) {
-        console.log(`🚫 Tool ${tool.fullName} filtered out: namespace "${namespace}" not in whitelist [${this.namespaceWhitelist!.join(', ')}]`);
+        logger.debug(`🚫 Tool ${tool.fullName} filtered out: namespace "${namespace}" not in whitelist [${this.namespaceWhitelist!.join(', ')}]`);
       }
 
       return isWhitelisted;
@@ -283,18 +283,18 @@ export class MCPProtocolHandler {
     if (this.jwtMiddleware) enabledFeatures.push('JWT auth');
 
     if (enabledFeatures.length === 0) {
-      console.log(`🧪 MCP endpoint ready at ${path} (ALL SECURITY DISABLED FOR TESTING)`);
+      logger.info(`🧪 MCP endpoint ready at ${path} (ALL SECURITY DISABLED FOR TESTING)`);
     } else if (this.jwtMiddleware) {
-      console.log(`✅ MCP endpoint ready at ${path} (with ${enabledFeatures.join(', ')})`);
+      logger.info(`✅ MCP endpoint ready at ${path} (with ${enabledFeatures.join(', ')})`);
     } else {
-      console.log(`⚠️  MCP endpoint ready at ${path} (${enabledFeatures.join(', ')} enabled, NO JWT AUTH)`);
+      logger.warn(`⚠️  MCP endpoint ready at ${path} (${enabledFeatures.join(', ')} enabled, NO JWT AUTH)`);
       if (enabledFeatures.length > 0) {
-        console.log(`🔒 SECURITY WARNING: MCP authentication is disabled!`);
-        console.log(`   This allows unrestricted access to all MCP tools and data.`);
-        console.log(`   For production use, enable authentication by configuring:`);
-        console.log(`   • OpenSaaS JWT: Set opensaas.enabled = true with publicKey`);
-        console.log(`   • Or implement custom JWT middleware`);
-        console.log(`   • See docs: specs/features/mcp-oauth-authentication.md`);
+        logger.warn(`🔒 SECURITY WARNING: MCP authentication is disabled!`);
+        logger.warn(`   This allows unrestricted access to all MCP tools and data.`);
+        logger.warn(`   For production use, enable authentication by configuring:`);
+        logger.warn(`   • OpenSaaS JWT: Set opensaas.enabled = true with publicKey`);
+        logger.warn(`   • Or implement custom JWT middleware`);
+        logger.warn(`   • See docs: specs/features/mcp-oauth-authentication.md`);
       }
     }
   }
@@ -345,7 +345,7 @@ export class MCPProtocolHandler {
           },
           id: null
         });
-        console.error(`🔒 DNS rebinding protection: ${validationError}`);
+        logger.error(`🔒 DNS rebinding protection: ${validationError}`);
         return;
       }
 
@@ -441,7 +441,7 @@ export class MCPProtocolHandler {
 
     const hasClientRootsCapability = this.clientCapabilities.roots?.listChanged === true;
 
-    console.log('🔗 MCP Initialize:', {
+    logger.debug('🔗 MCP Initialize:', {
       clientSupportsRoots: hasClientRootsCapability,
       clientCapabilities: this.clientCapabilities
     });
@@ -463,7 +463,7 @@ export class MCPProtocolHandler {
     // The client should call roots/list on the server to discover client roots
     // We only add this for debugging/compatibility if explicitly requested
     if (hasClientRootsCapability) {
-      console.log('📋 Client supports roots - server will accept roots/list calls');
+      logger.debug('📋 Client supports roots - server will accept roots/list calls');
     }
 
     return {
@@ -569,14 +569,14 @@ export class MCPProtocolHandler {
         }
       }
     } catch (error) {
-      console.error('Error extracting MCP tools from tRPC:', error);
+      logger.error('Error extracting MCP tools from tRPC:', error);
     }
 
     // Apply namespace whitelist filtering
     const filteredTools = this.applyNamespaceWhitelist(tools);
 
     if (this.namespaceWhitelist && this.namespaceWhitelist.length > 0) {
-      console.log(`🔍 Namespace filtering: ${tools.length} tools found, ${filteredTools.length} after whitelist filter [${this.namespaceWhitelist.join(', ')}]`);
+      logger.debug(`🔍 Namespace filtering: ${tools.length} tools found, ${filteredTools.length} after whitelist filter [${this.namespaceWhitelist.join(', ')}]`);
     }
 
     return filteredTools;
@@ -640,7 +640,7 @@ export class MCPProtocolHandler {
         }
       }
     } catch (error) {
-      console.error('Error extracting MCP prompts from tRPC:', error);
+      logger.error('Error extracting MCP prompts from tRPC:', error);
     }
 
     return prompts;
@@ -679,7 +679,7 @@ export class MCPProtocolHandler {
         additionalProperties: false
       };
     } catch (error) {
-      console.error('Failed to extract input schema:', error);
+      logger.error('Failed to extract input schema:', error);
       return {
         type: 'object',
         properties: {},
@@ -783,7 +783,7 @@ export class MCPProtocolHandler {
       };
 
     } catch (error) {
-      console.error('❌ Error in handleToolsList:', error);
+      logger.error('❌ Error in handleToolsList:', error);
       return this.createErrorResponse(
         request.id,
         ErrorCode.InternalError,
@@ -1070,7 +1070,7 @@ export class MCPProtocolHandler {
       };
 
     } catch (error) {
-      console.error('❌ Error in handlePromptsList:', error);
+      logger.error('❌ Error in handlePromptsList:', error);
       return this.createErrorResponse(
         request.id,
         ErrorCode.InternalError,
@@ -1362,7 +1362,7 @@ export class MCPProtocolHandler {
       };
 
     } catch (error) {
-      console.error('❌ Error in handleLegacyPromptsList:', error);
+      logger.error('❌ Error in handleLegacyPromptsList:', error);
       return this.createErrorResponse(
         request.id,
         ErrorCode.InternalError,
@@ -1416,7 +1416,7 @@ export class MCPProtocolHandler {
       };
 
     } catch (error) {
-      console.error('❌ Error in handleResourcesList:', error);
+      logger.error('❌ Error in handleResourcesList:', error);
       return this.createErrorResponse(
         request.id,
         ErrorCode.InternalError,
@@ -1448,7 +1448,7 @@ export class MCPProtocolHandler {
         );
       }
 
-      console.log(`📖 MCP Resource Read: ${uri} (user: ${redactEmail(req?.user?.email)})`);
+      logger.debug(`📖 MCP Resource Read: ${uri} (user: ${redactEmail(req?.user?.email)})`);
 
       // Extract user info for permission checks
       const userInfo = this.extractUserInfo(req);
@@ -1535,7 +1535,7 @@ export class MCPProtocolHandler {
 
       const { content: resourceContent, mimeType } = resourceResult;
 
-      console.log(`✅ Resource ${uri} read successfully (${resourceContent.length} chars)`);
+      logger.debug(`✅ Resource ${uri} read successfully (${resourceContent.length} chars)`);
 
       return {
         jsonrpc: '2.0',
@@ -1552,7 +1552,7 @@ export class MCPProtocolHandler {
       };
 
     } catch (error) {
-      console.error(`❌ Error reading resource ${request.params?.uri}:`, error);
+      logger.error(`❌ Error reading resource ${request.params?.uri}:`, error);
       return this.createErrorResponse(
         request.id,
         ErrorCode.InternalError,
@@ -1569,7 +1569,7 @@ export class MCPProtocolHandler {
 
       if (!hasClientRootsCapability) {
         // Client does not support roots capability
-        console.log('❌ MCP roots/list: Client does not support roots capability');
+        logger.debug('❌ MCP roots/list: Client does not support roots capability');
         return this.createErrorResponse(
           request.id,
           ErrorCode.MethodNotFound,
@@ -1588,10 +1588,10 @@ export class MCPProtocolHandler {
       // In a full implementation, this might return roots that were registered
       // via the registerClientWorkspace tool.
 
-      console.log('📋 MCP roots/list: Client supports roots capability');
-      console.log('📋 Returning empty list (no client roots registered with server)');
-      console.log('ℹ️  Use registerClientWorkspace tool to register client roots');
-      console.log('ℹ️  For server-managed directories, use getServerWorkspaces tool instead');
+      logger.debug('📋 MCP roots/list: Client supports roots capability');
+      logger.debug('📋 Returning empty list (no client roots registered with server)');
+      logger.debug('ℹ️  Use registerClientWorkspace tool to register client roots');
+      logger.debug('ℹ️  For server-managed directories, use getServerWorkspaces tool instead');
 
       return {
         jsonrpc: '2.0',
@@ -1601,7 +1601,7 @@ export class MCPProtocolHandler {
         }
       };
     } catch (error) {
-      console.error('❌ MCP roots/list error:', error);
+      logger.error('❌ MCP roots/list error:', error);
       return this.createErrorResponse(
         request.id,
         ErrorCode.InternalError,
@@ -1627,8 +1627,8 @@ export class MCPProtocolHandler {
   }
 
   private handleRootsListChanged(request: any) {
-    console.log('🗂️ MCP notification/roots/list_changed received');
-    console.log('📋 Client has updated their exposed workspace roots');
+    logger.debug('🗂️ MCP notification/roots/list_changed received');
+    logger.debug('📋 Client has updated their exposed workspace roots');
 
     // Note: This notification indicates that the client has changed their
     // list of exposed workspace roots. The server should call roots/list
@@ -1756,7 +1756,7 @@ export class MCPProtocolHandler {
         });
       }
 
-      console.log(`📋 MCP resources/templates/list: Found ${templateList.length} accessible templates (user: ${redactEmail(userInfo?.email)})`);
+      logger.debug(`📋 MCP resources/templates/list: Found ${templateList.length} accessible templates (user: ${redactEmail(userInfo?.email)})`);
 
       return {
         jsonrpc: '2.0',
@@ -1767,7 +1767,7 @@ export class MCPProtocolHandler {
       };
 
     } catch (error) {
-      console.error('❌ Error in handleResourcesTemplatesList:', error);
+      logger.error('❌ Error in handleResourcesTemplatesList:', error);
       return this.createErrorResponse(
         request.id,
         ErrorCode.InternalError,

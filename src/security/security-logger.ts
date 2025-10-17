@@ -246,7 +246,7 @@ export class SecurityLogger {
   private initializeLogger() {
     // Ensure log directory exists
     const logDir = path.dirname(this.config.logFile);
-    fs.mkdir(logDir, { recursive: true }).catch(console.error);
+    fs.mkdir(logDir, { recursive: true }).catch(error => appLogger.error('Failed to create log directory:', error));
 
     this.logger = winston.createLogger({
       level: this.config.logLevel,
@@ -343,7 +343,7 @@ export class SecurityLogger {
     
     // Prevent infinite recursion by checking if we're already in a logging context
     if (this.isLogging) {
-      console.warn('⚠️ Prevented recursive security logging call');
+      appLogger.warn('⚠️ Prevented recursive security logging call');
       return;
     }
 
@@ -495,7 +495,7 @@ export class SecurityLogger {
         
         next();
       } catch (error) {
-        console.error('❌ Security logging: Network filter error:', error);
+        appLogger.error('❌ Security logging: Network filter error:', error);
         // Don't block on filter errors, just log them
         next();
       }
@@ -753,7 +753,7 @@ export class SecurityLogger {
           }
         }
       } catch (error) {
-        console.error(`❌ Security logging: Custom rule error (${rule.name}):`, error);
+        appLogger.error(`❌ Security logging: Custom rule error (${rule.name}):`, error);
       }
     }
 
@@ -962,12 +962,12 @@ export class SecurityLogger {
     try {
       if (this.config.alerts.webhook) {
         // Send webhook alert (implement based on your webhook service)
-        console.log(`🚨 Security alert: ${message}`);
+        appLogger.info(`🚨 Security alert: ${message}`);
       }
       
       if (this.config.alerts.email) {
         // Send email alert (implement based on your email service)
-        console.log(`📧 Security alert email: ${message}`);
+        appLogger.info(`📧 Security alert email: ${message}`);
       }
       
       // Log the alert
@@ -983,7 +983,7 @@ export class SecurityLogger {
       });
       
     } catch (error) {
-      console.error('❌ Security logging: Failed to send alert:', error);
+      appLogger.error('❌ Security logging: Failed to send alert:', error);
     }
   }
 
@@ -1068,10 +1068,10 @@ export class SecurityLogger {
       }
       
       // Send to SIEM (implement based on your SIEM system)
-      console.log(`📊 SIEM: ${JSON.stringify(payload)}`);
+      appLogger.info(`📊 SIEM: ${JSON.stringify(payload)}`);
       
     } catch (error) {
-      console.error('❌ Security logging: Failed to send to SIEM:', error);
+      appLogger.error('❌ Security logging: Failed to send to SIEM:', error);
     }
   }
 

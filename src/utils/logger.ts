@@ -26,8 +26,8 @@ class Logger {
 
   private parseLogLevel(level?: string): LogLevel {
     if (!level) {
-      // Default to INFO in production, DEBUG in development
-      return process.env.NODE_ENV === 'production' ? LogLevel.INFO : LogLevel.DEBUG;
+      // Default to WARN for minimal noise (use LOG_LEVEL=info or LOG_LEVEL=debug for more verbose output)
+      return LogLevel.WARN;
     }
 
     switch (level.toLowerCase()) {

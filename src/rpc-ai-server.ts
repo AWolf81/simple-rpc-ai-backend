@@ -598,7 +598,7 @@ export class RpcAiServer {
             encryptionKey
           );
         } catch (error) {
-          console.error('❌ Failed to initialize PostgreSQL RPC Methods:', error);
+          logger.error('❌ Failed to initialize PostgreSQL RPC Methods:', error);
         }
       }
     }
@@ -653,7 +653,7 @@ export class RpcAiServer {
       : undefined;
 
     if (this.config.serverWorkspaces?.enabled && !workspaceConfig) {
-      console.warn('⚠️  serverWorkspaces.enabled is true but no workspace paths are configured. Skipping workspace API initialization.');
+      logger.warn('⚠️  serverWorkspaces.enabled is true but no workspace paths are configured. Skipping workspace API initialization.');
     }
 
     this.router = createAppRouter(
@@ -677,7 +677,7 @@ export class RpcAiServer {
 
     // Initialize OAuth server (if enabled)
     if (this.config.oauth.enabled) {
-      console.log(`🔐 Setting up OAuth 2.0 server...`);
+      logger.info(`🔐 Setting up OAuth 2.0 server...`);
       
       const storageConfig = {
         type: this.config.oauth.sessionStorage?.type || 'memory' as const,
@@ -688,7 +688,7 @@ export class RpcAiServer {
       const { oauth, storage } = createOAuthServer(storageConfig, this.config.mcp?.adminUsers || []);
       this.oauthServer = oauth;
       this.oauthStorage = storage; // Store reference to session storage
-      console.log(`✅ OAuth 2.0 server initialized with ${storageConfig.type} storage`);
+      logger.info(`✅ OAuth 2.0 server initialized with ${storageConfig.type} storage`);
     }
 
     this.app = express();
@@ -1111,7 +1111,7 @@ export class RpcAiServer {
 
     // OAuth 2.0 Functional Endpoints (if OAuth is enabled)
     if (this.config.oauth.enabled && this.oauthServer) {
-      console.log(`🔗 Setting up OAuth 2.0 functional endpoints...`);
+      logger.info(`🔗 Setting up OAuth 2.0 functional endpoints...`);
 
       // Import OAuth route handlers
       const { handleProviderLogin, handleProviderCallback, createAuthenticateHandler, handleProviderSelection } = await import('./auth/oauth-middleware.js');
@@ -1136,7 +1136,7 @@ export class RpcAiServer {
       this.app.get('/oauth/authorize', async (req: Request, res: Response, next) => {
         // Generate a default state parameter if missing (OAuth 2.0 state is optional)
         if (!req.query.state) {
-          console.log(`⚠️ OAuth: No state parameter provided, generating default state`);
+          logger.warn(`⚠️ OAuth: No state parameter provided, generating default state`);
           req.query.state = 'auto-generated-state-' + crypto.randomBytes(16).toString('hex');
         }
         
@@ -1201,7 +1201,7 @@ export class RpcAiServer {
           // Store client directly using the OAuth storage instance
           await this.oauthStorage!.setClient(clientId, client);
 
-          console.log(`✅ OAuth: Registered dynamic client ${clientId}`);
+          logger.info(`✅ OAuth: Registered dynamic client ${clientId}`);
 
           // Return client registration response
           res.json({
@@ -1213,7 +1213,7 @@ export class RpcAiServer {
           });
           
         } catch (error) {
-          console.error('❌ OAuth client registration failed:', error);
+          logger.error('❌ OAuth client registration failed:', error);
           res.status(500).json({ 
             error: 'server_error',
             error_description: 'Failed to register client'
@@ -1221,7 +1221,7 @@ export class RpcAiServer {
         }
       });
 
-      console.log(`✅ OAuth 2.0 functional endpoints configured (including registration)`);
+      logger.info(`✅ OAuth 2.0 functional endpoints configured (including registration)`);
     }
 
     // tRPC endpoint (if enabled)
@@ -1237,7 +1237,7 @@ export class RpcAiServer {
               logger.error(`❌ tRPC failed on ${path ?? "<no-path>"}: ${error.code} - ${error.message}`);
             } else {
               // In development, log full error for debugging
-              console.error(`❌ tRPC failed on ${path ?? "<no-path>"}:`, error);
+              logger.error(`❌ tRPC failed on ${path ?? "<no-path>"}:`, error);
             }
           },
         })
@@ -1373,7 +1373,7 @@ export class RpcAiServer {
           .digest('hex');
 
         if (signature !== `sha256=${expectedSignature}`) {
-          console.error('❌ Invalid webhook signature');
+          logger.error('❌ Invalid webhook signature');
           res.status(401).json({ error: 'Invalid signature' });
           return;
         }
@@ -1425,16 +1425,16 @@ export class RpcAiServer {
               webhookData
             );
 
-            console.log(`✅ Processed subscription: ${tokensPurchased} tokens for user ${userId}`);
+            logger.info(`✅ Processed subscription: ${tokensPurchased} tokens for user ${userId}`);
           } else {
-            console.log(`✅ Processed one-time purchase: ${orderValue / 100} for user ${userId}`);
+            logger.info(`✅ Processed one-time purchase: ${orderValue / 100} for user ${userId}`);
           }
         }
       }
 
       res.status(200).json({ received: true });
     } catch (error) {
-      console.error('❌ Webhook processing error:', error);
+      logger.error('❌ Webhook processing error:', error);
       res.status(500).json({ error: 'Webhook processing failed' });
     }
   }
@@ -1451,7 +1451,7 @@ export class RpcAiServer {
       return;
     }
 
-    console.log('🔐 Initializing remote MCP servers...');
+    logger.info('🔐 Initializing remote MCP servers...');
 
     // Security scanning if enabled (default: true)
     const securityConfig = config.security || {};
@@ -1460,7 +1460,7 @@ export class RpcAiServer {
     const trustAnthropicServers = securityConfig.trustAnthropicServers !== false; // Default: true
 
     if (enableStartupScan) {
-      console.log('🔍 Scanning remote MCP packages for security risks...');
+      logger.info('🔍 Scanning remote MCP packages for security risks...');
 
       try {
         const { scanMCPServerPackage } = await import('./security/mcp-server-scanner.js');
@@ -1477,18 +1477,18 @@ export class RpcAiServer {
           }
 
           if (!server.command) {
-            console.warn(`⚠️ Server ${server.name}: No command specified, skipping scan`);
+            logger.warn(`⚠️ Server ${server.name}: No command specified, skipping scan`);
             continue;
           }
 
           // Check for custom override
           if (securityConfig.packageOverrides?.[server.command] === 'SKIP') {
-            console.log(`⏭️ Server ${server.name}: Skipping scan (configured override)`);
+            logger.info(`⏭️ Server ${server.name}: Skipping scan (configured override)`);
             continue;
           }
 
           try {
-            console.log(`   Scanning ${server.name} (${server.transport}:${server.command})...`);
+            logger.info(`   Scanning ${server.name} (${server.transport}:${server.command})...`);
             const result = await scanMCPServerPackage(server.command, server.transport);
             scanResults.set(server.name, result);
 
@@ -1500,7 +1500,7 @@ export class RpcAiServer {
             const override = securityConfig.packageOverrides?.[server.command];
             if (override && override !== 'SKIP') {
               finalLevel = override;
-              console.log(`   📋 Applied security override: ${result.level} → ${finalLevel}`);
+              logger.info(`   📋 Applied security override: ${result.level} → ${finalLevel}`);
             }
 
             // Apply Anthropic trust policy
@@ -1509,29 +1509,29 @@ export class RpcAiServer {
             if (trustAnthropicServers && isAnthropicOfficial) {
               if (finalLevel === 'RED') {
                 finalLevel = 'YELLOW';
-                console.log(`   ✅ Downgraded security level: RED → YELLOW (official Anthropic package)`);
+                logger.info(`   ✅ Downgraded security level: RED → YELLOW (official Anthropic package)`);
               }
             }
 
             // Display result
             const icon = finalLevel === 'GREEN' ? '✅' : finalLevel === 'YELLOW' ? '⚠️' : '🚨';
-            console.log(`   ${icon} ${server.name}: ${finalLevel} (${result.scannedFiles} files, ${totalIssues} issues)`);
+            logger.info(`   ${icon} ${server.name}: ${finalLevel} (${result.scannedFiles} files, ${totalIssues} issues)`);
 
             if (finalLevel === 'RED') {
               hasHighRisk = true;
               if (result.redFlags.length > 0) {
-                console.log(`      High-risk patterns detected:`);
+                logger.info(`      High-risk patterns detected:`);
                 result.redFlags.slice(0, 3).forEach((flag: any) => {
-                  console.log(`      - ${flag.description} (${flag.file}:${flag.line})`);
+                  logger.info(`      - ${flag.description} (${flag.file}:${flag.line})`);
                 });
                 if (result.redFlags.length > 3) {
-                  console.log(`      ... and ${result.redFlags.length - 3} more`);
+                  logger.info(`      ... and ${result.redFlags.length - 3} more`);
                 }
               }
             }
           } catch (error) {
             hasErrors = true;
-            console.error(`   ❌ Failed to scan ${server.name}:`, error instanceof Error ? error.message : String(error));
+            logger.error(`   ❌ Failed to scan ${server.name}:`, error instanceof Error ? error.message : String(error));
           }
         }
 
@@ -1544,19 +1544,19 @@ export class RpcAiServer {
         }
 
         if (hasHighRisk) {
-          console.warn('⚠️ Warning: One or more high-risk MCP packages detected. Review security scan results above.');
+          logger.warn('⚠️ Warning: One or more high-risk MCP packages detected. Review security scan results above.');
         } else if (hasErrors) {
-          console.warn('⚠️ Warning: Some packages could not be scanned. They will still be initialized.');
+          logger.warn('⚠️ Warning: Some packages could not be scanned. They will still be initialized.');
         } else {
-          console.log('✅ All MCP packages passed security scan');
+          logger.info('✅ All MCP packages passed security scan');
         }
 
       } catch (error) {
         if (blockOnHighRisk) {
           throw error; // Re-throw if we're blocking on errors
         }
-        console.error('❌ MCP security scanning failed:', error instanceof Error ? error.message : String(error));
-        console.warn('⚠️ Continuing with server initialization despite scan failure');
+        logger.error('❌ MCP security scanning failed:', error instanceof Error ? error.message : String(error));
+        logger.warn('⚠️ Continuing with server initialization despite scan failure');
       }
     }
 
@@ -1588,25 +1588,25 @@ export class RpcAiServer {
 
       // Setup event handlers
       this.remoteMcpManager.on('serverConnected', (name: string) => {
-        console.log(`✅ Remote MCP server connected: ${name}`);
+        logger.info(`✅ Remote MCP server connected: ${name}`);
       });
 
       this.remoteMcpManager.on('serverDisconnected', ({ name, code }: { name: string; code?: number }) => {
-        console.warn(`⚠️ Remote MCP server disconnected: ${name}${code ? ` (exit code: ${code})` : ''}`);
+        logger.warn(`⚠️ Remote MCP server disconnected: ${name}${code ? ` (exit code: ${code})` : ''}`);
       });
 
       this.remoteMcpManager.on('serverError', ({ server, error }: { server: string; error: any }) => {
-        console.error(`❌ Remote MCP server error (${server}):`, error instanceof Error ? error.message : String(error));
+        logger.error(`❌ Remote MCP server error (${server}):`, error instanceof Error ? error.message : String(error));
       });
 
       // Initialize connections
       await this.remoteMcpManager.initialize();
 
       const connectedServers = this.remoteMcpManager.getConnectedServers();
-      console.log(`✅ Remote MCP: ${connectedServers.length}/${config.servers.length} servers connected`);
+      logger.info(`✅ Remote MCP: ${connectedServers.length}/${config.servers.length} servers connected`);
 
     } catch (error) {
-      console.error('❌ Failed to initialize remote MCP manager:', error instanceof Error ? error.message : String(error));
+      logger.error('❌ Failed to initialize remote MCP manager:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -1627,7 +1627,7 @@ export class RpcAiServer {
 
     // Setup MCP endpoint if enabled
     if (this.config.mcp?.enabled) {
-      console.log('🚀 Setting up MCP server...');
+      logger.info('🚀 Setting up MCP server...');
       // Import and create the protocol handler
       const { MCPProtocolHandler } = await import('./trpc/routers/mcp/protocol-handler.js');
       const protocolHandler = new MCPProtocolHandler(
@@ -1641,7 +1641,7 @@ export class RpcAiServer {
         : undefined;
 
       if (this.config.serverWorkspaces?.enabled && !mcpWorkspaceConfig) {
-        console.warn('⚠️  Server workspace API enabled for MCP, but no workspace paths configured. Skipping workspace manager initialization.');
+        logger.warn('⚠️  Server workspace API enabled for MCP, but no workspace paths configured. Skipping workspace manager initialization.');
       }
 
       if (mcpWorkspaceConfig) {
@@ -1657,7 +1657,7 @@ export class RpcAiServer {
             };
             rootManagerConfig.defaultRoot = normalizedDefault;
           } else if (mcpWorkspaceConfig.defaultWorkspace) {
-            console.warn('⚠️  MCP root manager default workspace is defined but missing a path. Ignoring default root.');
+            logger.warn('⚠️  MCP root manager default workspace is defined but missing a path. Ignoring default root.');
           }
 
           if (mcpWorkspaceConfig.additionalWorkspaces) {
@@ -1665,7 +1665,7 @@ export class RpcAiServer {
               Object.entries(mcpWorkspaceConfig.additionalWorkspaces)
                 .map(([rootId, config]) => {
                   if (!config?.path || config.path.trim().length === 0) {
-                    console.warn(`⚠️  MCP root manager additional workspace "${rootId}" is missing a path and will be ignored.`);
+                    logger.warn(`⚠️  MCP root manager additional workspace "${rootId}" is missing a path and will be ignored.`);
                     return null;
                   }
 
@@ -1691,15 +1691,15 @@ export class RpcAiServer {
           const rootManager = createRootManager(rootManagerConfig);
 
           protocolHandler.setRootManager(rootManager);
-          console.log('✅ MCP root manager configured for server workspaces');
+          logger.info('✅ MCP root manager configured for server workspaces');
         } catch (error) {
-          console.warn('⚠️ Could not initialize MCP root manager:', error instanceof Error ? error.message : String(error));
+          logger.warn('⚠️ Could not initialize MCP root manager:', error instanceof Error ? error.message : String(error));
         }
       }
 
       // Setup the MCP endpoint
       protocolHandler.setupMCPEndpoint(this.app, '/mcp');
-      console.log('⚠️ MCP endpoint ready at /mcp (security logging, rate limiting enabled, JWT AUTH configured)');
+      logger.info('⚠️ MCP endpoint ready at /mcp (security logging, rate limiting enabled, JWT AUTH configured)');
     }
 
     if (setupRoutes) {
@@ -1709,9 +1709,9 @@ export class RpcAiServer {
     // Catch-all (moved from rpc-ai-server setupRoutes method to run after the custom setup routes - if any)
     // Catch-all 404 middleware — place this LAST
     this.app.use((req: Request, res: Response) => {    
-      console.log('Requested URL:', req.originalUrl);
-      console.log('Matched route:', req.route?.path || '(none)');
-      console.log('Method:', req.method);
+      logger.debug('Requested URL:', req.originalUrl);
+      logger.debug('Matched route:', req.route?.path || '(none)');
+      logger.debug('Method:', req.method);
       res.status(404).json({
         error: 'Not found',
         message: 'This endpoint does not exist.',
@@ -1726,31 +1726,31 @@ export class RpcAiServer {
 
     return new Promise((resolve, reject) => {
       this.server = this.app.listen(this.config.port, () => {
-        console.log(`🚀 RPC AI Server running on port ${this.config.port}`);
-        console.log(`📍 Endpoints:`);
-        console.log(`   • Health: GET http://localhost:${this.config.port}${this.config.paths.health}`);
+        logger.info(`🚀 RPC AI Server running on port ${this.config.port}`);
+        logger.info(`📍 Endpoints:`);
+        logger.info(`   • Health: GET http://localhost:${this.config.port}${this.config.paths.health}`);
         if (this.config.protocols.jsonRpc) {
-          console.log(`   • JSON-RPC: POST http://localhost:${this.config.port}${this.config.paths.jsonRpc}`);
-          console.log(`   • OpenRPC Schema: GET http://localhost:${this.config.port}/openrpc.json`);
+          logger.info(`   • JSON-RPC: POST http://localhost:${this.config.port}${this.config.paths.jsonRpc}`);
+          logger.info(`   • OpenRPC Schema: GET http://localhost:${this.config.port}/openrpc.json`);
         }
         if (this.config.protocols.tRpc) {
-          console.log(`   • tRPC: POST http://localhost:${this.config.port}${this.config.paths.tRpc}/*`);
+          logger.info(`   • tRPC: POST http://localhost:${this.config.port}${this.config.paths.tRpc}/*`);
         }
-        console.log(`📋 Configuration:`);
-        console.log(`   • Protocols: ${Object.entries(this.config.protocols).filter(([,enabled]) => enabled).map(([name]) => name).join(', ')}`);
-        console.log(`   • Rate limit: ${this.config.rateLimit.max} req/${this.config.rateLimit.windowMs!/1000}s`);
+        logger.info(`📋 Configuration:`);
+        logger.info(`   • Protocols: ${Object.entries(this.config.protocols).filter(([,enabled]) => enabled).map(([name]) => name).join(', ')}`);
+        logger.info(`   • Rate limit: ${this.config.rateLimit.max} req/${this.config.rateLimit.windowMs!/1000}s`);
         if (this.config.aiLimits.content?.maxLength) {
-          console.log(`   • Content limit: ${this.config.aiLimits.content.maxLength.toLocaleString()} chars`);
+          logger.info(`   • Content limit: ${this.config.aiLimits.content.maxLength.toLocaleString()} chars`);
         }
         if (this.config.aiLimits.tokens?.maxTokenLimit) {
-          console.log(`   • Token limit: ${this.config.aiLimits.tokens.maxTokenLimit.toLocaleString()}`);
+          logger.info(`   • Token limit: ${this.config.aiLimits.tokens.maxTokenLimit.toLocaleString()}`);
         }
         if (this.config.tokenTracking.enabled) {
-          console.log(`   • Token tracking: enabled (${this.config.tokenTracking.platformFeePercent}% platform fee)`);
-          console.log(`   • Webhook: ${this.config.tokenTracking.webhookPath}`);
+          logger.info(`   • Token tracking: enabled (${this.config.tokenTracking.platformFeePercent}% platform fee)`);
+          logger.info(`   • Webhook: ${this.config.tokenTracking.webhookPath}`);
         }
         if (this.jwtMiddleware) {
-          console.log(`   • JWT authentication: enabled`);
+          logger.info(`   • JWT authentication: enabled`);
         }
         resolve();
       });
@@ -1768,7 +1768,7 @@ export class RpcAiServer {
     return new Promise((resolve) => {
       if (this.server) {
         this.server.close(() => {
-          console.log('✅ Server stopped');
+          logger.info('✅ Server stopped');
           resolve();
         });
       } else {
@@ -1844,7 +1844,7 @@ export class RpcAiServer {
             ...customProvider
           };
         } else {
-          console.warn(`Custom provider '${provider}' not found in customProviders config`);
+          logger.warn(`Custom provider '${provider}' not found in customProviders config`);
         }
       }
     });
