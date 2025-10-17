@@ -8,6 +8,9 @@ import { adminProcedures } from "./methods/admin";
 import { MCPProtocolHandler } from "./protocol-handler";
 import type { MCPRouterConfig } from "./types";
 
+// Re-export utility functions for creating MCP tools
+export { createMCPTool, type MCPToolScope } from '../../../auth/scopes';
+
 /**
  * Create MCP router with all procedure modules
  */

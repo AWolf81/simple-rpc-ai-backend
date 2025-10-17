@@ -240,5 +240,49 @@ export function createGenerationProcedures(
           message: 'Unable to process request - invalid execution path',
         });
       }),
+
+    /**
+     * Generate text with streaming support
+     * Returns text chunks as they are generated
+     */
+    generateTextStream: publicProcedure
+      .input(generateTextSchema)
+      .subscription(async function* ({ input, ctx }) {
+        const { content, systemPrompt, provider, metadata, options } = input;
+        const apiKey = input.apiKey || ctx.apiKey;
+
+        // For now, require API key for streaming (simplifies implementation)
+        if (!apiKey) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'API key required for streaming. Please provide your AI provider API key.',
+          });
+        }
+
+        try {
+          // Use the streaming method from AIService
+          const stream = aiService.executeStream({
+            content,
+            systemPrompt,
+            metadata: { ...metadata, provider },
+            options,
+            apiKey,
+          });
+
+          // Yield each chunk as it arrives
+          for await (const chunk of stream) {
+            yield { chunk, done: false };
+          }
+
+          // Signal completion
+          yield { chunk: '', done: true };
+
+        } catch (error) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `AI streaming error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          });
+        }
+      }),
   };
 }

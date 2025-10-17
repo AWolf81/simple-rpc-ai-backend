@@ -1,0 +1,16 @@
+{
+  "name": "agent-basic-example",
+  "version": "1.0.0",
+  "description": "Production agent server to demonstrate basic agent functionality with skills",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "setup": "cp .env.example .env && echo 'Edit .env with your credentials'"
+  },
+  "dependencies": {
+    "simple-rpc-ai-backend": "file:../../",
+    "dotenv": "^16.0.0"
+  }
+}

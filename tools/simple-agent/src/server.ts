@@ -3,25 +3,11 @@
  *
  * Manages the simple-rpc-ai-backend server instance
  */
-
 import { configManager } from './config.js';
-
-// We'll import from the parent package
-type RpcAiServer = any;
+import { createRpcAiServer, type RpcAiServer } from '../../../src/rpc-ai-server.js';
 
 export class ServerManager {
   private server: RpcAiServer | null = null;
-  private serverModule: any = null;
-
-  async initialize(): Promise<void> {
-    try {
-      // Dynamically import the parent package
-      this.serverModule = await import('../../../src/rpc-ai-server.js');
-    } catch (error) {
-      console.error('Failed to load simple-rpc-ai-backend:', error);
-      throw new Error('Could not load simple-rpc-ai-backend. Make sure it is installed.');
-    }
-  }
 
   /**
    * Start the server with configured settings
@@ -30,10 +16,6 @@ export class ServerManager {
     if (this.server) {
       console.log('Server is already running');
       return;
-    }
-
-    if (!this.serverModule) {
-      await this.initialize();
     }
 
     const serverConfig = configManager.get('server');
@@ -93,7 +75,7 @@ export class ServerManager {
     }
 
     try {
-      this.server = this.serverModule.createRpcAiServer(config);
+      this.server = createRpcAiServer(config);
       await this.server.start();
 
       console.log(`✅ Server started successfully`);

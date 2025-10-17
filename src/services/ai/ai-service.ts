@@ -5,7 +5,7 @@
  * Handles multiple providers (Anthropic, OpenAI, Google, etc.) seamlessly.
  */
 
-import { generateText } from 'ai';
+import { generateText, streamText } from 'ai';
 import { createAnthropic, anthropic } from '@ai-sdk/anthropic';
 import { createOpenAI, openai } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
@@ -594,6 +594,85 @@ export class AIService {
       }
       
       throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Execute AI request with streaming support
+   * Returns an async generator that yields text chunks as they arrive
+   */
+  async *executeStream(request: ExecuteRequest): AsyncGenerator<string, void, unknown> {
+    const { content, promptId, systemPrompt: legacySystemPrompt, metadata = {}, options = {}, apiKey } = request;
+
+    // Support both promptId (new) and systemPrompt (legacy)
+    const actualPromptId = promptId || legacySystemPrompt;
+    if (!actualPromptId) {
+      throw new Error('Either promptId or systemPrompt must be provided');
+    }
+
+    // Resolve promptId to actual system prompt text
+    const systemPrompt = this.resolveSystemPrompt(actualPromptId);
+
+    // Merge metadata into execution options
+    const executionConfig = {
+      provider: metadata.provider || this.config.provider,
+      model: metadata.model || options.model,
+      maxTokens: metadata.maxTokens || options.maxTokens,
+      temperature: metadata.temperature || options.temperature,
+      useWebSearch: metadata.useWebSearch || false,
+      webSearchPreference: metadata.webSearchPreference || 'duckduckgo'
+    };
+
+    logger.debug('🌊 AI Stream Execute:');
+    logger.debug(`   Provider: ${executionConfig.provider}`);
+    logger.debug(`   Model: ${executionConfig.model || 'default'}`);
+
+    // Get the AI model provider
+    const modelResult = await this.getModel(
+      executionConfig.model,
+      apiKey,
+      executionConfig.provider,
+      executionConfig.useWebSearch
+    );
+    const model = modelResult as Parameters<typeof streamText>[0]['model'];
+
+    // Prepare tools and enhanced system prompt
+    const { enhancedSystemPrompt, availableTools } = await this.prepareAIExecution(
+      systemPrompt,
+      executionConfig
+    );
+
+    const userPrompt = content;
+
+    try {
+      const streamOptions: any = {
+        model,
+        messages: [
+          { role: 'system', content: enhancedSystemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        maxTokens: executionConfig.maxTokens || this.config.maxTokens || 4000,
+        temperature: executionConfig.temperature || this.config.temperature || 0.3,
+      };
+
+      // Add tools if available
+      if (availableTools.length > 0) {
+        streamOptions.tools = availableTools;
+        streamOptions.toolChoice = 'auto';
+      }
+
+      console.log('🌊 Starting stream with model:', (model as any).modelId || 'unknown');
+
+      const result = await streamText(streamOptions);
+
+      // Stream text chunks as they arrive
+      for await (const textPart of result.textStream) {
+        yield textPart;
+      }
+
+    } catch (error: any) {
+      logger.error('Stream execution error:', error);
+      throw new Error(`Stream execution failed: ${error.message}`);
     }
   }
 

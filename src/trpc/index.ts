@@ -11,7 +11,7 @@ import type { Request, Response } from 'express';
 import { type McpMeta } from "trpc-to-mcp";
 import type { MCPPromptConfig } from '../auth/scopes';
 
-// Extended meta type that supports both MCP and OpenAPI
+// Extended meta type that supports both MCP, OpenAPI and OpenRPC
 export interface ExtendedMeta extends McpMeta {
   openapi?: {
     method: string;
@@ -19,6 +19,12 @@ export interface ExtendedMeta extends McpMeta {
     tags?: string[];
     summary?: string;
     description?: string;
+  };
+  openrpc?: {
+    method?: string;
+    summary?: string;
+    description?: string;
+    tags?: string[];
   };
   mcpExtensions?: {
     supportsProgress?: boolean;

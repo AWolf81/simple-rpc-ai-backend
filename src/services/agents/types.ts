@@ -224,7 +224,7 @@ export const AgentSkillSchema = z.object({
   name: z.string().max(64),
   description: z.string().max(1024),
   level: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   instructions: z.string().optional(),
   resources: z.array(z.object({
     type: z.enum(['file', 'script', 'reference']),
@@ -243,7 +243,7 @@ export const AgentToolSchema = z.object({
   description: z.string(),
   inputSchema: z.object({
     type: z.literal('object'),
-    properties: z.record(z.any()),
+    properties: z.record(z.string(), z.unknown()),
     required: z.array(z.string()).optional()
   })
 });
@@ -254,12 +254,12 @@ export const AgentExecuteRequestSchema = z.object({
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant', 'system']),
     content: z.string(),
-    metadata: z.record(z.any()).optional()
+    metadata: z.record(z.string(), z.unknown()).optional()
   })).optional(),
   context: z.object({
     userId: z.string().optional(),
     sessionId: z.string().optional(),
-    config: z.record(z.any()).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
     tools: z.array(AgentToolSchema).optional(),
     skills: z.array(AgentSkillSchema).optional()
   }).optional(),

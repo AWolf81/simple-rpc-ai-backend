@@ -152,7 +152,7 @@ export function createAppRouter(
   const sharedAIService = needsSharedAIService
     ? (() => {
         // Use MCP-specific configuration if useServerConfig is false
-        if (mcpConfig.ai.useServerConfig === false) {
+        if (mcpConfig?.ai?.useServerConfig === false) {
           // Use MCP-specific providers and configuration
           const mcpProviders = mcpConfig.ai.mcpProviders;
           const serviceProvidersConfig = mcpProviders

@@ -7,11 +7,11 @@
  * - Using skills for specialized tasks
  */
 
-import { createRpcAiServer } from '../../src/rpc-ai-server';
-import { AgentSkill } from '../../src/services/agents/types';
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
+// import { AgentSkill } from '../../src/services/agents/types';
 
 // Define a code review skill
-const codeReviewSkill: AgentSkill = {
+const codeReviewSkill = {
   id: 'code-reviewer',
   name: 'Code Review Expert',
   description: 'Analyzes code for best practices, bugs, and security issues',
@@ -47,7 +47,7 @@ Provide specific, actionable feedback with code examples.
 };
 
 // Define an API design skill
-const apiDesignSkill: AgentSkill = {
+const apiDesignSkill = {
   id: 'api-designer',
   name: 'API Design Expert',
   description: 'Designs RESTful APIs following industry best practices',
@@ -100,6 +100,11 @@ async function main() {
         enableSkills: true,
         defaultSkills: [codeReviewSkill, apiDesignSkill]
       }
+    },
+
+    // Enable MCP with default settings to avoid configuration errors
+    mcp: {
+      enableMCP: false  // Explicitly disable MCP to avoid undefined config issues
     },
 
     // Enable protocols

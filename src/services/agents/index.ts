@@ -6,6 +6,8 @@ export { AgentService } from './agent-service';
 export { ClaudeCodeAdapter } from './adapters/claude-code-adapter';
 export { OpenAIAgentAdapter } from './adapters/openai-agent-adapter';
 
+import type { ModelDefinition, ModelCapability } from '../ai/ai-service';
+
 export type {
   AgentConfig,
   AgentSDKType,
@@ -16,9 +18,10 @@ export type {
   AgentExecuteRequest,
   AgentExecuteResult,
   IAgentAdapter,
-  ModelDefinition,
-  ModelCapability
 } from './types';
+
+// Export types imported from other modules
+export type { ModelDefinition, ModelCapability };
 
 export {
   AgentSkillSchema,

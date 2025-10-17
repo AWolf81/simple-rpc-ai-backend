@@ -11,7 +11,10 @@ import {
   AgentExecuteRequestSchema,
   AgentSkillSchema,
   AgentToolSchema,
-  AgentConfig
+  AgentConfig,
+  type AgentTool,
+  type AgentSkill,
+  type AgentExecuteRequest
 } from '@services/agents/types';
 import { createMCPTool } from '@src-trpc/routers/mcp/index';
 
@@ -33,21 +36,105 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
      */
     execute: publicProcedure
       .meta({
+        ...createMCPTool({
+          name: 'execute-agent',
+          description: 'Execute an AI agent request with SDK selection and skills support',
+          category: 'agents'
+        }),
         openrpc: {
           method: 'agents.execute',
           summary: 'Execute an agent request',
           description: 'Run an agent with specified SDK (claude-code or openai) and get AI-powered response with skills/tools support',
           tags: ['agents']
-        },
-        mcp: createMCPTool({
-          title: 'Execute Agent',
-          description: 'Execute an AI agent request with SDK selection and skills support',
-          category: 'agents'
-        })
+        }
       })
       .input(AgentExecuteRequestSchema)
       .mutation(async ({ input }) => {
-        return await agentService.execute(input);
+        // Create a properly typed version of the input for the agent service
+        const agentRequest: AgentExecuteRequest = {
+          ...input,
+          context: input.context ? {
+            ...input.context,
+            tools: input.context.tools?.map(tool => ({
+              ...tool,
+              execute: async (args: any) => {
+                throw new Error(`Tool ${tool.name} execution function not implemented via API. Register server-side with implementation.`);
+              }
+            })) as AgentTool[], // Trust that we're providing execute function
+            skills: input.context.skills?.map(skill => ({
+              ...skill,
+              // Level is required in AgentSkill type, so ensure it exists
+              level: skill.level as 1 | 2 | 3
+            })) as AgentSkill[] // Trust that we're providing required fields
+          } : undefined
+        };
+        
+        return await agentService.execute(agentRequest);
+      }),
+
+    /**
+     * Execute an agent request with streaming
+     * Returns text chunks as they are generated
+     */
+    executeStream: publicProcedure
+      .meta({
+        ...createMCPTool({
+          name: 'execute-agent-stream',
+          description: 'Execute an AI agent request with streaming response',
+          category: 'agents'
+        }),
+        openrpc: {
+          method: 'agents.executeStream',
+          summary: 'Execute an agent request with streaming',
+          description: 'Run an agent and receive the response as a stream of text chunks',
+          tags: ['agents']
+        }
+      })
+      .input(AgentExecuteRequestSchema)
+      .subscription(async function* ({ input }) {
+        // Prepare agent request
+        const agentRequest: AgentExecuteRequest = {
+          ...input,
+          context: input.context ? {
+            ...input.context,
+            tools: input.context.tools?.map(tool => ({
+              ...tool,
+              execute: async (args: any) => {
+                throw new Error(`Tool ${tool.name} execution not implemented via API.`);
+              }
+            })) as AgentTool[],
+            skills: input.context.skills?.map(skill => ({
+              ...skill,
+              level: skill.level as 1 | 2 | 3
+            })) as AgentSkill[]
+          } : undefined
+        };
+
+        try {
+          // For now, execute normally and simulate streaming
+          // TODO: Implement true streaming through agent adapters
+          const result = await agentService.execute(agentRequest);
+
+          // Chunk the response for streaming effect
+          const chunkSize = 50;
+          for (let i = 0; i < result.content.length; i += chunkSize) {
+            yield {
+              chunk: result.content.slice(i, i + chunkSize),
+              done: false
+            };
+          }
+
+          // Final chunk with metadata
+          yield {
+            chunk: '',
+            done: true,
+            usage: result.usage,
+            model: result.model
+          };
+
+        } catch (error) {
+          throw new Error(`Agent streaming failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
       }),
 
     /**
@@ -99,14 +186,26 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
           tags: ['agents']
         }
       })
-      .input(AgentToolSchema.extend({
-        execute: z.function().optional() // Can't serialize functions, so we make it optional in schema
+      .input(z.object({
+        name: z.string(),
+        description: z.string(),
+        inputSchema: z.object({
+          type: z.literal('object'),
+          properties: z.record(z.string(), z.unknown()),
+          required: z.array(z.string()).optional()
+        })
       }))
       .mutation(async ({ input }) => {
         // Note: For actual tool execution, you'd need to provide the execute function
         // This is a limitation of tRPC - functions can't be serialized
         // In practice, tools should be registered server-side
-        agentService.addTool(input as any);
+        const tool: AgentTool = {
+          ...input,
+          execute: async () => {
+            throw new Error('Tool execution function not implemented via API. Register server-side with implementation.');
+          }
+        };
+        agentService.addTool(tool);
         return { success: true, message: `Tool '${input.name}' added` };
       }),
 
@@ -172,7 +271,8 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
       .input(AgentSkillSchema)
       .mutation(async ({ input }) => {
         try {
-          agentService.addSkill(input);
+          // Input is validated by Zod, so we can safely cast it to AgentSkill
+          agentService.addSkill(input as AgentSkill);
           return { success: true, message: `Skill '${input.name}' added` };
         } catch (error) {
           return {
@@ -220,8 +320,8 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
           description: 'Get list of all registered skills for Claude Code agent',
           tags: ['agents', 'skills']
         },
-        mcp: createMCPTool({
-          title: 'List Agent Skills',
+        ...createMCPTool({
+          name: 'list-agent-skills',
           description: 'Get all available Claude Code agent skills with progressive disclosure metadata',
           category: 'agents'
         })
