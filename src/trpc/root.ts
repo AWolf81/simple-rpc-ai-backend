@@ -19,6 +19,8 @@ import { createAdminRouter } from '@src-trpc/routers/admin';
 import { createAgentRouter } from '@src-trpc/routers/agents';
 import { AgentService } from '@services/agents/agent-service';
 import type { AgentConfig } from '@services/agents/types';
+import { SkillManager } from '@services/agents/skills/manager';
+import { DEFAULT_SANDBOX_CONFIG } from '@services/agents/skills/sandbox';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { PostgreSQLAdapter } from '@database/postgres-adapter';
 import type { PostgreSQLRPCMethods } from '@auth/PostgreSQLRPCMethods';
@@ -195,6 +197,8 @@ export function createAppRouter(
 
   // Initialize Agent Service if enabled
   let agentService: AgentService | undefined;
+  let skillManager: SkillManager | undefined;
+
   if (agentConfig?.enabled && sharedAIService) {
     try {
       agentService = new AgentService(sharedAIService, {
@@ -209,6 +213,40 @@ export function createAppRouter(
       logger.debug(`🤖 Agent service initialized`);
     } catch (error) {
       logger.error('Failed to create agent service:', error);
+    }
+  }
+
+  // Initialize Skill Manager if skills are enabled
+  if (agentConfig?.enabled && (agentConfig as any).skills?.enabled) {
+    try {
+      const skillsConfig = (agentConfig as any).skills;
+      skillManager = new SkillManager({
+        sources: skillsConfig.sources || [],
+        sandbox: {
+          ...DEFAULT_SANDBOX_CONFIG,
+          ...skillsConfig.sandbox
+        },
+        validation: {
+          enabled: skillsConfig.validation?.enabled !== false,
+          maxTokens: {
+            level1: skillsConfig.validation?.maxTokens?.level1 || 100,
+            level2: skillsConfig.validation?.maxTokens?.level2 || 5000
+          },
+          requireLicense: skillsConfig.validation?.requireLicense || false,
+          allowedLicenses: skillsConfig.validation?.allowedLicenses || [],
+          requireVersion: skillsConfig.validation?.requireVersion || false
+        },
+        cacheDir: skillsConfig.cacheDir,
+        maxConcurrentLoads: skillsConfig.maxConcurrentLoads || 5
+      });
+
+      // Initialize skills asynchronously
+      skillManager.initialize().catch(error => {
+        logger.error('Failed to initialize skill manager:', error);
+      });
+      logger.debug(`📚 Skill manager initialized`);
+    } catch (error) {
+      logger.error('Failed to create skill manager:', error);
     }
   }
 
@@ -240,10 +278,11 @@ export function createAppRouter(
   if (agentConfig?.enabled && agentService) {
     const agentsRouter = createAgentRouter({
       agentService,
-      agentConfig
+      agentConfig,
+      skillManager
     });
     baseRouters.agents = agentsRouter;
-    logger.debug(`🤖 Agents router included`);
+    logger.debug(`🤖 Agents router included (skills: ${skillManager ? 'enabled' : 'disabled'})`);
   } else if (agentConfig?.enabled) {
     logger.warn(`⚠️  Agents enabled but agent service not available (AI service may be missing)`);
   } else {

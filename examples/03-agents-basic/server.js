@@ -29,7 +29,8 @@ async function main() {
           { type: 'builtin', name: 'file-handling' },
 
           // Local custom skills
-          { type: 'local', path: './examples/03-agents-basic/custom-skills' }
+          { type: 'local', path: './examples/03-agents-basic/custom-skills/brand-guidelines' },
+          { type: 'local', path: './examples/03-agents-basic/custom-skills/hello-world' }
         ],
         sandbox: {
           allowedPaths: ['/workspace', '/tmp'],
@@ -62,6 +63,8 @@ async function main() {
   console.log('\n📚 Loaded Skills:');
   console.log('  - file-handling (built-in)');
   console.log('  - brand-guidelines (local custom skill)');
+  console.log('  - hello-world (test skill)');
+  console.log('\n📖 Testing Guide: SKILL_TESTING_GUIDE.md');
 
   console.log('\n📝 New Skills System API Examples:');
   console.log(`
