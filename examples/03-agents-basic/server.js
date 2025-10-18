@@ -92,9 +92,6 @@ async function main() {
     // Enable agents with new skills system
     agents: {
       enabled: true,
-      defaultSDK: 'claude-code',
-      enableClaudeCode: true,
-      enableOpenAI: false,
 
       // New skills system configuration
       skills: {

@@ -73,9 +73,6 @@ export interface RpcAiServerConfig {
   // Agent Configuration (Vercel AI SDK based)
   agents?: {
     enabled?: boolean;                               // Enable agent functionality (default: false)
-    defaultSDK?: 'claude-code' | 'openai';          // Default agent SDK to use (default: 'claude-code')
-    enableClaudeCode?: boolean;                      // Enable Claude Code SDK adapter (default: true)
-    enableOpenAI?: boolean;                          // Enable OpenAI Agents SDK adapter (default: true)
 
     // Skills Configuration (Vercel AI SDK based, no Anthropic proprietary code)
     skills?: {
