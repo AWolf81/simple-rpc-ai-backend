@@ -1,7 +1,7 @@
 /**
  * Agents Router - Agent functionality via tRPC
  *
- * Provides access to Claude Code SDK and OpenAI Agents SDK through tRPC
+ * Provides access to AI Agent SDK and OpenAI Agents SDK through tRPC
  */
 
 import { z } from 'zod';
@@ -50,7 +50,7 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
         openrpc: {
           method: 'agents.execute',
           summary: 'Execute an agent request',
-          description: 'Run an agent with specified SDK (claude-code or openai) and get AI-powered response with skills/tools support',
+          description: 'Run an agent with specified SDK (ai-agent or openai) and get AI-powered response with skills/tools support',
           tags: ['agents']
         }
       })
@@ -151,7 +151,7 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
         openrpc: {
           method: 'agents.listSDKs',
           summary: 'List available agent SDKs',
-          description: 'Get list of available agent SDKs (claude-code, openai)',
+          description: 'Get list of available agent SDKs (ai-agent, openai)',
           tags: ['agents']
         }
       })
@@ -248,7 +248,7 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
         }
       })
       .input(z.object({
-        sdk: z.enum(['claude-code', 'openai']).optional()
+        sdk: z.enum(['ai-agent', 'openai']).optional()
       }).optional())
       .query(async ({ input }) => {
         const tools = agentService.getTools(input?.sdk);
@@ -263,13 +263,13 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
       }),
 
     /**
-     * Add a skill (Claude Code only)
+     * Add a skill (AI Agent only)
      */
     addSkill: publicProcedure
       .meta({
         openrpc: {
           method: 'agents.addSkill',
-          summary: 'Add a skill to Claude Code agent',
+          summary: 'Add a skill to AI Agent agent',
           description: 'Register a new skill following Claude\'s agent skills architecture (progressive disclosure model)',
           tags: ['agents', 'skills']
         }
@@ -289,13 +289,13 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
       }),
 
     /**
-     * Remove a skill (Claude Code only)
+     * Remove a skill (AI Agent only)
      */
     removeSkill: publicProcedure
       .meta({
         openrpc: {
           method: 'agents.removeSkill',
-          summary: 'Remove a skill from Claude Code agent',
+          summary: 'Remove a skill from AI Agent agent',
           description: 'Unregister a skill by ID',
           tags: ['agents', 'skills']
         }
@@ -316,19 +316,19 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
       }),
 
     /**
-     * List available skills (Claude Code only)
+     * List available skills (AI Agent only)
      */
     listSkills: publicProcedure
       .meta({
         openrpc: {
           method: 'agents.listSkills',
           summary: 'List available skills',
-          description: 'Get list of all registered skills for Claude Code agent',
+          description: 'Get list of all registered skills for AI Agent agent',
           tags: ['agents', 'skills']
         },
         ...createMCPTool({
           name: 'list-agent-skills',
-          description: 'Get all available Claude Code agent skills with progressive disclosure metadata',
+          description: 'Get all available AI Agent agent skills with progressive disclosure metadata',
           category: 'agents'
         })
       })
@@ -348,7 +348,7 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
       }),
 
     /**
-     * Get skill details (Claude Code only)
+     * Get skill details (AI Agent only)
      */
     getSkill: publicProcedure
       .meta({
@@ -386,7 +386,7 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
         }
       })
       .input(z.object({
-        sdk: z.enum(['claude-code', 'openai'])
+        sdk: z.enum(['ai-agent', 'openai'])
       }))
       .query(async ({ input }) => {
         return {

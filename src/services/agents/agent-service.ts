@@ -1,7 +1,7 @@
 /**
  * Agent Service - Unified agent management
  *
- * Provides abstraction over Claude Code SDK and OpenAI Agents SDK,
+ * Provides abstraction over AI Agent SDK and OpenAI Agents SDK,
  * reusing existing AI provider infrastructure
  */
 
@@ -16,7 +16,7 @@ import {
   IAgentAdapter,
   AgentSDKType
 } from './types';
-import { ClaudeCodeAdapter } from './adapters/claude-code-adapter';
+import { AIAgentAdapter } from './adapters/ai-agent-adapter';
 import { OpenAIAgentAdapter } from './adapters/openai-agent-adapter';
 import { logger } from '../../utils/logger';
 
@@ -33,15 +33,14 @@ export class AgentService {
   ) {
     this.aiService = aiService;
     this.config = {
-      defaultSDK: config.defaultSDK || 'claude-code',
-      enableClaudeCode: config.enableClaudeCode !== false,
-      enableOpenAI: config.enableOpenAI !== false,
+      defaultSDK: config.defaultSDK || 'ai-agent',
+      enabled: config.enabled !== false,
       ...config
     };
 
     this.adapters = new Map();
     this.defaultTools = config.defaultTools || [];
-    this.defaultSkills = config.claudeCode?.defaultSkills || [];
+    this.defaultSkills = config.agent?.defaultSkills || [];
   }
 
   /**
@@ -50,39 +49,24 @@ export class AgentService {
   async initialize(): Promise<void> {
     logger.debug('🤖 Initializing AgentService...');
 
-    // Initialize Claude Code adapter if enabled
-    if (this.config.enableClaudeCode) {
-      const claudeAdapter = new ClaudeCodeAdapter(
+    // Initialize AI Agent adapter if enabled
+    if (this.config.enabled) {
+      const vercelAdapter = new AIAgentAdapter(
         this.aiService,
-        this.config.claudeCode
+        this.config.agent
       );
-      await claudeAdapter.initialize();
+      await vercelAdapter.initialize();
 
       // Add default tools and skills
-      this.defaultTools.forEach(tool => claudeAdapter.addTool(tool));
-      this.defaultSkills.forEach(skill => claudeAdapter.addSkill?.(skill));
+      this.defaultTools.forEach(tool => vercelAdapter.addTool(tool));
+      this.defaultSkills.forEach(skill => vercelAdapter.addSkill?.(skill));
 
-      this.adapters.set('claude-code', claudeAdapter);
-      logger.debug('✅ Claude Code adapter initialized');
-    }
-
-    // Initialize OpenAI adapter if enabled
-    if (this.config.enableOpenAI) {
-      const openaiAdapter = new OpenAIAgentAdapter(
-        this.aiService,
-        this.config.openai
-      );
-      await openaiAdapter.initialize();
-
-      // Add default tools
-      this.defaultTools.forEach(tool => openaiAdapter.addTool(tool));
-
-      this.adapters.set('openai', openaiAdapter);
-      logger.debug('✅ OpenAI adapter initialized');
+      this.adapters.set('ai-agent', vercelAdapter);
+      logger.debug('✅ AI Agent adapter initialized');
     }
 
     if (this.adapters.size === 0) {
-      throw new Error('No agent adapters initialized. Enable at least one SDK.');
+      throw new Error('No agent adapters initialized. Set agents.enabled = true.');
     }
 
     logger.debug(`🤖 AgentService initialized with ${this.adapters.size} adapter(s)`);
@@ -92,7 +76,7 @@ export class AgentService {
    * Execute agent request using specified or default SDK
    */
   async execute(request: AgentExecuteRequest): Promise<AgentExecuteResult> {
-    const sdkType = request.sdk || this.config.defaultSDK || 'claude-code';
+    const sdkType = request.sdk || this.config.defaultSDK || 'ai-agent';
 
     const adapter = this.adapters.get(sdkType);
     if (!adapter) {
@@ -143,38 +127,38 @@ export class AgentService {
   }
 
   /**
-   * Add a skill (Claude Code only)
+   * Add a skill (AI Agent only)
    */
   addSkill(skill: AgentSkill): void {
-    const claudeAdapter = this.adapters.get('claude-code');
+    const claudeAdapter = this.adapters.get('ai-agent');
     if (!claudeAdapter?.supportsSkills()) {
-      throw new Error('Claude Code adapter not available or does not support skills');
+      throw new Error('AI Agent adapter not available or does not support skills');
     }
 
     this.defaultSkills.push(skill);
     claudeAdapter.addSkill?.(skill);
-    logger.debug(`📚 Skill '${skill.name}' added to Claude Code adapter`);
+    logger.debug(`📚 Skill '${skill.name}' added to AI Agent adapter`);
   }
 
   /**
-   * Remove a skill (Claude Code only)
+   * Remove a skill (AI Agent only)
    */
   removeSkill(skillId: string): void {
-    const claudeAdapter = this.adapters.get('claude-code');
+    const claudeAdapter = this.adapters.get('ai-agent');
     if (!claudeAdapter?.supportsSkills()) {
-      throw new Error('Claude Code adapter not available or does not support skills');
+      throw new Error('AI Agent adapter not available or does not support skills');
     }
 
     this.defaultSkills = this.defaultSkills.filter(s => s.id !== skillId);
     claudeAdapter.removeSkill?.(skillId);
-    logger.debug(`📚 Skill '${skillId}' removed from Claude Code adapter`);
+    logger.debug(`📚 Skill '${skillId}' removed from AI Agent adapter`);
   }
 
   /**
-   * Get available skills (Claude Code only)
+   * Get available skills (AI Agent only)
    */
   getSkills(): AgentSkill[] {
-    const claudeAdapter = this.adapters.get('claude-code');
+    const claudeAdapter = this.adapters.get('ai-agent');
     if (!claudeAdapter?.supportsSkills()) {
       return [];
     }

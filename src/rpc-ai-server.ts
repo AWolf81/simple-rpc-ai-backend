@@ -70,11 +70,11 @@ export interface RpcAiServerConfig {
     blockedModels?: string[];                        // Specific models to block
   }>;
 
-  // Agent Configuration (Vercel AI SDK based)
+  // Agent Configuration (AI Agent SDK based)
   agents?: {
     enabled?: boolean;                               // Enable agent functionality (default: false)
 
-    // Skills Configuration (Vercel AI SDK based, no Anthropic proprietary code)
+    // Skills Configuration (AI Agent SDK based, no Anthropic proprietary code)
     skills?: {
       enabled?: boolean;                             // Enable skills system (default: true if agents enabled)
       sources?: Array<{                              // Skill sources to load
@@ -559,9 +559,6 @@ export class RpcAiServer {
       // Agent configuration (disabled by default)
       agents: {
         enabled: false,
-        defaultSDK: 'claude-code',
-        enableClaudeCode: true,
-        enableOpenAI: true,
         ...config.agents
       },
 

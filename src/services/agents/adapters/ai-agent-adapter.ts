@@ -1,8 +1,9 @@
 /**
- * Claude Code SDK Adapter
+ * AI Agent Agent Adapter
  *
- * Implements agent functionality using Claude with skills support
- * Follows the progressive disclosure model from Claude's agent skills documentation
+ * Implements agent functionality using AI Agent SDK with skills support
+ * Follows the progressive disclosure model from agent skills architecture
+ * Compatible with AI Agent skills but built entirely on AI Agent SDK
  */
 
 import crypto from 'crypto';
@@ -19,22 +20,22 @@ import {
 } from '../types';
 import { logger } from '../../../utils/logger';
 
-interface ClaudeCodeConfig {
+interface AIAgentConfig {
   enableSkills?: boolean;
   defaultSkills?: AgentSkill[];
   skillsDirectory?: string;
 }
 
-export class ClaudeCodeAdapter implements IAgentAdapter {
-  readonly sdkType: AgentSDKType = 'claude-code';
+export class AIAgentAdapter implements IAgentAdapter {
+  readonly sdkType: AgentSDKType = 'ai-agent';
 
   private aiService: AIService;
-  private config: ClaudeCodeConfig;
+  private config: AIAgentConfig;
   private tools: Map<string, AgentTool>;
   private skills: Map<string, AgentSkill>;
   private initialized: boolean = false;
 
-  constructor(aiService: AIService, config?: ClaudeCodeConfig) {
+  constructor(aiService: AIService, config?: AIAgentConfig) {
     this.aiService = aiService;
     this.config = config || {};
     this.tools = new Map();
@@ -46,7 +47,7 @@ export class ClaudeCodeAdapter implements IAgentAdapter {
       return;
     }
 
-    logger.debug('🔧 Initializing Claude Code adapter...');
+    logger.debug('🔧 Initializing AI Agent agent adapter...');
 
     // Load default skills if provided
     if (this.config.defaultSkills) {
@@ -62,12 +63,12 @@ export class ClaudeCodeAdapter implements IAgentAdapter {
     }
 
     this.initialized = true;
-    logger.debug('✅ Claude Code adapter initialized');
+    logger.debug('✅ AI Agent adapter initialized');
   }
 
   async execute(request: AgentExecuteRequest): Promise<AgentExecuteResult> {
     if (!this.initialized) {
-      throw new Error('Claude Code adapter not initialized');
+      throw new Error('AI Agent adapter not initialized');
     }
 
     const requestId = crypto.randomUUID();
@@ -101,14 +102,14 @@ export class ClaudeCodeAdapter implements IAgentAdapter {
     });
 
     // Execute AI request
-    logger.debug(`🤖 Executing Claude Code agent request (${requestId})`);
+    logger.debug(`🤖 Executing AI Agent agent request (${requestId})`);
 
     try {
       const result = await this.aiService.execute({
         content: request.prompt,
         systemPrompt: systemPrompt,
         metadata: {
-          provider: request.provider || 'anthropic', // Claude Code uses Anthropic
+          provider: request.provider || 'anthropic', // AI Agent uses Anthropic
           model: request.model,
           maxTokens: request.maxTokens,
           temperature: request.temperature
@@ -138,19 +139,19 @@ export class ClaudeCodeAdapter implements IAgentAdapter {
         requestId
       };
     } catch (error) {
-      logger.error('❌ Claude Code execution failed:', error);
+      logger.error('❌ AI Agent execution failed:', error);
       throw error;
     }
   }
 
   addTool(tool: AgentTool): void {
     this.tools.set(tool.name, tool);
-    logger.debug(`🔧 Tool '${tool.name}' added to Claude Code adapter`);
+    logger.debug(`🔧 Tool '${tool.name}' added to AI Agent adapter`);
   }
 
   removeTool(toolName: string): void {
     this.tools.delete(toolName);
-    logger.debug(`🔧 Tool '${toolName}' removed from Claude Code adapter`);
+    logger.debug(`🔧 Tool '${toolName}' removed from AI Agent adapter`);
   }
 
   getTools(): AgentTool[] {
@@ -186,7 +187,7 @@ export class ClaudeCodeAdapter implements IAgentAdapter {
     this.tools.clear();
     this.skills.clear();
     this.initialized = false;
-    logger.debug('✅ Claude Code adapter disposed');
+    logger.debug('✅ AI Agent adapter disposed');
   }
 
   /**

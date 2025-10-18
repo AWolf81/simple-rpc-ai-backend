@@ -126,7 +126,7 @@ export class SkillManager {
    */
   async executeScript(
     skillId: string,
-    request: Omit<ScriptExecutionRequest, 'scriptPath'> & { scriptName: string }
+    request: Omit<ScriptExecutionRequest, 'scriptPath' | 'runtime'> & { scriptName: string }
   ): Promise<ScriptExecutionResult> {
     const skill = this.skills.get(skillId);
 

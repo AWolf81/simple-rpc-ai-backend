@@ -1,7 +1,7 @@
 /**
  * Agent Types and Interfaces
  *
- * Defines the agent abstraction that supports both Claude Code SDK and OpenAI Agents SDK
+ * Defines the agent abstraction using AI Agent SDK with optional OpenAI compatibility
  */
 
 import { z } from 'zod';
@@ -9,10 +9,10 @@ import { z } from 'zod';
 /**
  * Agent SDK types
  */
-export type AgentSDKType = 'claude-code' | 'openai';
+export type AgentSDKType = 'ai-agent' | 'openai';
 
 /**
- * Agent skill definition (Claude Code concept)
+ * Agent skill definition (progressive disclosure model)
  * Skills are modular capabilities that extend agent functionality
  */
 export interface AgentSkill {
@@ -72,7 +72,7 @@ export interface AgentContext {
   config?: Record<string, any>;
   /** Available tools for this execution */
   tools?: AgentTool[];
-  /** Available skills (Claude Code only) */
+  /** Available skills (AI Agent only) */
   skills?: AgentSkill[];
 }
 
@@ -133,7 +133,7 @@ export interface AgentExecuteResult {
     arguments: any;
     result: any;
   }>;
-  /** Skills triggered during execution (Claude Code only) */
+  /** Skills triggered during execution (AI Agent only) */
   skillsTriggered?: string[];
   /** Finish reason */
   finishReason?: string;
@@ -145,27 +145,18 @@ export interface AgentExecuteResult {
  * Agent configuration
  */
 export interface AgentConfig {
+  /** Enable agent system */
+  enabled?: boolean;
   /** Default SDK to use */
   defaultSDK?: AgentSDKType;
-  /** Enable Claude Code SDK */
-  enableClaudeCode?: boolean;
-  /** Enable OpenAI Agents SDK */
-  enableOpenAI?: boolean;
-  /** Claude Code specific config */
-  claudeCode?: {
+  /** Agent-specific config (skills, etc.) */
+  agent?: {
     /** Enable skills support */
     enableSkills?: boolean;
     /** Default skills to load */
     defaultSkills?: AgentSkill[];
     /** Skills directory path */
     skillsDirectory?: string;
-  };
-  /** OpenAI specific config */
-  openai?: {
-    /** Assistant ID to use */
-    assistantId?: string;
-    /** Default instructions */
-    instructions?: string;
   };
   /** Default tools available to agents */
   defaultTools?: AgentTool[];
@@ -203,13 +194,13 @@ export interface IAgentAdapter {
   /** Check if adapter supports skills */
   supportsSkills(): boolean;
 
-  /** Add a skill (Claude Code only) */
+  /** Add a skill (AI Agent only) */
   addSkill?(skill: AgentSkill): void;
 
-  /** Remove a skill (Claude Code only) */
+  /** Remove a skill (AI Agent only) */
   removeSkill?(skillId: string): void;
 
-  /** Get available skills (Claude Code only) */
+  /** Get available skills (AI Agent only) */
   getSkills?(): AgentSkill[];
 
   /** Cleanup resources */
@@ -263,7 +254,7 @@ export const AgentExecuteRequestSchema = z.object({
     tools: z.array(AgentToolSchema).optional(),
     skills: z.array(AgentSkillSchema).optional()
   }).optional(),
-  sdk: z.enum(['claude-code', 'openai']).optional(),
+  sdk: z.enum(['ai-agent', 'openai']).optional(),
   model: z.string().optional(),
   provider: z.string().optional(),
   maxTokens: z.number().optional(),

@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import { router, publicProcedure } from '../../trpc.js';
+import { router, publicProcedure } from '../../index.js';
 import type { SkillManager } from '../../../services/agents/skills/manager.js';
 import { logger } from '../../../utils/logger.js';
 

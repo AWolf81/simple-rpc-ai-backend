@@ -78,11 +78,8 @@ export function createAppRouter(
   customRouters?: { [namespace: string]: any },
   agentConfig?: {
     enabled?: boolean;
-    defaultSDK?: 'claude-code' | 'openai';
-    enableClaudeCode?: boolean;
-    enableOpenAI?: boolean;
-    claudeCode?: AgentConfig['claudeCode'];
-    openai?: AgentConfig['openai'];
+    defaultSDK?: 'ai-agent' | 'openai';
+    agent?: AgentConfig['agent'];
   }
 ): ReturnType<typeof router> {
   // Initialize services if database is available
@@ -202,10 +199,8 @@ export function createAppRouter(
     try {
       agentService = new AgentService(sharedAIService, {
         defaultSDK: agentConfig.defaultSDK,
-        enableClaudeCode: agentConfig.enableClaudeCode,
-        enableOpenAI: agentConfig.enableOpenAI,
-        claudeCode: agentConfig.claudeCode,
-        openai: agentConfig.openai
+        enabled: agentConfig.enabled,
+        agent: agentConfig.agent
       });
       // Initialize asynchronously - services should handle this
       agentService.initialize().catch(error => {
