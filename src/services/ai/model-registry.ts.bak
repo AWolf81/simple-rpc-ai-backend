@@ -535,22 +535,7 @@ ${this.config.useRegistry ? `
 
       const cleanId = preferredModel.id.replace('-(deprecated)', '');
       logger.debug(`📡 Legacy fallback: "${cleanId}"`);
-      
-      // Format the model ID properly for the Anthropic API
-      if (preferredModel.releaseDate) {
-        return this.formatAnthropicModelId(cleanId, preferredModel.releaseDate);
-      } else {
-        // If no release date is available, try to format with current date
-        // This is a last resort since Anthropic SDKs require proper versioned IDs
-        const currentDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const formattedId = this.formatAnthropicModelId(cleanId, currentDate);
-        if (formattedId) {
-          logger.warn(`⚠️ Using current date for model ID: ${formattedId} - release date not available in registry`);
-          return formattedId;
-        } else {
-          throw new Error(`Could not format Anthropic model ID: ${cleanId}`);
-        }
-      }
+      return cleanId;
     }
     
     // TODO: Remove override when registry is updated with current models

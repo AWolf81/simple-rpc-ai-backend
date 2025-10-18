@@ -11,7 +11,8 @@ import { randomPKCECodeVerifier, calculatePKCECodeChallenge } from 'openid-clien
 import crypto from 'crypto';
 import { createSessionStorage, SessionStorage } from './session-storage.js';
 import { Request, Response } from 'express';
-import { HandlebarsTemplateEngine, HandlebarsTemplateConfig, HandlebarsTemplateData, HANDLEBARS_PROVIDER_ICONS } from './handlebars-template-engine.js';
+import { HandlebarsTemplateEngine, HANDLEBARS_PROVIDER_ICONS } from './handlebars-template-engine.js';
+import type { HandlebarsTemplateConfig, HandlebarsTemplateData } from './handlebars-template-engine.js';
 import winston from 'winston';
 
 // Session storage instance (will be set during initialization)

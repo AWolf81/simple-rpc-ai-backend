@@ -1,42 +1,27 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "bundler",
-    "lib": ["ES2022"],
-    "outDir": "./dist",
-    "baseUrl": "../../",
-    "paths": {
-      "@/*": ["src/*"],
-      "@services/*": ["src/services/*"],
-      "@services/ai": ["src/services/ai"],
-      "@services/ai/*": ["src/services/ai/*"],
-      "@services/resources": ["src/services/resources"],
-      "@services/resources/*": ["src/services/resources/*"],
-      "@services/mcp": ["src/services/mcp"],
-      "@services/mcp/*": ["src/services/mcp/*"],
-      "@services/billing": ["src/services/billing"],
-      "@services/billing/*": ["src/services/billing/*"],
-      "@services/security": ["src/services/security"],
-      "@services/security/*": ["src/services/security/*"],
-      "@auth/*": ["src/auth/*"],
-      "@src-trpc/*": ["src/trpc/*"],
-      "@database/*": ["src/database/*"],
-      "@billing/*": ["src/billing/*"],
-      "@security/*": ["src/security/*"],
-      "@storage/*": ["src/storage/*"],
-      "@schemas/*": ["src/schemas/*"],
-      "@mcp/*": ["src/mcp/*"],
-      "@monetization/*": ["src/monetization/*"],
-      "@middleware/*": ["src/middleware/*"]
-    },
-    "strict": false,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
+    /* === Core Setup === */
+    "target": "ES2022",                    // modern Node syntax
+    "module": "ESNext",                    // use ES modules (import/export)
+    "moduleResolution": "bundler",         // best for tsx / ESM
+    "jsx": "react-jsx",                    // for JSX/TSX with React 17+
+    "allowJs": true,                       // if you mix JS/TS
+    "esModuleInterop": true,               // makes 'import x from y' work properly
+    "skipLibCheck": true,                  // faster builds
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "types": ["node"]
+
+    /* === Type Safety === */
+    "strict": true,                        // recommended strictness
+    "resolveJsonModule": true,             // allow importing .json files
+
+    /* === Node + CLI Environment === */
+    "types": ["node"],                     // add Node typings
+    //"noEmit": true,                        // if using `tsx` (no build output)
+    
+    /* === Output (only if building) === */
+    "outDir": "dist",                   // uncomment if using `tsc` to build
+    "rootDir": "src"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules"]
 }

@@ -70,28 +70,53 @@ export interface RpcAiServerConfig {
     blockedModels?: string[];                        // Specific models to block
   }>;
 
-  // Agent Configuration (Claude Code SDK & OpenAI Agents SDK)
+  // Agent Configuration (Vercel AI SDK based)
   agents?: {
     enabled?: boolean;                               // Enable agent functionality (default: false)
     defaultSDK?: 'claude-code' | 'openai';          // Default agent SDK to use (default: 'claude-code')
     enableClaudeCode?: boolean;                      // Enable Claude Code SDK adapter (default: true)
     enableOpenAI?: boolean;                          // Enable OpenAI Agents SDK adapter (default: true)
-    claudeCode?: {
-      enableSkills?: boolean;                        // Enable skills support (default: true)
-      skillsDirectory?: string;                      // Directory containing SKILL.md files
-      defaultSkills?: Array<{                        // Pre-configured skills
-        id: string;
-        name: string;                                // Max 64 chars
-        description: string;                         // Max 1024 chars
-        level: 1 | 2 | 3;                           // Progressive disclosure level
-        instructions?: string;                       // Level 2 instructions (<5k tokens)
-        resources?: Array<{                          // Level 3 resources
-          type: 'file' | 'script' | 'reference';
-          path: string;
-          content?: string;
-        }>;
+
+    // Skills Configuration (Vercel AI SDK based, no Anthropic proprietary code)
+    skills?: {
+      enabled?: boolean;                             // Enable skills system (default: true if agents enabled)
+      sources?: Array<{                              // Skill sources to load
+        type: 'builtin' | 'github' | 'npm' | 'local' | 'url' | 'zip';
+        name?: string;                               // For builtin skills
+        url?: string;                                // For github/url sources
+        path?: string;                               // For local/npm/github subdirs
+        ref?: string;                                // For github branch/tag
+        package?: string;                            // For npm packages
+        version?: string;                            // For npm version
+        autoExtract?: boolean;                       // For zip files (default: true)
       }>;
+      sandbox?: {                                    // Script execution sandbox config
+        allowedPaths?: string[];                     // Paths scripts can access (default: ['/workspace', '/tmp'])
+        timeout?: number;                            // Script timeout in ms (default: 30000)
+        maxMemory?: number;                          // Memory limit in bytes (default: 512MB)
+        networkAccess?: false;                       // Always false for security
+        environmentVars?: Record<string, string>;    // Whitelisted env vars
+      };
+      validation?: {                                 // Skill validation config
+        enabled?: boolean;                           // Enable validation (default: true)
+        maxTokens?: {
+          level1?: number;                           // Metadata token limit (default: 100)
+          level2?: number;                           // Instructions token limit (default: 5000)
+        };
+        requireLicense?: boolean;                    // Require license field (default: false)
+        allowedLicenses?: string[];                  // Whitelist of licenses (default: all)
+        requireVersion?: boolean;                    // Require version field (default: false)
+      };
+      cacheDir?: string;                             // Directory for downloaded/extracted skills
+      maxConcurrentLoads?: number;                   // Parallel loading limit (default: 5)
     };
+
+    // Legacy claudeCode config (deprecated, use skills config above)
+    claudeCode?: {
+      enableSkills?: boolean;                        // Deprecated: Use agents.skills.enabled
+      skillsDirectory?: string;                      // Deprecated: Use agents.skills.sources with type: 'local'
+    };
+
     openai?: {
       assistantId?: string;                          // OpenAI Assistant ID to use
       instructions?: string;                         // Default instructions for agent

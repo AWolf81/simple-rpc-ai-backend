@@ -17,20 +17,26 @@ import {
   type AgentExecuteRequest
 } from '@services/agents/types';
 import { createMCPTool } from '@src-trpc/routers/mcp/index';
+import { createSkillsRouter } from './skills.js';
+import type { SkillManager } from '@services/agents/skills/manager';
 
 export interface AgentRouterConfig {
   agentService?: AgentService;
   agentConfig?: AgentConfig;
+  skillManager?: SkillManager;
 }
 
 export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<typeof router> {
-  const { agentService } = config;
+  const { agentService, skillManager } = config;
 
   if (!agentService) {
     throw new Error('AgentService is required for agent router');
   }
 
   return router({
+    // Skills sub-router (new skill system)
+    skills: createSkillsRouter(skillManager),
+
     /**
      * Execute an agent request
      */

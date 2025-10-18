@@ -89,22 +89,44 @@ async function main() {
     port: 8000,
     serverProviders: ['anthropic'], // Using Anthropic for Claude Code
 
-    // Enable agents with skills
+    // Enable agents with new skills system
     agents: {
       enabled: true,
       defaultSDK: 'claude-code',
       enableClaudeCode: true,
-      enableOpenAI: false, // Disable OpenAI for this example
+      enableOpenAI: false,
 
+      // New skills system configuration
+      skills: {
+        enabled: true,
+        sources: [
+          // Built-in file-handling skill
+          { type: 'builtin', name: 'file-handling' },
+
+          // Local custom skills
+          { type: 'local', path: './examples/03-agents-basic/custom-skills' }
+        ],
+        sandbox: {
+          allowedPaths: ['/workspace', '/tmp'],
+          timeout: 30000,
+          maxMemory: 512 * 1024 * 1024
+        },
+        validation: {
+          enabled: true,
+          maxTokens: { level1: 100, level2: 5000 }
+        }
+      },
+
+      // Legacy claudeCode config (for backward compatibility)
       claudeCode: {
         enableSkills: true,
         defaultSkills: [codeReviewSkill, apiDesignSkill]
       }
     },
 
-    // Enable MCP with default settings to avoid configuration errors
+    // Enable MCP with default settings
     mcp: {
-      enableMCP: false  // Explicitly disable MCP to avoid undefined config issues
+      enableMCP: false
     },
 
     // Enable protocols

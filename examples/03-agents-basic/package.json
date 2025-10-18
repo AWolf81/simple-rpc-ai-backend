@@ -7,10 +7,15 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "setup": "cp .env.example .env && echo 'Edit .env with your credentials'"
+    "setup": "cp .env.example .env && echo 'Edit .env with your credentials'",
+    "test-cli": "node test-cli.js",
+    "test-cli-advanced": "node advanced-test-cli.js",
+    "test-cli-streaming": "node streaming-test-cli.js"
   },
   "dependencies": {
-    "simple-rpc-ai-backend": "file:../../",
-    "dotenv": "^16.0.0"
+    "axios": "^1.12.2",
+    "dotenv": "^16.0.0",
+    "ora": "^8.2.0",
+    "simple-rpc-ai-backend": "file:../../"
   }
 }
