@@ -107,17 +107,6 @@ export interface RpcAiServerConfig {
       cacheDir?: string;                             // Directory for downloaded/extracted skills
       maxConcurrentLoads?: number;                   // Parallel loading limit (default: 5)
     };
-
-    // Legacy claudeCode config (deprecated, use skills config above)
-    claudeCode?: {
-      enableSkills?: boolean;                        // Deprecated: Use agents.skills.enabled
-      skillsDirectory?: string;                      // Deprecated: Use agents.skills.sources with type: 'local'
-    };
-
-    openai?: {
-      assistantId?: string;                          // OpenAI Assistant ID to use
-      instructions?: string;                         // Default instructions for agent
-    };
   };
 
   // Secret Manager Configuration (for BYOK key storage)
