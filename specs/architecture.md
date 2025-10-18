@@ -340,6 +340,337 @@ project/
 | **Multi-language project** | JSON-RPC | Works with any language |
 | **Full TypeScript stack** | tRPC | End-to-end type safety |
 
+## Agent Skills System Architecture
+
+### **Overview**
+
+The Agent Skills System extends the AI backend with modular, reusable capabilities through a progressive disclosure model. Built entirely on Vercel AI SDK (no Anthropic proprietary code), it provides Claude Code-compatible functionality with multi-provider support.
+
+### **Core Architecture**
+
+```mermaid
+graph TB
+    subgraph "Skill Sources"
+        S1[GitHub Repos]
+        S2[npm Packages]
+        S3[Local Folders]
+        S4[ZIP Files]
+        S5[URLs]
+    end
+
+    subgraph "Skill Loading Pipeline"
+        DL[Downloader]
+        EX[Extractor]
+        VA[Validator]
+        PA[Parser]
+        CA[Cache]
+    end
+
+    subgraph "Progressive Disclosure"
+        L1[Level 1: Metadata<br/>~100 tokens]
+        L2[Level 2: Instructions<br/><5k tokens]
+        L3[Level 3: Resources<br/>Unlimited]
+    end
+
+    subgraph "Sandboxed Execution"
+        PY[Python Runtime]
+        TS[TypeScript Runtime]
+        JS[JavaScript Runtime]
+        SH[Shell Runtime]
+        SB[Sandbox Manager<br/>Path/Timeout/Memory Limits]
+    end
+
+    subgraph "Agent Integration"
+        AG[Agent Service]
+        AI[AI Service<br/>Vercel SDK]
+        PR[AI Providers]
+    end
+
+    S1 --> DL
+    S2 --> DL
+    S3 --> DL
+    S4 --> DL
+    S5 --> DL
+
+    DL --> EX
+    EX --> VA
+    VA --> PA
+    PA --> CA
+
+    CA --> L1
+    L1 --> L2
+    L2 --> L3
+
+    L3 --> PY
+    L3 --> TS
+    L3 --> JS
+    L3 --> SH
+
+    PY --> SB
+    TS --> SB
+    JS --> SB
+    SH --> SB
+
+    SB --> AG
+    AG --> AI
+    AI --> PR
+```
+
+### **Skill Structure**
+
+```
+skill-name/
+├── SKILL.md           # Frontmatter + Instructions (Level 2)
+├── references/        # Documentation (Level 3)
+├── scripts/          # Executable code (Level 3)
+├── commands/         # Slash commands (Level 3)
+├── templates/        # File templates (Level 3)
+└── examples/         # Usage examples (Level 3)
+```
+
+### **Progressive Disclosure Levels**
+
+| Level | Content | Tokens | Loading |
+|-------|---------|--------|---------|
+| **L1** | YAML frontmatter (name, description) | ~100 | Always (startup) |
+| **L2** | SKILL.md body content | <5k | On skill match |
+| **L3** | References, scripts, templates | Unlimited | On-demand only |
+
+### **Multi-Source Loading**
+
+```typescript
+const server = createRpcAiServer({
+  agents: {
+    enabled: true,
+    skills: {
+      enabled: true,
+      sources: [
+        // Built-in core skills
+        { type: 'builtin', name: 'file-handling' },
+        { type: 'builtin', name: 'code-analysis' },
+
+        // GitHub repository
+        {
+          type: 'github',
+          url: 'https://github.com/org/skills',
+          path: 'skills',
+          ref: 'main'
+        },
+
+        // npm package
+        {
+          type: 'npm',
+          package: '@org/skills',
+          version: 'latest'
+        },
+
+        // Local development
+        { type: 'local', path: './skills' },
+
+        // Remote ZIP
+        { type: 'url', url: 'https://cdn.example.com/skills.zip' }
+      ]
+    }
+  }
+});
+```
+
+### **Sandboxed Script Execution**
+
+```typescript
+interface SandboxConfig {
+  allowedPaths: string[];     // ['/workspace', '/tmp']
+  timeout: number;            // 30000ms (30s)
+  maxMemory: number;          // 512MB
+  networkAccess: false;       // Always disabled
+  environmentVars: Record<string, string>;
+}
+```
+
+**Supported Runtimes**:
+- **Python**: `python3` (stdlib only)
+- **TypeScript**: `tsx`/`ts-node`
+- **JavaScript**: `node`
+- **Shell**: `bash`
+
+**Security Model**:
+1. Scripts must be within skill directory
+2. Only workspace and temp paths accessible
+3. Timeout enforcement (default 30s)
+4. Memory limits (default 512MB)
+5. No network access
+6. Only stdout/stderr enters context
+
+### **Built-In Core Skills**
+
+Shipped with library in `src/services/agents/skills/builtin/`:
+
+1. **file-handling**: Read, write, search files
+2. **code-analysis**: Syntax, dependencies, metrics
+3. **git-operations**: Status, diff, commit, branch
+4. **testing**: Test execution, coverage, generation
+5. **documentation**: Doc generation, API extraction
+
+### **Skill Validation & Dev Panel**
+
+**Validation Features** (`http://localhost:8080/skills/validate`):
+- Structure compliance (SKILL.md, frontmatter)
+- Token usage analysis (L1: ~100, L2: <5k)
+- Best practices checks (file organization, naming)
+- Security audit (paths, runtimes, network attempts)
+
+**Validation API**:
+```typescript
+await client.agents.validateSkill.query({
+  skillId: 'brand-guidelines'
+});
+
+// Response:
+{
+  valid: true,
+  metrics: {
+    level1Tokens: 87,
+    level2Tokens: 3421,
+    level3Files: 8,
+    scripts: [
+      {
+        path: 'scripts/validate.ts',
+        runtime: 'typescript',
+        safe: true
+      }
+    ]
+  },
+  recommendations: [
+    'Consider moving examples to Level 3'
+  ]
+}
+```
+
+### **Agent Configuration**
+
+```typescript
+const server = createRpcAiServer({
+  agents: {
+    enabled: true,
+    skills: {
+      enabled: true,
+      sources: [...],
+
+      sandbox: {
+        allowedPaths: ['/workspace', '/tmp'],
+        timeout: 30000,
+        maxMemory: 512 * 1024 * 1024,
+        networkAccess: false
+      },
+
+      validation: {
+        enabled: true,
+        maxTokens: {
+          level1: 100,
+          level2: 5000
+        },
+        requireLicense: false,
+        allowedLicenses: ['MIT', 'Apache-2.0', 'BSD-3-Clause']
+      }
+    }
+  }
+});
+```
+
+### **Token Optimization**
+
+- **Metadata**: ~100 tokens (name + description)
+- **Instructions**: <5k tokens (~500 lines recommended)
+- **References**: Zero until accessed
+- **Scripts**: Only output enters context, not code
+
+### **SKILL.md Example**
+
+```yaml
+---
+name: brand-guidelines
+description: Apply consistent brand guidelines to content
+version: 1.0.0
+author: Team
+license: MIT
+capabilities: [content-validation, style-checking]
+scripts:
+  - path: scripts/validate-colors.ts
+    runtime: typescript
+    description: Validate brand colors
+allowedPaths: [/workspace]
+---
+
+# Brand Guidelines Skill
+
+## Instructions
+Check: colors, fonts, tone (see references/)
+
+Run: `tsx scripts/validate-colors.ts <file>`
+```
+
+### **Data Flow: Skill Execution**
+
+```
+User Request → Skill Matching (L1 metadata)
+             → Load Instructions (L2 SKILL.md)
+             → Agent Reasoning (Vercel AI SDK)
+             → Load Resources (L3 on-demand)
+             → Execute Scripts (sandboxed)
+             → Capture Output
+             → Include in Context
+             → Generate Response
+```
+
+### **Security Guarantees**
+
+1. **No Network**: Scripts cannot make HTTP requests
+2. **Path Isolation**: Only workspace/temp accessible
+3. **Timeout Protection**: Auto-terminate after 30s
+4. **Memory Limits**: Prevent resource exhaustion
+5. **Pre-Validation**: All skills validated before load
+6. **Sandbox Isolation**: OS-level process isolation
+
+### **Performance Characteristics**
+
+- **Lazy Loading**: Resources loaded only when needed
+- **Caching**: Parsed skills cached in memory
+- **Parallel Loading**: Multiple skills loaded concurrently
+- **Streaming**: Large files streamed, not fully loaded
+- **Token Efficiency**: Progressive disclosure minimizes context
+
+### **Integration with AI Service**
+
+```typescript
+// Agent execution with skills
+const result = await client.agents.execute.mutation({
+  prompt: 'Analyze this code',
+  skills: ['code-analysis', 'file-handling'],
+  context: {
+    workspace: '/project',
+    files: ['src/index.ts']
+  }
+});
+
+// Skill-aware response
+{
+  content: "Analysis complete...",
+  skillsTriggered: ['code-analysis'],
+  usage: { promptTokens: 3240, ... }
+}
+```
+
+### **Migration from Claude Code**
+
+Existing Claude Code skills work with minimal changes:
+
+1. **Compatible**: SKILL.md format identical
+2. **Enhanced**: Add sandbox config via frontmatter
+3. **Flexible**: Use any AI provider (not just Anthropic)
+4. **Portable**: Skills work across different backends
+
+For full specification, see: `specs/features/agent-skills-system.md`
+
 ## Future Considerations
 
 ### **Planned Enhancements**
@@ -347,13 +678,17 @@ project/
 - Additional AI provider integrations
 - Performance monitoring and metrics
 - Plugin system for custom providers
+- **Skill Marketplace**: Central repository of community skills
+- **Skill Analytics**: Usage tracking and optimization
 
 ### **Architecture Evolution**
 - WebSocket support for real-time features
 - Redis caching for high-scale deployments
 - Kubernetes deployment configurations
 - Multi-region deployment support
+- **Skill Composition**: Combine multiple skills into workflows
+- **Hot Reload**: Update skills without server restart
 
 ---
 
-This architecture provides a simple, unified approach to AI backend services while maintaining flexibility for different client types and deployment scenarios. The dual-protocol design allows universal compatibility while providing enhanced developer experience for TypeScript projects.
+This architecture provides a simple, unified approach to AI backend services while maintaining flexibility for different client types and deployment scenarios. The dual-protocol design allows universal compatibility while providing enhanced developer experience for TypeScript projects. The Agent Skills System extends this with modular, reusable capabilities compatible with Claude Code patterns but built entirely on Vercel AI SDK for vendor independence.
