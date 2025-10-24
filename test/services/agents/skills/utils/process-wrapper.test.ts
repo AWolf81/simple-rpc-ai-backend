@@ -77,8 +77,8 @@ describe('process-wrapper utilities', () => {
       sandbox
     });
 
-    expect(wrapCommandWithBwrapMock).toHaveBeenCalledTimes(1);
-    const call = wrapCommandWithBwrapMock.mock.calls[0];
+    expect(vi.mocked(wrapCommandWithBwrap)).toHaveBeenCalledTimes(1);
+    const call = vi.mocked(wrapCommandWithBwrap).mock.calls[0];
     expect(call[0]).toBe(path.resolve(commandPath));
 
     const options = call[2];
@@ -122,9 +122,9 @@ describe('process-wrapper utilities', () => {
     });
 
     expect(result).toEqual({ command: 'bwrap', args: ['--', '/usr/bin/python3', 'script.py'] });
-    expect(wrapCommandWithBwrapMock).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(wrapCommandWithBwrap)).toHaveBeenCalledTimes(1);
 
-    const call = wrapCommandWithBwrapMock.mock.calls[0];
+    const call = vi.mocked(wrapCommandWithBwrap).mock.calls[0];
     expect(call[0]).toBe('/usr/bin/python3');
     expect(call[1]).toEqual(['script.py']);
     expect(call[2]).toMatchObject({
