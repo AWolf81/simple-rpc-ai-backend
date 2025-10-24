@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AuthManager, type AuthSession, type OAuthProvider } from '../src/auth/auth-manager.js';
-import { UserManager } from '../src/auth/user-manager.js';
-import { SimpleKeyManager } from '../src/auth/key-manager.js';
+import { AuthManager, type AuthSession, type OAuthProvider } from '../src/auth/auth-manager';
+import { UserManager } from '../src/auth/user-manager';
+import { SimpleKeyManager } from '../src/auth/key-manager';
 
 // Mock dependencies
 vi.mock('../src/auth/user-manager.js', () => ({

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { createRpcAiServer } from '../src/rpc-ai-server.js';
-import type { AppRouter } from '../src/trpc/root.js';
+import { LOCALHOST_AVAILABLE } from './helpers/network';
+import { createRpcAiServer } from '../src/rpc-ai-server';
+import type { AppRouter } from '../src/trpc/root';
 
 // Mock the Vercel AI SDK BEFORE any imports
 vi.mock('ai', async () => {
@@ -31,7 +32,9 @@ vi.mock('ai', async () => {
   };
 });
 
-describe('Simple AI Server', () => {
+const describeNetwork = LOCALHOST_AVAILABLE ? describe : describe.skip;
+
+describeNetwork('Simple AI Server', () => {
   let server: ReturnType<typeof createRpcAiServer>;
   let caller: ReturnType<AppRouter['createCaller']>;
 

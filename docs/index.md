@@ -13,7 +13,7 @@ Welcome to the official documentation for the Simple RPC AI Backend. This site c
 
 - [Getting Started]({{ site.baseurl }}{% link getting-started/index.md %}) – project introduction, installation, and first-run guidance.
 - [Common Configurations]({{ site.baseurl }}{% link common-configurations/index.md %}) – environment variables, authentication, and workspace management.
-- [Server API]({{ site.baseurl }}{% link server-api/index.md %}) – transport layers, tools, and registry integrations.
+- [Server API]({{ site.baseurl }}{% link server-api/index.md %}) – transport layers, tools, registry integrations, and agent/skills documentation.
 - [Common Issues]({{ site.baseurl }}{% link common-issues/index.md %}) – troubleshooting steps for local and production deployments.
 - [Tips & Tricks]({{ site.baseurl }}{% link tips-and-tricks/index.md %}) – handy TypeScript patterns and testing utilities.
 

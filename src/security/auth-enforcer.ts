@@ -11,7 +11,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest, OpenSaaSJWTPayload } from '../auth/jwt-middleware';
 import { SecurityLogger, SecurityEventType, SecuritySeverity } from './security-logger';
-import { logger as appLogger } from '../utils/logger.js';
+import { logger as appLogger } from '../utils/logger';
 
 // Resource types for tracking
 export enum ResourceType {

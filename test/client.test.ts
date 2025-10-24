@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RPCClient } from '../src/client.js';
+import { RPCClient } from '../src/client';
 
 // Mock axios for testing
 vi.mock('axios', () => ({

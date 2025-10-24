@@ -20,7 +20,7 @@ export interface MCPAIServiceConfig extends AIServiceConfig {
 }
 
 export interface EnhancedExecuteRequest extends ExecuteRequest {
-  tools?: {
+  toolsConfig?: {
     enabled?: boolean;
     whitelist?: string[]; // Only allow specific tools
     blacklist?: string[]; // Disallow specific tools
@@ -85,7 +85,7 @@ export class MCPAIService {
    */
   async execute(request: EnhancedExecuteRequest): Promise<EnhancedExecuteResult> {
     // If MCP tools are disabled or not requested, use the base implementation
-    if (!this.mcpConfig.enableMCPTools || !this.mcpService || !request.tools?.enabled) {
+    if (!this.mcpConfig.enableMCPTools || !this.mcpService || !request.toolsConfig?.enabled) {
       const result = await this.aiService.execute(request);
       return result as EnhancedExecuteResult;
     }
@@ -100,7 +100,7 @@ export class MCPAIService {
     const { content, systemPrompt, metadata = {}, options = {} } = request;
     
     // Get available tools
-    const availableTools = this.getFilteredTools(request.tools);
+    const availableTools = this.getFilteredTools(request.toolsConfig);
     
     // Create enhanced system prompt with tool information
     const enhancedSystemPrompt = this.createToolAwareSystemPrompt(systemPrompt || '', availableTools);
@@ -124,7 +124,7 @@ export class MCPAIService {
   /**
    * Get filtered tools based on whitelist/blacklist
    */
-  private getFilteredTools(toolsConfig?: EnhancedExecuteRequest['tools']): MCPToolDefinition[] {
+  private getFilteredTools(toolsConfig?: EnhancedExecuteRequest['toolsConfig']): MCPToolDefinition[] {
     if (!this.mcpService) return [];
 
     let tools = this.mcpService.getAvailableToolsForAI();

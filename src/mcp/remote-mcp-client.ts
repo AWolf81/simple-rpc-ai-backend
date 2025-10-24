@@ -10,7 +10,7 @@
 
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
-import { resolveNodePackageRunner } from '../utils/node-package-runner.js';
+import { resolveNodePackageRunner } from '../utils/node-package-runner';
 
 export type RemoteMCPTransport = 'uvx' | 'npx' | 'npm-exec' | 'docker' | 'http' | 'https';
 

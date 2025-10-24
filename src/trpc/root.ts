@@ -28,7 +28,7 @@ import { VirtualTokenService } from '@services/billing/virtual-token-service';
 import { UsageAnalyticsService } from '@services/billing/usage-analytics-service';
 import { WorkspaceManager } from '@services/resources/workspace-manager';
 import type { WorkspaceManagerConfig, ServerWorkspaceConfig } from '@services/resources/workspace-manager';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger';
 
 
 /**
@@ -220,10 +220,14 @@ export function createAppRouter(
   if (agentConfig?.enabled && (agentConfig as any).skills?.enabled) {
     try {
       const skillsConfig = (agentConfig as any).skills;
+      // Since we can't use require in ESM context directly here, 
+      // we'll set a placeholder and let the sandbox find the project root itself
+      // The sandbox.ts file already has the logic to find project root properly
       skillManager = new SkillManager({
         sources: skillsConfig.sources || [],
         sandbox: {
           ...DEFAULT_SANDBOX_CONFIG,
+          // projectRoot will be determined by the sandbox itself in prepareEnvironment
           ...skillsConfig.sandbox
         },
         validation: {

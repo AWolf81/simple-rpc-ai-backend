@@ -87,5 +87,7 @@ export interface MCPRouterConfig {
      * If not specified, all available tools are exposed
      */
     namespaceWhitelist?: string[];
+    /** Suppress authentication warnings in logs (useful for local/testing scenarios) */
+    suppressAuthWarning?: boolean;
 }
 //# sourceMappingURL=types.d.ts.map

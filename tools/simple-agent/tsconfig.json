@@ -1,4 +1,5 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     /* === Core Setup === */
     "target": "ES2022",                    // modern Node syntax

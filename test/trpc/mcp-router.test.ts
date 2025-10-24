@@ -9,8 +9,11 @@ import { createMCPRouter, MCPProtocolHandler } from '../../src/trpc/routers/mcp'
 import type { AuthenticatedRequest } from '../../src/auth/jwt-middleware';
 import { Response } from 'express';
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { LOCALHOST_AVAILABLE } from '../helpers/network';
 
-describe('MCP Router handleMCPRequest', () => {
+const describeNetwork = LOCALHOST_AVAILABLE ? describe : describe.skip;
+
+describeNetwork('MCP Router handleMCPRequest', () => {
   let mcpHandler: MCPProtocolHandler;
   let mockReq: Partial<AuthenticatedRequest>;
   let mockRes: Partial<Response>;
@@ -60,7 +63,9 @@ describe('MCP Router handleMCPRequest', () => {
     vi.restoreAllMocks();
   });
 
-  describe('Request Headers and CORS', () => {
+  const describeNetwork = LOCALHOST_AVAILABLE ? describe : describe.skip;
+
+describeNetwork('Request Headers and CORS', () => {
     it('should set proper CORS headers for all requests', async () => {
       mockReq.body = { jsonrpc: '2.0', method: 'ping', id: 1 };
 

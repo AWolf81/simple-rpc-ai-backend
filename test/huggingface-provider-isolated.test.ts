@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AIService } from '../src/services/ai/ai-service.js';
+import { AIService } from '../src/services/ai/ai-service';
 
 describe.skip('Hugging Face Provider Configuration Tests', () => {
   let aiService: AIService;

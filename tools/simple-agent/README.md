@@ -45,6 +45,7 @@ node src/cli.js plugins
 | Command | Description |
 |---------|-------------|
 | `/help` | Show available commands |
+| `/skills` | List available skills with details |
 | `/exit`, `/quit` | Exit the CLI |
 | `/clear` | Clear chat history |
 | `/model <name>` | Switch AI model |
@@ -91,10 +92,32 @@ Plugins receive a context object with:
 
 ## Agent Skills
 
-The agent comes with three built-in skills:
+The agent has access to a skills system that provides specialized capabilities. Skills are loaded automatically on startup.
 
-### 1. Code Review Expert
-Analyzes code for best practices, security issues, and performance.
+📖 **For detailed information on using skills, see [SKILLS_USAGE_GUIDE.md](SKILLS_USAGE_GUIDE.md)**
+
+### Built-in Skills
+
+#### 1. file-handling (Built-in)
+- **Purpose**: Safely read, write, search, and manage files
+- **Capabilities**: file-read, file-write, file-search, directory-operations
+- **Scripts**: safe-read.ts, search-files.ts, validate-path.ts
+
+#### 2. hello-world (Test Skill)
+- **Purpose**: Demonstrate skill structure and script execution
+- **Capabilities**: testing, demonstration
+- **Scripts**: greet.ts, validate-json.ts
+
+### Using Skills
+
+Ask the agent naturally:
+```
+You: Read the file at /workspace/config.json
+You: Find all TypeScript files in the project
+You: Generate a greeting for Alice
+```
+
+Or use the `/skills` command to see what's available.
 
 **Example:**
 ```

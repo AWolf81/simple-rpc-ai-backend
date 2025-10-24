@@ -8,6 +8,7 @@ import {
   getDefaultSecurityLogger
 } from '@security/security-logger';
 import { AuthenticatedRequest } from '@auth/jwt-middleware';
+import { logger as appLogger } from '@/utils/logger';
 import winston from 'winston';
 import fs from 'fs/promises';
 
@@ -276,7 +277,7 @@ describe('SecurityLogger', () => {
     });
 
     it('should prevent recursive logging calls', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(appLogger, 'warn').mockImplementation(() => {});
       
       // Simulate a recursive call by mocking the logger to trigger another logSecurityEvent
       mockLogger.log.mockImplementation(() => {
@@ -294,8 +295,8 @@ describe('SecurityLogger', () => {
         details: { message: 'Original event' }
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith('⚠️ Prevented recursive security logging call');
-      consoleSpy.mockRestore();
+      expect(loggerSpy).toHaveBeenCalledWith('⚠️ Prevented recursive security logging call');
+      loggerSpy.mockRestore();
     });
 
     it('should map security severities to correct Winston log levels', async () => {
@@ -558,9 +559,9 @@ describe('SecurityLogger', () => {
       // No need to wait - check immediate state
 
       // Debug: Log all calls to see what's being logged
-      console.log('Total mock calls:', mockLogger.log.mock.calls.length);
+      
       mockLogger.log.mock.calls.forEach((call: any, index: number) => {
-        console.log(`Call ${index + 1}:`, call[0], call[1], call[2]?.eventType);
+        
       });
 
       // The test expectation needs to be relaxed - let's check if at least 3 auth_failure events were logged
@@ -691,7 +692,7 @@ describe('SecurityLogger', () => {
         }
       });
 
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(appLogger, 'info').mockImplementation(() => {});
 
       await siemLogger.logSecurityEvent({
         eventType: SecurityEventType.AUTH_SUCCESS,
@@ -701,11 +702,11 @@ describe('SecurityLogger', () => {
         details: { message: 'Test CEF event' }
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringMatching(/📊 SIEM: "CEF:0\|SimpleRPC\|MCPSecurity\|1\.0\|auth_success\|Test CEF event\|3\|/)
       );
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should format events as LEEF when configured', async () => {
@@ -717,7 +718,7 @@ describe('SecurityLogger', () => {
         }
       });
 
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(appLogger, 'info').mockImplementation(() => {});
 
       await siemLogger.logSecurityEvent({
         eventType: SecurityEventType.AUTH_FAILURE,
@@ -727,11 +728,11 @@ describe('SecurityLogger', () => {
         details: { message: 'Test LEEF event' }
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringMatching(/📊 SIEM: "LEEF:2\.0\|SimpleRPC\|MCPSecurity\|1\.0\|auth_failure\|/)
       );
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
   });
 
@@ -760,7 +761,7 @@ describe('SecurityLogger', () => {
 
   describe('Alert Thresholds', () => {
     it('should trigger alerts when thresholds are exceeded', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(appLogger, 'info').mockImplementation(() => {});
       
       // Clear previous calls
       mockLogger.log.mockClear();
@@ -789,7 +790,7 @@ describe('SecurityLogger', () => {
       // TODO: Fix the recursive logging issue for alert thresholds
       expect(mockLogger.log.mock.calls.length).toBeGreaterThanOrEqual(1);
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
   });
 });

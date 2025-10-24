@@ -9,10 +9,10 @@ import ExpressOAuthServer from '@node-oauth/express-oauth-server';
 import * as OAuth2Server from '@node-oauth/oauth2-server';
 import { randomPKCECodeVerifier, calculatePKCECodeChallenge } from 'openid-client';
 import crypto from 'crypto';
-import { createSessionStorage, SessionStorage } from './session-storage.js';
+import { createSessionStorage, SessionStorage } from './session-storage';
 import { Request, Response } from 'express';
-import { HandlebarsTemplateEngine, HANDLEBARS_PROVIDER_ICONS } from './handlebars-template-engine.js';
-import type { HandlebarsTemplateConfig, HandlebarsTemplateData } from './handlebars-template-engine.js';
+import { HandlebarsTemplateEngine, HANDLEBARS_PROVIDER_ICONS } from './handlebars-template-engine';
+import type { HandlebarsTemplateConfig, HandlebarsTemplateData } from './handlebars-template-engine';
 import winston from 'winston';
 
 // Session storage instance (will be set during initialization)

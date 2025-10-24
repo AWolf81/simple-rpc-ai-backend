@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import { RPCClient } from '../src/client.js';
-import { PostgreSQLRPCMethods } from '../src/auth/PostgreSQLRPCMethods.js';
+import { LOCALHOST_AVAILABLE } from './helpers/network';
+import { RPCClient } from '../src/client';
+import { PostgreSQLRPCMethods } from '../src/auth/PostgreSQLRPCMethods';
 import express from 'express';
 import type { Server } from 'http';
-import { PostgreSQLConfig } from '../src/services/PostgreSQLSecretManager.js';
+import { PostgreSQLConfig } from '../src/services/PostgreSQLSecretManager';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
+if (!LOCALHOST_AVAILABLE) {
+  describe.skip('RPC Key Management (requires network)', () => {
+    it('skips due to network restrictions', () => {});
+  });
+} else {
 
 const TEST_USERS = {
   alice: {
@@ -186,3 +192,5 @@ describe.skip('PostgreSQLRPCMethods RPC tests (requires Docker)', () => {
     expect(aliceKey).not.toBe(bobKey);
   });
 });
+
+}

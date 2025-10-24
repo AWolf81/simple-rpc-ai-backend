@@ -14,29 +14,30 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as trpcExpress from '@trpc/server/adapters/express';
-import { createTRPCContext } from './trpc/index.js';
-import { createAppRouter } from './trpc/root.js';
+import { createTRPCContext } from './trpc/index';
+import { createAppRouter } from './trpc/root';
 import type { AnyRouter } from '@trpc/server';
-import type { AppRouter } from './trpc/root.js';
-import type { AIRouterConfig } from './trpc/routers/ai/types.js';
-import { JWTMiddleware } from './auth/jwt-middleware.js';
-import type { AuthenticatedRequest, OpenSaaSJWTPayload } from './auth/jwt-middleware.js';
-import type { SessionStorage } from './auth/session-storage.js';
-import { PostgreSQLAdapter } from './database/postgres-adapter.js';
-import { VirtualTokenService } from './services/billing/virtual-token-service.js';
-import { UsageAnalyticsService } from './services/billing/usage-analytics-service.js';
-import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods.js';
-import { RPC_METHODS } from './constants.js';
-import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge.js';
-import { MCPExtensionConfig } from './mcp/mcp-config.js';
-import { MCPRateLimitConfig } from './security/rate-limiter.js';
-import { SecurityLoggerConfig } from './security/security-logger.js';
-import { AuthEnforcementConfig } from './security/auth-enforcer.js';
-import type { RootManagerConfig, RootFolderConfig } from './services/resources/root-manager.js';
-import { createOAuthServer, initializeOAuthServer, closeOAuthServer } from './auth/oauth-middleware.js';
-import { getTestSafeConfig } from './security/test-helpers.js';
-import { initializeTiming } from './utils/timing.js';
-import { logger } from './utils/logger.js';
+import type { AppRouter } from './trpc/root';
+import type { AIRouterConfig } from './trpc/routers/ai/types';
+import { JWTMiddleware } from './auth/jwt-middleware';
+import type { AuthenticatedRequest, OpenSaaSJWTPayload } from './auth/jwt-middleware';
+import type { SessionStorage } from './auth/session-storage';
+import { PostgreSQLAdapter } from './database/postgres-adapter';
+import { VirtualTokenService } from './services/billing/virtual-token-service';
+import { UsageAnalyticsService } from './services/billing/usage-analytics-service';
+import { PostgreSQLRPCMethods } from './auth/PostgreSQLRPCMethods';
+import { RPC_METHODS } from './constants';
+import { createTRPCToJSONRPCBridge } from './trpc/trpc-to-jsonrpc-bridge';
+import { MCPExtensionConfig } from './mcp/mcp-config';
+import { MCPRateLimitConfig } from './security/rate-limiter';
+import { SecurityLoggerConfig } from './security/security-logger';
+import { AuthEnforcementConfig } from './security/auth-enforcer';
+import type { RootManagerConfig, RootFolderConfig } from './services/resources/root-manager';
+import { createOAuthServer, initializeOAuthServer, closeOAuthServer } from './auth/oauth-middleware';
+import { getTestSafeConfig } from './security/test-helpers';
+import { initializeTiming } from './utils/timing';
+import { logger } from './utils/logger';
+import type { AgentSkill, AgentTool } from './services/agents/types';
 
 // Built-in provider types
 export type BuiltInProvider = 'anthropic' | 'openai' | 'google';
@@ -57,7 +58,9 @@ export interface CustomProvider {
 export interface RpcAiServerConfig {
   // Basic settings
   port?: number;
-  
+  host?: string;
+  autoKillExistingServer?: boolean;  // Automatically kill process on same port before starting (default: false)
+
   // AI Configuration
   aiLimits?: AIRouterConfig;
   serverProviders?: (BuiltInProvider | string)[];    // Built-in providers + custom names
@@ -73,6 +76,11 @@ export interface RpcAiServerConfig {
   // Agent Configuration (AI Agent SDK based)
   agents?: {
     enabled?: boolean;                               // Enable agent functionality (default: false)
+
+    agent?: {
+      defaultSkills?: AgentSkill[];                  // Built-in agent prompts that should be loaded by default
+      defaultTools?: AgentTool[];                    // Default tools attached to the agent service
+    };
 
     // Skills Configuration (AI Agent SDK based, no Anthropic proprietary code)
     skills?: {
@@ -250,6 +258,10 @@ export interface RpcAiServerConfig {
      * Authentication enforcement configuration
      */
     authEnforcement?: AuthEnforcementConfig;
+    /**
+     * Suppress authentication warning logs (useful for local/testing scenarios)
+     */
+    suppressAuthWarning?: boolean;
   }
 
   /**
@@ -488,7 +500,9 @@ export class RpcAiServer {
     
     // Set smart defaults
     this.config = {
-      port: 8000,
+      port: config.port ?? 8001,
+      host: config.host ?? '127.0.0.1',
+      autoKillExistingServer: config.autoKillExistingServer ?? false,
       debug: config.debug || {},
       aiLimits: {},
       serverProviders: ['anthropic'],  // Default: Anthropic only for easier onboarding
@@ -531,29 +545,30 @@ export class RpcAiServer {
       },
       mcp: {
         enabled: config.mcp?.enabled !== false && !!config.mcp,  // Enable MCP if mcp config object is provided and not explicitly disabled
-        transports: {
-          http: true,    // HTTP transport enabled by default - universal compatibility
-          sse: true,     // SSE transport enabled by default - real-time capabilities
-          stdio: false,  // STDIO transport disabled by default - specialized use case
-          sseEndpoint: '/sse',
-          ...config.mcp?.transports
-        },
-        auth: {
-          requireAuthForToolsList: false,  // tools/list is public by default
-          requireAuthForToolsCall: true,   // tools/call requires auth by default
-          publicTools: ['greeting'],       // greeting can be public by default
-          ...config.mcp?.auth
-        },
-        defaultConfig: {
-          enableWebSearchTool: false,
-          enableRefTools: false,
-          enableFilesystemTools: false,
-          ...config.mcp?.defaultConfig
-        },
-        extensions: config.mcp?.extensions,
-        // Spread any other MCP config properties
-        ...config.mcp
+      transports: {
+        http: true,    // HTTP transport enabled by default - universal compatibility
+        sse: true,     // SSE transport enabled by default - real-time capabilities
+        stdio: false,  // STDIO transport disabled by default - specialized use case
+        sseEndpoint: '/sse',
+        ...config.mcp?.transports
       },
+      auth: {
+        requireAuthForToolsList: false,  // tools/list is public by default
+        requireAuthForToolsCall: true,   // tools/call requires auth by default
+        publicTools: ['greeting'],       // greeting can be public by default
+        ...config.mcp?.auth
+      },
+      defaultConfig: {
+        enableWebSearchTool: false,
+        enableRefTools: false,
+        enableFilesystemTools: false,
+        ...config.mcp?.defaultConfig
+      },
+      extensions: config.mcp?.extensions,
+      suppressAuthWarning: config.mcp?.suppressAuthWarning ?? false,
+      // Spread any other MCP config properties
+      ...config.mcp
+    },
       modelRestrictions: config.modelRestrictions || {},  // Default: no model restrictions
 
       // Agent configuration (disabled by default)
@@ -706,8 +721,73 @@ export class RpcAiServer {
       this.app.set('trust proxy', 1);
       logger.debug(`🔧 Trust proxy enabled for reverse proxy support`);
     }
-    
+
     this.setupMiddleware();
+    this.setupSignalHandlers();
+  }
+
+  /**
+   * Setup signal handlers for graceful shutdown
+   */
+  private setupSignalHandlers(): void {
+    const gracefulShutdown = async (signal: string) => {
+      logger.info(`\n🛑 Received ${signal}, shutting down gracefully...`);
+      try {
+        await this.stop();
+        logger.info('✅ Server stopped successfully');
+        process.exit(0);
+      } catch (error) {
+        logger.error('❌ Error during shutdown:', error);
+        process.exit(1);
+      }
+    };
+
+    // Handle Ctrl+C
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+    // Handle kill command
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+    // Handle process exit
+    process.on('beforeExit', (code) => {
+      if (code === 0) {
+        logger.debug('Process exiting normally');
+      }
+    });
+  }
+
+  /**
+   * Check if port is already in use and optionally kill the process
+   */
+  private async checkPortAvailability(port: number, killExisting: boolean = false): Promise<void> {
+    try {
+      const { execSync } = await import('child_process');
+      // Check if port is in use
+      const command = `lsof -ti:${port}`;
+      try {
+        const pid = execSync(command, { encoding: 'utf-8' }).trim();
+        if (pid) {
+          if (killExisting) {
+            logger.warn(`⚠️  Port ${port} is in use by process ${pid}, killing...`);
+            execSync(`kill -9 ${pid}`);
+            // Wait a bit for port to be released
+            await new Promise(resolve => setTimeout(resolve, 500));
+            logger.info(`✅ Killed process ${pid} on port ${port}`);
+          } else {
+            logger.warn(`⚠️  Port ${port} is already in use by process ${pid}`);
+            logger.warn(`   Tip: Set config.autoKillExistingServer = true to automatically kill old servers`);
+          }
+        }
+      } catch (error: any) {
+        // lsof returns non-zero exit code if port is not in use - this is expected
+        if (error.status !== 1) {
+          throw error;
+        }
+      }
+    } catch (error) {
+      // Silently ignore errors in port checking (e.g., lsof not available on Windows)
+      logger.debug('Port availability check skipped:', error);
+    }
   }
 
   private createContext(providerApiKeys: Record<string, string | undefined>) {
@@ -1122,7 +1202,7 @@ export class RpcAiServer {
       logger.info(`🔗 Setting up OAuth 2.0 functional endpoints...`);
 
       // Import OAuth route handlers
-      const { handleProviderLogin, handleProviderCallback, createAuthenticateHandler, handleProviderSelection } = await import('./auth/oauth-middleware.js');
+      const { handleProviderLogin, handleProviderCallback, createAuthenticateHandler, handleProviderSelection } = await import('./auth/oauth-middleware');
       
       // Provider selection page
       this.app.get('/login', handleProviderSelection);
@@ -1132,7 +1212,7 @@ export class RpcAiServer {
 
       // Extension OAuth handler (intercepts before regular callback if enabled)
       if (this.config.extensionOAuth?.enabled) {
-        const { createExtensionOAuthHandler } = await import('./auth/extension-oauth.js');
+        const { createExtensionOAuthHandler } = await import('./auth/extension-oauth');
         const extensionOAuthHandler = createExtensionOAuthHandler(this.config.extensionOAuth);
         this.app.get('/callback/:provider', extensionOAuthHandler);
       }
@@ -1471,7 +1551,7 @@ export class RpcAiServer {
       logger.info('🔍 Scanning remote MCP packages for security risks...');
 
       try {
-        const { scanMCPServerPackage } = await import('./security/mcp-server-scanner.js');
+        const { scanMCPServerPackage } = await import('./security/mcp-server-scanner');
 
         const scanResults = new Map<string, any>();
         let hasHighRisk = false;
@@ -1570,7 +1650,7 @@ export class RpcAiServer {
 
     // Initialize RemoteMCPManager
     try {
-      const { RemoteMCPManager } = await import('./mcp/remote-mcp-manager.js');
+      const { RemoteMCPManager } = await import('./mcp/remote-mcp-manager');
 
       this.remoteMcpManager = new RemoteMCPManager({
         servers: config.servers.map(server => ({
@@ -1620,6 +1700,9 @@ export class RpcAiServer {
   }
 
   public async start(setupRoutes?: (app: Application) => void): Promise<void> {
+    // Check if port is available and optionally kill existing server
+    await this.checkPortAvailability(this.config.port!, this.config.autoKillExistingServer);
+
     // Initialize OAuth server session storage (if enabled)
     if (this.config.oauth.enabled) {
       await initializeOAuthServer();
@@ -1637,7 +1720,7 @@ export class RpcAiServer {
     if (this.config.mcp?.enabled) {
       logger.info('🚀 Setting up MCP server...');
       // Import and create the protocol handler
-      const { MCPProtocolHandler } = await import('./trpc/routers/mcp/protocol-handler.js');
+      const { MCPProtocolHandler } = await import('./trpc/routers/mcp/protocol-handler');
       const protocolHandler = new MCPProtocolHandler(
         this.router,
         this.config.mcp
@@ -1654,7 +1737,7 @@ export class RpcAiServer {
 
       if (mcpWorkspaceConfig) {
         try {
-          const { createRootManager } = await import('./services/resources/root-manager.js');
+          const { createRootManager } = await import('./services/resources/root-manager');
 
           const rootManagerConfig: RootManagerConfig = {};
 
@@ -1733,7 +1816,7 @@ export class RpcAiServer {
     });
 
     return new Promise((resolve, reject) => {
-      this.server = this.app.listen(this.config.port, () => {
+      this.server = this.app.listen(this.config.port, this.config.host || '127.0.0.1', () => {
         logger.info(`🚀 RPC AI Server running on port ${this.config.port}`);
         logger.info(`📍 Endpoints:`);
         logger.info(`   • Health: GET http://localhost:${this.config.port}${this.config.paths.health}`);

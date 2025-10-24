@@ -4,8 +4,11 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { createRpcAiServer } from '../../src/rpc-ai-server';
 import { createTestMCPConfig } from '../../src/security/test-helpers';
+import { LOCALHOST_AVAILABLE } from '../helpers/network';
 
-describe('MCP Security Features', () => {
+const describeNetwork = LOCALHOST_AVAILABLE ? describe : describe.skip;
+
+describeNetwork('MCP Security Features', () => {
   let app: express.Application;
   let server: any;
   const testJwtSecret = 'test-jwt-secret';

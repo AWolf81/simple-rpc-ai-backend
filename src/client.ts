@@ -19,6 +19,7 @@ import { JSONRPCClient } from 'json-rpc-2.0';
 import { createTRPCProxyClient, type CreateTRPCClientOptions } from '@trpc/client';
 import type { AppRouter } from './trpc/root';
 import type { AIRouterType } from './trpc/routers/ai';
+import superjson from 'superjson';
 
 export interface ClientOptions {
   timeout?: number;
@@ -288,12 +289,11 @@ export class AIClient extends RPCClient {
  */
 export function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient>[0]) {
   const client = createTRPCProxyClient<AppRouter>(config);
-  
-  // Create a typed wrapper that preserves procedure methods
-  // This ensures TypeScript can properly infer .query() vs .mutate()
-  return {
-    ai: client.ai as unknown as AIRouterType
-  };
+
+  // Return the full client with all routers
+  // This includes ai, agents, mcp, system, user, billing, auth, admin, and custom routers
+  // Note: Caller should add transformer: superjson to their httpLink/httpBatchLink config
+  return client;
 }
 
 /**

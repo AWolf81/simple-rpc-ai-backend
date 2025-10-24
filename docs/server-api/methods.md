@@ -23,7 +23,7 @@ nav_order: 5
 ## ai.generateText
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">ai.generateText</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/ai/methods/generation.ts#L58">src/trpc/routers/ai/methods/generation.ts:58</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">ai.generateText</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/ai/methods/generation.ts#L58">src/trpc/routers/ai/methods/generation.ts:58</a></span></div></div>
 <div class="method-card__summary">Generate structured text completions across supported AI providers.</div>
 <div class="method-card__description"><p>Executes guarded text generation with system prompt protection, token metering, and BYOK handling for authenticated and public callers.</p></div>
 <div class="method-card__columns">
@@ -521,10 +521,318 @@ console.log(result);</code></pre></div>
   </div>
 </div>
 
+## ai.generateTextStream
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-subscription">SUBSCRIPTION</span><code class="method-card__method">ai.generateTextStream</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/ai/methods/generation.ts#L248">src/trpc/routers/ai/methods/generation.ts:248</a></span></div></div>
+<div class="method-card__summary">Generate text with streaming support</div>
+<div class="method-card__description"><p>Generate text with streaming support
+Returns text chunks as they are generated</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-ai-generatetextstream" aria-haspopup="dialog" aria-controls="modal-ai-generatetextstream" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-ai-generatetextstream-input" aria-expanded="false" aria-controls="schema-ai-generatetextstream-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">content</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">systemPrompt</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">provider</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">enum</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>anthropic</code><code>openai</code><code>google</code><code>openrouter</code></div></div>
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">apiKey</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field method-field--has-children">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">metadata</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">object</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    <div class="method-field__children"><ul class="method-field-list method-field-list--nested"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">name</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">type</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li></ul></div>
+  </li><li class="method-field method-field--has-children">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">options</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">object</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    <div class="method-field__children"><ul class="method-field-list method-field-list--nested"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">model</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">maxTokens</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">number</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--default">default</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">temperature</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">number</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li></ul></div>
+  </li></ul>
+    <div class="method-section__schema" id="schema-ai-generatetextstream-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;content&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;systemPrompt&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;provider&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodEnum&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;enum&quot;,
+        &quot;enum&quot;: [
+          &quot;anthropic&quot;,
+          &quot;openai&quot;,
+          &quot;google&quot;,
+          &quot;openrouter&quot;
+        ]
+      }
+    },
+    &quot;apiKey&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;metadata&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodObject&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {
+          &quot;name&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          },
+          &quot;type&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          }
+        }
+      }
+    },
+    &quot;options&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodObject&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {
+          &quot;model&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          },
+          &quot;maxTokens&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;default&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;hasDefault&quot;: true,
+              &quot;innerType&quot;: {
+                &quot;type&quot;: &quot;ZodNumber&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;number&quot;
+              }
+            }
+          },
+          &quot;temperature&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodNumber&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;number&quot;
+            }
+          }
+        }
+      }
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-ai-generatetextstream" hidden role="dialog" aria-modal="true" aria-labelledby="modal-ai-generatetextstream-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-ai-generatetextstream" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-ai-generatetextstream-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-ai-generatetextstream" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-ai-generatetextstream-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-ai-generatetextstream-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;ai.generateTextStream&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-ai-generatetextstream-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-ai-generatetextstream-trpc-code" data-lang="ts">const result = await client.ai.generateTextStream.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
 ## ai.getRegistryHealth
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.getRegistryHealth</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/ai/methods/providers.ts#L102">src/trpc/routers/ai/methods/providers.ts:102</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.getRegistryHealth</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/ai/methods/providers.ts#L102">src/trpc/routers/ai/methods/providers.ts:102</a></span></div></div>
 <div class="method-card__summary">Retrieve the AI model registry health status.</div>
 <div class="method-card__description"><p>Reports availability and summary metrics for the registry integration, falling back to error details when checks fail.</p></div>
 <div class="method-card__columns">
@@ -592,7 +900,7 @@ console.log(result);</code></pre></div>
 ## ai.listAllowedModels
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listAllowedModels</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/ai/methods/providers.ts#L65">src/trpc/routers/ai/methods/providers.ts:65</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listAllowedModels</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/ai/methods/providers.ts#L65">src/trpc/routers/ai/methods/providers.ts:65</a></span></div></div>
 <div class="method-card__summary">List allowed models for a provider (respects model restrictions)</div>
 <div class="method-card__description"><p>List allowed models for a provider (respects model restrictions)
 Returns production-ready model IDs that can be used directly with AI SDKs</p></div>
@@ -698,7 +1006,7 @@ console.log(result);</code></pre></div>
 ## ai.listProviders
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listProviders</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/ai/methods/providers.ts#L17">src/trpc/routers/ai/methods/providers.ts:17</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listProviders</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/ai/methods/providers.ts#L17">src/trpc/routers/ai/methods/providers.ts:17</a></span></div></div>
 <div class="method-card__summary">List available AI service providers.</div>
 <div class="method-card__description"><p>Returns the providers currently registered in the model registry along with metadata about the registry source.</p></div>
 <div class="method-card__columns">
@@ -766,7 +1074,7 @@ console.log(result);</code></pre></div>
 ## ai.listProvidersBYOK
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listProvidersBYOK</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/ai/methods/providers.ts#L41">src/trpc/routers/ai/methods/providers.ts:41</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">ai.listProvidersBYOK</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/ai/methods/providers.ts#L41">src/trpc/routers/ai/methods/providers.ts:41</a></span></div></div>
 <div class="method-card__summary">List available BYOK (Bring Your Own Key) providers.</div>
 <div class="method-card__description"><p>Filters the provider catalog to only those eligible for user-supplied API keys.</p></div>
 <div class="method-card__columns">
@@ -834,7 +1142,7 @@ console.log(result);</code></pre></div>
 ## ai.validateProvider
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">ai.validateProvider</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/ai/methods/providers.ts#L143">src/trpc/routers/ai/methods/providers.ts:143</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">ai.validateProvider</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/ai/methods/providers.ts#L143">src/trpc/routers/ai/methods/providers.ts:143</a></span></div></div>
 <div class="method-card__summary">Validate AI provider configuration.</div>
 <div class="method-card__description"><p>Performs lightweight API key validation for supported providers to catch obvious misconfigurations.</p></div>
 <div class="method-card__columns">
@@ -943,7 +1251,7 @@ console.log(result);</code></pre></div>
 ## mcp.apiDocumentationPrompt
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.apiDocumentationPrompt</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/methods/prompt.ts#L89">src/trpc/routers/mcp/methods/prompt.ts:89</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.apiDocumentationPrompt</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/mcp/methods/prompt.ts#L89">src/trpc/routers/mcp/methods/prompt.ts:89</a></span></div></div>
 <div class="method-card__description"><p>Generate comprehensive API documentation from code</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -1055,7 +1363,7 @@ console.log(result);</code></pre></div>
 ## mcp.codeReviewPrompt
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.codeReviewPrompt</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/methods/prompt.ts#L19">src/trpc/routers/mcp/methods/prompt.ts:19</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.codeReviewPrompt</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/mcp/methods/prompt.ts#L19">src/trpc/routers/mcp/methods/prompt.ts:19</a></span></div></div>
 <div class="method-card__description"><p>Comprehensive code review with security, performance, and maintainability analysis</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -1177,7 +1485,7 @@ console.log(result);</code></pre></div>
 ## mcp.currentSystemTime
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.currentSystemTime</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/methods/utility.ts#L50">src/trpc/routers/mcp/methods/utility.ts:50</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.currentSystemTime</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/mcp/methods/utility.ts#L50">src/trpc/routers/mcp/methods/utility.ts:50</a></span></div></div>
 <div class="method-card__description"><p>Get the current system time</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -1274,7 +1582,7 @@ console.log(result);</code></pre></div>
 ## mcp.echo
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.echo</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/methods/utility.ts#L36">src/trpc/routers/mcp/methods/utility.ts:36</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.echo</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/mcp/methods/utility.ts#L36">src/trpc/routers/mcp/methods/utility.ts:36</a></span></div></div>
 <div class="method-card__description"><p>Echo back a message</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -1360,7 +1668,7 @@ console.log(result);</code></pre></div>
 ## mcp.explainConceptPrompt
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.explainConceptPrompt</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/methods/prompt.ts#L152">src/trpc/routers/mcp/methods/prompt.ts:152</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.explainConceptPrompt</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/mcp/methods/prompt.ts#L152">src/trpc/routers/mcp/methods/prompt.ts:152</a></span></div></div>
 <div class="method-card__description"><p>Explain technical concepts clearly at different skill levels</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -1491,7 +1799,7 @@ console.log(result);</code></pre></div>
 ## mcp.getResources
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.getResources</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/methods/resource.ts#L12">src/trpc/routers/mcp/methods/resource.ts:12</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.getResources</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/mcp/methods/resource.ts#L12">src/trpc/routers/mcp/methods/resource.ts:12</a></span></div></div>
 <div class="method-card__summary">List MCP resources</div>
 <div class="method-card__description"><p>List available MCP resources with metadata</p></div>
 <div class="method-card__columns">
@@ -1647,7 +1955,7 @@ console.log(result);</code></pre></div>
 ## mcp.greeting
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.greeting</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/methods/utility.ts#L15">src/trpc/routers/mcp/methods/utility.ts:15</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.greeting</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/mcp/methods/utility.ts#L15">src/trpc/routers/mcp/methods/utility.ts:15</a></span></div></div>
 <div class="method-card__description"><p>Generate a friendly greeting in the specified language</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -1760,7 +2068,7 @@ console.log(result);</code></pre></div>
 ## mcp.incidentResponsePrompt
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.incidentResponsePrompt</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/methods/prompt.ts#L235">src/trpc/routers/mcp/methods/prompt.ts:235</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.incidentResponsePrompt</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/mcp/methods/prompt.ts#L235">src/trpc/routers/mcp/methods/prompt.ts:235</a></span></div></div>
 <div class="method-card__description"><p>Guide incident response procedures and provide action steps</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -1888,7 +2196,7 @@ console.log(result);</code></pre></div>
 ## mcp.readResource
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.readResource</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/mcp/methods/resource.ts#L114">src/trpc/routers/mcp/methods/resource.ts:114</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">mcp.readResource</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/mcp/methods/resource.ts#L114">src/trpc/routers/mcp/methods/resource.ts:114</a></span></div></div>
 <div class="method-card__summary">Read resource content</div>
 <div class="method-card__description"><p>Read the content of a specific MCP resource</p></div>
 <div class="method-card__columns">
@@ -2029,7 +2337,7 @@ console.log(result);</code></pre></div>
 ## admin.clearCache
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">admin.clearCache</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/admin/index.ts#L339">src/trpc/routers/admin/index.ts:339</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">admin.clearCache</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/admin/index.ts#L339">src/trpc/routers/admin/index.ts:339</a></span></div></div>
 <div class="method-card__summary">Clear caches and reset services</div>
 <div class="method-card__description"><p>Clear caches and reset services</p><p>Clear system caches and reset services</p></div>
 <div class="method-card__columns">
@@ -2128,7 +2436,7 @@ console.log(result);</code></pre></div>
 ## admin.getConfig
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.getConfig</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/admin/index.ts#L228">src/trpc/routers/admin/index.ts:228</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.getConfig</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/admin/index.ts#L228">src/trpc/routers/admin/index.ts:228</a></span></div></div>
 <div class="method-card__summary">System configuration management</div>
 <div class="method-card__description"><p>System configuration management</p><p>Get current system configuration</p></div>
 <div class="method-card__columns">
@@ -2228,7 +2536,7 @@ console.log(result);</code></pre></div>
 ## admin.getUserInfo
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.getUserInfo</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/admin/index.ts#L185">src/trpc/routers/admin/index.ts:185</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.getUserInfo</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/admin/index.ts#L185">src/trpc/routers/admin/index.ts:185</a></span></div></div>
 <div class="method-card__summary">Get user information (admin only)</div>
 <div class="method-card__description"><p>Get user information (admin only)</p><p>Get detailed user information and permissions</p></div>
 <div class="method-card__columns">
@@ -2355,7 +2663,7 @@ console.log(result);</code></pre></div>
 ## admin.healthCheck
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.healthCheck</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/admin/index.ts#L288">src/trpc/routers/admin/index.ts:288</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.healthCheck</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/admin/index.ts#L288">src/trpc/routers/admin/index.ts:288</a></span></div></div>
 <div class="method-card__summary">System health checks</div>
 <div class="method-card__description"><p>System health checks</p><p>Run comprehensive health checks on all services</p></div>
 <div class="method-card__columns">
@@ -2418,7 +2726,7 @@ console.log(result);</code></pre></div>
 ## admin.statistics
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.statistics</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/admin/index.ts#L121">src/trpc/routers/admin/index.ts:121</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.statistics</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/admin/index.ts#L121">src/trpc/routers/admin/index.ts:121</a></span></div></div>
 <div class="method-card__summary">Get system statistics</div>
 <div class="method-card__description"><p>Get system statistics</p><p>Get detailed system statistics and metrics</p></div>
 <div class="method-card__columns">
@@ -2511,7 +2819,7 @@ console.log(result);</code></pre></div>
 ## admin.status
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.status</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/admin/index.ts#L58">src/trpc/routers/admin/index.ts:58</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">admin.status</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/admin/index.ts#L58">src/trpc/routers/admin/index.ts:58</a></span></div></div>
 <div class="method-card__summary">Server status with detailed information</div>
 <div class="method-card__description"><p>Server status with detailed information</p><p>Get detailed server status and health information</p></div>
 <div class="method-card__columns">
@@ -2787,7 +3095,7 @@ console.log(result);</code></pre></div>
 ## auth.deleteUserKey
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">auth.deleteUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/auth/index.ts#L199">src/trpc/routers/auth/index.ts:199</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">auth.deleteUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/auth/index.ts#L199">src/trpc/routers/auth/index.ts:199</a></span></div></div>
 <div class="method-card__summary">Delete user API key</div>
 <div class="method-card__description"><p>Delete user API key</p></div>
 <div class="method-card__columns">
@@ -2894,7 +3202,7 @@ console.log(result);</code></pre></div>
 ## auth.getUserKey
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">auth.getUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/auth/index.ts#L52">src/trpc/routers/auth/index.ts:52</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">auth.getUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/auth/index.ts#L52">src/trpc/routers/auth/index.ts:52</a></span></div></div>
 <div class="method-card__summary">Get user API key status (without exposing the key)</div>
 <div class="method-card__description"><p>Get user API key status (without exposing the key)</p></div>
 <div class="method-card__columns">
@@ -3001,7 +3309,7 @@ console.log(result);</code></pre></div>
 ## auth.getUserProviders
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">auth.getUserProviders</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/auth/index.ts#L90">src/trpc/routers/auth/index.ts:90</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">auth.getUserProviders</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/auth/index.ts#L90">src/trpc/routers/auth/index.ts:90</a></span></div></div>
 <div class="method-card__summary">Get all configured providers for a user</div>
 <div class="method-card__description"><p>Get all configured providers for a user</p></div>
 <div class="method-card__columns">
@@ -3088,7 +3396,7 @@ console.log(result);</code></pre></div>
 ## auth.rotateUserKey
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">auth.rotateUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/auth/index.ts#L162">src/trpc/routers/auth/index.ts:162</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">auth.rotateUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/auth/index.ts#L162">src/trpc/routers/auth/index.ts:162</a></span></div></div>
 <div class="method-card__summary">Rotate (update) user API key</div>
 <div class="method-card__description"><p>Rotate (update) user API key</p></div>
 <div class="method-card__columns">
@@ -3210,7 +3518,7 @@ console.log(result);</code></pre></div>
 ## auth.storeUserKey
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">auth.storeUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/auth/index.ts#L15">src/trpc/routers/auth/index.ts:15</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">auth.storeUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/auth/index.ts#L15">src/trpc/routers/auth/index.ts:15</a></span></div></div>
 <div class="method-card__summary">Store user API key (BYOK)</div>
 <div class="method-card__description"><p>Store user API key (BYOK)</p></div>
 <div class="method-card__columns">
@@ -3332,7 +3640,7 @@ console.log(result);</code></pre></div>
 ## auth.validateUserKey
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">auth.validateUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/auth/index.ts#L128">src/trpc/routers/auth/index.ts:128</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">auth.validateUserKey</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/auth/index.ts#L128">src/trpc/routers/auth/index.ts:128</a></span></div></div>
 <div class="method-card__summary">Validate user API key</div>
 <div class="method-card__description"><p>Validate user API key</p></div>
 <div class="method-card__columns">
@@ -3441,7 +3749,7 @@ console.log(result);</code></pre></div>
 ## billing.getConsumptionHistory
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getConsumptionHistory</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/billing/index.ts#L92">src/trpc/routers/billing/index.ts:92</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getConsumptionHistory</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/billing/index.ts#L92">src/trpc/routers/billing/index.ts:92</a></span></div></div>
 <div class="method-card__summary">Get consumption history for user</div>
 <div class="method-card__description"><p>Get consumption history for user</p></div>
 <div class="method-card__columns">
@@ -3534,7 +3842,7 @@ console.log(result);</code></pre></div>
 ## billing.getPurchaseHistory
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getPurchaseHistory</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/billing/index.ts#L215">src/trpc/routers/billing/index.ts:215</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getPurchaseHistory</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/billing/index.ts#L215">src/trpc/routers/billing/index.ts:215</a></span></div></div>
 <div class="method-card__summary">Get user&#39;s purchase history (both subscription and one-time)</div>
 <div class="method-card__description"><p>Get user&#39;s purchase history (both subscription and one-time)</p></div>
 <div class="method-card__columns">
@@ -3653,7 +3961,7 @@ console.log(result);</code></pre></div>
 ## billing.getTokenBalance
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getTokenBalance</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/billing/index.ts#L111">src/trpc/routers/billing/index.ts:111</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getTokenBalance</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/billing/index.ts#L111">src/trpc/routers/billing/index.ts:111</a></span></div></div>
 <div class="method-card__summary">Get user&#39;s token balance (requires authentication)</div>
 <div class="method-card__description"><p>Get user&#39;s token balance (requires authentication)</p></div>
 <div class="method-card__columns">
@@ -3721,7 +4029,7 @@ console.log(result);</code></pre></div>
 ## billing.getTopupHistory
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getTopupHistory</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/billing/index.ts#L163">src/trpc/routers/billing/index.ts:163</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getTopupHistory</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/billing/index.ts#L163">src/trpc/routers/billing/index.ts:163</a></span></div></div>
 <div class="method-card__summary">Get user&#39;s token purchase history (requires authentication)</div>
 <div class="method-card__description"><p>Get user&#39;s token purchase history (requires authentication)</p></div>
 <div class="method-card__columns">
@@ -3814,7 +4122,7 @@ console.log(result);</code></pre></div>
 ## billing.getUsageAnalytics
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getUsageAnalytics</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/billing/index.ts#L182">src/trpc/routers/billing/index.ts:182</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getUsageAnalytics</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/billing/index.ts#L182">src/trpc/routers/billing/index.ts:182</a></span></div></div>
 <div class="method-card__summary">Get user&#39;s complete usage analytics (for both subscription and BYOK users)</div>
 <div class="method-card__description"><p>Get user&#39;s complete usage analytics (for both subscription and BYOK users)</p></div>
 <div class="method-card__columns">
@@ -3948,7 +4256,7 @@ console.log(result);</code></pre></div>
 ## billing.getUsageHistory
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getUsageHistory</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/billing/index.ts#L144">src/trpc/routers/billing/index.ts:144</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getUsageHistory</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/billing/index.ts#L144">src/trpc/routers/billing/index.ts:144</a></span></div></div>
 <div class="method-card__summary">Get user&#39;s token usage history (requires authentication)</div>
 <div class="method-card__description"><p>Get user&#39;s token usage history (requires authentication)</p></div>
 <div class="method-card__columns">
@@ -4041,7 +4349,7 @@ console.log(result);</code></pre></div>
 ## billing.getUserTokenBalances
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getUserTokenBalances</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/billing/index.ts#L26">src/trpc/routers/billing/index.ts:26</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.getUserTokenBalances</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/billing/index.ts#L26">src/trpc/routers/billing/index.ts:26</a></span></div></div>
 <div class="method-card__summary">Get user&#39;s token balances (all types)</div>
 <div class="method-card__description"><p>Get user&#39;s token balances (all types)</p></div>
 <div class="method-card__columns">
@@ -4109,7 +4417,7 @@ console.log(result);</code></pre></div>
 ## billing.planConsumption
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.planConsumption</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/billing/index.ts#L58">src/trpc/routers/billing/index.ts:58</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">billing.planConsumption</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/billing/index.ts#L58">src/trpc/routers/billing/index.ts:58</a></span></div></div>
 <div class="method-card__summary">Plan token consumption for a request (preview before execution)</div>
 <div class="method-card__description"><p>Plan token consumption for a request (preview before execution)</p></div>
 <div class="method-card__columns">
@@ -4218,7 +4526,7 @@ console.log(result);</code></pre></div>
 ## system.addServerWorkspace
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.addServerWorkspace</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L275">src/trpc/routers/system/index.ts:275</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.addServerWorkspace</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L275">src/trpc/routers/system/index.ts:275</a></span></div></div>
 <div class="method-card__summary">Add a new server workspace configuration</div>
 <div class="method-card__description"><p>Add a new server workspace configuration</p><p>Add a new server workspace configuration for file operations</p></div>
 <div class="method-card__columns">
@@ -4616,7 +4924,7 @@ console.log(result);</code></pre></div>
 ## system.getServerWorkspaces
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.getServerWorkspaces</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L83">src/trpc/routers/system/index.ts:83</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.getServerWorkspaces</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L83">src/trpc/routers/system/index.ts:83</a></span></div></div>
 <div class="method-card__summary">Get configured server workspaces for client applications</div>
 <div class="method-card__description"><p>Get configured server workspaces for client applications</p><p>Get all configured server workspaces with accessibility status</p></div>
 <div class="method-card__columns">
@@ -4688,7 +4996,7 @@ console.log(result);</code></pre></div>
 ## system.health
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.health</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L69">src/trpc/routers/system/index.ts:69</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.health</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L69">src/trpc/routers/system/index.ts:69</a></span></div></div>
 <div class="method-card__summary">Health check procedure</div>
 <div class="method-card__description"><p>Health check procedure</p></div>
 <div class="method-card__columns">
@@ -4756,7 +5064,7 @@ console.log(result);</code></pre></div>
 ## system.listClientWorkspaces
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.listClientWorkspaces</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L423">src/trpc/routers/system/index.ts:423</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.listClientWorkspaces</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L423">src/trpc/routers/system/index.ts:423</a></span></div></div>
 <div class="method-card__summary">List registered client workspaces (MCP client roots)</div>
 <div class="method-card__description"><p>List registered client workspaces (MCP client roots)
 This is separate from server workspaces and MCP roots/list</p><p>List all registered client workspace folders</p></div>
@@ -4835,7 +5143,7 @@ console.log(result);</code></pre></div>
 ## system.listFiles
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.listFiles</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L16">src/trpc/routers/system/index.ts:16</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.listFiles</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L16">src/trpc/routers/system/index.ts:16</a></span></div></div>
 <div class="method-card__description"><p>List files and directories in a configured root folder</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -4995,7 +5303,7 @@ console.log(result);</code></pre></div>
 ## system.pathExists
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.pathExists</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L19">src/trpc/routers/system/index.ts:19</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.pathExists</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L19">src/trpc/routers/system/index.ts:19</a></span></div></div>
 <div class="method-card__description"><p>Check if a file or directory exists in a configured root folder</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -5136,7 +5444,7 @@ console.log(result);</code></pre></div>
 ## system.readFile
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.readFile</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L17">src/trpc/routers/system/index.ts:17</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">system.readFile</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L17">src/trpc/routers/system/index.ts:17</a></span></div></div>
 <div class="method-card__description"><p>Read the content of a file from a configured root folder</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -5339,7 +5647,7 @@ console.log(result);</code></pre></div>
 ## system.registerClientWorkspace
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.registerClientWorkspace</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L357">src/trpc/routers/system/index.ts:357</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.registerClientWorkspace</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L357">src/trpc/routers/system/index.ts:357</a></span></div></div>
 <div class="method-card__summary">Register a client workspace (MCP client root)</div>
 <div class="method-card__description"><p>Register a client workspace (MCP client root)
 This allows MCP clients to dynamically register their workspace folders</p><p>Register a client workspace folder for MCP access</p></div>
@@ -5536,7 +5844,7 @@ console.log(result);</code></pre></div>
 ## system.removeServerWorkspace
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.removeServerWorkspace</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L325">src/trpc/routers/system/index.ts:325</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.removeServerWorkspace</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L325">src/trpc/routers/system/index.ts:325</a></span></div></div>
 <div class="method-card__summary">Remove a server workspace configuration</div>
 <div class="method-card__description"><p>Remove a server workspace configuration</p></div>
 <div class="method-card__columns">
@@ -5675,7 +5983,7 @@ console.log(result);</code></pre></div>
 ## system.test
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.test</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L56">src/trpc/routers/system/index.ts:56</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.test</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L56">src/trpc/routers/system/index.ts:56</a></span></div></div>
 <div class="method-card__summary">Simple test procedure with minimal Zod schema</div>
 <div class="method-card__description"><p>Simple test procedure with minimal Zod schema</p><p>Just a echo test endpoint</p></div>
 <div class="method-card__columns">
@@ -5796,7 +6104,7 @@ console.log(result);</code></pre></div>
 ## system.unregisterClientWorkspace
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.unregisterClientWorkspace</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L393">src/trpc/routers/system/index.ts:393</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.unregisterClientWorkspace</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L393">src/trpc/routers/system/index.ts:393</a></span></div></div>
 <div class="method-card__summary">Unregister a client workspace (MCP client root)</div>
 <div class="method-card__description"><p>Unregister a client workspace (MCP client root)</p><p>Unregister a client workspace folder</p></div>
 <div class="method-card__columns">
@@ -5935,7 +6243,7 @@ console.log(result);</code></pre></div>
 ## system.writeFile
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.writeFile</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/system/index.ts#L18">src/trpc/routers/system/index.ts:18</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">system.writeFile</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/system/index.ts#L18">src/trpc/routers/system/index.ts:18</a></span></div></div>
 <div class="method-card__description"><p>Write content to a file in a configured root folder</p></div>
 <div class="method-card__columns">
 <div class="method-card__column"><div class="method-section">
@@ -6134,7 +6442,7 @@ console.log(result);</code></pre></div>
 ## user.checkRequestEligibility
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">user.checkRequestEligibility</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/user/index.ts#L189">src/trpc/routers/user/index.ts:189</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">user.checkRequestEligibility</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/user/index.ts#L189">src/trpc/routers/user/index.ts:189</a></span></div></div>
 <div class="method-card__summary">Check if user can make AI requests (subscription users need tokens, BYOK users need API key)</div>
 <div class="method-card__description"><p>Check if user can make AI requests (subscription users need tokens, BYOK users need API key)</p></div>
 <div class="method-card__columns">
@@ -6247,7 +6555,7 @@ console.log(result);</code></pre></div>
 ## user.configureBYOK
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">user.configureBYOK</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/user/index.ts#L78">src/trpc/routers/user/index.ts:78</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">user.configureBYOK</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/user/index.ts#L78">src/trpc/routers/user/index.ts:78</a></span></div></div>
 <div class="method-card__summary">Configure BYOK providers for user (SECURE - API keys stored server-side)</div>
 <div class="method-card__description"><p>Configure BYOK providers for user (SECURE - API keys stored server-side)</p></div>
 <div class="method-card__columns">
@@ -6354,7 +6662,7 @@ console.log(result);</code></pre></div>
 ## user.getBYOKStatus
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">user.getBYOKStatus</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/user/index.ts#L119">src/trpc/routers/user/index.ts:119</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">user.getBYOKStatus</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/user/index.ts#L119">src/trpc/routers/user/index.ts:119</a></span></div></div>
 <div class="method-card__summary">Get BYOK configuration status (without exposing API keys)</div>
 <div class="method-card__description"><p>Get BYOK configuration status (without exposing API keys)</p></div>
 <div class="method-card__columns">
@@ -6422,7 +6730,7 @@ console.log(result);</code></pre></div>
 ## user.getUserProfile
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">user.getUserProfile</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/user/index.ts#L28">src/trpc/routers/user/index.ts:28</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">user.getUserProfile</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/user/index.ts#L28">src/trpc/routers/user/index.ts:28</a></span></div></div>
 <div class="method-card__summary">Get user profile with capabilities and preferences (hybrid users)</div>
 <div class="method-card__description"><p>Get user profile with capabilities and preferences (hybrid users)</p></div>
 <div class="method-card__columns">
@@ -6490,7 +6798,7 @@ console.log(result);</code></pre></div>
 ## user.getUserStatus
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">user.getUserStatus</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/user/index.ts#L159">src/trpc/routers/user/index.ts:159</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">user.getUserStatus</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/user/index.ts#L159">src/trpc/routers/user/index.ts:159</a></span></div></div>
 <div class="method-card__summary">Get user status (subscription vs BYOK, purchase history)</div>
 <div class="method-card__description"><p>Get user status (subscription vs BYOK, purchase history)</p></div>
 <div class="method-card__columns">
@@ -6558,7 +6866,7 @@ console.log(result);</code></pre></div>
 ## user.updateUserPreferences
 
 <div class="method-card">
-<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">user.updateUserPreferences</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/master/src/trpc/routers/user/index.ts#L51">src/trpc/routers/user/index.ts:51</a></span></div></div>
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">user.updateUserPreferences</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Auth required</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/user/index.ts#L51">src/trpc/routers/user/index.ts:51</a></span></div></div>
 <div class="method-card__summary">Update user consumption preferences</div>
 <div class="method-card__description"><p>Update user consumption preferences</p></div>
 <div class="method-card__columns">

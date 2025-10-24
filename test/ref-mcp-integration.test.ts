@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RefMCPIntegration, RefMCPConfig, VSCodeRefIntegration } from '../src/services/mcp/ref-mcp-integration.js';
-import { MCPService } from '../src/services/mcp/mcp-service.js';
+import { RefMCPIntegration, RefMCPConfig, VSCodeRefIntegration } from '../src/services/mcp/ref-mcp-integration';
+import { MCPService } from '../src/services/mcp/mcp-service';
 import fs from 'fs/promises';
 
 // Mock dependencies

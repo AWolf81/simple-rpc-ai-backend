@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MCPRateLimiter, MCPRateLimitConfig } from '../../src/security/rate-limiter.js';
+import { MCPRateLimiter, MCPRateLimitConfig } from '../../src/security/rate-limiter';
 
 // Mock os module for memory monitoring
 vi.mock('os', () => ({

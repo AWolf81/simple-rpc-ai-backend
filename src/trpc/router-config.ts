@@ -5,11 +5,11 @@
  * are included in the generated tRPC methods documentation.
  */
 
-import { WorkspaceManager } from '../services/resources/workspace-manager.js';
+import { WorkspaceManager } from '../services/resources/workspace-manager';
 import type {
   WorkspaceManagerConfig,
   ServerWorkspaceConfig
-} from '../services/resources/workspace-manager.js';
+} from '../services/resources/workspace-manager';
 
 export interface TRPCGenerationConfig {
   /**
@@ -62,6 +62,12 @@ export interface TRPCGenerationConfig {
     enabled: boolean;
     includeInGeneration?: boolean;
   };  
+
+  agents?: {
+    enabled: boolean;
+    includeInGeneration?: boolean;
+    includeSkills?: boolean;
+  };
 
   /** When true all routers are included regardless of individual toggles */
   includeAll?: boolean;
@@ -146,6 +152,11 @@ export function loadTRPCGenerationConfig(): TRPCGenerationConfig {
       enabled: false,  // Disabled by default for consumers
       includeInGeneration: false,
     },
+    agents: {
+      enabled: true,
+      includeInGeneration: true,
+      includeSkills: true
+    }
   };
 
   // Override with environment variables if present
@@ -194,6 +205,15 @@ export function loadTRPCGenerationConfig(): TRPCGenerationConfig {
     config.admin!.includeInGeneration = config.admin!.enabled;
   }
 
+  if (process.env.TRPC_GEN_AGENTS_ENABLED !== undefined) {
+    config.agents!.enabled = process.env.TRPC_GEN_AGENTS_ENABLED === 'true';
+    config.agents!.includeInGeneration = config.agents!.enabled;
+  }
+
+  if (process.env.TRPC_GEN_AGENTS_INCLUDE_SKILLS !== undefined) {
+    config.agents!.includeSkills = process.env.TRPC_GEN_AGENTS_INCLUDE_SKILLS === 'true';
+  }
+
   if (process.env.TRPC_GEN_INCLUDE_ALL === 'true') {
     config.includeAll = true;
 
@@ -214,6 +234,7 @@ export function loadTRPCGenerationConfig(): TRPCGenerationConfig {
     enableSection('billing');
     enableSection('auth');
     enableSection('admin');
+    enableSection('agents');
 
     if (config.mcp?.ai) {
       config.mcp.ai.enabled = true;
@@ -249,7 +270,7 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
   const generationConfig = config || loadTRPCGenerationConfig();
 
   // Import the createAppRouter function dynamically for ES modules
-  const { createAppRouter } = await import('./root.js');
+  const { createAppRouter } = await import('./root');
 
   // Create router configuration for generation
   const routerConfig: any = {};
@@ -257,6 +278,8 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
   // Only include enabled routers in generation
   const includeAI = generationConfig.ai?.enabled && generationConfig.ai?.includeInGeneration;
   const includeMCP = generationConfig.mcp?.enabled && generationConfig.mcp?.includeInGeneration;
+  const includeAgents = generationConfig.includeAll
+    || (generationConfig.agents?.enabled && generationConfig.agents?.includeInGeneration !== false);
 
   // Create MCP configuration for router creation
   const mcpConfig = includeMCP ? {
@@ -287,18 +310,18 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
   console.log(`🔧 tRPC generation – AI ${aiStatus}, MCP ${mcpStatus}${mcpAiStatus ? ` (${mcpAiStatus})` : ''}`);
 
   // Import router creation functions individually using relative paths
-  const { router } = await import('./index.js');
-  const { createMCPRouter } = await import('./routers/mcp/index.js');
-  const { createSystemRouter } = await import('./routers/system/index.js');
-  const { createUserRouter } = await import('./routers/user/index.js');
-  const { createBillingRouter } = await import('./routers/billing/index.js');
-  const { createAuthRouter } = await import('./routers/auth/index.js');
-  const { createAdminRouter } = await import('./routers/admin/index.js');
+  const { router } = await import('./index');
+  const { createMCPRouter } = await import('./routers/mcp/index');
+  const { createSystemRouter } = await import('./routers/system/index');
+  const { createUserRouter } = await import('./routers/user/index');
+  const { createBillingRouter } = await import('./routers/billing/index');
+  const { createAuthRouter } = await import('./routers/auth/index');
+  const { createAdminRouter } = await import('./routers/admin/index');
 
   // Conditionally import AI router only if needed
   let aiRouter = null;
   if (includeAI) {
-    const { createAIRouter } = await import('./routers/ai/index.js');
+    const { createAIRouter } = await import('./routers/ai/index');
     aiRouter = createAIRouter({
       config: aiConfig,
       tokenTrackingEnabled: false,
@@ -401,6 +424,65 @@ export async function createRouterForGeneration(config?: TRPCGenerationConfig): 
       usageAnalyticsService: null,
       virtualTokenService: null
     });
+  }
+
+  if (includeAgents) {
+    try {
+      const { AgentService } = await import('../services/agents/agent-service');
+      const { AIService } = await import('../services/ai/ai-service');
+      const { createServiceProvidersConfig } = await import('./routers/ai/types');
+      const { createAgentRouter } = await import('./routers/agents/index');
+
+      const agentConfigForRouter = {
+        enabled: true,
+        defaultSDK: 'ai-agent',
+        agent: {
+          enableSkills: generationConfig.agents?.includeSkills !== false
+        }
+      } as any;
+
+      const agentAIService = new AIService({
+        serviceProviders: createServiceProvidersConfig(['anthropic'])
+      });
+      const agentService = new AgentService(agentAIService, agentConfigForRouter);
+
+      try {
+        await agentService.initialize();
+      } catch (error: any) {
+        console.warn(`⚠️  Failed to initialize AgentService for generation: ${error?.message || error}`);
+      }
+
+      let skillManager: any = undefined;
+      if (generationConfig.agents?.includeSkills !== false) {
+        try {
+          const { SkillManager } = await import('../services/agents/skills/manager');
+          const { DEFAULT_SANDBOX_CONFIG } = await import('../services/agents/skills/sandbox');
+
+          skillManager = new SkillManager({
+            sources: [],
+            sandbox: DEFAULT_SANDBOX_CONFIG,
+            validation: {
+              enabled: true,
+              maxTokens: { level1: 100, level2: 5000 },
+              requireLicense: false,
+              allowedLicenses: [],
+              requireVersion: false
+            },
+            maxConcurrentLoads: 2
+          });
+        } catch (error: any) {
+          console.warn(`⚠️  Failed to prepare SkillManager for generation: ${error?.message || error}`);
+        }
+      }
+
+      baseRouters.agents = createAgentRouter({
+        agentService,
+        agentConfig: agentConfigForRouter,
+        skillManager
+      });
+    } catch (error: any) {
+      console.warn(`⚠️  Failed to include agents router in generation output: ${error?.message || error}`);
+    }
   }
 
   // Check for custom routers from consumer projects or examples

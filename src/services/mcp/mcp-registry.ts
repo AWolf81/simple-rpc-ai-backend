@@ -8,7 +8,7 @@
 import { EventEmitter } from 'events';
 import { spawn, ChildProcess } from 'child_process';
 import fetch from 'node-fetch';
-import { resolveNodePackageRunner } from '../../utils/node-package-runner.js';
+import { resolveNodePackageRunner } from '../../utils/node-package-runner';
 
 export interface MCPServerConfig {
   id: string;

@@ -22,7 +22,7 @@ vi.mock('@huggingface/inference', () => ({
 }));
 
 // Import after mocking
-import { AIService } from '../src/services/ai/ai-service.js';
+import { AIService } from '../src/services/ai/ai-service';
 
 describe.skip('Hugging Face Provider Tests', () => {
   beforeEach(() => {

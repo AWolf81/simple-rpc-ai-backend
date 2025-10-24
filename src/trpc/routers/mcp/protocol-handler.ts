@@ -8,10 +8,10 @@ import { MCPRateLimiter, getDefaultRateLimiter } from '../../../security/rate-li
 import { SecurityLogger, getDefaultSecurityLogger } from '../../../security/security-logger';
 import { AuthEnforcer, getDefaultAuthEnforcer } from '../../../security/auth-enforcer';
 import { MCPRouterConfig, MCPAuthConfig } from './types';
-import { mcpResourceRegistry } from '../../../services/resources/mcp/mcp-resource-registry.js';
-import { logger } from '../../../utils/logger.js';
-import { redactEmail } from '../../../utils/redact.js';
-import { zodSchemaToJson } from '../../../utils/zod-json-schema.js';
+import { mcpResourceRegistry } from '../../../services/resources/mcp/mcp-resource-registry';
+import { logger } from '../../../utils/logger';
+import { redactEmail } from '../../../utils/redact';
+import { zodSchemaToJson } from '../../../utils/zod-json-schema';
 import fs from 'fs';
 import path from 'path';
 
@@ -45,6 +45,7 @@ export class MCPProtocolHandler {
   private clientCapabilities: any = null;
   private aiEnabled: boolean;
   private namespaceWhitelist?: string[];
+  private suppressAuthWarning: boolean;
 
   constructor(appRouter: any, config?: MCPRouterConfig) {
     this.appRouter = appRouter;
@@ -52,6 +53,7 @@ export class MCPProtocolHandler {
     this.jwtMiddleware = config?.jwtMiddleware;
     this.aiEnabled = config?.ai?.enabled || false;
     this.namespaceWhitelist = config?.namespaceWhitelist;
+    this.suppressAuthWarning = config?.suppressAuthWarning ?? false;
 
     // Initialize auth config with defaults
     this.authConfig = {
@@ -287,14 +289,18 @@ export class MCPProtocolHandler {
     } else if (this.jwtMiddleware) {
       logger.info(`✅ MCP endpoint ready at ${path} (with ${enabledFeatures.join(', ')})`);
     } else {
-      logger.warn(`⚠️  MCP endpoint ready at ${path} (${enabledFeatures.join(', ')} enabled, NO JWT AUTH)`);
-      if (enabledFeatures.length > 0) {
-        logger.warn(`🔒 SECURITY WARNING: MCP authentication is disabled!`);
-        logger.warn(`   This allows unrestricted access to all MCP tools and data.`);
-        logger.warn(`   For production use, enable authentication by configuring:`);
-        logger.warn(`   • OpenSaaS JWT: Set opensaas.enabled = true with publicKey`);
-        logger.warn(`   • Or implement custom JWT middleware`);
-        logger.warn(`   • See docs: specs/features/mcp-oauth-authentication.md`);
+      if (this.suppressAuthWarning) {
+        logger.info(`ℹ️  MCP endpoint ready at ${path} (${enabledFeatures.join(', ')} enabled, auth disabled for local use)`);
+      } else {
+        logger.warn(`⚠️  MCP endpoint ready at ${path} (${enabledFeatures.join(', ')} enabled, NO JWT AUTH)`);
+        if (enabledFeatures.length > 0) {
+          logger.warn(`🔒 SECURITY WARNING: MCP authentication is disabled!`);
+          logger.warn(`   This allows unrestricted access to all MCP tools and data.`);
+          logger.warn(`   For production use, enable authentication by configuring:`);
+          logger.warn(`   • OpenSaaS JWT: Set opensaas.enabled = true with publicKey`);
+          logger.warn(`   • Or implement custom JWT middleware`);
+          logger.warn(`   • See docs: specs/features/mcp-oauth-authentication.md`);
+        }
       }
     }
   }

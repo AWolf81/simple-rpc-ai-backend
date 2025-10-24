@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { FileStorageAdapter } from '../../src/storage/FileStorageAdapter.js';
+import { FileStorageAdapter } from '../../src/storage/FileStorageAdapter';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 

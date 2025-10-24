@@ -25,23 +25,27 @@
     "directory": "tools/simple-agent"
   },
   "scripts": {
-    "start": "tsx src/cli.js",
-    "build": "tsc",
-    "dev": "node --watch src/cli.js"
+    "start": "tsx src/cli.ts",
+    "start:prod": "node dist/cli.js",
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx --watch src/cli.ts"
   },
   "dependencies": {
-    "chalk": "^5.4.1",
+    "chalk": "^4.1.2",
     "commander": "^12.1.0",
     "ink": "^5.1.0",
     "ink-select-input": "^6.0.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
+    "marked-terminal": "^7.3.0",
     "react": "^18.3.1",
     "react-dom": "^19.2.0",
     "simple-rpc-ai-backend": "workspace:*",
-    "strip-ansi": "^7.1.0"
+    "strip-ansi": "^7.1.0",
+    "superjson": "^2.2.2"
   },
   "devDependencies": {
+    "@types/node": "^20.19.11",
     "@types/react": "^18.3.1"
   }
 }

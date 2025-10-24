@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createMCPRouter } from '../src/trpc/routers/mcp/index.js';
-import { MCPService } from '../src/services/mcp/mcp-service.js';
-import { RefMCPIntegration } from '../src/services/mcp/ref-mcp-integration.js';
+import { createMCPRouter } from '../src/trpc/routers/mcp/index';
+import { MCPService } from '../src/services/mcp/mcp-service';
+import { RefMCPIntegration } from '../src/services/mcp/ref-mcp-integration';
 import { TRPCError } from '@trpc/server';
 
 // Mock dependencies

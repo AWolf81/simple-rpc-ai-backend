@@ -4,7 +4,7 @@
  * Manages connections to multiple remote MCP servers and proxies requests.
  */
 import { EventEmitter } from 'events';
-import { RemoteMCPClient, RemoteMCPServerConfig } from './remote-mcp-client.js';
+import { RemoteMCPClient, RemoteMCPServerConfig } from './remote-mcp-client';
 export interface RemoteMCPManagerConfig {
     servers: RemoteMCPServerConfig[];
     autoConnect?: boolean;

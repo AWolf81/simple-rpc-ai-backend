@@ -4,8 +4,8 @@
  * Allows package users to register custom resources with template helpers and dynamic content.
  */
 
-import { handleMCPResourceParameters, createMCPResourceHandler } from './mcp-resource-helpers.js';
-import { logger } from '../../../utils/logger.js';
+import { handleMCPResourceParameters, createMCPResourceHandler } from './mcp-resource-helpers';
+import { logger } from '../../../utils/logger';
 
 export interface MCPResource {
   /** Unique identifier for the resource */

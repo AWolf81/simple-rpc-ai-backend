@@ -122,9 +122,9 @@ export const DEFAULT_MCP_RATE_LIMITS: MCPRateLimitConfig = {
   },
   
   adaptive: {
-    enabled: true,
+    enabled: false,            // Disabled by default (opt-in for production)
     cpuThreshold: 80,          // Start throttling at 80% CPU
-    memoryThreshold: 85,       // Start throttling at 85% memory
+    memoryThreshold: 85,       // Start throttling at 85% memory (often unreliable in dev)
     throttleMultiplier: 0.5    // Reduce limits to 50% when throttling
   }
 };

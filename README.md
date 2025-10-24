@@ -136,6 +136,31 @@ npx check-mcp-security --url http://localhost:8000/mcp
 
 ---
 
+## 🧪 Simple Agent CLI (Experimental)
+
+`simple-agent` is a minimal terminal client that uses this backend internally for all orchestration. It showcases the agent implementation with the server-side skill system, without pulling in the Anthropic Claude Code SDK or Codex SDK directly.
+
+- Built on `createRpcAiServer` with embedded agent + skills support.
+- Ships with progressive disclosure skills (code review, file handling, hello-world example).
+- Uses the Ink UI with slash commands and plugin hooks.
+
+```bash
+pnpm install
+pnpm exec simple-agent init               # scaffold ~/.simple-agent/.env
+echo "ANTHROPIC_API_KEY=sk-ant-..." >> ~/.simple-agent/.env
+pnpm exec simple-agent chat               # launches local backend on :8001 and opens the CLI
+```
+
+More usage details live in **[docs/agents/simple-agent.md](docs/agents/simple-agent.md)**.
+
+**TODOs**
+- Test skill sandboxing end-to-end.
+- Check Anthropic skills in the bundled scenario.
+- Verify simple-agent workflows inside a project directory (read/write file permissions).
+- Improve simple-agent features (basic session history, context usage display in percent based on used model).
+
+---
+
 ## 📸 Screenshots
 
 **Dev Panel – API Explorer**

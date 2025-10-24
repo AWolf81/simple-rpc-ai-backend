@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { LOCALHOST_AVAILABLE } from '../helpers/network';
 import request from 'supertest';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { JWTMiddleware, type OpenSaaSJWTPayload, type AuthenticatedRequest } from '../../src/auth/jwt-middleware';
 
-describe('JWTMiddleware', () => {
+const describeNetwork = LOCALHOST_AVAILABLE ? describe : describe.skip;
+
+describeNetwork('JWTMiddleware', () => {
   let app: express.Application;
   let jwtMiddleware: JWTMiddleware;
   let privateKey: string;

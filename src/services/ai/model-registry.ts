@@ -5,10 +5,10 @@
  * caching, and fallback mechanisms for production safety.
  */
 
-import { getModelSafetyConfig, ModelValidator, type ModelSafetyConfig } from '../../config/model-safety.js';
+import { getModelSafetyConfig, ModelValidator, type ModelSafetyConfig } from '../../config/model-safety';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import { logger } from '../../utils/logger.js';
+import { logger } from '../../utils/logger';
 
 // Get the directory of this file for proper path resolution
 const __filename = fileURLToPath(import.meta.url);
@@ -233,7 +233,7 @@ ${this.config.useRegistry ? `
     // Special handling for Anthropic - use hybrid registry with production models
     if (provider === 'anthropic') {
       try {
-        const { HybridModelRegistry } = await import('./hybrid-model-registry.js');
+        const { HybridModelRegistry } = await import('./hybrid-model-registry');
         const hybridRegistry = new HybridModelRegistry({
           productionMode: true,  // Always use production mode for cached/test
           fallbackToAliases: false
@@ -497,7 +497,7 @@ ${this.config.useRegistry ? `
     
     try {
       // Use hybrid registry for production-safe model selection
-      const { HybridModelRegistry } = await import('./hybrid-model-registry.js');
+      const { HybridModelRegistry } = await import('./hybrid-model-registry');
       const hybridRegistry = new HybridModelRegistry({
         productionMode: process.env.NODE_ENV === 'production',
         fallbackToAliases: false  // Never fallback to aliases - only use models with production mappings

@@ -16,7 +16,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { scanMCPServerPackage, scanMCPServerConfig, formatScanResult, type MCPServerSecurityConfig } from '../security/mcp-server-scanner.js';
+import { scanMCPServerPackage, scanMCPServerConfig, formatScanResult, type MCPServerSecurityConfig } from '../security/mcp-server-scanner';
 
 interface ClaudeDesktopConfig {
   mcpServers?: Record<string, {

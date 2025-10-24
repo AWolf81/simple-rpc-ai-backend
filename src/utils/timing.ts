@@ -5,7 +5,7 @@
  * Controlled via server config or environment variable.
  */
 
-import { logger } from './logger.js';
+import { logger } from './logger';
 
 let timingEnabled = false;
 

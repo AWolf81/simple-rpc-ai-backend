@@ -13,7 +13,7 @@ import { AuthenticatedRequest } from '../auth/jwt-middleware';
 import winston from 'winston';
 import fs from 'fs/promises';
 import path from 'path';
-import { logger as appLogger } from '../utils/logger.js';
+import { logger as appLogger } from '../utils/logger';
 
 // Security event types
 export enum SecurityEventType {

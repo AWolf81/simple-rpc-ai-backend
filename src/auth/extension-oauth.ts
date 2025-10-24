@@ -9,7 +9,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { redactEmail } from '../utils/redact.js';
+import { redactEmail } from '../utils/redact';
 
 export interface ExtensionOAuthState {
   /**

@@ -1230,8 +1230,25 @@ async function setupTRPCPlayground() {
           }
 
           // Create router with custom routers if available
+          const schemaMcpConfig = {
+            enabled: true,
+            ai: {
+              enabled: true,
+              useServerConfig: true,
+              restrictToSampling: true,
+              allowByokOverride: false
+            }
+          };
+
+          const schemaAgentConfig = {
+            enabled: true,
+            defaultSDK: 'ai-agent',
+            agent: {
+              enableSkills: false
+            }
+          };
+
           if (customRouters && Object.keys(customRouters).length > 0) {
-            // Pass customRouters as final parameter: createAppRouter(aiConfig, tokenTracking, db, serverProviders, byokProviders, postgresRPC, mcpConfig, modelRestrictions, serverWorkspaces, customRouters)
             schemaRouter = routerModule.createAppRouter(
               undefined,  // aiConfig
               false,      // tokenTrackingEnabled
@@ -1239,14 +1256,27 @@ async function setupTRPCPlayground() {
               ['anthropic'],  // serverProviders
               ['anthropic'],  // byokProviders
               undefined,  // postgresRPCMethods
-              { enableMCP: true },  // mcpConfig
+              schemaMcpConfig,  // mcpConfig
               undefined,  // modelRestrictions
               undefined,  // serverWorkspaces
-              customRouters  // customRouters (10th parameter)
+              customRouters,  // customRouters (10th parameter)
+              schemaAgentConfig // agentConfig (11th parameter)
             );
             console.log('✅ Router loaded via createAppRouter with custom routers:', Object.keys(customRouters));
           } else {
-            schemaRouter = routerModule.createAppRouter();
+            schemaRouter = routerModule.createAppRouter(
+              undefined,
+              false,
+              undefined,
+              ['anthropic'],
+              ['anthropic'],
+              undefined,
+              schemaMcpConfig,
+              undefined,
+              undefined,
+              undefined,
+              schemaAgentConfig
+            );
             console.log('✅ Router loaded via createAppRouter (core only)');
           }
         } else if (routerModule.getCustomRouters) {

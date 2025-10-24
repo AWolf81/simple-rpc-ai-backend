@@ -7,8 +7,11 @@ import { join } from 'path';
 import crypto from 'crypto';
 import { createRpcAiServer } from '../../src/rpc-ai-server';
 import { createTestMCPConfig, createJWTMCPConfig } from '../../src/security/test-helpers';
+import { LOCALHOST_AVAILABLE } from '../helpers/network';
 
-describe('MCP Authentication', () => {
+const describeNetwork = LOCALHOST_AVAILABLE ? describe : describe.skip;
+
+describeNetwork('MCP Authentication', () => {
   let app: express.Application;
   let server: any;
   const testOAuthToken = 'test_mcp_auth_token_123';

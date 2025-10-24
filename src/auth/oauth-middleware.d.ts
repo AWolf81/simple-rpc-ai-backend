@@ -6,9 +6,9 @@
  */
 import ExpressOAuthServer from '@node-oauth/express-oauth-server';
 import * as OAuth2Server from '@node-oauth/oauth2-server';
-import { SessionStorage } from './session-storage.js';
+import { SessionStorage } from './session-storage';
 import { Request, Response } from 'express';
-import { HandlebarsTemplateEngine, HandlebarsTemplateConfig, HandlebarsTemplateData } from './handlebars-template-engine.js';
+import { HandlebarsTemplateEngine, HandlebarsTemplateConfig, HandlebarsTemplateData } from './handlebars-template-engine';
 interface IdentityProviderConfig {
     type: 'oidc' | 'oauth2';
     clientId: string;

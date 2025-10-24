@@ -8,7 +8,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { logger } from './utils/logger.js';
+import { logger } from './utils/logger';
 
 export interface DevPanelConfig {
   port?: number;

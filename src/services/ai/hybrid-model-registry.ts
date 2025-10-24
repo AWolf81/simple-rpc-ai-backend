@@ -7,7 +7,7 @@
 
 import { getModelsByProvider } from '@anolilab/ai-model-registry';
 import productionModelsData from '../../data/production-models.json' with { type: 'json' };
-import { logger } from '../../utils/logger.js';
+import { logger } from '../../utils/logger';
 
 interface ProductionModelData {
   productionId: string;

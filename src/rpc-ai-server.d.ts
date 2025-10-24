@@ -7,12 +7,12 @@
 import 'dotenv/config';
 import type { Express, Application } from 'express';
 import type { AnyRouter } from '@trpc/server';
-import type { AppRouter } from './trpc/root.js';
-import type { AIRouterConfig } from './trpc/routers/ai/types.js';
-import { MCPExtensionConfig } from './mcp/mcp-config.js';
-import { MCPRateLimitConfig } from './security/rate-limiter.js';
-import { SecurityLoggerConfig } from './security/security-logger.js';
-import { AuthEnforcementConfig } from './security/auth-enforcer.js';
+import type { AppRouter } from './trpc/root';
+import type { AIRouterConfig } from './trpc/routers/ai/types';
+import { MCPExtensionConfig } from './mcp/mcp-config';
+import { MCPRateLimitConfig } from './security/rate-limiter';
+import { SecurityLoggerConfig } from './security/security-logger';
+import { AuthEnforcementConfig } from './security/auth-enforcer';
 export type BuiltInProvider = 'anthropic' | 'openai' | 'google';
 export interface CustomProvider {
     name: string;
@@ -26,6 +26,7 @@ export interface CustomProvider {
 }
 export interface RpcAiServerConfig {
     port?: number;
+    host?: string;
     aiLimits?: AIRouterConfig;
     serverProviders?: (BuiltInProvider | string)[];
     byokProviders?: (BuiltInProvider | string)[];
@@ -66,6 +67,7 @@ export interface RpcAiServerConfig {
         type?: 'postgresql';
         host?: string;
         port?: number;
+    host?: string;
         database?: string;
         user?: string;
         password?: string;
@@ -101,6 +103,7 @@ export interface RpcAiServerConfig {
             redis?: {
                 host?: string;
                 port?: number;
+    host?: string;
                 password?: string;
                 db?: number;
                 keyPrefix?: string;

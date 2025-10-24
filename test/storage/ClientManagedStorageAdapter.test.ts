@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ClientManagedStorageAdapter } from '../../src/storage/ClientManagedStorageAdapter.js';
+import { ClientManagedStorageAdapter } from '../../src/storage/ClientManagedStorageAdapter';
 
 describe('ClientManagedStorageAdapter', () => {
   let adapter: ClientManagedStorageAdapter;

@@ -17,28 +17,47 @@ const __dirname = path.dirname(__filename);
 
 const PLUGINS_DIR = path.join(__dirname, '../../plugins');
 
+export type Plugin = {
+  command: string;
+  description?: string;
+  handler: (args: string[], context: any) => Promise<any> | any;
+};
+
 /**
  * Load all plugins from the plugins directory
  */
-export async function loadPlugins() {
-  const plugins = [];
+export async function loadPlugins(): Promise<Plugin[]> {
+  const plugins: Plugin[] = [];
 
   try {
     const files = await fs.readdir(PLUGINS_DIR);
 
     for (const file of files) {
-      if (file.endsWith('.js') || file.endsWith('.mjs')) {
+      if (file.endsWith('.js') || file.endsWith('.mjs') || file.endsWith('.cjs')) {
         const pluginPath = path.join(PLUGINS_DIR, file);
-        const plugin = await import(`file://${pluginPath}`);
+        // Dynamic file import - use file:// URL for ESM support
+        const pluginModule = await import(`file://${pluginPath}`);
 
-        if (plugin.default && plugin.default.command && plugin.default.handler) {
-          plugins.push(plugin.default);
+        // Support both default export and module namespace export
+        const loaded = (pluginModule && (pluginModule.default ?? pluginModule)) as Partial<Plugin> | undefined;
+
+        if (
+          loaded &&
+          typeof loaded.command === 'string' &&
+          typeof loaded.handler === 'function'
+        ) {
+          plugins.push({
+            command: loaded.command,
+            description: loaded.description,
+            handler: loaded.handler as (args: string[], context: any) => Promise<any>
+          });
         }
       }
     }
-  } catch (error) {
+  } catch (err) {
+    const error = err as any;
     // Plugins directory doesn't exist or is empty - that's ok
-    if (error.code !== 'ENOENT') {
+    if (error?.code !== 'ENOENT') {
       console.error('Error loading plugins:', error);
     }
   }
@@ -49,7 +68,7 @@ export async function loadPlugins() {
 /**
  * Execute a plugin command
  */
-export async function executePlugin(command, args, context) {
+export async function executePlugin(command: string, args: string[], context: any): Promise<any> {
   const plugins = await loadPlugins();
   const plugin = plugins.find(p => p.command === command);
 
@@ -63,17 +82,17 @@ export async function executePlugin(command, args, context) {
 /**
  * Check if a message is a slash command
  */
-export function isSlashCommand(message) {
+export function isSlashCommand(message: string): boolean {
   return message.trim().startsWith('/');
 }
 
 /**
  * Parse a slash command message
  */
-export function parseSlashCommand(message) {
+export function parseSlashCommand(message: string): { command: string; args: string[] } {
   const trimmed = message.trim();
   const parts = trimmed.slice(1).split(/\s+/);
-  const command = parts[0];
+  const command = parts[0] ?? '';
   const args = parts.slice(1);
 
   return { command, args };

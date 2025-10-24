@@ -5,7 +5,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { RemoteMCPClient, RemoteMCPServerConfig, createRemoteMCPClient } from './remote-mcp-client.js';
+import { RemoteMCPClient, RemoteMCPServerConfig, createRemoteMCPClient } from './remote-mcp-client';
 
 export interface RemoteMCPManagerConfig {
   servers: RemoteMCPServerConfig[];

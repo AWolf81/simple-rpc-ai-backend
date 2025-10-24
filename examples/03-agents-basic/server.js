@@ -21,19 +21,28 @@ async function main() {
     agents: {
       enabled: true,
 
+      // Agent behavior configuration (uses main-agent by default)
+      agent: {
+        // Main agent SKILL.md provides core agentic behavior
+        // This is mandatory for proper tool usage and iteration logic
+        defaultSkills: ['main-agent']  // Loaded from src/services/agents/builtin/main-agent
+      },
+
       // New skills system configuration
       skills: {
         enabled: true,
         sources: [
-          // Built-in file-handling skill
+          // Built-in core skills (mandatory for file operations)
           { type: 'builtin', name: 'file-handling' },
+          { type: 'builtin', name: 'script-caller' },
+          { type: 'builtin', name: 'skill-creator' },
 
-          // Local custom skills
+          // Local custom skills (examples)
           { type: 'local', path: './examples/03-agents-basic/custom-skills/brand-guidelines' },
           { type: 'local', path: './examples/03-agents-basic/custom-skills/hello-world' }
         ],
         sandbox: {
-          allowedPaths: ['/workspace', '/tmp'],
+          allowedPaths: ['/workspace', '/tmp', process.cwd()], // cwd is the agent server directory in examples/03-agents-basic
           timeout: 30000,
           maxMemory: 512 * 1024 * 1024
         },

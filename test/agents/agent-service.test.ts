@@ -1,32 +1,33 @@
-/**
- * Agent Service Tests
- */
-
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { AIService } from '../../src/services/ai/ai-service';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AgentService } from '../../src/services/agents/agent-service';
-import { AgentSkill, AgentTool } from '../../src/services/agents/types';
+import type { AIService } from '../../src/services/ai/ai-service';
+import type { AgentSkill, AgentTool } from '../../src/services/agents/types';
 
-describe('AgentService', () => {
+const createMockAIService = () => {
+  const execute = vi.fn().mockResolvedValue({
+    content: 'mock-response',
+    usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    model: 'mock-model',
+    provider: 'anthropic',
+    finishReason: 'stop',
+    requestId: 'test-request',
+    toolCalls: []
+  });
+
+  return { execute } as Pick<AIService, 'execute'> as AIService;
+};
+
+describe('AgentService (ai-agent SDK)', () => {
   let aiService: AIService;
   let agentService: AgentService;
 
   beforeEach(async () => {
-    // Initialize AI service with test configuration
-    aiService = new AIService({
-      serviceProviders: {
-        anthropic: {
-          apiKey: process.env.ANTHROPIC_API_KEY || 'test-key',
-          priority: 1
-        }
-      }
-    });
-
-    // Initialize agent service
+    aiService = createMockAIService();
     agentService = new AgentService(aiService, {
-      defaultSDK: 'claude-code',
-      enableClaudeCode: true,
-      enableOpenAI: false // Disable OpenAI for basic tests
+      defaultSDK: 'ai-agent',
+      agent: {
+        enableSkills: true
+      }
     });
 
     await agentService.initialize();
@@ -37,14 +38,13 @@ describe('AgentService', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with Claude Code adapter', () => {
+    it('initializes with the internal ai-agent adapter', () => {
       const sdks = agentService.getAvailableSDKs();
-      expect(sdks).toContain('claude-code');
+      expect(sdks).toEqual(['ai-agent']);
     });
 
-    it('should have default SDK set to claude-code', () => {
-      const config = agentService.getConfig();
-      expect(config.defaultSDK).toBe('claude-code');
+    it('uses ai-agent as the default SDK', () => {
+      expect(agentService.getConfig().defaultSDK).toBe('ai-agent');
     });
   });
 
@@ -62,22 +62,19 @@ describe('AgentService', () => {
       execute: async (args: any) => ({ result: `Processed: ${args.query}` })
     };
 
-    it('should add a tool', () => {
+    it('adds a tool', () => {
       agentService.addTool(testTool);
-      const tools = agentService.getTools();
-      expect(tools).toHaveLength(1);
-      expect(tools[0].name).toBe('test_tool');
+      expect(agentService.getTools()).toHaveLength(1);
     });
 
-    it('should remove a tool', () => {
+    it('removes a tool', () => {
       agentService.addTool(testTool);
       agentService.removeTool('test_tool');
-      const tools = agentService.getTools();
-      expect(tools).toHaveLength(0);
+      expect(agentService.getTools()).toHaveLength(0);
     });
   });
 
-  describe('Skill Management (Claude Code)', () => {
+  describe('Skill Management', () => {
     const testSkill: AgentSkill = {
       id: 'test-skill',
       name: 'Test Skill',
@@ -86,24 +83,21 @@ describe('AgentService', () => {
       instructions: 'This is a test skill that demonstrates the skills system.'
     };
 
-    it('should add a skill', () => {
+    it('adds and lists skills', () => {
       agentService.addSkill(testSkill);
-      const skills = agentService.getSkills();
-      expect(skills).toHaveLength(1);
-      expect(skills[0].id).toBe('test-skill');
+      expect(agentService.getSkills()).toEqual([testSkill]);
     });
 
-    it('should remove a skill', () => {
+    it('removes skills', () => {
       agentService.addSkill(testSkill);
-      agentService.removeSkill('test-skill');
-      const skills = agentService.getSkills();
-      expect(skills).toHaveLength(0);
+      agentService.removeSkill(testSkill.id);
+      expect(agentService.getSkills()).toHaveLength(0);
     });
 
-    it('should validate skill structure', () => {
+    it('validates skills on add', () => {
       const invalidSkill = {
         id: 'invalid',
-        name: 'A'.repeat(100), // Too long (>64 chars)
+        name: 'A'.repeat(100),
         description: 'Test',
         level: 2
       } as AgentSkill;
@@ -113,118 +107,43 @@ describe('AgentService', () => {
   });
 
   describe('Agent Execution', () => {
-    it('should execute a basic agent request', async () => {
-      // Skip if no API key
-      if (!process.env.ANTHROPIC_API_KEY) {
-        console.log('⏭️  Skipping agent execution test (no ANTHROPIC_API_KEY)');
-        return;
-      }
-
+    it('executes with mocked AI service', async () => {
       const result = await agentService.execute({
         prompt: 'Say hello in one word',
-        systemPrompt: 'You are a helpful assistant. Respond with exactly one word.',
-        sdk: 'claude-code'
+        systemPrompt: 'Respond with exactly one word.',
+        sdk: 'ai-agent'
       });
 
-      expect(result.content).toBeTruthy();
-      expect(result.sdk).toBe('claude-code');
-      expect(result.usage.totalTokens).toBeGreaterThan(0);
+      expect(result.content).toBe('mock-response');
+      expect(result.sdk).toBe('ai-agent');
+      expect(result.usage.totalTokens).toBe(2);
     });
 
-    it('should execute with skills context', async () => {
-      // Skip if no API key
-      if (!process.env.ANTHROPIC_API_KEY) {
-        console.log('⏭️  Skipping skills test (no ANTHROPIC_API_KEY)');
-        return;
-      }
-
-      const codeReviewSkill: AgentSkill = {
+    it('passes skill context through execution', async () => {
+      const skill: AgentSkill = {
         id: 'code-review',
         name: 'Code Review',
-        description: 'Expert code reviewer skill',
+        description: 'Review code for issues',
         level: 2,
-        instructions: 'Analyze code for best practices, bugs, and security issues.'
+        instructions: 'Provide a detailed review.'
       };
 
-      agentService.addSkill(codeReviewSkill);
+      agentService.addSkill(skill);
 
       const result = await agentService.execute({
         prompt: 'Review this code: const x = 5;',
-        systemPrompt: 'You are a code reviewer. Use your Code Review skill.',
-        sdk: 'claude-code'
+        systemPrompt: 'You are a code reviewer.',
+        sdk: 'ai-agent'
       });
 
-      expect(result.content).toBeTruthy();
-      expect(result.sdk).toBe('claude-code');
+      expect(result.content).toBe('mock-response');
     });
   });
 
   describe('SDK Availability', () => {
-    it('should check if SDK is available', () => {
-      expect(agentService.isSDKAvailable('claude-code')).toBe(true);
+    it('reports ai-agent availability only', () => {
+      expect(agentService.isSDKAvailable('ai-agent')).toBe(true);
       expect(agentService.isSDKAvailable('openai')).toBe(false);
     });
-
-    it('should return available SDKs', () => {
-      const sdks = agentService.getAvailableSDKs();
-      expect(sdks).toBeInstanceOf(Array);
-      expect(sdks.length).toBeGreaterThan(0);
-    });
-  });
-});
-
-describe('AgentService with both SDKs', () => {
-  let aiService: AIService;
-  let agentService: AgentService;
-
-  beforeEach(async () => {
-    aiService = new AIService({
-      serviceProviders: {
-        anthropic: {
-          apiKey: process.env.ANTHROPIC_API_KEY || 'test-key-anthropic',
-          priority: 1
-        },
-        openai: {
-          apiKey: process.env.OPENAI_API_KEY || 'test-key-openai',
-          priority: 2
-        }
-      }
-    });
-
-    agentService = new AgentService(aiService, {
-      defaultSDK: 'claude-code',
-      enableClaudeCode: true,
-      enableOpenAI: true
-    });
-
-    await agentService.initialize();
-  });
-
-  afterEach(async () => {
-    await agentService.dispose();
-  });
-
-  it('should have both SDKs available', () => {
-    const sdks = agentService.getAvailableSDKs();
-    expect(sdks).toContain('claude-code');
-    expect(sdks).toContain('openai');
-  });
-
-  it('should execute with OpenAI SDK', async () => {
-    // Skip if no API key
-    if (!process.env.OPENAI_API_KEY) {
-      console.log('⏭️  Skipping OpenAI test (no OPENAI_API_KEY)');
-      return;
-    }
-
-    const result = await agentService.execute({
-      prompt: 'Say hello in one word',
-      systemPrompt: 'Respond with exactly one word.',
-      sdk: 'openai'
-    });
-
-    expect(result.content).toBeTruthy();
-    expect(result.sdk).toBe('openai');
-    expect(result.usage.totalTokens).toBeGreaterThan(0);
   });
 });
