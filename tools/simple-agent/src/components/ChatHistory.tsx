@@ -6,8 +6,51 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import stripAnsi from 'strip-ansi';
 
-export default function ChatHistory({ messages }) {
-  if (messages.length === 0) {
+import { marked } from 'marked';
+import TerminalRenderer from 'marked-terminal';
+
+// Configure marked to use terminal renderer
+marked.setOptions({
+  renderer: new TerminalRenderer()
+});
+
+// Helper to render markdown to terminal format
+function renderMarkdown(text: string): string {
+  try {
+    return marked(text);
+  } catch (error) {
+    // Fallback to plain text if markdown rendering fails
+    return text;
+  }
+}
+
+type Role = 'user' | 'assistant' | 'system' | 'error';
+
+type Usage = {
+  totalTokens?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+};
+
+type ToolCall = {
+  name: string;
+  arguments: any;
+  result: any;
+};
+
+export type Message = {
+  role: Role;
+  content: string;
+  usage?: Usage;
+  toolCalls?: ToolCall[];
+};
+
+interface ChatHistoryProps {
+  messages: Message[];
+}
+
+export default function ChatHistory({ messages }: ChatHistoryProps) {
+  if (!messages || messages.length === 0) {
     return (
       <Box>
         <Text dimColor>
@@ -26,24 +69,32 @@ export default function ChatHistory({ messages }) {
   );
 }
 
-function MessageItem({ message }) {
+function MessageItem({ message }: { message: Message }) {
   const { role, content, usage } = message;
+  const rawContent = content || '';
+
+  // Render markdown for assistant messages, strip ANSI for others
+  const renderedContent = role === 'assistant'
+    ? renderMarkdown(rawContent)
+    : stripAnsi(rawContent);
 
   // User message
   if (role === 'user') {
     return (
-      <Box marginY={1}>
-        <Box marginRight={1}>
-          <Text bold color="green">You:</Text>
+      <Box marginY={1} flexDirection="column">
+        <Box>
+          <Box marginRight={1}>
+            <Text bold color="green">You:</Text>
+          </Box>
         </Box>
-        <Box flexDirection="column">
-          <Text>{content}</Text>
+        <Box paddingLeft={2}>
+          <Text>{renderedContent}</Text>
         </Box>
       </Box>
     );
   }
 
-  // Assistant message
+  // Assistant message - with markdown rendering
   if (role === 'assistant') {
     return (
       <Box marginY={1} flexDirection="column">
@@ -53,11 +104,22 @@ function MessageItem({ message }) {
           </Box>
         </Box>
         <Box flexDirection="column" paddingLeft={2}>
-          <Text>{content}</Text>
+          {/* Tool Executions */}
+          {message.toolCalls && message.toolCalls.length > 0 && (
+            <Box flexDirection="column" marginBottom={1}>
+              {message.toolCalls.map((toolCall, idx) => (
+                <ToolExecutionBlock key={idx} toolCall={toolCall} />
+              ))}
+            </Box>
+          )}
+
+          {/* AI Response */}
+          <Text>{renderedContent}</Text>
+
           {usage && (
             <Box marginTop={1}>
               <Text dimColor>
-                (Tokens: {usage.totalTokens} • Prompt: {usage.promptTokens} • Completion: {usage.completionTokens})
+                (Tokens: {usage.totalTokens ?? '-'} • Prompt: {usage.promptTokens ?? '-'} • Completion: {usage.completionTokens ?? '-'})
               </Text>
             </Box>
           )}
@@ -70,7 +132,7 @@ function MessageItem({ message }) {
   if (role === 'system') {
     return (
       <Box marginY={1}>
-        <Text color="yellow">ℹ️  {content}</Text>
+        <Text color="yellow">ℹ️  {renderedContent}</Text>
       </Box>
     );
   }
@@ -79,10 +141,76 @@ function MessageItem({ message }) {
   if (role === 'error') {
     return (
       <Box marginY={1}>
-        <Text color="red">❌ Error: {content}</Text>
+        <Text color="red">❌ Error: {renderedContent}</Text>
       </Box>
     );
   }
 
   return null;
+}
+
+/**
+ * Tool Execution Block - Shows raw tool output
+ */
+function ToolExecutionBlock({ toolCall }: { toolCall: ToolCall }) {
+  const { name, arguments: args, result } = toolCall;
+
+  // Format the tool result
+  let output = '';
+  let exitCode: number | undefined;
+  let duration: number | undefined;
+
+  if (result && typeof result === 'object') {
+    // Extract structured result (from skill execution)
+    exitCode = result.exitCode;
+    duration = result.duration;
+    output = result.stdout || result.error || JSON.stringify(result, null, 2);
+  } else {
+    output = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+  }
+
+  // Limit output to 4 lines max with ellipsis
+  const lines = output.split('\n');
+  const displayOutput = lines.length > 4
+    ? lines.slice(0, 4).join('\n') + '\n... (' + (lines.length - 4) + ' more lines)'
+    : output;
+
+  const isSuccess = exitCode === undefined || exitCode === 0;
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={isSuccess ? "gray" : "red"}
+      paddingX={1}
+      marginBottom={1}
+    >
+      {/* Tool Header */}
+      <Box>
+        <Text bold color="magenta">🔧 Tool:</Text>
+        <Text color="magenta"> {name}</Text>
+        {exitCode !== undefined && (
+          <Text dimColor> (exit: {exitCode})</Text>
+        )}
+        {duration !== undefined && (
+          <Text dimColor> ({duration}ms)</Text>
+        )}
+      </Box>
+
+      {/* Tool Arguments (if any) */}
+      {args && Object.keys(args).length > 0 && (
+        <Box marginTop={0}>
+          <Text dimColor>Args: {JSON.stringify(args)}</Text>
+        </Box>
+      )}
+
+      {/* Tool Output */}
+      <Box flexDirection="column" marginTop={0}>
+        <Text dimColor>Output:</Text>
+        <Box paddingLeft={1}>
+          <Text color={isSuccess ? "white" : "red"}>{displayOutput.trim()}</Text>
+        </Box>
+      </Box>
+    </Box>
+  );
 }

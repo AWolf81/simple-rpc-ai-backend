@@ -9,6 +9,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 import {
   Skill,
   SkillSource,
@@ -21,14 +22,18 @@ import {
   UrlSkillSource,
   ZipSkillSource,
   BuiltinSkillSource
-} from './types.js';
+} from './types';
 import {
   parseSkillFile,
   loadSkillDirectory,
   estimateTokens,
   extractSkillId
-} from './parser.js';
-import { logger } from '../../../utils/logger.js';
+} from './parser';
+import { logger } from '../../../utils/logger';
+
+// ESM equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Skill Loader - Loads skills from multiple sources

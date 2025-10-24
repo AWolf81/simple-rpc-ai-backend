@@ -99,12 +99,24 @@ export interface SkillMetadata {
 /**
  * Script definition in SKILL.md frontmatter
  */
+export interface SkillScriptArgument {
+  name: string;
+  description?: string;
+  type?: 'string' | 'number' | 'boolean';
+  required?: boolean;
+  enum?: Array<string | number>;
+  default?: string | number | boolean | Array<string | number>;
+  flag?: string;
+  multiple?: boolean;
+}
+
 export interface SkillScript {
   path: string;                   // Relative path from skill root
   runtime: 'python' | 'typescript' | 'javascript' | 'shell';
   description?: string;
   allowedPaths?: string[];        // Override skill-level paths
   timeout?: number;               // Override default timeout
+  args?: SkillScriptArgument[];   // Structured argument metadata
 }
 
 /**
@@ -156,11 +168,24 @@ export interface SkillResources {
  */
 export interface SandboxConfig {
   allowedPaths: string[];         // Paths scripts can access
+  allowedReadPaths?: string[];    // Explicit read allowlist (defaults to allowedPaths)
+  allowedWritePaths?: string[];   // Explicit write allowlist (defaults to allowedPaths)
   timeout: number;                // Milliseconds (default: 30000)
   maxMemory: number;              // Bytes (default: 512MB)
-  networkAccess: false;           // Always disabled
-  environmentVars?: Record<string, string>;  // Whitelisted env vars
+  networkAccess: boolean;          // Enable network access when explicitly permitted
+  allowedNetworkHosts?: string[]; // Optional allowlist when network is enabled
+  blockedNetworkHosts?: string[]; // Optional deny list
+  allowedUnixSockets?: string[];  // Whitelisted unix domain sockets
+  allowChildProcesses?: boolean;  // Allow child process spawning (default: false)
+  allowedEnvVars?: string[];      // Environment variables scripts may read
+  monitorViolations?: boolean;    // Enable OS level violation logging when supported
+  environmentVars?: Record<string, string>;  // Whitelisted env vars injected into sandbox
+  enforceNodePermissions?: boolean;          // Use Node experimental permission flags when available
+  projectRoot?: string;           // Project/workspace root directory for resolving relative paths
 }
+
+// Re-export SandboxProviderConfig for convenience
+export type { SandboxProviderConfig } from './sandbox-provider';
 
 /**
  * Script execution request
@@ -184,6 +209,8 @@ export interface ScriptExecutionResult {
   duration: number;               // Milliseconds
   timedOut: boolean;
   error?: string;
+  violationLogs?: string[];
+  securityWarnings?: string[];
 }
 
 /**

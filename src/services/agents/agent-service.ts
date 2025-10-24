@@ -75,7 +75,7 @@ export class AgentService {
   /**
    * Execute agent request using specified or default SDK
    */
-  async execute(request: AgentExecuteRequest): Promise<AgentExecuteResult> {
+  async execute(request: AgentExecuteRequest, skillTools?: any[]): Promise<AgentExecuteResult> {
     const sdkType = request.sdk || this.config.defaultSDK || 'ai-agent';
 
     const adapter = this.adapters.get(sdkType);
@@ -86,7 +86,13 @@ export class AgentService {
     logger.debug(`🤖 Executing agent request with ${sdkType} SDK`);
 
     try {
-      const result = await adapter.execute(request);
+      // Pass skillTools through the request for the adapter to use
+      const enhancedRequest: any = {
+        ...request,
+        skillTools // Add skillTools to request
+      };
+
+      const result = await adapter.execute(enhancedRequest);
 
       logger.debug(`✅ Agent execution completed: ${result.usage.totalTokens} tokens used`);
 

@@ -1,11 +1,33 @@
 /**
  * AI Service using Vercel AI SDK
- * 
+ *
  * Simple wrapper around Vercel AI SDK for RPC backend services.
  * Handles multiple providers (Anthropic, OpenAI, Google, etc.) seamlessly.
+ *
+ * TODO: REFACTORING NEEDED - File has grown to 2000+ lines
+ *
+ * Proposed refactoring plan:
+ * - Extract tool execution logic into separate ToolExecutionService class
+ *   - executeToolCalls, executeToolCallsWithCustomTools, executeSingleToolCall
+ *   - deduplicateToolCalls, formatToolResultForAI
+ *   - Tool execution tracking and history management
+ *
+ * - Extract model management into separate ModelService class
+ *   - getModel, getDefaultModel, listAvailableModels
+ *   - Provider initialization and configuration
+ *   - Model restrictions and validation
+ *
+ * - Extract conversation continuation into ConversationService class
+ *   - continueWithToolResults, formatExecuteResult
+ *   - Message formatting and conversion
+ *   - Multi-step iteration loop logic
+ *
+ * - Keep AIService as orchestrator with core execute/executeStream methods
+ *   - Coordinate between ModelService, ToolExecutionService, ConversationService
+ *   - Maintain backward compatibility with existing API
  */
 
-import { generateText, streamText } from 'ai';
+import { generateText, streamText, tool as createTool, convertToModelMessages, jsonSchema } from 'ai';
 import { createAnthropic, anthropic } from '@ai-sdk/anthropic';
 import { createOpenAI, openai } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
@@ -14,11 +36,14 @@ import { InferenceClient } from '@huggingface/inference';
 import crypto from 'crypto';
 import { LanguageModel } from 'ai';
 import { MCPService, MCPServiceConfig } from '../mcp/mcp-service';
-import { ModelRegistry } from './model-registry.js';
-import { hybridRegistry } from './hybrid-model-registry.js';
-import type { ModelInfo } from './model-registry.js';
-import { TimingLogger } from '../../utils/timing.js';
-import { logger } from '../../utils/logger.js';
+import { ModelRegistry } from './model-registry';
+import { hybridRegistry } from './hybrid-model-registry';
+import type { ModelInfo } from './model-registry';
+import { TimingLogger } from '../../utils/timing';
+import { logger } from '../../utils/logger';
+import type { Tool as ProviderTool } from '@ai-sdk/provider-utils';
+import type { UIMessage } from 'ai';
+import yaml from 'js-yaml';
 
 /**
  * Configuration options for Hugging Face model adapter
@@ -168,11 +193,12 @@ export interface AIServiceConfig {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  maxToolIterations?: number;
   mcpConfig?: MCPServiceConfig; // MCP service configuration for web search
   
   // Model Registry Configuration
   modelRegistry?: {
-    registryConfig?: Partial<import('../../config/model-safety.js').ModelSafetyConfig>;
+    registryConfig?: Partial<import('../../config/model-safety').ModelSafetyConfig>;
   };
   
   // Model Restrictions Configuration
@@ -187,6 +213,13 @@ export interface ExecuteRequest {
   content: string;
   promptId?: string; // Can be a key (like "code_review") or direct text
   systemPrompt?: string; // Legacy - for backward compatibility
+  messages?: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>; // Conversation history
+  tools?: Array<{
+    name: string;
+    description: string;
+    parameters: any; // JSON Schema
+    execute?: (args: any) => Promise<any>; // Optional execution function for custom tools
+  }>;
   metadata?: {
     name?: string;
     type?: string;
@@ -194,6 +227,7 @@ export interface ExecuteRequest {
     model?: string;
     maxTokens?: number;
     temperature?: number;
+    maxToolIterations?: number;
     useWebSearch?: boolean;
     webSearchPreference?: 'duckduckgo' | 'mcp' | 'ai-web-search' | 'never';
     maxWebSearches?: number;
@@ -227,6 +261,12 @@ export interface ExecuteResult {
   provider?: string;
   requestId?: string;
   finishReason?: string;
+  toolCalls?: Array<{
+    name: string;
+    arguments: any;
+    result: any;
+  }>;
+  progressMessages?: string[];
 }
 
 export interface SearchResult {
@@ -364,6 +404,7 @@ export class AIService {
     allowedPatterns?: string[];
     blockedModels?: string[];
   }>;
+  private toolExecutionTracker = new Map<string, Promise<any>>(); // Track ongoing tool executions by ID to prevent duplicates
 
   constructor(config: AIServiceConfig) {
     // Initialize system prompts from config or use defaults
@@ -446,6 +487,7 @@ export class AIService {
       model: metadata.model || options.model,
       maxTokens: metadata.maxTokens || options.maxTokens,
       temperature: metadata.temperature || options.temperature,
+      maxToolIterations: metadata.maxToolIterations ?? this.config.maxToolIterations ?? 4,
       useWebSearch: metadata.useWebSearch || false,
       webSearchPreference: metadata.webSearchPreference || 'duckduckgo'
     };
@@ -463,6 +505,7 @@ export class AIService {
     logger.debug(`   Model: ${executionConfig.model || 'default'}`);
     logger.debug(`   API Key: ${apiKey ? 'Provided' : 'None'}`);
     logger.debug(`   Web Search: ${executionConfig.useWebSearch ? executionConfig.webSearchPreference : 'DISABLED'}`);
+    logger.debug(`   Max tool iterations: ${executionConfig.maxToolIterations}`);
 
     // Debug model creation
     logger.debug(`🔧 Model Debug: Creating model for provider=${executionConfig.provider}, model=${executionConfig.model || 'default'}`);
@@ -483,26 +526,51 @@ export class AIService {
     // Prepare tools and enhanced system prompt
     const { enhancedSystemPrompt, availableTools } = await this.prepareAIExecution(
       systemPrompt,
-      executionConfig
+      executionConfig,
+      request.tools // Pass custom tools (skills, agent tools, etc.)
     );
     let t3 = timing.checkpoint('Prepared AI execution', t2);
 
     // Create the user prompt from content
     const userPrompt = content;
 
+    // Build messages array - use provided messages or create new one
+    let conversationMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+    if (request.messages && request.messages.length > 0) {
+      // Use provided conversation history and append current message
+      conversationMessages = [
+        ...request.messages,
+        { role: 'user', content: userPrompt }
+      ];
+    } else {
+      // Simple single-message case
+      conversationMessages = [
+        { role: 'user', content: userPrompt }
+      ];
+    }
+
     try {
-      const generateOptions: any = {
+      const normalizedMessages = conversationMessages.map(msg => ({
+        role: msg.role,
+        parts: [{
+          type: 'text' as const,
+          text: msg.content
+        }]
+      })) as Array<Omit<UIMessage, 'id'>>;
+
+      const modelMessages = convertToModelMessages(normalizedMessages);
+
+      let generateOptions: any = {
         model,
-        messages: [
-          { role: 'system', content: enhancedSystemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
+        system: enhancedSystemPrompt,  // System prompt is separate, not in messages array
+        messages: modelMessages,
         maxTokens: executionConfig.maxTokens || this.config.maxTokens || 4000,
         temperature: executionConfig.temperature || this.config.temperature || 0.3,
       };
 
       // Add tools if available
-      if (availableTools.length > 0) {
+      const hasTools = Array.isArray(availableTools) ? availableTools.length > 0 : Object.keys(availableTools).length > 0;
+      if (hasTools) {
         if (executionConfig.webSearchPreference === 'ai-web-search') {
           // For provider-native tools, pass them directly to the AI SDK
           generateOptions.tools = availableTools;
@@ -522,26 +590,107 @@ export class AIService {
       logger.debug(`   Model provider: ${(model as any)?.provider}`);
       logger.debug(`   Generate options keys: ${Object.keys(generateOptions)}`);
       logger.debug(`   Max tokens: ${generateOptions.maxTokens}`);
+      logger.debug(`   Messages count: ${normalizedMessages.length}`);
+      logger.debug(`   Has tools: ${hasTools}`);
+      if (hasTools) {
+        const toolNames = Object.keys(availableTools);
+        logger.debug(`   Tool names: ${toolNames.join(', ')}`);
+        toolNames.forEach(name => {
+          const tool = availableTools[name];
+          logger.debug(`   Tool ${name}:`, {
+            hasDescription: !!tool.description,
+            hasExecute: !!tool.execute,
+            inputSchemaKeys: tool.parameters ? Object.keys(tool.parameters) : 'none'
+          });
+        });
+      }
+      logger.debug(`   Messages:`, JSON.stringify(normalizedMessages, null, 2));
 
       let t4 = timing.checkpoint('Calling generateText (Vercel AI SDK)', t3);
-      const result = await generateText(generateOptions);
+      let result = await generateText(generateOptions);
       let t5 = timing.checkpoint('generateText completed', t4);
 
-      // Handle tool calls if present (only for MCP tools, not provider-native)
-      if (result.toolCalls && result.toolCalls.length > 0 && executionConfig.webSearchPreference !== 'ai-web-search') {
-        logger.debug(`🔧 AI requested ${result.toolCalls.length} MCP tool calls`);
-        
-        // Execute tool calls via MCP
-        const toolResults = await this.executeToolCalls(result.toolCalls);
-        
-        // Continue conversation with tool results
-        const finalResult = await this.continueWithToolResults(
-          generateOptions,
-          result,
-          toolResults
-        );
-        
-        return this.formatExecuteResult(finalResult, executionConfig);
+      const allToolHistory: Array<{ name: string; arguments: any; result: any }> = [];
+      const progressMessages: string[] = [];
+      const progressCallback = (message: string) => {
+        progressMessages.push(message);
+        logger.info(`[progress] ${message}`);
+      };
+
+      // Execute tool calls if present and tools are available - with iteration loop
+      if (executionConfig.webSearchPreference !== 'ai-web-search' && hasTools && result.toolCalls && result.toolCalls.length > 0) {
+        const maxSteps = typeof executionConfig.maxToolIterations === 'number'
+          ? Math.max(1, executionConfig.maxToolIterations)
+          : 4;
+
+        logger.info(`🔧 AI requested ${result.toolCalls.length} tool call(s), max steps: ${maxSteps}`);
+
+        try {
+          let currentResult = result;
+          let currentOptions = generateOptions;
+          let stepCount = 0;
+
+          // Loop until no more tool calls or max steps reached
+          while (currentResult.toolCalls && currentResult.toolCalls.length > 0 && stepCount < maxSteps) {
+            stepCount++;
+            logger.info(`🔄 Tool iteration ${stepCount}/${maxSteps}...`);
+
+            // Execute the requested tool calls
+            const toolCallResults = await this.executeToolCallsWithCustomTools(
+              currentResult.toolCalls,
+              request.tools,
+              progressCallback
+            );
+
+            // Track the tool executions in history
+            currentResult.toolCalls.forEach((tc) => {
+              const toolCallId = (tc as any).toolCallId;
+              allToolHistory.push({
+                name: (tc as any).toolName,
+                arguments: this.extractToolArguments(tc),
+                result: toolCallResults[toolCallId]?.result || {}
+              });
+            });
+
+            logger.info(`✅ Tool execution completed: ${allToolHistory.length} total tool call(s) executed`);
+
+            // Continue conversation with tool results
+            // Allow further tool calls only if we haven't reached max steps
+            const allowMoreTools = stepCount < maxSteps;
+            logger.info(`🔄 Continuing conversation with tool results (allow more tools: ${allowMoreTools})...`);
+
+            const continuationResult = await this.continueWithToolResults(
+              currentOptions,
+              currentResult,
+              Object.values(toolCallResults),
+              allowMoreTools
+            );
+
+            // Update for next iteration
+            currentResult = continuationResult.result;
+            currentOptions = continuationResult.options;
+
+            // If no more tool calls or finish reason is stop, we're done
+            if (!currentResult.toolCalls || currentResult.toolCalls.length === 0 || currentResult.finishReason === 'stop') {
+              logger.info(`✅ Tool iteration completed - finishReason: ${currentResult.finishReason}`);
+              break;
+            }
+          }
+
+          // Update final result
+          result = currentResult;
+
+          if (stepCount >= maxSteps && result.toolCalls && result.toolCalls.length > 0) {
+            logger.warn(`⚠️  Reached max tool iterations (${maxSteps}), stopping even though AI wants more tool calls`);
+          }
+
+          logger.info(`✅ All tool executions completed: ${allToolHistory.length} total call(s) in ${stepCount} iteration(s)`);
+        } catch (agentError) {
+          logger.error(`❌ Tool execution failed:`, agentError);
+          logger.error(`   Error details:`, agentError);
+          // Fall back to using the initial result
+          logger.warn(`⚠️  Falling back to initial result without tool execution`);
+        }
       }
 
       timing.end();
@@ -549,6 +698,11 @@ export class AIService {
       const promptTokens = result.usage.inputTokens ?? (result.usage as any).promptTokens ?? 0;
       const completionTokens = result.usage.outputTokens ?? (result.usage as any).completionTokens ?? 0;
       const totalTokens = result.usage.totalTokens ?? (promptTokens + completionTokens);
+
+      // If there were tool calls processed, include the tool history in the response
+      if (allToolHistory.length > 0) {
+        return this.formatExecuteResult(result, executionConfig, undefined, undefined, allToolHistory, progressMessages);
+      }
 
       return {
         content: result.text,
@@ -560,7 +714,8 @@ export class AIService {
         model: typeof model === 'string' ? model : model.modelId,
         provider: executionConfig.provider,
         requestId: crypto.randomUUID(),
-        finishReason: result.finishReason
+        finishReason: result.finishReason,
+        progressMessages
       };
 
     } catch (error: any) {
@@ -593,7 +748,20 @@ export class AIService {
         errorMessage += `: ${error.message}`;
       }
       
-      throw new Error(errorMessage);
+      // Instead of throwing, return a proper error response that can be handled by the caller
+      return {
+        content: `Error: ${errorMessage}`,
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        },
+        model: modelForError,
+        provider: provider,
+        requestId: crypto.randomUUID(),
+        finishReason: 'error',
+        progressMessages: [`❌ ${errorMessage}`]
+      };
     }
   }
 
@@ -639,7 +807,8 @@ export class AIService {
     // Prepare tools and enhanced system prompt
     const { enhancedSystemPrompt, availableTools } = await this.prepareAIExecution(
       systemPrompt,
-      executionConfig
+      executionConfig,
+      request.tools // Pass custom tools (skills, agent tools, etc.)
     );
 
     const userPrompt = content;
@@ -940,11 +1109,60 @@ export class AIService {
    * Prepare AI execution with tools and enhanced system prompt
    */
   private async prepareAIExecution(
-    systemPrompt: string, 
-    executionConfig: any
-  ): Promise<{ enhancedSystemPrompt: string; availableTools: any[] }> {
+    systemPrompt: string,
+    executionConfig: any,
+    customTools?: any[]
+  ): Promise<{ enhancedSystemPrompt: string; availableTools: any }> {
     let enhancedSystemPrompt = systemPrompt;
-    let availableTools: any[] = [];
+    let availableTools: any = {}; // Tools can be object or array
+
+    // Include custom tools first (skills, agent tools, etc.)
+    if (customTools && customTools.length > 0) {
+      // Convert tools to Vercel AI SDK format
+      // Tools should be an object with tool names as keys
+      const toolsObject: Record<string, any> = {};
+
+      customTools.forEach(tool => {
+        const params = tool.parameters || { type: 'object', properties: {}, required: [] };
+        logger.debug(`🔧 Converting tool: ${tool.name}, schema type: ${params.type}, schema:`, JSON.stringify(params, null, 2));
+
+        // Validate that params has required 'type' field
+        if (!params.type) {
+          logger.warn(`⚠️  Tool ${tool.name} parameters missing 'type' field, adding it`);
+          params.type = 'object';
+        }
+
+        // Get execute function
+        let executeFunction: ((args: any) => Promise<any>) | undefined;
+        if (typeof tool.execute === 'function') {
+          executeFunction = async (args: any) => {
+            return await tool.execute(args);
+          };
+        } else if (typeof tool.run === 'function') {
+          executeFunction = async (args: any) => {
+            return await tool.run(args);
+          };
+        }
+
+        // Use the tool() helper from Vercel AI SDK for proper format
+        // The AI SDK v5 tool() function expects: { description?, inputSchema, execute? }
+        // Note: Use inputSchema (camelCase) for AI SDK v5+, not parameters
+        // Note: inputSchema must be wrapped in jsonSchema() helper for plain JSON schemas
+        const createdTool = createTool({
+          description: tool.description || `Execute ${tool.name}`,
+          inputSchema: jsonSchema(params), // Wrap JSON schema with jsonSchema() helper
+          execute: executeFunction
+        });
+
+        // Add to tools object
+        toolsObject[tool.name] = createdTool;
+      });
+
+      // AI SDK v5+ expects tools as a Record<string, Tool>, not an array
+      // Keep as Record for proper tool registration
+      availableTools = toolsObject;
+      logger.debug(`✅ Converted ${customTools.length} custom tools to AI SDK format (as Record)`);
+    }
 
     // Handle different web search preferences
     if (executionConfig.useWebSearch && executionConfig.webSearchPreference !== 'never') {
@@ -1109,29 +1327,46 @@ The tools will be available during our conversation. Call them when needed to ga
   /**
    * Execute tool calls requested by the AI
    */
-  private async executeToolCalls(toolCalls: any[]): Promise<any[]> {
+  private async executeToolCalls(
+    toolCalls: any[],
+    customTools?: any[],
+    progressCallback?: (message: string) => void
+  ): Promise<any[]> {
     const toolResults: any[] = [];
-    
+
+    // Note: Deduplication now happens at a higher level (before this method is called)
+    // This method executes the already-deduplicated tool calls
     for (const toolCall of toolCalls) {
-      // Privacy: Don't log user input - only log tool name
-      logger.debug(`🔧 Executing tool: ${toolCall.toolName}`);
+      logger.info('🧾 Raw tool call payload:', JSON.stringify(toolCall, null, 2));
+      progressCallback?.(`➡️  Calling ${toolCall.toolName}…`);
+
+      // Check if this tool call ID is already being executed to prevent concurrent duplicates
+      if (this.toolExecutionTracker.has(toolCall.toolCallId)) {
+        logger.warn(`⚠️  Tool call ID already in progress: ${toolCall.toolCallId} for tool ${toolCall.toolName}`);
+        // Wait for the existing execution to complete and reuse its result
+        const existingResult = await this.toolExecutionTracker.get(toolCall.toolCallId);
+        toolResults.push({
+          ...existingResult,
+          toolCallId: toolCall.toolCallId  // Ensure correct ID
+        });
+        continue; // Skip duplicate execution
+      }
       
+      // Privacy: Don't log user input - only log tool name
+      logger.debug(`🔧 Executing tool: ${toolCall.toolName} (ID: ${toolCall.toolCallId})`);
+
       try {
-        let result;
-        
-        if (this.mcpService) {
-          // Execute via MCP service
-          const mcpResult = await this.mcpService.executeToolForAI({
-            name: toolCall.toolName,
-            arguments: toolCall.args
-          });
-          
-          result = mcpResult.success ? mcpResult.result : { error: mcpResult.error };
-        } else {
-          // No MCP service available
-          result = { error: 'MCP service not available' };
+        // Create a promise for the tool execution and track it
+        const executionPromise = this.executeSingleToolCall(toolCall, customTools);
+
+        // Track the execution by toolCallId to prevent concurrent duplicate executions
+        this.toolExecutionTracker.set(toolCall.toolCallId, executionPromise);
+
+        const result = await executionPromise;
+        if (!result?.error) {
+          progressCallback?.(`✅ ${toolCall.toolName} completed`);
         }
-        
+
         toolResults.push({
           toolCallId: toolCall.toolCallId,
           toolName: toolCall.toolName,
@@ -1141,63 +1376,482 @@ The tools will be available during our conversation. Call them when needed to ga
         
       } catch (error) {
         logger.error(`🚨 Tool execution failed for ${toolCall.toolName}:`, error);
+        progressCallback?.(`⚠️  ${toolCall.toolName} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         toolResults.push({
           toolCallId: toolCall.toolCallId,
           toolName: toolCall.toolName,
           result: { error: error instanceof Error ? error.message : 'Unknown error' },
           success: false
         });
+      } finally {
+        // Clean up the tracker after execution completes
+        this.toolExecutionTracker.delete(toolCall.toolCallId);
       }
     }
     
+    // Ensure tracker is fully cleared between requests
+    this.toolExecutionTracker.clear();
+
     return toolResults;
   }
 
   /**
+   * Execute tool calls and return results as a Map indexed by toolCallId
+   */
+  private async executeToolCallsWithCustomTools(
+    toolCalls: any[],
+    customTools?: any[],
+    progressCallback?: (message: string) => void
+  ): Promise<Record<string, any>> {
+    const results = await this.executeToolCalls(toolCalls, customTools, progressCallback);
+
+    // Convert array to Record indexed by toolCallId
+    const resultsMap: Record<string, any> = {};
+    results.forEach(result => {
+      resultsMap[result.toolCallId] = result;
+    });
+
+    return resultsMap;
+  }
+
+  /**
+   * Execute a single tool call
+   */
+  private async executeSingleToolCall(toolCall: any, customTools?: any[]) {
+    try {
+      let result;
+
+      // Check if it's a custom tool first (skills, agent tools)
+      const customTool = customTools?.find(t => t.name === toolCall.toolName);
+      const rawArgs = this.extractToolArguments(toolCall);
+
+      if (customTool && customTool.execute) {
+        logger.info(`🎯 Executing custom tool: ${toolCall.toolName}`);
+        logger.info(`   Raw args type: ${typeof rawArgs}`, typeof rawArgs === 'string' ? rawArgs : JSON.stringify(rawArgs, null, 2));
+        const parsedArgs = this.parseToolArguments(rawArgs);
+        logger.info(`   Parsed args:`, typeof parsedArgs === 'string' ? parsedArgs : JSON.stringify(parsedArgs, null, 2));
+        result = await customTool.execute(parsedArgs);
+      } else if (this.mcpService) {
+        // Execute via MCP service
+        logger.info(`🔌 Executing MCP tool: ${toolCall.toolName}`);
+        logger.info(`   Raw args type: ${typeof rawArgs}`, typeof rawArgs === 'string' ? rawArgs : JSON.stringify(rawArgs, null, 2));
+        const parsedArgs = this.parseToolArguments(rawArgs);
+        logger.info(`   Parsed args:`, typeof parsedArgs === 'string' ? parsedArgs : JSON.stringify(parsedArgs, null, 2));
+        const mcpResult = await this.mcpService.executeToolForAI({
+          name: toolCall.toolName,
+          arguments: parsedArgs
+        });
+
+        result = mcpResult.success ? mcpResult.result : { error: mcpResult.error };
+      } else {
+        // Attempt numeric fallback (LLMs sometimes reply with menu numbers)
+        const availableCustomTools = customTools?.map(t => t.name) || [];
+        const numericMatch = typeof toolCall.toolName === 'string' && /^\d+$/.test(toolCall.toolName);
+        if (numericMatch && availableCustomTools.length > 0) {
+          const numericIndex = parseInt(toolCall.toolName, 10) - 1; // LLMs tend to use 1-based numbering
+          const fallbackTool = customTools?.[numericIndex];
+          if (fallbackTool && fallbackTool.execute) {
+            logger.warn(`⚠️  Tool name "${toolCall.toolName}" is numeric. Using fallback tool "${fallbackTool.name}" at index ${numericIndex + 1}.`);
+            logger.info(`   Raw args type: ${typeof rawArgs}`, typeof rawArgs === 'string' ? rawArgs : JSON.stringify(rawArgs, null, 2));
+            const parsedArgs = this.parseToolArguments(rawArgs);
+            logger.info(`   Parsed args:`, typeof parsedArgs === 'string' ? parsedArgs : JSON.stringify(parsedArgs, null, 2));
+            result = await fallbackTool.execute(parsedArgs);
+          } else {
+            logger.warn(`⚠️  Numeric tool index "${toolCall.toolName}" did not map to a known tool. Available tools: ${availableCustomTools.join(', ') || 'none'}`);
+            result = { error: 'MCP service not available' };
+          }
+        } else {
+          // No MCP service available / tool not found
+          logger.warn(`⚠️  Custom tool not found: ${toolCall.toolName}. Available tools: ${availableCustomTools.join(', ') || 'none'}`);
+          result = { error: 'MCP service not available' };
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      logger.error(`🚨 Tool execution failed for ${toolCall.toolName}:`, error);
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Extract raw arguments from various tool call formats returned by providers.
+   */
+  private extractToolArguments(toolCall: any): unknown {
+    if (!toolCall) {
+      return undefined;
+    }
+
+    if (toolCall.args !== undefined) {
+      return toolCall.args;
+    }
+
+    if (toolCall.arguments !== undefined) {
+      return toolCall.arguments;
+    }
+
+    if (toolCall.input !== undefined) {
+      return toolCall.input;
+    }
+
+    if (Array.isArray(toolCall.content)) {
+      const inputJsonPart = toolCall.content.find((part: any) => part?.type === 'input_json' && part?.input_json !== undefined);
+      if (inputJsonPart) {
+        return inputJsonPart.input_json;
+      }
+
+      const textPart = toolCall.content.find((part: any) => part?.type === 'text' && typeof part?.text === 'string');
+      if (textPart) {
+        return textPart.text;
+      }
+    }
+
+    if (typeof toolCall.argsText === 'string') {
+      return toolCall.argsText;
+    }
+
+    // As a last resort, log the unexpected shape for debugging
+    logger.warn('⚠️  Unable to determine tool call arguments from payload:', toolCall);
+
+    return undefined;
+  }
+
+  /**
+   * Normalize tool arguments from AI SDK responses.
+   * Some providers return JSON strings; parse those into objects when possible.
+   */
+  private parseToolArguments(rawArgs: unknown): unknown {
+    if (typeof rawArgs !== 'string') {
+      return rawArgs;
+    }
+
+    const trimmed = rawArgs.trim();
+    if (
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        logger.info('✅ Parsed tool arguments from JSON string.', typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2));
+        return parsed;
+      } catch (error) {
+        logger.warn('Failed to parse tool arguments as JSON, using raw string:', {
+          error: error instanceof Error ? error.message : error,
+          rawArgs
+        });
+        try {
+          const yamlParsed = yaml.load(trimmed);
+          if (yamlParsed !== undefined) {
+            logger.info('✅ Parsed tool arguments via YAML loader.', typeof yamlParsed === 'string' ? yamlParsed : JSON.stringify(yamlParsed, null, 2));
+            return yamlParsed;
+          }
+        } catch (yamlError) {
+          logger.warn('Failed to parse tool arguments via YAML loader:', {
+            error: yamlError instanceof Error ? yamlError.message : yamlError,
+            rawArgs
+          });
+        }
+      }
+    }
+
+    return rawArgs;
+  }
+
+  /**
+   * Deduplicate tool calls based on tool name and arguments
+   * Returns unique calls and a mapping of all IDs to their canonical call
+   */
+  private deduplicateToolCalls(toolCalls: any[]): {
+    uniqueToolCalls: any[];
+    allToolCallIds: Map<string, string>; // all IDs -> canonical ID
+  } {
+    const signatureToCanonical = new Map<string, any>();
+    const allToolCallIds = new Map<string, string>();
+    const uniqueToolCalls: any[] = [];
+
+    for (const toolCall of toolCalls) {
+      // Create signature based on tool name and arguments
+      const args = toolCall.args || {};
+      const sortedKeys = Object.keys(args).sort();
+      const argsStr = sortedKeys.map(key => `${key}=${JSON.stringify(args[key])}`).join('|');
+      const signature = `${toolCall.toolName}(${argsStr})`;
+
+      if (signatureToCanonical.has(signature)) {
+        // Duplicate - map this ID to canonical ID
+        const canonicalCall = signatureToCanonical.get(signature)!;
+        allToolCallIds.set(toolCall.toolCallId, canonicalCall.toolCallId);
+        logger.debug(`   🔄 Duplicate detected: ${toolCall.toolCallId} → ${canonicalCall.toolCallId}`);
+      } else {
+        // First occurrence - this is canonical
+        signatureToCanonical.set(signature, toolCall);
+        allToolCallIds.set(toolCall.toolCallId, toolCall.toolCallId);
+        uniqueToolCalls.push(toolCall);
+      }
+    }
+
+    return { uniqueToolCalls, allToolCallIds };
+  }
+
+  /**
+   * Map execution results from unique calls to all original tool call IDs
+   */
+  private mapResultsToAllIds(
+    uniqueResults: any[],
+    allToolCallIds: Map<string, string>
+  ): any[] {
+    // Build map of canonical ID -> result
+    const canonicalResults = new Map<string, any>();
+    uniqueResults.forEach(result => {
+      canonicalResults.set(result.toolCallId, result);
+    });
+
+    // Map results to all original IDs
+    const allResults: any[] = [];
+    allToolCallIds.forEach((canonicalId, originalId) => {
+      const result = canonicalResults.get(canonicalId);
+      if (result) {
+        allResults.push({
+          ...result,
+          toolCallId: originalId // Use original ID for proper conversation tracking
+        });
+      } else {
+        logger.warn(`⚠️  No result found for canonical ID: ${canonicalId}`);
+        allResults.push({
+          toolCallId: originalId,
+          result: { error: 'Result not found' },
+          success: false
+        });
+      }
+    });
+
+    return allResults;
+  }
+
+  /**
+   * Format tool result for AI consumption
+   * Extracts the meaningful content from tool execution results
+   * Limits output to ~25k tokens (100k chars) to prevent context overflow
+   */
+  private formatToolResultForAI(result: any): any {
+    // If result is null or undefined, return as-is
+    if (result == null) {
+      return result;
+    }
+
+    let formattedResult: any;
+
+    // If result has a success/exitCode structure (from skill tools)
+    if (typeof result === 'object' && 'success' in result) {
+      // If successful, return the actual output
+      if (result.success) {
+        // Prefer stdout if available (most tool output goes here)
+        if (result.stdout && typeof result.stdout === 'string' && result.stdout.trim()) {
+          formattedResult = result.stdout;
+        }
+        // Fall back to stderr if stdout is empty
+        else if (result.stderr && typeof result.stderr === 'string' && result.stderr.trim()) {
+          formattedResult = result.stderr;
+        }
+        // If both are empty, return a success message
+        else {
+          formattedResult = 'Operation completed successfully';
+        }
+      } else {
+        // If failed, return error information
+        const errorMsg = result.stderr || result.error || 'Operation failed';
+        formattedResult = `Error: ${errorMsg}`;
+      }
+    } else {
+      // For other results, use as-is
+      formattedResult = result;
+    }
+
+    // Limit size to ~25k tokens (approximately 100k characters)
+    // Using 4 chars per token as rough estimate
+    const MAX_TOKENS = 25000;
+    const MAX_CHARS = MAX_TOKENS * 4; // 100k characters
+
+    if (typeof formattedResult === 'string' && formattedResult.length > MAX_CHARS) {
+      const truncated = formattedResult.substring(0, MAX_CHARS);
+      const removedChars = formattedResult.length - MAX_CHARS;
+      return `${truncated}\n\n... [Output truncated: ${removedChars} characters removed to stay within token limits]`;
+    }
+
+    return formattedResult;
+  }
+
+  /**
    * Continue conversation with tool results
+   * Properly formats messages for Vercel AI SDK v5+ to understand tool execution
    */
   private async continueWithToolResults(
     originalOptions: any,
     initialResult: any,
-    toolResults: any[]
-  ): Promise<any> {
-    // Build updated messages including tool results
-    const messages = [...originalOptions.messages];
-    
-    // Add AI's initial response (with tool calls)
-    messages.push({
-      role: 'assistant',
-      content: initialResult.text,
-      toolCalls: initialResult.toolCalls
+    toolResults: any[],
+    allowFurtherTools: boolean
+  ): Promise<{ options: any; result: any }> {
+    // Deduplicate tool results by toolCallId
+    const uniqueToolResults = new Map();
+    toolResults.forEach(toolResult => {
+      if (!uniqueToolResults.has(toolResult.toolCallId)) {
+        uniqueToolResults.set(toolResult.toolCallId, toolResult);
+      } else {
+        logger.warn(`⚠️  Duplicate tool result detected for ID: ${toolResult.toolCallId}, ignoring`);
+      }
     });
-    
-    // Add tool results
-    for (const toolResult of toolResults) {
-      messages.push({
-        role: 'tool',
-        content: JSON.stringify(toolResult.result),
-        toolCallId: toolResult.toolCallId
-      });
+
+    const toolCallResults: Record<string, any> = {};
+    uniqueToolResults.forEach((toolResult, toolCallId) => {
+      // Format tool result for AI consumption
+      const formattedResult = this.formatToolResultForAI(toolResult.result);
+      toolCallResults[toolCallId] = formattedResult;
+
+      // Log what we're passing to the AI
+      logger.debug(`📤 Formatted tool result for AI (ID: ${toolCallId}):`);
+      logger.debug(`   Raw result type: ${typeof toolResult.result}`);
+      logger.debug(`   Formatted result type: ${typeof formattedResult}`);
+      logger.debug(`   Formatted result (first 200 chars): ${typeof formattedResult === 'string' ? formattedResult.substring(0, 200) : JSON.stringify(formattedResult).substring(0, 200)}`);
+    });
+
+    // CRITICAL FIX: Properly construct message array for AI SDK v5+
+    // Build tool invocations with results embedded in assistant message
+    const existingMessages = Array.isArray(originalOptions.messages)
+      ? [...originalOptions.messages]
+      : [];
+
+    // Ensure we have valid tool calls array
+    if (!initialResult.toolCalls || !Array.isArray(initialResult.toolCalls)) {
+      logger.error('❌ Invalid toolCalls in initialResult:', initialResult);
+      throw new Error('Invalid tool calls structure');
     }
-    
-    // Generate final response with tool results
-    const finalResult = await generateText({
-      ...originalOptions,
-      messages,
-      tools: [], // Don't allow more tool calls in the final response
-      toolChoice: 'none'
+
+    // Normalize existing messages to UIMessage format
+    // They might have 'content' instead of 'parts'
+    const normalizedExisting = existingMessages.map((msg: any) => {
+      if (msg.parts) {
+        // Already in UIMessage format
+        return msg;
+      }
+      // Convert from ModelMessage format (has 'content') to UIMessage format (has 'parts')
+      if (msg.content) {
+        return {
+          role: msg.role,
+          parts: Array.isArray(msg.content) ? msg.content : [{
+            type: 'text' as const,
+            text: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
+          }]
+        };
+      }
+      // Fallback - assume it's already correct
+      return msg;
     });
+
+    // Build UIMessages with tool invocations that include results
+    const toolInvocations = initialResult.toolCalls.map((tc: any) => {
+      const args = this.extractToolArguments(tc);
+      const result = toolCallResults[tc.toolCallId];
+
+      return {
+        state: 'result' as const,
+        toolCallId: tc.toolCallId,
+        toolName: tc.toolName,
+        args: args !== undefined ? args : {},
+        result: result !== undefined ? result : null
+      };
+    });
+
+    // Add assistant message with tool results to accumulate conversation history
+    const assistantWithToolResults: any = {
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'text' as const,
+          text: initialResult.text || ''
+        }
+      ],
+      toolInvocations: toolInvocations.length > 0 ? toolInvocations : undefined
+    };
+
+    // ALSO add a user message that explicitly describes the tool results
+    // This helps models that don't properly handle toolInvocations
+    const toolResultsSummary = toolInvocations.map(inv => {
+      const resultText = typeof inv.result === 'string'
+        ? inv.result.substring(0, 1000)  // Limit length
+        : JSON.stringify(inv.result).substring(0, 1000);
+      return `Tool ${inv.toolName} returned:\n${resultText}`;
+    }).join('\n\n');
+
+    const userPromptWithResults: Omit<UIMessage, 'id'> = {
+      role: 'user' as const,
+      parts: [
+        {
+          type: 'text' as const,
+          text: `The tool(s) have been executed. Here are the results:\n\n${toolResultsSummary}\n\nIMPORTANT: Use these tool results to complete the original task. If the results show file paths or partial information, call additional tools as needed to fully answer the question. Do not just acknowledge the tool execution - use the information to provide a complete answer.`
+        }
+      ]
+    };
+
+    const uiMessages: Array<Omit<UIMessage, 'id'>> = [
+      ...normalizedExisting,
+      assistantWithToolResults,
+      userPromptWithResults  // Add explicit results message
+    ];
+
+    // Convert UIMessages to ModelMessages for AI SDK
+    let modelMessages;
+    try {
+      modelMessages = convertToModelMessages(uiMessages);
+    } catch (conversionError) {
+      logger.error('❌ Failed to convert UIMessages to ModelMessages:', conversionError);
+      logger.debug('UIMessages:', JSON.stringify(uiMessages, null, 2));
+      throw conversionError;
+    }
+
+    // CRITICAL: Update the original options with accumulated messages for next iteration
+    const continueOptions = {
+      ...originalOptions,
+      messages: modelMessages,  // This will now include all previous messages + tool results
+      tools: allowFurtherTools ? originalOptions.tools : {},  // Empty object to disable tools
+      toolChoice: allowFurtherTools ? (originalOptions.toolChoice ?? 'auto') : 'none'  // Explicitly disable tool calling
+    };
+
+    logger.debug(`🔄 Continuing with ${uniqueToolResults.size} tool results`);
+    logger.info(`🔍 Built ${modelMessages.length} model messages from ${uiMessages.length} UI messages`);
     
-    return finalResult;
+    const nextResult = await generateText(continueOptions);
+
+    return {
+      options: continueOptions,
+      result: nextResult
+    };
   }
 
   /**
    * Format execute result with tool call information
    */
-  private formatExecuteResult(result: any, executionConfig: any): ExecuteResult {
+  private formatExecuteResult(
+    result: any,
+    executionConfig: any,
+    toolCalls?: any[],
+    toolResults?: any[],
+    toolHistory?: Array<{ name: string; arguments: any; result: any }>,
+    progressMessages?: string[]
+  ): ExecuteResult {
     const promptTokens = result.usage.inputTokens ?? (result.usage as any).promptTokens ?? 0;
     const completionTokens = result.usage.outputTokens ?? (result.usage as any).completionTokens ?? 0;
     const totalTokens = result.usage.totalTokens ?? (promptTokens + completionTokens);
+
+    // Format tool executions if present
+    let formattedToolCalls: Array<{ name: string; arguments: any; result: any }> | undefined;
+    if (toolHistory && toolHistory.length > 0) {
+      formattedToolCalls = toolHistory;
+    } else if (toolCalls && toolResults) {
+      formattedToolCalls = toolCalls.map((tc, index) => ({
+        name: tc.toolName,
+        arguments: this.extractToolArguments(tc),
+        result: toolResults[index]?.result || {}
+      }));
+    }
 
     return {
       content: result.text,
@@ -1209,8 +1863,32 @@ The tools will be available during our conversation. Call them when needed to ga
       model: result.response?.modelId || executionConfig.model || 'unknown',
       provider: executionConfig.provider,
       requestId: crypto.randomUUID(),
-      finishReason: result.finishReason
+      finishReason: result.finishReason,
+      toolCalls: formattedToolCalls,
+      progressMessages: progressMessages ?? []
     };
+  }
+
+  /**
+   * Normalize tool call history entries for logging/serialization
+   */
+  private formatToolCallHistory(toolCalls: any[], toolResults: any[]): Array<{ name: string; arguments: any; result: any }> {
+    if (!toolCalls || toolCalls.length === 0) {
+      return [];
+    }
+
+    const resultsById = new Map<string, any>();
+    toolResults.forEach(tr => {
+      if (tr && tr.toolCallId) {
+        resultsById.set(tr.toolCallId, tr.result);
+      }
+    });
+
+    return toolCalls.map(tc => ({
+      name: tc.toolName,
+      arguments: this.extractToolArguments(tc),
+      result: resultsById.get(tc.toolCallId) ?? {}
+    }));
   }
 
   /**
@@ -1344,7 +2022,7 @@ The tools will be available during our conversation. Call them when needed to ga
 
   /**
    * Normalize Google model names from registry format to SDK format
-   * Registry has "gemini-1-5-flash" but Google SDK expects "models/gemini-1.5-flash"
+   * Registry has "gemini-1-5-flash" but Google SDK expects "gemini-1.5-flash"
    * All Google models require the "models/" prefix for Vercel AI SDK
    */
   private normalizeGoogleModelName(modelName: string): string {
@@ -1701,8 +2379,8 @@ The tools will be available during our conversation. Call them when needed to ga
       .replace(/\./g, '\\.')  // Escape dots
       .replace(/\*/g, '.*')   // Convert * to .*
       .replace(/\?/g, '.');   // Convert ? to .
-    
-    const regex = new RegExp(`^${regexPattern}$`);
+
+    const regex = new RegExp(`^${regexPattern}`);
     return regex.test(model);
   }
 

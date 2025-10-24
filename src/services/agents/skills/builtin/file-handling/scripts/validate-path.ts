@@ -9,7 +9,9 @@
 
 import path from 'path';
 
-const ALLOWED_PATHS = ['/workspace', '/tmp'];
+// Use project root from environment or fall back to current working directory
+const PROJECT_ROOT = process.env.PROJECT_ROOT || process.cwd();
+const ALLOWED_PATHS = [PROJECT_ROOT, '/tmp'];
 
 function main() {
   const targetPath = process.argv[2];
@@ -21,8 +23,16 @@ function main() {
   }
 
   try {
+    let absolutePath;
+    
+    // If the path is relative, resolve it relative to the project root instead of the script location
+    if (path.isAbsolute(targetPath)) {
+      absolutePath = targetPath;
+    } else {
+      absolutePath = path.join(PROJECT_ROOT, targetPath);
+    }
+
     // Normalize and resolve path
-    const absolutePath = path.resolve(targetPath);
     const normalized = path.normalize(absolutePath);
 
     // Check for path traversal attempts

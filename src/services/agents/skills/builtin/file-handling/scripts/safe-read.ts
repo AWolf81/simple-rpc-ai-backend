@@ -11,7 +11,9 @@ import fs from 'fs/promises';
 import path from 'path';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_PATHS = ['/workspace', '/tmp'];
+// Use project root from environment or fall back to current working directory
+const PROJECT_ROOT = process.env.PROJECT_ROOT || process.cwd();
+const ALLOWED_PATHS = [PROJECT_ROOT, '/tmp'];
 
 async function main() {
   const filePath = process.argv[2];
@@ -23,8 +25,16 @@ async function main() {
   }
 
   try {
+    let absolutePath;
+    
+    // If the path is relative, resolve it relative to the project root instead of the script location
+    if (path.isAbsolute(filePath)) {
+      absolutePath = filePath;
+    } else {
+      absolutePath = path.join(PROJECT_ROOT, filePath);
+    }
+
     // Validate path
-    const absolutePath = path.resolve(filePath);
     const isAllowed = ALLOWED_PATHS.some(allowed =>
       absolutePath.startsWith(path.resolve(allowed))
     );

@@ -19,6 +19,7 @@ import {
   AgentSDKType
 } from '../types';
 import { logger } from '../../../utils/logger';
+import { SkillsToolConverter } from '../skills/tools-converter';
 
 interface AIAgentConfig {
   enableSkills?: boolean;
@@ -66,7 +67,7 @@ export class AIAgentAdapter implements IAgentAdapter {
     logger.debug('✅ AI Agent adapter initialized');
   }
 
-  async execute(request: AgentExecuteRequest): Promise<AgentExecuteResult> {
+  async execute(request: AgentExecuteRequest & { skillTools?: any[] }): Promise<AgentExecuteResult> {
     if (!this.initialized) {
       throw new Error('AI Agent adapter not initialized');
     }
@@ -79,35 +80,82 @@ export class AIAgentAdapter implements IAgentAdapter {
       request.context?.skills
     );
 
-    // Convert tools to Claude tool format
-    const tools = this.convertToolsToClaudeFormat(
-      request.context?.tools || Array.from(this.tools.values())
-    );
+    // Combine all tools: agent tools, context tools, and skill tools
+    const agentTools = Array.from(this.tools.values());
+    const contextTools = request.context?.tools || [];
+    const skillTools = request.skillTools || [];
 
-    // Build conversation messages
-    const messages: Array<{ role: string; content: string }> = [];
+    logger.info(`🔧 Tool sources: agent=${agentTools.length}, context=${contextTools.length}, skills=${skillTools.length}`);
+    if (skillTools.length > 0) {
+      logger.info(`   Skill tools: ${skillTools.map((t: any) => t.name).join(', ')}`);
+    }
+
+    const allTools = [
+      ...agentTools,
+      ...contextTools,
+      ...skillTools // Add skill tools from SkillsToolConverter
+    ];
+
+    // Convert tools to Claude tool format (but we'll pass them directly to AIService)
+    const claudeTools = this.convertToolsToClaudeFormat(allTools);
+
+    // Build conversation messages from history (but don't add current prompt yet - AIService will do that)
+    const conversationHistory: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [];
 
     // Add conversation history if provided
     if (request.messages) {
-      messages.push(...request.messages.map(m => ({
-        role: m.role,
-        content: m.content
-      })));
+      request.messages.forEach(m => {
+        conversationHistory.push({
+          role: m.role as 'user' | 'assistant' | 'system',
+          content: m.content
+        });
+      });
     }
 
-    // Add current prompt
-    messages.push({
-      role: 'user',
-      content: request.prompt
-    });
-
     // Execute AI request
-    logger.debug(`🤖 Executing AI Agent agent request (${requestId})`);
+    logger.debug(`🤖 Executing AI Agent agent request (${requestId}) with ${allTools.length} tools`);
+    logger.debug(`   Conversation history: ${conversationHistory.length} messages`);
+
+    // Convert tools to AIService format (inputSchema -> parameters)
+    // Filter out any invalid tools and convert format
+    const aiServiceTools = allTools
+      .filter(tool => {
+        if (!tool || !tool.name || !tool.description) {
+          logger.warn(`⚠️  Filtering out invalid tool: ${tool?.name || 'unnamed'}`);
+          return false;
+        }
+        return true;
+      })
+      .map(tool => {
+        const schema = tool.inputSchema || tool.parameters;
+        if (!schema || !schema.type || schema.type !== 'object') {
+          logger.warn(`⚠️  Tool ${tool.name} has invalid schema, using default`);
+        }
+        return {
+          name: tool.name,
+          description: tool.description,
+          parameters: schema && schema.type === 'object' ? schema : { type: 'object', properties: {}, required: [] },
+          execute: tool.execute
+        };
+      });
+
+    logger.debug(`🔧 Converted ${allTools.length} tools to ${aiServiceTools.length} AIService tools`);
+    logger.info(`📋 Available tools (${aiServiceTools.length} total):`);
+    if (aiServiceTools.length > 0) {
+      aiServiceTools.forEach((tool, i) => {
+        logger.info(`   [${i}] ${tool.name}: ${tool.description.substring(0, 60)}...`);
+        logger.debug(`       Schema: type=${tool.parameters?.type}, props=${Object.keys(tool.parameters?.properties || {}).length}`);
+      });
+    } else {
+      logger.warn(`⚠️  No tools available for AI agent execution!`);
+    }
 
     try {
       const result = await this.aiService.execute({
         content: request.prompt,
         systemPrompt: systemPrompt,
+        messages: conversationHistory, // Pass cleaned conversation history (AIService will append current prompt)
+        tools: aiServiceTools.length > 0 ? aiServiceTools : undefined, // Pass all tools (skills, agent tools, context tools)
         metadata: {
           provider: request.provider || 'anthropic', // AI Agent uses Anthropic
           model: request.model,
@@ -136,7 +184,8 @@ export class AIAgentAdapter implements IAgentAdapter {
         sdk: this.sdkType,
         skillsTriggered,
         finishReason: result.finishReason,
-        requestId
+        requestId,
+        toolCalls: result.toolCalls // Pass through tool execution details
       };
     } catch (error) {
       logger.error('❌ AI Agent execution failed:', error);

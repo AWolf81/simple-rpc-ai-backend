@@ -13,22 +13,42 @@ import {
   ScriptExecutionRequest,
   ScriptExecutionResult,
   SkillScript
-} from './types.js';
-import { logger } from '../../../utils/logger.js';
+} from './types';
+import { logger } from '../../../utils/logger';
+import { getNodePermissionFlags } from './utils/node-permissions';
+import { findProjectRoot } from '../../../utils/workspace-resolver';
+import {
+  augmentSandboxForCommand,
+  wrapSkillCommandWithBwrap
+} from './utils/process-wrapper';
 
 /**
  * Default sandbox configuration
  */
+const NODE_PERMISSION_FLAGS = getNodePermissionFlags();
+
+
+
 export const DEFAULT_SANDBOX_CONFIG: SandboxConfig = {
-  allowedPaths: ['/workspace', '/tmp'],
+  allowedPaths: [process.cwd(), '/tmp'],
+  allowedReadPaths: [process.cwd(), '/tmp'],
+  allowedWritePaths: [process.cwd(), '/tmp'],
   timeout: 30000, // 30 seconds
   maxMemory: 512 * 1024 * 1024, // 512MB
   networkAccess: false,
+  allowedNetworkHosts: [],
+  blockedNetworkHosts: [],
+  allowedUnixSockets: [],
+  allowChildProcesses: false,
+  allowedEnvVars: ['PATH', 'HOME', 'USER', 'TMPDIR', 'TMP', 'PWD'],
+  monitorViolations: false,
+  enforceNodePermissions: Boolean(NODE_PERMISSION_FLAGS),
   environmentVars: {
     PATH: process.env.PATH || '',
     HOME: process.env.HOME || '',
     USER: process.env.USER || ''
-  }
+  },
+  projectRoot: process.cwd()  // Use process.cwd as default, will be overridden by server config
 };
 
 /**
@@ -44,7 +64,7 @@ export class ScriptSandbox {
     const startTime = Date.now();
 
     // Merge sandbox config
-    const sandbox = { ...this.config, ...request.sandbox };
+    let sandbox: SandboxConfig = { ...this.config, ...request.sandbox };
 
     // Validate script path
     this.validateScriptPath(request.scriptPath, sandbox);
@@ -56,6 +76,9 @@ export class ScriptSandbox {
 
     // Get runtime command
     const runtimeCmd = this.getRuntimeCommand(request.runtime, request.scriptPath);
+
+    // Apply network allowances for specific tooling (e.g., registry access)
+    sandbox = augmentSandboxForCommand(sandbox, runtimeCmd.command);
 
     // Prepare environment
     const env = this.prepareEnvironment(sandbox);
@@ -70,7 +93,8 @@ export class ScriptSandbox {
         timeout: sandbox.timeout,
         maxMemory: sandbox.maxMemory,
         stdin: request.stdin
-      }
+      },
+      sandbox
     );
 
     return {
@@ -94,10 +118,10 @@ export class ScriptSandbox {
         };
 
       case 'typescript':
-        // Try tsx first, fallback to ts-node
+        // Use npx to find tsx from node_modules
         return {
-          command: 'tsx',
-          args: [scriptPath]
+          command: 'npx',
+          args: ['tsx', scriptPath]
         };
 
       case 'javascript':
@@ -121,7 +145,31 @@ export class ScriptSandbox {
    * Prepare sandboxed environment variables
    */
   private prepareEnvironment(sandbox: SandboxConfig): NodeJS.ProcessEnv {
-    const env: NodeJS.ProcessEnv = { ...sandbox.environmentVars };
+    const env: NodeJS.ProcessEnv = {};
+    const allowedEnvKeys = new Set(
+      (sandbox.allowedEnvVars && sandbox.allowedEnvVars.length > 0)
+        ? sandbox.allowedEnvVars
+        : Object.keys(sandbox.environmentVars || {})
+    );
+
+    for (const key of allowedEnvKeys) {
+      if (sandbox.environmentVars && key in sandbox.environmentVars) {
+        env[key] = sandbox.environmentVars[key];
+      } else if (process.env[key] !== undefined) {
+        env[key] = process.env[key];
+      }
+    }
+
+    // Ensure essential defaults
+    if (!env.PATH && process.env.PATH) {
+      env.PATH = process.env.PATH;
+    }
+    if (!env.TMPDIR && process.env.TMPDIR) {
+      env.TMPDIR = process.env.TMPDIR;
+    }
+    if (!env.TMP && process.env.TMP) {
+      env.TMP = process.env.TMP;
+    }
 
     // Block network access by unsetting proxy variables
     if (!sandbox.networkAccess) {
@@ -143,6 +191,46 @@ export class ScriptSandbox {
     // Set Node to production mode (minimal packages)
     env.NODE_ENV = 'production';
 
+    // Add project root to environment - use configured value or find it synchronously
+    if (sandbox.projectRoot) {
+      env.PROJECT_ROOT = sandbox.projectRoot;
+    } else {
+      // If no project root provided, try to find it synchronously
+      let currentDir = process.cwd();
+      const pathModule = require('path');
+      const fsModule = require('fs');
+      
+      // Traverse up the directory tree until we find package.json or reach root
+      while (currentDir !== pathModule.dirname(currentDir)) {
+        try {
+          const packageJsonPath = pathModule.join(currentDir, 'package.json');
+          fsModule.accessSync(packageJsonPath);
+          env.PROJECT_ROOT = currentDir;
+          break;
+        } catch {
+          // package.json not found in this directory, go up one level
+          currentDir = pathModule.dirname(currentDir);
+        }
+      }
+      
+      // Fallback to current working directory if package.json not found
+      if (!env.PROJECT_ROOT) {
+        env.PROJECT_ROOT = process.cwd();
+      }
+    }
+
+    // Security policy hints for guard scripts
+    const delimiter = path.delimiter;
+    env.AI_SANDBOX_DEFAULT_NET = sandbox.networkAccess || (sandbox.allowedNetworkHosts && sandbox.allowedNetworkHosts.length > 0)
+      ? 'allow'
+      : 'deny';
+    env.AI_SANDBOX_ALLOW_NET = (sandbox.allowedNetworkHosts || []).join(',');
+    env.AI_SANDBOX_DENY_NET = (sandbox.blockedNetworkHosts || []).join(',');
+    env.AI_SANDBOX_ALLOW_UNIX_SOCKETS = (sandbox.allowedUnixSockets || []).join(',');
+    env.AI_SANDBOX_ALLOW_CHILD_PROCESS = sandbox.allowChildProcesses ? '1' : '0';
+    env.AI_SANDBOX_ALLOW_FS_READ = (sandbox.allowedReadPaths || sandbox.allowedPaths).join(delimiter);
+    env.AI_SANDBOX_ALLOW_FS_WRITE = (sandbox.allowedWritePaths || sandbox.allowedPaths).join(delimiter);
+
     return env;
   }
 
@@ -158,7 +246,8 @@ export class ScriptSandbox {
       timeout: number;
       maxMemory: number;
       stdin?: string;
-    }
+    },
+    sandbox: SandboxConfig
   ): Promise<Omit<ScriptExecutionResult, 'duration'>> {
     return new Promise((resolve, reject) => {
       let stdout = '';
@@ -166,8 +255,16 @@ export class ScriptSandbox {
       let timedOut = false;
       let memoryExceeded = false;
 
+      const wrapped = wrapSkillCommandWithBwrap({
+        command,
+        args,
+        cwd: options.cwd,
+        env: options.env,
+        sandbox
+      });
+
       // Spawn process
-      const child = spawn(command, args, {
+      const child = spawn(wrapped.command, wrapped.args, {
         cwd: options.cwd,
         env: options.env,
         stdio: ['pipe', 'pipe', 'pipe']
@@ -300,10 +397,21 @@ export class ScriptSandbox {
     // Check if path exists
     // Note: We can't use async here, but we'll validate during execution
 
-    // For now, just ensure it's not trying to escape via ..
-    const normalized = path.normalize(scriptPath);
-    if (normalized.includes('..')) {
-      throw new Error('Script path contains invalid characters (..)');
+    // Check for path traversal attempts
+    if (scriptPath.includes('../') || scriptPath.includes('..\\')) {
+      throw new Error('Path traversal detected: script path cannot contain "../" or "..\\"');
+    }
+
+    // Ensure the path is within allowed paths
+    const isAllowed = sandbox.allowedPaths.some(allowedPath => {
+      const normalizedAllowed = path.resolve(allowedPath);
+      return absolutePath.startsWith(normalizedAllowed + path.sep) || absolutePath === normalizedAllowed;
+    });
+
+    if (!isAllowed) {
+      throw new Error(
+        `Script path "${scriptPath}" is not within allowed paths: ${sandbox.allowedPaths.join(', ')}`
+      );
     }
   }
 
@@ -311,13 +419,17 @@ export class ScriptSandbox {
    * Validate path is within allowed paths
    */
   private validatePath(targetPath: string, sandbox: SandboxConfig): void {
+    // Check for path traversal attempts
+    if (targetPath.includes('../') || targetPath.includes('..\\')) {
+      throw new Error('Path traversal detected: target path cannot contain "../" or "..\\"');
+    }
+
     const absolutePath = path.resolve(targetPath);
-    const normalized = path.normalize(absolutePath);
 
     // Check if path is within allowed paths
     const isAllowed = sandbox.allowedPaths.some(allowedPath => {
-      const normalizedAllowed = path.normalize(path.resolve(allowedPath));
-      return normalized.startsWith(normalizedAllowed);
+      const normalizedAllowed = path.resolve(allowedPath);
+      return absolutePath.startsWith(normalizedAllowed + path.sep) || absolutePath === normalizedAllowed;
     });
 
     if (!isAllowed) {

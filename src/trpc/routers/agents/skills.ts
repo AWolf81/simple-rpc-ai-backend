@@ -5,9 +5,9 @@
  */
 
 import { z } from 'zod';
-import { router, publicProcedure } from '../../index.js';
-import type { SkillManager } from '../../../services/agents/skills/manager.js';
-import { logger } from '../../../utils/logger.js';
+import { router, publicProcedure } from '../../index';
+import type { SkillManager } from '../../../services/agents/skills/manager';
+import { logger } from '../../../utils/logger';
 
 // Zod schemas for skill operations
 const skillSourceSchema = z.union([
@@ -48,6 +48,23 @@ const skillMatchCriteriaSchema = z.object({
   exclude: z.array(z.string()).optional()
 });
 
+const scriptInvocationSchema = z.union([
+  z.object({
+    mode: z.literal('path'),
+    scriptPath: z.string(),
+    runtime: z.enum(['javascript', 'typescript', 'python']).optional(),
+    args: z.array(z.string()).optional()
+  }),
+  z.object({
+    mode: z.literal('inline'),
+    runtime: z.enum(['javascript', 'typescript', 'python']),
+    source: z.string(),
+    args: z.array(z.string()).optional()
+  })
+]);
+
+const SCRIPT_CALLER_RUNNER = 'scripts/run-script.ts';
+
 /**
  * Create skills router with SkillManager instance
  */
@@ -55,30 +72,43 @@ export function createSkillsRouter(skillManager?: SkillManager) {
   return router({
     /**
      * List all loaded skills
+     * Note: input accepts any because superjson client sends metadata even for empty queries
      */
     list: publicProcedure
+      .input(z.any().optional())
       .query(async () => {
         if (!skillManager) {
           return { skills: [], message: 'Skills system not initialized' };
         }
 
+        await skillManager.initialize();
+
         const skills = skillManager.getAll();
 
         return {
-          skills: skills.map(skill => ({
-            id: skill.id,
-            name: skill.metadata.name,
-            description: skill.metadata.description,
-            version: skill.metadata.version,
-            author: skill.metadata.author,
-            license: skill.metadata.license,
-            capabilities: skill.metadata.capabilities,
-            level1Tokens: skill.level1Tokens,
-            level2Tokens: skill.level2Tokens,
-            hasResources: !!skill.resources,
-            sourceType: skill.source.type,
-            loadedAt: skill.loadedAt
-          }))
+          skills: skills.map(skill => {
+            const skillData: any = {
+              id: skill.id,
+              name: skill.metadata.name,
+              description: skill.metadata.description,
+              version: skill.metadata.version,
+              author: skill.metadata.author,
+              capabilities: skill.metadata.capabilities,
+              level: (skill.resources ? 3 : (skill.instructions ? 2 : 1)) as 1 | 2 | 3,
+              level1Tokens: skill.level1Tokens,
+              level2Tokens: skill.level2Tokens,
+              hasResources: !!skill.resources,
+              sourceType: skill.source.type,
+              loadedAt: skill.loadedAt?.toISOString() || new Date().toISOString()
+            };
+
+            // Only include license if it has a value (avoid null/undefined issues with superjson)
+            if (skill.metadata.license) {
+              skillData.license = skill.metadata.license;
+            }
+
+            return skillData;
+          })
         };
       }),
 
@@ -93,6 +123,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
         if (!skillManager) {
           throw new Error('Skills system not initialized');
         }
+
+        await skillManager.initialize();
 
         const skill = skillManager.get(input.skillId);
 
@@ -124,6 +156,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
           return { skills: [] };
         }
 
+        await skillManager.initialize();
+
         const matches = skillManager.match(input);
 
         return {
@@ -149,6 +183,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
           throw new Error('Skills system not initialized');
         }
 
+        await skillManager.initialize();
+
         await skillManager.loadResources(input.skillId);
 
         const skill = skillManager.get(input.skillId);
@@ -172,20 +208,41 @@ export function createSkillsRouter(skillManager?: SkillManager) {
     executeScript: publicProcedure
       .input(z.object({
         skillId: z.string(),
-        scriptName: z.string(),
+        scriptName: z.string().optional(),
         args: z.array(z.string()).optional(),
         stdin: z.string().optional(),
-        cwd: z.string().optional()
+        cwd: z.string().optional(),
+        scriptInvocation: scriptInvocationSchema.optional()
       }))
       .mutation(async ({ input }) => {
         if (!skillManager) {
           throw new Error('Skills system not initialized');
         }
 
+        await skillManager.initialize();
+
+        let scriptName = input.scriptName;
+        let args = input.args;
+        let stdin = input.stdin;
+
+        if (input.skillId === 'script-caller') {
+          if (!input.scriptInvocation) {
+            throw new Error('scriptInvocation is required when using the script-caller skill');
+          }
+
+          scriptName = SCRIPT_CALLER_RUNNER;
+          args = [];
+          stdin = JSON.stringify(input.scriptInvocation);
+        }
+
+        if (!scriptName) {
+          throw new Error('scriptName is required for script execution');
+        }
+
         const result = await skillManager.executeScript(input.skillId, {
-          scriptName: input.scriptName,
-          args: input.args,
-          stdin: input.stdin,
+          scriptName,
+          args,
+          stdin,
           cwd: input.cwd
         });
 
@@ -211,6 +268,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
           throw new Error('Skills system not initialized');
         }
 
+        await skillManager.initialize();
+
         const validation = await skillManager.validate(input.skillId);
 
         return validation;
@@ -227,6 +286,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
         if (!skillManager) {
           throw new Error('Skills system not initialized');
         }
+
+        await skillManager.initialize();
 
         const metrics = await skillManager.getMetrics(input.skillId);
 
@@ -245,6 +306,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
           throw new Error('Skills system not initialized');
         }
 
+        await skillManager.initialize();
+
         await skillManager.reload(input.skillId);
 
         return { success: true, message: `Skill ${input.skillId} reloaded` };
@@ -258,6 +321,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
         if (!skillManager) {
           throw new Error('Skills system not initialized');
         }
+
+        await skillManager.initialize();
 
         await skillManager.reloadAll();
 
@@ -275,6 +340,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
         if (!skillManager) {
           throw new Error('Skills system not initialized');
         }
+
+        await skillManager.initialize();
 
         const skill = await skillManager.addSource(input.source as any);
 
@@ -300,6 +367,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
           throw new Error('Skills system not initialized');
         }
 
+        await skillManager.initialize();
+
         const removed = skillManager.remove(input.skillId);
 
         return {
@@ -321,6 +390,8 @@ export function createSkillsRouter(skillManager?: SkillManager) {
             totalLevel2Tokens: 0
           };
         }
+
+        await skillManager.initialize();
 
         return skillManager.getStats();
       })

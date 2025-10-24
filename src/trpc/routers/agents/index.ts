@@ -17,8 +17,10 @@ import {
   type AgentExecuteRequest
 } from '@services/agents/types';
 import { createMCPTool } from '@src-trpc/routers/mcp/index';
-import { createSkillsRouter } from './skills.js';
+import { createSkillsRouter } from './skills';
+import { logger } from '../../../utils/logger';
 import type { SkillManager } from '@services/agents/skills/manager';
+import { SkillsToolConverter } from '@services/agents/skills/tools-converter';
 
 export interface AgentRouterConfig {
   agentService?: AgentService;
@@ -56,6 +58,44 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
       })
       .input(AgentExecuteRequestSchema)
       .mutation(async ({ input }) => {
+        // Convert skills to executable tools
+        let skillTools: any[] = [];
+
+        logger.info(`🎯 Agent execution request`);
+        logger.info(`   SDK: ${input.sdk || 'ai-agent'}, Model: ${input.model || 'default'}`);
+        logger.info(`   Input skills: ${input.context?.skills?.length || 0}`);
+        logger.info(`   SkillManager available: ${!!skillManager}`);
+
+        if (skillManager) {
+          // Ensure skills are initialized before accessing them
+          await skillManager.initialize();
+
+          const converter = new SkillsToolConverter(skillManager);
+
+          // Auto-load all skills if none specified in context
+          if (!input.context?.skills || input.context.skills.length === 0) {
+            // Get all available skills from SkillManager
+            const allSkills = skillManager.getAll();
+            logger.info(`   🔄 Auto-loading all available skills (${allSkills.length} total)`);
+
+            if (allSkills.length > 0) {
+              // Convert all skills to tools
+              skillTools = converter.convertSkillsToTools();
+              logger.info(`   ✅ Auto-loaded ${skillTools.length} skill tools: ${skillTools.map(t => t.name).join(', ')}`);
+            } else {
+              logger.warn(`   ⚠️  No skills available in SkillManager`);
+            }
+          } else {
+            // Use explicitly specified skills
+            const skillIds = input.context.skills.map((s: any) => s.id);
+            logger.info(`   🎯 Converting specified skills to tools: ${skillIds.join(', ')}`);
+            skillTools = converter.convertSkillsToTools(skillIds);
+            logger.info(`   ✅ Converted ${skillTools.length} skill tools: ${skillTools.map(t => t.name).join(', ')}`);
+          }
+        } else {
+          logger.warn(`   ⚠️  SkillManager not available - no skills loaded`);
+        }
+
         // Create a properly typed version of the input for the agent service
         const agentRequest: AgentExecuteRequest = {
           ...input,
@@ -74,8 +114,9 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
             })) as AgentSkill[] // Trust that we're providing required fields
           } : undefined
         };
-        
-        return await agentService.execute(agentRequest);
+
+        // Pass skill tools to agent execution via aiService.execute
+        return await agentService.execute(agentRequest, skillTools);
       }),
 
     /**

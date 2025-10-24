@@ -7,8 +7,9 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { SkillMetadata, SkillScript } from './types.js';
-import { logger } from '../../../utils/logger.js';
+import yaml from 'js-yaml';
+import { SkillMetadata, SkillScript } from './types';
+import { logger } from '../../../utils/logger';
 
 /**
  * Parse result from SKILL.md
@@ -58,94 +59,18 @@ export function parseSkillContent(content: string): ParsedSkill {
 /**
  * Parse YAML frontmatter into metadata object
  */
-export function parseYamlFrontmatter(yaml: string): SkillMetadata {
-  const metadata: Record<string, any> = {};
-  const lines = yaml.split('\n');
+export function parseYamlFrontmatter(yamlContent: string): SkillMetadata {
+  try {
+    const parsed = yaml.load(yamlContent);
 
-  let currentKey: string | null = null;
-  let currentValue: any = null;
-  let inArray = false;
-  let arrayItems: any[] = [];
-  let inObject = false;
-  let objectItems: Record<string, any> = {};
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Skip empty lines
-    if (!line.trim()) {
-      continue;
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('YAML frontmatter must be an object');
     }
 
-    // Array item
-    if (line.trim().startsWith('- ')) {
-      const item = line.trim().substring(2).trim();
-
-      if (inArray && currentKey) {
-        // Check if it's an object item (contains colon)
-        if (item.includes(':')) {
-          // Start of object in array
-          const [objKey, objValue] = item.split(':').map(s => s.trim());
-          objectItems = { [objKey]: parseValue(objValue) };
-          inObject = true;
-        } else {
-          arrayItems.push(parseValue(item));
-        }
-      }
-      continue;
-    }
-
-    // Object property within array
-    if (inObject && line.trim().match(/^\w+:/)) {
-      const [objKey, objValue] = line.split(':').map(s => s.trim());
-      objectItems[objKey] = parseValue(objValue);
-      continue;
-    }
-
-    // Key-value pair
-    const colonIndex = line.indexOf(':');
-    if (colonIndex > 0) {
-      // Save previous key if in array
-      if (inArray && currentKey && arrayItems.length > 0) {
-        if (inObject && Object.keys(objectItems).length > 0) {
-          arrayItems.push(objectItems);
-          objectItems = {};
-          inObject = false;
-        }
-        metadata[currentKey] = arrayItems;
-        arrayItems = [];
-        inArray = false;
-      } else if (inArray && currentKey) {
-        metadata[currentKey] = arrayItems;
-        arrayItems = [];
-        inArray = false;
-      }
-
-      const key = line.substring(0, colonIndex).trim();
-      const value = line.substring(colonIndex + 1).trim();
-
-      currentKey = key;
-
-      if (!value || value === '') {
-        // Empty value, might be array or object
-        inArray = true;
-        arrayItems = [];
-      } else {
-        metadata[key] = parseValue(value);
-        currentKey = null;
-      }
-    }
+    return parsed as SkillMetadata;
+  } catch (error) {
+    throw new Error(`Failed to parse YAML frontmatter: ${error instanceof Error ? error.message : String(error)}`);
   }
-
-  // Save last array if exists
-  if (inArray && currentKey) {
-    if (inObject && Object.keys(objectItems).length > 0) {
-      arrayItems.push(objectItems);
-    }
-    metadata[currentKey] = arrayItems.length > 0 ? arrayItems : [];
-  }
-
-  return metadata as SkillMetadata;
 }
 
 /**
@@ -214,6 +139,24 @@ function validateMetadata(metadata: SkillMetadata): void {
         }
         if (script.runtime && !['python', 'typescript', 'javascript', 'shell'].includes(script.runtime)) {
           errors.push(`scripts[${idx}] invalid runtime: ${script.runtime} (must be python, typescript, javascript, or shell)`);
+        }
+        if (script.args !== undefined) {
+          if (!Array.isArray(script.args)) {
+            errors.push(`scripts[${idx}].args must be an array when provided`);
+          } else {
+            script.args.forEach((arg: any, argIdx: number) => {
+              if (!arg || typeof arg !== 'object') {
+                errors.push(`scripts[${idx}].args[${argIdx}] must be an object`);
+                return;
+              }
+              if (!arg.name || typeof arg.name !== 'string') {
+                errors.push(`scripts[${idx}].args[${argIdx}] missing required field: name`);
+              }
+              if (arg.type && !['string', 'number', 'boolean'].includes(arg.type)) {
+                errors.push(`scripts[${idx}].args[${argIdx}] has invalid type: ${arg.type}`);
+              }
+            });
+          }
         }
       });
     }

@@ -12,33 +12,80 @@ import {
   SkillValidationResult,
   ScriptExecutionRequest,
   ScriptExecutionResult,
-  TokenMetrics
-} from './types.js';
-import { SkillLoader } from './loader.js';
-import { ScriptSandbox, DEFAULT_SANDBOX_CONFIG } from './sandbox.js';
-import { validateSkillStructure, estimateTokens } from './parser.js';
-import { logger } from '../../../utils/logger.js';
+  TokenMetrics,
+  SandboxConfig
+} from './types';
+import { SkillLoader } from './loader';
+import { ScriptSandbox, DEFAULT_SANDBOX_CONFIG } from './sandbox';
+import { SandboxProviderFactory, type ISandboxProvider, type SandboxProviderConfig } from './sandbox-provider';
+import { validateSkillStructure, estimateTokens } from './parser';
+import { logger } from '../../../utils/logger';
+import path from 'path';
 
 /**
  * Skill Manager - Central interface for skills system
  */
 export class SkillManager {
   private loader: SkillLoader;
-  private sandbox: ScriptSandbox;
+  private sandbox: ScriptSandbox; // Legacy support
+  private sandboxProvider?: ISandboxProvider; // New pluggable sandbox
   private skills = new Map<string, Skill>();
+  private config: SkillLoaderConfig;
+  private initializationPromise?: Promise<void>; // Track initialization promise
+  private initialized = false; // Track if initialization is complete
 
   constructor(config: SkillLoaderConfig) {
+    this.config = config;
     this.loader = new SkillLoader(config);
-    this.sandbox = new ScriptSandbox(config.sandbox);
+    this.sandbox = new ScriptSandbox(config.sandbox); // Legacy fallback
   }
 
   /**
    * Initialize and load all skills
    */
   async initialize(): Promise<void> {
+    // If already initializing, return existing promise
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    // If already initialized, return immediately
+    if (this.initialized) {
+      return Promise.resolve();
+    }
+
+    // Create and store initialization promise
+    this.initializationPromise = this._doInitialize();
+
+    try {
+      await this.initializationPromise;
+      this.initialized = true;
+    } finally {
+      // Don't clear the promise so multiple calls return the same promise
+    }
+  }
+
+  /**
+   * Internal initialization logic
+   */
+  private async _doInitialize(): Promise<void> {
     logger.info('🚀 Initializing skill system...');
 
     try {
+      // Initialize sandbox provider if configured
+      // TODO: Add sandboxProvider to SkillLoaderConfig type
+      // @ts-ignore - sandboxProvider not yet in type definition
+      if (this.config.sandboxProvider) {
+        try {
+          // @ts-ignore
+          this.sandboxProvider = await SandboxProviderFactory.create(this.config.sandboxProvider);
+          await this.sandboxProvider.initialize(this.config.sandbox || DEFAULT_SANDBOX_CONFIG);
+          logger.info(`🔧 Using ${this.sandboxProvider.name} sandbox provider`);
+        } catch (error) {
+          logger.warn(`⚠️  Failed to initialize sandbox provider, falling back to legacy sandbox:`, error);
+        }
+      }
+
       const skills = await this.loader.loadAll();
 
       // Store skills in map
@@ -55,8 +102,15 @@ export class SkillManager {
 
   /**
    * Get all loaded skills
+   *
+   * Note: If called before initialization completes, returns empty array.
+   * Always call initialize() and await it before using getAll().
    */
   getAll(): Skill[] {
+    if (!this.initialized && this.initializationPromise) {
+      logger.warn('⚠️  getAll() called before skills initialization completed. Returning empty array. Make sure to await initialize() before calling getAll().');
+      return [];
+    }
     return Array.from(this.skills.values());
   }
 
@@ -134,15 +188,22 @@ export class SkillManager {
       throw new Error(`Skill not found: ${skillId}`);
     }
 
-    // Resolve script path
-    const scriptPath = this.resolveScriptPath(skill, request.scriptName);
-
     // Validate script exists in metadata
     const scriptMeta = skill.metadata.scripts?.find(s => s.path.endsWith(request.scriptName));
 
     if (!scriptMeta) {
       throw new Error(`Script not found in skill metadata: ${request.scriptName}`);
     }
+
+    const allowedPaths = this.mergePathLists(
+      this.config.sandbox?.allowedPaths || DEFAULT_SANDBOX_CONFIG.allowedPaths,
+      skill.metadata.allowedPaths,
+      scriptMeta.allowedPaths,
+      request.sandbox?.allowedPaths
+    );
+
+    const scriptPath = this.resolveScriptPath(skill, request.scriptName, allowedPaths);
+    const sandboxOverrides = this.buildSandboxOverrides(allowedPaths, request.sandbox);
 
     // Execute script
     const result = await this.sandbox.execute({
@@ -151,7 +212,7 @@ export class SkillManager {
       args: request.args,
       stdin: request.stdin,
       cwd: request.cwd,
-      sandbox: request.sandbox
+      sandbox: sandboxOverrides
     });
 
     logger.debug(`📜 Executed script ${request.scriptName} from skill ${skillId}: exit ${result.exitCode}`);
@@ -405,7 +466,12 @@ export class SkillManager {
 
     const validations = await Promise.all(
       skill.metadata.scripts.map(async script => {
-        const scriptPath = this.resolveScriptPath(skill, script.path);
+        const allowedPaths = this.mergePathLists(
+          this.config.sandbox?.allowedPaths || DEFAULT_SANDBOX_CONFIG.allowedPaths,
+          skill.metadata.allowedPaths,
+          script.allowedPaths
+        );
+        const scriptPath = this.resolveScriptPath(skill, script.path, allowedPaths);
 
         const validation = await this.sandbox.validateScriptSecurity(
           scriptPath,
@@ -429,8 +495,78 @@ export class SkillManager {
   /**
    * Resolve script path from skill
    */
-  private resolveScriptPath(skill: Skill, scriptName: string): string {
-    const path = require('path');
-    return path.join(skill.basePath, scriptName);
+  private resolveScriptPath(skill: Skill, scriptName: string, allowedPaths: string[]): string {
+    // Check for path traversal attempts in the scriptName
+    if (scriptName.includes('../') || scriptName.includes('..\\')) {
+      throw new Error('Path traversal detected: script path cannot contain "../" or "..\\"');
+    }
+
+    // Normalize the combined path to resolve any relative path components
+    const resolvedPath = path.isAbsolute(scriptName)
+      ? path.resolve(scriptName)
+      : path.resolve(skill.basePath, scriptName);
+    const normalizedBasePath = path.resolve(skill.basePath);
+
+    // Verify that the resolved path is within the allowed base path
+    if (!resolvedPath.startsWith(normalizedBasePath + path.sep) && resolvedPath !== normalizedBasePath) {
+      if (this.isPathWithinAllowedPaths(resolvedPath, allowedPaths)) {
+        return resolvedPath;
+      }
+      throw new Error(
+        `Path traversal detected: script path "${resolvedPath}" is outside allowed base path "${normalizedBasePath}" and not permitted by allowed paths: ${allowedPaths.join(', ')}`
+      );
+    }
+
+    return resolvedPath;
+  }
+
+  private isPathWithinAllowedPaths(targetPath: string, allowedPaths: string[]): boolean {
+    const normalizedTarget = path.resolve(targetPath);
+    return allowedPaths.some(allowedPath => {
+      if (!allowedPath) {
+        return false;
+      }
+      const normalizedAllowed = path.resolve(allowedPath);
+      return normalizedTarget === normalizedAllowed || normalizedTarget.startsWith(normalizedAllowed + path.sep);
+    });
+  }
+
+  private mergePathLists(...lists: Array<string[] | undefined>): string[] {
+    const ordered: string[] = [];
+    const seen = new Set<string>();
+
+    for (const list of lists) {
+      if (!list) {
+        continue;
+      }
+      for (const entry of list) {
+        if (!entry) {
+          continue;
+        }
+        const resolved = path.resolve(entry);
+        if (seen.has(resolved)) {
+          continue;
+        }
+        seen.add(resolved);
+        ordered.push(entry);
+      }
+    }
+
+    return ordered.length > 0 ? ordered : [...DEFAULT_SANDBOX_CONFIG.allowedPaths];
+  }
+
+  private buildSandboxOverrides(
+    allowedPaths: string[],
+    sandboxOverride?: Partial<SandboxConfig>
+  ): Partial<SandboxConfig> | undefined {
+    const overrides: Partial<SandboxConfig> = {
+      ...(sandboxOverride ?? {})
+    };
+
+    overrides.allowedPaths = this.mergePathLists(allowedPaths);
+    overrides.allowedReadPaths = this.mergePathLists(overrides.allowedReadPaths, allowedPaths);
+    overrides.allowedWritePaths = this.mergePathLists(overrides.allowedWritePaths, allowedPaths);
+
+    return overrides;
   }
 }

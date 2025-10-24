@@ -4,8 +4,10 @@
  * Exports core skills functionality for loading, parsing, and executing skills.
  */
 
-export * from './types.js';
-export * from './parser.js';
-export * from './loader.js';
-export * from './sandbox.js';
-export { SkillManager } from './manager.js';
+export * from './types';
+export * from './parser';
+export * from './loader';
+export * from './sandbox';
+export { SkillManager } from './manager';
+export { SkillsToolConverter } from './tools-converter';
+export type { SkillTool } from './tools-converter';
