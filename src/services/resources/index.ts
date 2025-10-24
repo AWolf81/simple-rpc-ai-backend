@@ -1,6 +1,6 @@
 // Resources Domain - File system, templates, and workspaces
-export * from './file-reader-helper.js';
-export * from './template-engine.js';
+export * from './file-reader-helper';
+export * from './template-engine';
 
 // Root Manager exports (including FileInfo from root-manager)
 export {
@@ -11,7 +11,7 @@ export {
   type ClientRootFolderInfo,
   type FileInfo as RootFileInfo,
   type RootManagerConfig
-} from './root-manager.js';
+} from './root-manager';
 
 // Workspace Manager exports (renamed FileInfo to avoid conflict)
 export {
@@ -22,8 +22,8 @@ export {
   type ClientWorkspaceInfo,
   type FileInfo as WorkspaceFileInfo,
   type WorkspaceManagerConfig
-} from './workspace-manager.js';
+} from './workspace-manager';
 
 // MCP Resources subdomain
-export * from './mcp/mcp-resource-registry.js';
-export * from './mcp/mcp-resource-helpers.js';
+export * from './mcp/mcp-resource-registry';
+export * from './mcp/mcp-resource-helpers';

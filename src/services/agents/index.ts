@@ -5,6 +5,7 @@
 export { AgentService } from './agent-service';
 export { AIAgentAdapter } from './adapters/ai-agent-adapter';
 export { OpenAIAgentAdapter } from './adapters/openai-agent-adapter';
+export { loadMainAgentSkill } from './builtin/index';
 
 import type { ModelDefinition, ModelCapability } from '../ai/ai-service';
 
