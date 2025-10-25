@@ -24,7 +24,7 @@ await trpc.agents.skills.executeScript.mutation({
   skillId: 'script-caller',
   scriptInvocation: {
     mode: 'path',                   // Read an existing file from the sandbox
-    scriptPath: '/workspace/scripts/demo.py',
+    scriptPath: './scripts/demo.py', // Relative to project root
     runtime: 'python',              // Optional; inferred from extension when omitted
     args: ['--dry-run']             // Optional CLI arguments forwarded to the script
   }
@@ -46,7 +46,7 @@ await trpc.agents.skills.executeScript.mutation({
   ```json
   {
     "mode": "path",
-    "scriptPath": "/workspace/scripts/demo.py",
+    "scriptPath": "./scripts/demo.py",
     "runtime": "python",
     "args": ["--dry-run"]
   }

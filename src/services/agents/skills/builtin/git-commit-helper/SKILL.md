@@ -14,7 +14,7 @@ scripts:
     description: Show concise git status information for the repository
     args:
       - name: cwd
-        description: Repository root (defaults to /workspace)
+        description: Repository root (defaults to project root)
         type: string
 ---
 
@@ -37,7 +37,11 @@ git diff --staged
 View repository status:
 
 ```bash
-tsx scripts/git-status.ts /workspace
+# Uses current project root by default
+tsx scripts/git-status.ts
+
+# Or specify a custom path
+tsx scripts/git-status.ts /path/to/repo
 ```
 
 ## Commit message format

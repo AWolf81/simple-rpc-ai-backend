@@ -6,10 +6,11 @@ import path from 'path';
 import fs from 'fs/promises';
 
 const execFileAsync = promisify(execFile);
-const ALLOWED_ROOTS = ['/workspace', '/tmp'];
+const PROJECT_ROOT = process.env.PROJECT_ROOT || process.cwd();
+const ALLOWED_ROOTS = [PROJECT_ROOT, '/tmp'];
 
 async function main() {
-  const rawCwd = process.argv[2] || '/workspace';
+  const rawCwd = process.argv[2] || PROJECT_ROOT;
   const resolvedCwd = path.resolve(rawCwd);
 
   if (!ALLOWED_ROOTS.some(root => resolvedCwd === root || resolvedCwd.startsWith(path.resolve(root) + path.sep))) {
