@@ -101,7 +101,7 @@ The agent has access to a skills system that provides specialized capabilities. 
 #### 1. file-handling (Built-in)
 - **Purpose**: Safely read, write, search, and manage files
 - **Capabilities**: file-read, file-write, file-search, directory-operations
-- **Scripts**: safe-read.ts, search-files.ts, validate-path.ts
+- **Scripts**: read.ts, search-files.ts, validate-path.ts
 
 #### 2. hello-world (Test Skill)
 - **Purpose**: Demonstrate skill structure and script execution

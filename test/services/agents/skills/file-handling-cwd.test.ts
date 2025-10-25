@@ -67,7 +67,7 @@ describe('File Handling Skills - CWD Integration', () => {
 
     // Run the safe-read script as a subprocess from the project root
     const result = await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
-      const child = spawn('npx', ['tsx', 'src/services/agents/skills/builtin/file-handling/scripts/safe-read.ts', testFilePath], {
+      const child = spawn('npx', ['tsx', 'src/services/agents/skills/builtin/file-handling/scripts/read.ts', testFilePath], {
         cwd: process.cwd(), // Run from project root
         env: { ...process.env, TSX_SILENCE_DEPRECATION: '1' } // Suppress deprecation warnings
       });
@@ -103,7 +103,7 @@ describe('File Handling Skills - CWD Integration', () => {
     
     // Run the safe-read script to attempt to read the restricted file from project root
     const result = await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
-      const child = spawn('npx', ['tsx', 'src/services/agents/skills/builtin/file-handling/scripts/safe-read.ts', restrictedPath], {
+      const child = spawn('npx', ['tsx', 'src/services/agents/skills/builtin/file-handling/scripts/read.ts', restrictedPath], {
         cwd: process.cwd(), // Run from project root
         env: { ...process.env, TSX_SILENCE_DEPRECATION: '1' } // Suppress deprecation warnings
       });

@@ -109,7 +109,7 @@ describe('process-wrapper utilities', () => {
     expect(updated).toBe(sandbox);
   });
 
-  it.skip('wraps commands with bwrap using sandbox paths', () => {
+  it('wraps commands with bwrap using sandbox paths', () => {
     const sandbox = createSandbox({ networkAccess: true });
     const env = { PATH: '/usr/bin' };
 

@@ -11,9 +11,44 @@ capabilities:
   - file-search
   - directory-operations
 scripts:
-  - path: scripts/safe-read.ts
+  - path: scripts/read.ts
     runtime: typescript
-    description: Safely read file contents with size limits
+    description: Read file contents with optional line-based offset and limit
+    args:
+      - name: file-path
+        description: Path to file (relative to project root or absolute)
+        type: string
+        required: true
+      - name: --offset
+        description: Start reading from line number (1-indexed, default 1)
+        type: number
+      - name: --limit
+        description: Max number of lines to read (default unlimited)
+        type: number
+      - name: --max-size
+        description: Max file size in bytes (default 10MB)
+        type: number
+  - path: scripts/grep.ts
+    runtime: typescript
+    description: Search for regex patterns in file, returns matching lines with numbers
+    args:
+      - name: file-path
+        description: Path to file to search
+        type: string
+        required: true
+      - name: pattern
+        description: Regex pattern to search for
+        type: string
+        required: true
+      - name: --context
+        description: Number of context lines before/after match (default 0)
+        type: number
+      - name: --max-matches
+        description: Maximum matches to return (default 100)
+        type: number
+      - name: --case-sensitive
+        description: Enable case-sensitive search
+        type: boolean
   - path: scripts/search-files.ts
     runtime: typescript
     description: Search for files matching patterns
@@ -41,8 +76,7 @@ This skill provides safe file system operations within the project root director
 ### Workflow 1: Find and Read a File
 When you need to read a file but don't know its exact path:
 1. **Search** for the file: Use `search-files.ts` with the filename pattern
-2. **Read** the file: Use `safe-read.ts` with the absolute path from search results
-3. Never search for the same file twice - use the result from step 1
+2. **Read** the file: Use `read.ts` with the absolute path from search results
 
 Example:
 ```bash
@@ -50,17 +84,35 @@ Example:
 tsx scripts/search-files.ts "CLAUDE.md"
 # Returns: /home/user/project/CLAUDE.md
 
-# Step 2: Read the file using the path from step 1
-tsx scripts/safe-read.ts /home/user/project/CLAUDE.md
+# Step 2: Read the file (first 20 lines)
+tsx scripts/read.ts /home/user/project/CLAUDE.md --limit 20
+
+# Step 3: Read specific section (lines 10-30)
+tsx scripts/read.ts /home/user/project/CLAUDE.md --offset 10 --limit 20
 ```
 
-### Workflow 2: Read a Known File
-When you already know the exact path:
-- **Skip searching** - directly use `safe-read.ts` with the path
+### Workflow 2: Find Pattern then Read Context
+When you want to check if a pattern exists and read the context:
+1. **Grep** for pattern: Use `grep.ts` to find if pattern exists
+2. **Read** specific lines: Use line numbers from grep output with `read.ts`
 
 Example:
 ```bash
-tsx scripts/safe-read.ts ./README.md
+# Step 1: Find where "TODO" appears
+tsx scripts/grep.ts ./file.txt "TODO" --context 2
+# Returns: Line 45:> TODO: Fix this bug
+
+# Step 2: Read that section with more context
+tsx scripts/read.ts ./file.txt --offset 40 --limit 15
+```
+
+### Workflow 3: Read a Known File
+When you already know the exact path:
+- **Skip searching** - directly use `read.ts` with the path
+
+Example:
+```bash
+tsx scripts/read.ts ./README.md --limit 50  # First 50 lines
 ```
 
 ## Core Operations
@@ -69,12 +121,30 @@ tsx scripts/safe-read.ts ./README.md
 
 To read a file:
 1. Validate the path is within project root (relative paths are resolved from project root automatically)
-2. Check file size (< 10MB for direct reading)
-3. Read contents and return
+2. Check file size and offset validity
+3. Read contents with optional offset and limit
 
-Use the `safe-read.ts` script for automatic validation:
+Use the `read.ts` script for automatic validation:
 ```bash
-tsx scripts/safe-read.ts <file-path>
+tsx scripts/read.ts <file-path> [--offset <line>] [--limit <lines>] [--max-size <bytes>]
+
+# Examples:
+tsx scripts/read.ts ./README.md                      # Read entire file (up to 10MB)
+tsx scripts/read.ts ./large-file.log --limit 50      # Read first 50 lines
+tsx scripts/read.ts ./data.json --offset 10 --limit 20  # Read lines 10-29
+```
+
+### Searching File Content
+
+Use the `grep.ts` script to search for patterns:
+```bash
+tsx scripts/grep.ts <file-path> <pattern> [--context <lines>] [--max-matches <n>]
+
+# Examples:
+tsx scripts/grep.ts ./file.txt "error"                 # Find "error" (case-insensitive)
+tsx scripts/grep.ts ./file.txt "TODO" --context 3     # Show 3 lines before/after
+tsx scripts/grep.ts ./file.txt "^import" --max-matches 10  # First 10 import statements
+tsx scripts/grep.ts ./file.txt "Error" --case-sensitive    # Case-sensitive search
 ```
 
 **Path Resolution**:
@@ -136,11 +206,14 @@ Returns: `safe` or `unsafe` with reason
 
 **Read configuration file:**
 ```
-tsx scripts/safe-read.ts ./config.json
+tsx scripts/read.ts ./config.json
+tsx scripts/read.ts CLAUDE.md --limit 30  # First 30 lines
 ```
-or
+
+**Search then read:**
 ```
-tsx scripts/safe-read.ts CLAUDE.md
+tsx scripts/grep.ts ./app.ts "function.*login"  # Find login functions
+tsx scripts/read.ts ./app.ts --offset 45 --limit 10  # Read that section
 ```
 
 **Search for TypeScript files:**

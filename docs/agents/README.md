@@ -151,7 +151,7 @@ Safe file system operations with permission-based safeguards.
 **Capabilities**: `file-read`, `file-write`, `file-search`, `directory-operations`
 
 **Scripts**:
-- `safe-read.ts` - Read files with size limits
+- `read.ts` - Read files with size limits
 - `search-files.ts` - Search for files by pattern
 - `validate-path.ts` - Validate file paths
 
@@ -299,7 +299,7 @@ Execute a skill script directly:
 ```typescript
 const result = await client.agents.skills.executeScript.mutate({
   skillId: 'file-handling',
-  scriptName: 'scripts/safe-read.ts',
+  scriptName: 'scripts/read.ts',
   args: ['README.md']
 });
 ```

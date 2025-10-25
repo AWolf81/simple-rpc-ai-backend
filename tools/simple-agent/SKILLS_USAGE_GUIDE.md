@@ -10,7 +10,7 @@ When you start `simple-agent`, it automatically loads these skills:
 **Purpose**: Safely read, write, search, and manage files
 
 **Available Scripts**:
-- `safe-read.ts` - Read file contents with size limits
+- `read.ts` - Read file contents with size limits
 - `search-files.ts` - Search for files matching patterns
 - `validate-path.ts` - Validate file path is safe
 
@@ -104,7 +104,7 @@ within /workspace or /tmp).
 You: Read /workspace/package.json
 
 Agent: I'll use the file-handling skill to read that file...
-[Executes scripts/safe-read.ts]
+[Executes scripts/read.ts]
 [Returns file contents]
 ```
 
