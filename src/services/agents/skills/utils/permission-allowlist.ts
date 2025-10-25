@@ -8,7 +8,7 @@
  * - Read(/path/to/**)
  */
 
-import { minimatch } from 'minimatch';
+import minimatch from 'minimatch';
 
 export interface PermissionConfig {
   allow: string[];
