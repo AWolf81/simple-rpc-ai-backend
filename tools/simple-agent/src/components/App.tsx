@@ -65,6 +65,13 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
   const { exit } = useApp();
   const toolProgressRef = useRef<string[]>([]);
 
+  // Conversation tracking for interactions
+  const [pendingConversation, setPendingConversation] = useState<{
+    conversationId: string;
+    interaction: any;
+  } | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+
   useEffect(() => {
     toolProgressRef.current = toolProgress;
   }, [toolProgress]);
@@ -409,9 +416,39 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
         systemPrompt: systemPrompt,
         provider: provider,
         model: model,
-        messages: priorConversation
+        messages: priorConversation,
+        conversationId: conversationId || undefined  // Pass conversation ID if exists
         // Note: skills are auto-loaded from SkillManager on the server
       });
+
+      // Check for interaction requirement
+      if ((result as any).type === 'interaction_required') {
+        logger.info(`🔔 Interaction required - showing dialog`);
+
+        // Store conversation ID
+        setConversationId((result as any).conversationId);
+
+        // Add interaction message to UI
+        setMessages(prev => [...prev, {
+          role: 'interaction',
+          content: '',
+          interaction: (result as any).interaction
+        } as any]);
+
+        // Store pending conversation
+        setPendingConversation({
+          conversationId: (result as any).conversationId,
+          interaction: (result as any).interaction
+        });
+
+        setIsLoading(false);
+        return;
+      }
+
+      // Normal completion - update conversation ID
+      if ((result as any).conversationId) {
+        setConversationId((result as any).conversationId);
+      }
 
       const progressFromResult = Array.isArray(result.progressMessages) && result.progressMessages.length > 0
         ? result.progressMessages
@@ -492,6 +529,77 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
     setIsLoading(false);
   };
 
+  const handleInteractionResponse = async (response: string | string[]) => {
+    if (!pendingConversation) {
+      logger.error('No pending conversation for interaction response');
+      return;
+    }
+
+    setIsLoading(true);
+
+    // Remove interaction message, add user response
+    setMessages(prev => {
+      const withoutInteraction = prev.filter(m => m.role !== 'interaction');
+      const responseText = Array.isArray(response) ? response.join(', ') : response;
+      return [...withoutInteraction, {
+        role: 'user',
+        content: responseText
+      }];
+    });
+
+    try {
+      // Resume agent with user response
+      const result = await client.agents.resume.mutate({
+        conversationId: pendingConversation.conversationId,
+        response
+      });
+
+      // Check if another interaction is required
+      if ((result as any).type === 'interaction_required') {
+        logger.info(`🔔 Another interaction required`);
+
+        setMessages(prev => [...prev, {
+          role: 'interaction',
+          content: '',
+          interaction: (result as any).interaction
+        } as any]);
+
+        setPendingConversation({
+          conversationId: (result as any).conversationId,
+          interaction: (result as any).interaction
+        });
+
+        setIsLoading(false);
+        return;
+      }
+
+      // Normal completion
+      setPendingConversation(null);
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: result.content || '',
+        usage: result.usage,
+        toolCalls: result.toolCalls
+      }]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setMessages(prev => [...prev, {
+        role: 'error',
+        content: `Resume failed: ${errorMessage}`
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInteractionCancel = () => {
+    // Remove interaction message
+    setMessages(prev => prev.filter(m => m.role !== 'interaction'));
+    setPendingConversation(null);
+    setIsLoading(false);
+  };
+
   return (
     <Box flexDirection="column" padding={1}>
       {/* Header */}
@@ -512,7 +620,11 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
 
       {/* Chat History */}
       <Box flexDirection="column" marginY={1}>
-        <ChatHistory messages={messages} />
+        <ChatHistory
+          messages={messages}
+          onInteractionResponse={handleInteractionResponse}
+          onInteractionCancel={handleInteractionCancel}
+        />
       </Box>
 
       {/* Debug panel */}
