@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import { router, publicProcedure } from '@src-trpc/index';
+import { TRPCError } from '@trpc/server';
 import { AgentService } from '@services/agents/agent-service';
 import {
   AgentExecuteRequestSchema,
@@ -21,6 +22,7 @@ import { createSkillsRouter } from './skills';
 import { logger } from '../../../utils/logger';
 import type { SkillManager } from '@services/agents/skills/manager';
 import { SkillsToolConverter } from '@services/agents/skills/tools-converter';
+import { getConversationStateManager } from '@services/agents/conversation-state-manager';
 
 export interface AgentRouterConfig {
   agentService?: AgentService;
@@ -34,6 +36,9 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
   if (!agentService) {
     throw new Error('AgentService is required for agent router');
   }
+
+  // Get conversation state manager
+  const conversationManager = getConversationStateManager();
 
   return router({
     // Skills sub-router (new skill system)
@@ -56,7 +61,9 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
           tags: ['agents']
         }
       })
-      .input(AgentExecuteRequestSchema)
+      .input(AgentExecuteRequestSchema.extend({
+        conversationId: z.string().optional()
+      }))
       .mutation(async ({ input }) => {
         // Convert skills to executable tools
         let skillTools: any[] = [];
@@ -115,8 +122,60 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
           } : undefined
         };
 
+        // Get or create conversation state
+        let convId = input.conversationId;
+        let state = convId ? conversationManager.get(convId) : null;
+
+        if (!state) {
+          state = conversationManager.create({
+            messages: input.messages || [],
+            model: input.model || 'claude-3-5-sonnet-20241022',
+            provider: input.provider,
+            systemPrompt: input.systemPrompt
+          });
+          convId = state.id;
+          logger.info(`📝 Created new conversation: ${convId}`);
+        } else {
+          logger.info(`📝 Resuming conversation: ${convId}`);
+        }
+
         // Pass skill tools to agent execution via aiService.execute
-        return await agentService.execute(agentRequest, skillTools);
+        const result = await agentService.execute(agentRequest, skillTools);
+
+        // Check for interaction requirement
+        if ((result as any).type === 'interaction_required') {
+          logger.info(`🔔 Interaction required - pausing conversation ${convId}`);
+
+          // Save pending interaction in conversation state
+          conversationManager.pause(
+            convId,
+            (result as any).interaction,
+            { name: (result as any).toolName, arguments: {} }
+          );
+
+          return {
+            conversationId: convId,
+            type: 'interaction_required',
+            interaction: (result as any).interaction,
+            toolName: (result as any).toolName,
+            partialContent: (result as any).partialContent || '',
+            usage: (result as any).usage
+          };
+        }
+
+        // Normal completion - add assistant response to conversation
+        if (result.content) {
+          conversationManager.addMessage(convId, {
+            role: 'assistant',
+            content: result.content
+          });
+        }
+
+        return {
+          conversationId: convId,
+          type: 'completed',
+          ...result
+        };
       }),
 
     /**
@@ -433,6 +492,109 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
         return {
           sdk: input.sdk,
           available: agentService.isSDKAvailable(input.sdk)
+        };
+      }),
+
+    /**
+     * Resume agent execution after user interaction
+     */
+    resume: publicProcedure
+      .meta({
+        openrpc: {
+          method: 'agents.resume',
+          summary: 'Resume agent execution after user interaction',
+          description: 'Continue agent execution with user response from interaction dialog',
+          tags: ['agents']
+        }
+      })
+      .input(z.object({
+        conversationId: z.string(),
+        response: z.union([z.string(), z.array(z.string())])
+      }))
+      .mutation(async ({ input }) => {
+        logger.info(`🔄 Resuming conversation ${input.conversationId} with user response`);
+
+        const state = conversationManager.get(input.conversationId);
+
+        if (!state) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `Conversation ${input.conversationId} not found or expired`
+          });
+        }
+
+        if (!state.pendingInteraction) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `No pending interaction for conversation ${input.conversationId}`
+          });
+        }
+
+        // Add user response to conversation
+        const responseText = Array.isArray(input.response)
+          ? input.response.join(', ')
+          : input.response;
+
+        conversationManager.addMessage(input.conversationId, {
+          role: 'user',
+          content: `[User interaction response: ${responseText}]`
+        });
+
+        // Resume execution with updated messages
+        // Build skill tools again
+        let skillTools: any[] = [];
+        if (skillManager) {
+          await skillManager.initialize();
+          const converter = new SkillsToolConverter(skillManager);
+          skillTools = converter.convertSkillsToTools();
+        }
+
+        const agentRequest: AgentExecuteRequest = {
+          prompt: `The user responded: ${responseText}. Please continue based on their response.`,
+          messages: state.messages,
+          model: state.model,
+          provider: state.provider,
+          systemPrompt: state.systemPrompt,
+          sdk: 'ai-agent'
+        };
+
+        const result = await agentService.execute(agentRequest, skillTools);
+
+        // Clear pending interaction
+        conversationManager.resume(input.conversationId, input.response);
+
+        // Check if another interaction is required
+        if ((result as any).type === 'interaction_required') {
+          logger.info(`🔔 Another interaction required in conversation ${input.conversationId}`);
+
+          conversationManager.pause(
+            input.conversationId,
+            (result as any).interaction,
+            { name: (result as any).toolName, arguments: {} }
+          );
+
+          return {
+            conversationId: input.conversationId,
+            type: 'interaction_required',
+            interaction: (result as any).interaction,
+            toolName: (result as any).toolName,
+            partialContent: (result as any).partialContent || '',
+            usage: (result as any).usage
+          };
+        }
+
+        // Normal completion
+        if (result.content) {
+          conversationManager.addMessage(input.conversationId, {
+            role: 'assistant',
+            content: result.content
+          });
+        }
+
+        return {
+          conversationId: input.conversationId,
+          type: 'completed',
+          ...result
         };
       })
   });

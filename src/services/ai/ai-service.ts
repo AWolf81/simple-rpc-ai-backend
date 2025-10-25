@@ -642,6 +642,23 @@ export class AIService {
               progressCallback
             );
 
+            // Check for interaction marker
+            if (toolCallResults.__interaction_required__) {
+              logger.info(`🔔 Interaction detected - pausing agent execution`);
+              return {
+                type: 'interaction_required',
+                interaction: toolCallResults.interaction,
+                toolName: toolCallResults.toolName,
+                partialContent: currentResult.text || '',
+                toolCalls: allToolHistory,
+                usage: {
+                  promptTokens: currentResult.usage.inputTokens || 0,
+                  completionTokens: currentResult.usage.outputTokens || 0,
+                  totalTokens: currentResult.usage.totalTokens || 0
+                }
+              } as any;
+            }
+
             // Track the tool executions in history
             currentResult.toolCalls.forEach((tc) => {
               const toolCallId = (tc as any).toolCallId;
@@ -1404,6 +1421,21 @@ The tools will be available during our conversation. Call them when needed to ga
     progressCallback?: (message: string) => void
   ): Promise<Record<string, any>> {
     const results = await this.executeToolCalls(toolCalls, customTools, progressCallback);
+
+    // Check for interaction markers in results
+    for (const result of results) {
+      if (result.result && typeof result.result === 'object' && result.result.__interaction_required__) {
+        logger.info(`🔔 User interaction required - detected in tool ${result.toolName}`);
+        // Return special marker that will be detected by execute()
+        return {
+          __interaction_required__: true,
+          interaction: result.result.interaction,
+          toolName: result.toolName,
+          toolCallId: result.toolCallId,
+          originalResults: results
+        } as any;
+      }
+    }
 
     // Convert array to Record indexed by toolCallId
     const resultsMap: Record<string, any> = {};

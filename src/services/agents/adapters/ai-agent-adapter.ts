@@ -169,10 +169,26 @@ export class AIAgentAdapter implements IAgentAdapter {
         }
       });
 
+      // Check for interaction requirement
+      if ((result as any).type === 'interaction_required') {
+        logger.info(`🔔 User interaction required - returning interaction result`);
+        return {
+          type: 'interaction_required',
+          interaction: (result as any).interaction,
+          toolName: (result as any).toolName,
+          partialContent: (result as any).partialContent || '',
+          requestId,
+          provider: 'anthropic',
+          sdk: this.sdkType,
+          usage: (result as any).usage
+        } as any;
+      }
+
       // Track which skills were potentially triggered
       const skillsTriggered = this.detectTriggeredSkills(result.content);
 
       return {
+        type: 'completed',
         content: result.content,
         usage: {
           promptTokens: result.usage.promptTokens,
