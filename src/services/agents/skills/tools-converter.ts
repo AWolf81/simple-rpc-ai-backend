@@ -7,6 +7,11 @@
 import type { SkillManager } from './manager';
 import type { Skill, SkillScript, SkillScriptArgument } from './types';
 import { logger } from '../../../utils/logger';
+import {
+  extractInteractionXML,
+  parseInteractionXML,
+  type InteractionData
+} from './utils/xml-interaction-parser';
 
 export interface SkillTool {
   name: string;
@@ -77,6 +82,28 @@ export class SkillsToolConverter {
                 stdin,
                 cwd
               });
+
+              // Check for user interaction (exit code 42 + XML marker)
+              if (result.exitCode === 0 && result.stdout) {
+                const xml = extractInteractionXML(result.stdout);
+                if (xml) {
+                  const interaction = parseInteractionXML(xml);
+                  if (interaction) {
+                    logger.info(`🔔 User interaction detected in ${toolName}:`, interaction.type);
+                    return {
+                      __interaction_required__: true,
+                      interaction,
+                      toolName,
+                      originalResult: {
+                        exitCode: result.exitCode,
+                        stdout: result.stdout,
+                        stderr: result.stderr,
+                        duration: result.duration
+                      }
+                    };
+                  }
+                }
+              }
 
               // Return structured result
               return {

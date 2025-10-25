@@ -171,9 +171,15 @@ function outputInteraction(args: ConfirmArgs) {
   `.trim();
 
   console.log(xml);
-  process.exit(42); // Special exit code: awaiting user input
+  process.exit(0); // Exit successfully - XML presence indicates interaction needed
 }
 ```
+
+**Exit Code Convention:**
+- Exit code `0` - Success (normal or interaction)
+- XML presence - `<interaction>` tag indicates user interaction needed
+- No special exit codes - Follows Unix conventions
+- More robust - Works even if exit code is misinterpreted
 
 ### 2. Agent Executor Detection
 

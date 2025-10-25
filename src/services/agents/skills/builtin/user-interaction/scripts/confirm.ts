@@ -99,8 +99,8 @@ async function main() {
   // Output XML interaction marker
   outputInteractionXML(args);
 
-  // Exit with special code indicating UI interaction needed
-  process.exit(42);
+  // Exit successfully - XML presence indicates interaction needed
+  process.exit(0);
 }
 
 main().catch(error => {
