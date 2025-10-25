@@ -2,102 +2,108 @@
 /**
  * Input Dialog Script
  *
- * Prompt user for text input
+ * Prompt user for text input - outputs XML for UI rendering
  */
 
-import readline from 'readline';
-
-interface InputResult {
-  value: string;
-  provided: boolean;
+interface InputArgs {
+  message: string;
+  title?: string;
+  defaultValue?: string;
+  enableAIInterpretation?: boolean;
+  aiContext?: string;
 }
 
-async function main() {
-  const args = process.argv.slice(2);
+function escapeXML(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
-  let prompt = 'Enter value:';
-  let defaultValue = '';
-  let multiline = false;
+function parseArgs(args: string[]): InputArgs {
+  const result: InputArgs = {
+    message: 'Enter value:',
+    enableAIInterpretation: false
+  };
 
-  // Parse arguments
   let i = 0;
   while (i < args.length) {
-    if (args[i] === '--default' && i + 1 < args.length) {
-      defaultValue = args[i + 1];
+    if (args[i] === '--title' && i + 1 < args.length) {
+      result.title = args[i + 1];
       i += 2;
-    } else if (args[i] === '--multiline') {
-      multiline = true;
+    } else if (args[i] === '--default' && i + 1 < args.length) {
+      result.defaultValue = args[i + 1];
+      i += 2;
+    } else if (args[i] === '--default-value' && i + 1 < args.length) {
+      result.defaultValue = args[i + 1];
+      i += 2;
+    } else if (args[i] === '--enable-ai-interpretation') {
+      result.enableAIInterpretation = true;
+      i++;
+    } else if (args[i] === '--ai-context' && i + 1 < args.length) {
+      result.aiContext = args[i + 1];
       i++;
     } else if (i === 0) {
-      prompt = args[i];
+      result.message = args[i];
       i++;
     } else {
       i++;
     }
   }
 
-  // Check for non-interactive mode
-  const interactiveMode = process.env.USER_INTERACTION_MODE || 'interactive';
-  if (interactiveMode !== 'interactive') {
-    handleNonInteractiveMode(defaultValue);
-    return;
+  return result;
+}
+
+function outputInteractionXML(args: InputArgs) {
+  let xml = `<interaction type="input">\n`;
+
+  if (args.title) {
+    xml += `  <title>${escapeXML(args.title)}</title>\n`;
   }
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
+  xml += `  <message>${escapeXML(args.message)}</message>\n`;
 
-  if (multiline) {
-    console.log(`${prompt}`);
-    console.log('(Press Ctrl+D when done, or enter an empty line)\n');
-
-    const lines: string[] = [];
-
-    rl.on('line', (line) => {
-      if (line.trim() === '' && lines.length > 0) {
-        rl.close();
-      } else {
-        lines.push(line);
-      }
-    });
-
-    await new Promise<void>((resolve) => {
-      rl.on('close', resolve);
-    });
-
-    const value = lines.join('\n').trim() || defaultValue;
-    const result: InputResult = {
-      value,
-      provided: value.length > 0
-    };
-
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    const defaultHint = defaultValue ? ` [${defaultValue}]` : '';
-    const answer = await new Promise<string>((resolve) => {
-      rl.question(`> ${prompt}${defaultHint} `, resolve);
-    });
-
-    rl.close();
-
-    const value = answer.trim() || defaultValue;
-    const result: InputResult = {
-      value,
-      provided: value.length > 0
-    };
-
-    console.log(JSON.stringify(result, null, 2));
+  if (args.defaultValue) {
+    xml += `  <default-value>${escapeXML(args.defaultValue)}</default-value>\n`;
   }
+
+  if (args.enableAIInterpretation) {
+    xml += `  <enable-ai-interpretation>true</enable-ai-interpretation>\n`;
+  }
+
+  if (args.aiContext) {
+    xml += `  <ai-context>${escapeXML(args.aiContext)}</ai-context>\n`;
+  }
+
+  xml += `</interaction>`;
+
+  console.log(xml);
 }
 
 function handleNonInteractiveMode(defaultValue: string) {
-  const result: InputResult = {
-    value: defaultValue,
-    provided: defaultValue.length > 0
-  };
+  const value = defaultValue || '';
+  console.log(`<interaction-response>\n  <value>${escapeXML(value)}</value>\n</interaction-response>`);
+  process.exit(0);
+}
 
-  console.log(JSON.stringify(result, null, 2));
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+
+  // Check for non-interactive mode
+  const interactiveMode = process.env.USER_INTERACTION_MODE || 'xml';
+
+  if (interactiveMode === 'auto-approve' || interactiveMode === 'auto-deny' || interactiveMode === 'default') {
+    handleNonInteractiveMode(args.defaultValue || '');
+    return;
+  }
+
+  // Output XML interaction marker
+  outputInteractionXML(args);
+
+  // Exit with special code indicating UI interaction needed
+  process.exit(42);
 }
 
 main().catch(error => {

@@ -213,7 +213,7 @@
     "express-handlebars": "^8.0.3",
     "express-rate-limit": "^7.1.5",
     "express-session": "^1.18.2",
-    "fast-xml-parser": "^4.3.2",
+    "fast-xml-parser": "^4.5.3",
     "helmet": "^7.1.0",
     "ioredis": "^5.7.0",
     "js-yaml": "^4.1.0",

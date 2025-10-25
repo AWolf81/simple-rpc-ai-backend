@@ -2,127 +2,118 @@
 /**
  * Selection Dialog Script
  *
- * Multiple choice selection menu
+ * Multiple choice selection menu - outputs XML for UI rendering
  */
 
-import readline from 'readline';
-
-interface SelectResult {
-  selected: string[];
-  indices: number[];
+interface SelectArgs {
+  message: string;
+  title?: string;
+  options: string[];
+  multiSelect?: boolean;
 }
 
-async function main() {
-  const args = process.argv.slice(2);
+function escapeXML(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
-  let prompt = 'Select an option:';
-  let choicesJson = '[]';
-  let multi = false;
+function parseArgs(args: string[]): SelectArgs {
+  const result: SelectArgs = {
+    message: 'Select an option:',
+    options: [],
+    multiSelect: false
+  };
 
-  // Parse arguments
   let i = 0;
   while (i < args.length) {
-    if (args[i] === '--multi') {
-      multi = true;
+    if (args[i] === '--title' && i + 1 < args.length) {
+      result.title = args[i + 1];
+      i += 2;
+    } else if (args[i] === '--multi' || args[i] === '--multi-select') {
+      result.multiSelect = true;
       i++;
     } else if (i === 0) {
-      prompt = args[i];
+      result.message = args[i];
       i++;
     } else if (i === 1) {
-      choicesJson = args[i];
+      // Parse options JSON
+      try {
+        const parsed = JSON.parse(args[i]);
+        if (Array.isArray(parsed)) {
+          result.options = parsed;
+        }
+      } catch (error) {
+        console.error('Invalid options format. Expected JSON array like ["Option 1", "Option 2"]');
+        process.exit(1);
+      }
       i++;
     } else {
       i++;
     }
   }
 
-  // Parse choices
-  let choices: string[];
-  try {
-    choices = JSON.parse(choicesJson);
-    if (!Array.isArray(choices) || choices.length === 0) {
-      throw new Error('Choices must be a non-empty array');
-    }
-  } catch (error) {
-    console.error('Invalid choices format. Expected JSON array like ["Option 1", "Option 2"]');
+  if (result.options.length === 0) {
+    console.error('No options provided');
     process.exit(1);
   }
 
+  return result;
+}
+
+function outputInteractionXML(args: SelectArgs) {
+  let xml = `<interaction type="select">\n`;
+
+  if (args.title) {
+    xml += `  <title>${escapeXML(args.title)}</title>\n`;
+  }
+
+  xml += `  <message>${escapeXML(args.message)}</message>\n`;
+
+  xml += `  <options>\n`;
+  for (const option of args.options) {
+    xml += `    <option>${escapeXML(option)}</option>\n`;
+  }
+  xml += `  </options>\n`;
+
+  if (args.multiSelect) {
+    xml += `  <multi-select>true</multi-select>\n`;
+  }
+
+  xml += `</interaction>`;
+
+  console.log(xml);
+}
+
+function handleNonInteractiveMode(options: string[], multiSelect: boolean) {
+  // Default to first choice in non-interactive mode
+  if (multiSelect) {
+    console.log(`<interaction-response>\n  <values>\n    <value>${escapeXML(options[0])}</value>\n  </values>\n</interaction-response>`);
+  } else {
+    console.log(`<interaction-response>\n  <value>${escapeXML(options[0])}</value>\n</interaction-response>`);
+  }
+  process.exit(0);
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+
   // Check for non-interactive mode
-  const interactiveMode = process.env.USER_INTERACTION_MODE || 'interactive';
-  if (interactiveMode !== 'interactive') {
-    handleNonInteractiveMode(choices);
+  const interactiveMode = process.env.USER_INTERACTION_MODE || 'xml';
+
+  if (interactiveMode === 'auto-approve' || interactiveMode === 'auto-deny' || interactiveMode === 'default') {
+    handleNonInteractiveMode(args.options, args.multiSelect || false);
     return;
   }
 
-  // Display menu
-  console.log(`\n? ${prompt}\n`);
-  choices.forEach((choice, index) => {
-    console.log(`  ${index + 1}. ${choice}`);
-  });
-  console.log('');
+  // Output XML interaction marker
+  outputInteractionXML(args);
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  if (multi) {
-    // Multiple selection
-    const answer = await new Promise<string>((resolve) => {
-      rl.question('Select options (comma-separated, e.g., 1,3,4): ', resolve);
-    });
-
-    rl.close();
-
-    const selections = answer
-      .split(',')
-      .map(s => parseInt(s.trim(), 10))
-      .filter(n => !isNaN(n) && n >= 1 && n <= choices.length);
-
-    if (selections.length === 0) {
-      console.error('No valid selections made');
-      process.exit(1);
-    }
-
-    const result: SelectResult = {
-      selected: selections.map(i => choices[i - 1]),
-      indices: selections.map(i => i - 1)
-    };
-
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    // Single selection
-    const answer = await new Promise<string>((resolve) => {
-      rl.question(`Your choice [1-${choices.length}]: `, resolve);
-    });
-
-    rl.close();
-
-    const selection = parseInt(answer.trim(), 10);
-
-    if (isNaN(selection) || selection < 1 || selection > choices.length) {
-      console.error('Invalid selection');
-      process.exit(1);
-    }
-
-    const result: SelectResult = {
-      selected: [choices[selection - 1]],
-      indices: [selection - 1]
-    };
-
-    console.log(JSON.stringify(result, null, 2));
-  }
-}
-
-function handleNonInteractiveMode(choices: string[]) {
-  // Default to first choice in non-interactive mode
-  const result: SelectResult = {
-    selected: [choices[0]],
-    indices: [0]
-  };
-
-  console.log(JSON.stringify(result, null, 2));
+  // Exit with special code indicating UI interaction needed
+  process.exit(42);
 }
 
 main().catch(error => {

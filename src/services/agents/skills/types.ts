@@ -300,7 +300,12 @@ export interface SkillLoaderConfig {
     deny: string[];               // Denied permission patterns
     ask: string[];                // Patterns requiring approval
   };
-  approvalCallback?: (request: any) => Promise<{ approved: boolean; rememberChoice?: boolean }>;
+  approvalCallback?: (request: any) => Promise<{
+    requestId: string;
+    approved: boolean;
+    rememberChoice?: boolean;
+    timestamp: Date;
+  }>;
 }
 
 /**
