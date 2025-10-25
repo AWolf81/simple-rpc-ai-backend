@@ -8,6 +8,7 @@ import stripAnsi from 'strip-ansi';
 
 import { marked } from 'marked';
 import TerminalRenderer from 'marked-terminal';
+import { UserInteractionDialog, InteractionType } from './UserInteractionDialog.js';
 
 // Configure marked to use terminal renderer
 marked.setOptions({
@@ -24,7 +25,7 @@ function renderMarkdown(text: string): string {
   }
 }
 
-type Role = 'user' | 'assistant' | 'system' | 'error';
+type Role = 'user' | 'assistant' | 'system' | 'error' | 'interaction';
 
 type Usage = {
   totalTokens?: number;
@@ -38,18 +39,32 @@ type ToolCall = {
   result: any;
 };
 
+type InteractionData = {
+  type: InteractionType;
+  title: string;
+  message: string;
+  options?: string[];
+  defaultValue?: string;
+  multiSelect?: boolean;
+  enableAIInterpretation?: boolean;
+  aiContext?: string;
+};
+
 export type Message = {
   role: Role;
   content: string;
   usage?: Usage;
   toolCalls?: ToolCall[];
+  interaction?: InteractionData;
 };
 
 interface ChatHistoryProps {
   messages: Message[];
+  onInteractionResponse?: (response: string | string[]) => void;
+  onInteractionCancel?: () => void;
 }
 
-export default function ChatHistory({ messages }: ChatHistoryProps) {
+export default function ChatHistory({ messages, onInteractionResponse, onInteractionCancel }: ChatHistoryProps) {
   if (!messages || messages.length === 0) {
     return (
       <Box>
@@ -63,14 +78,25 @@ export default function ChatHistory({ messages }: ChatHistoryProps) {
   return (
     <Box flexDirection="column">
       {messages.map((message, index) => (
-        <MessageItem key={index} message={message} />
+        <MessageItem
+          key={index}
+          message={message}
+          onInteractionResponse={onInteractionResponse}
+          onInteractionCancel={onInteractionCancel}
+        />
       ))}
     </Box>
   );
 }
 
-function MessageItem({ message }: { message: Message }) {
-  const { role, content, usage } = message;
+interface MessageItemProps {
+  message: Message;
+  onInteractionResponse?: (response: string | string[]) => void;
+  onInteractionCancel?: () => void;
+}
+
+function MessageItem({ message, onInteractionResponse, onInteractionCancel }: MessageItemProps) {
+  const { role, content, usage, interaction } = message;
   const rawContent = content || '';
 
   // Render markdown for assistant messages, strip ANSI for others
@@ -142,6 +168,23 @@ function MessageItem({ message }: { message: Message }) {
     return (
       <Box marginY={1}>
         <Text color="red">❌ Error: {renderedContent}</Text>
+      </Box>
+    );
+  }
+
+  // Interactive message - renders interactive dialog
+  if (role === 'interaction' && interaction) {
+    return (
+      <Box marginY={1}>
+        <UserInteractionDialog
+          {...interaction}
+          onSubmit={(response) => {
+            if (onInteractionResponse) {
+              onInteractionResponse(response);
+            }
+          }}
+          onCancel={onInteractionCancel}
+        />
       </Box>
     );
   }

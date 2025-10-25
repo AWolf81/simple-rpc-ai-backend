@@ -736,8 +736,73 @@ docker-compose -f test/agents/skills/safety/docker-compose.safety-test.yml up
 - [Approval System Usage Guide](docs/agents/APPROVAL_SYSTEM.md) - How to configure and use
 - [Technical Specification](specs/features/APPROVAL_SYSTEM.md) - Implementation details
 - [Safety Test Plan](specs/test_plan/safety_approval_system.md) - Testing guide
+- [User Interaction UI](docs/agents/USER_INTERACTION_UI.md) - Interactive dialogs in simple-agent CLI
 - [Agent Skills Documentation](docs/agents/README.md) - Skills system overview
 - [Skill Testing Guide](examples/03-agents-basic/custom-skills/hello-world/SKILL.md) - Create custom skills
+
+### User Interaction UI (simple-agent CLI)
+
+The simple-agent CLI provides interactive UI components for user interactions during agent execution. Agents can request user input through the `user-interaction` skill, which renders as interactive dialogs in the terminal.
+
+**Available Interactions:**
+
+**1. Select Dialog** - Choose from options with arrow keys
+```typescript
+// Agent calls user_interaction_select skill
+{
+  title: "Choose Action",
+  options: ["Create file", "Edit file", "Delete file"],
+  multiSelect: false  // or true for multi-select with Space bar
+}
+```
+
+**2. Input Dialog** - Free-form text with optional AI interpretation
+```typescript
+// Agent calls user_interaction_input skill
+{
+  title: "Enter Filename",
+  message: "What should we name the file?",
+  enableAIInterpretation: true  // AI interprets responses like "yes but add X first"
+}
+```
+
+**3. Confirm Dialog** - Yes/No with optional custom responses
+```typescript
+// Agent calls user_interaction_confirm skill
+{
+  message: "Create MyComponent.tsx?",
+  enableAIInterpretation: true  // Allow custom responses with 'c' key
+}
+```
+
+**AI Interpretation:**
+When enabled, AI can interpret free-form user responses:
+- "yes" → Direct approval
+- "yes but add error handling first" → Conditional approval with prerequisite
+- "don't do it" → Rejection
+- "not now" → Postponement
+
+**Keyboard Controls:**
+- **↑↓** - Navigate options (Select/Confirm)
+- **Space** - Toggle selection (multi-select mode)
+- **y/n** - Quick yes/no (Confirm)
+- **c** - Custom response (Confirm with AI interpretation)
+- **Enter** - Submit
+- **Esc** - Cancel
+- **Backspace/Delete** - Edit text (Input mode)
+
+**Example Usage:**
+```typescript
+// In agent system prompt:
+const systemPrompt = `Use user_interaction tools to confirm actions:
+- user_interaction_select: Choose from options
+- user_interaction_input: Get user input (enable AI interpretation)
+- user_interaction_confirm: Get confirmation (enable AI interpretation)
+
+Always confirm before destructive operations.`;
+```
+
+**See:** [User Interaction UI Documentation](docs/agents/USER_INTERACTION_UI.md) for complete guide and examples.
 
 ## Security & Development Guidelines
 
