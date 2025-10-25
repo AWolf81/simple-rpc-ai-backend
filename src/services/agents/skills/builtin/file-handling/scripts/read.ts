@@ -134,9 +134,15 @@ async function main() {
 
       // Stop if we've reached the limit
       if (limit !== undefined && linesRead >= limit) {
+        rl.close();
+        fileStream.destroy();
         break;
       }
     }
+
+    // Close resources if not already closed
+    rl.close();
+    fileStream.destroy();
 
     // Output to stdout
     console.log(outputLines.join('\n'));
