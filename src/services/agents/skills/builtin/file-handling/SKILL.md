@@ -19,13 +19,16 @@ scripts:
         description: Path to file (relative to project root or absolute)
         type: string
         required: true
-      - name: --offset
+      - name: offset
+        flag: --offset
         description: Start reading from line number (1-indexed, default 1)
         type: number
-      - name: --limit
+      - name: limit
+        flag: --limit
         description: Max number of lines to read (default unlimited)
         type: number
-      - name: --max-size
+      - name: max-size
+        flag: --max-size
         description: Max file size in bytes (default 10MB)
         type: number
   - path: scripts/grep.ts
@@ -40,13 +43,16 @@ scripts:
         description: Regex pattern to search for
         type: string
         required: true
-      - name: --context
+      - name: context
+        flag: --context
         description: Number of context lines before/after match (default 0)
         type: number
-      - name: --max-matches
+      - name: max-matches
+        flag: --max-matches
         description: Maximum matches to return (default 100)
         type: number
-      - name: --case-sensitive
+      - name: case-sensitive
+        flag: --case-sensitive
         description: Enable case-sensitive search
         type: boolean
   - path: scripts/search-files.ts

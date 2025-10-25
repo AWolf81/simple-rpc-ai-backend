@@ -509,6 +509,178 @@ app.post('/mcp', handleMCP);         // Model Context Protocol
 - **OAuth Authentication**: Anonymous discovery → JWT authentication for execution
 - **Input Validation**: All MCP tool calls validated against tRPC schemas
 
+## Agent Skills System
+
+The server includes a powerful skills system that allows AI agents to execute specialized tasks through sandboxed scripts. Skills provide reusable, documented capabilities that extend agent functionality.
+
+### Built-in Skills
+
+The following skills are included by default:
+
+#### **file-handling**
+Read, write, search, and manage files safely within the project root. Includes:
+- `read.ts` - Read file contents with line-based offset/limit
+- `grep.ts` - Search for regex patterns with context
+- `search-files.ts` - Find files by glob patterns
+- `validate-path.ts` - Validate paths are safe and accessible
+
+**Note**: When defining script arguments with command-line flags, use the `flag` field:
+```yaml
+args:
+  - name: limit          # Property name in tool calls
+    flag: --limit        # Actual command-line flag
+    description: Max lines to read
+    type: number
+```
+
+#### **git-commit-helper**
+Generate descriptive commit messages by analyzing git diffs and following conventional commits format.
+
+#### **script-caller**
+Execute workspace scripts with sandboxed runtimes (JavaScript, TypeScript, Python) in isolated environments.
+
+#### **agent-creator**
+Create and orchestrate specialized AI sub-agents that work together on complex tasks through sequential, parallel, or supervisor patterns.
+
+#### **skill-creator**
+Guide for creating effective skills with best practices for documentation, security, and integration.
+
+### Using Skills in Agents
+
+Skills are automatically loaded and converted to AI tools that agents can invoke:
+
+```typescript
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
+
+const server = createRpcAiServer({
+  agents: {
+    enabled: true,
+    skills: {
+      sources: [
+        { type: 'builtin', name: 'file-handling' },
+        { type: 'builtin', name: 'git-commit-helper' }
+      ]
+    }
+  }
+});
+```
+
+### Adding Custom Skills in Consuming Apps
+
+Create custom skills by following the skill structure:
+
+**1. Create skill directory:**
+```
+my-app/custom-skills/
+  └── data-processor/
+      ├── SKILL.md           # Metadata and documentation
+      └── scripts/
+          └── process.ts     # Executable script
+```
+
+**2. Define skill metadata (SKILL.md):**
+```yaml
+---
+name: data-processor
+description: Process and transform data files with validation
+version: 1.0.0
+capabilities:
+  - data-processing
+scripts:
+  - path: scripts/process.ts
+    runtime: typescript
+    description: Process CSV data with validation
+    args:
+      - name: input-file
+        description: Path to input CSV file
+        type: string
+        required: true
+      - name: format
+        flag: --format
+        description: Output format (json|csv)
+        type: string
+        enum: [json, csv]
+---
+
+# Data Processor Skill
+
+[Detailed documentation here...]
+```
+
+**3. Register with server:**
+```typescript
+import { createRpcAiServer } from 'simple-rpc-ai-backend';
+import { join } from 'path';
+
+const server = createRpcAiServer({
+  agents: {
+    enabled: true,
+    skills: {
+      sources: [
+        // Built-in skills
+        { type: 'builtin', name: 'file-handling' },
+
+        // Custom local skill
+        {
+          type: 'local',
+          path: join(process.cwd(), 'custom-skills/data-processor')
+        }
+      ]
+    }
+  }
+});
+```
+
+**4. Agent automatically gets the tool:**
+```typescript
+const result = await client.agents.execute.mutate({
+  messages: [{
+    role: 'user',
+    content: 'Process users.csv and convert to JSON format'
+  }]
+});
+
+// Agent can now call: data_processor_process tool
+// With args: { "input-file": "users.csv", "format": "json" }
+```
+
+### Skill Script Guidelines
+
+**Argument Definition Best Practices:**
+- Use `flag` field for command-line flags (e.g., `--limit`, `--format`)
+- Use `name` field for the property name AI uses in tool calls
+- Required positional arguments don't need flags
+- Boolean flags typically don't need values
+
+**Example:**
+```yaml
+# Positional argument (no flag)
+- name: file-path
+  type: string
+  required: true
+
+# Optional flag argument
+- name: limit
+  flag: --limit
+  type: number
+  description: Max items to process
+
+# Boolean flag
+- name: verbose
+  flag: --verbose
+  type: boolean
+```
+
+**Security:**
+- Scripts run in sandboxed environments with restricted filesystem access
+- Only project root and `/tmp` directories are accessible by default
+- Network access is disabled unless explicitly allowed
+- Memory and timeout limits enforced
+
+**See also:**
+- [Agent Skills Documentation](docs/agents/README.md)
+- [Skill Testing Guide](examples/03-agents-basic/custom-skills/hello-world/SKILL.md)
+
 ## Security & Development Guidelines
 
 **Security**: System prompt protection, AES-256-GCM encryption, no hardcoded secrets, input validation, rate limiting
@@ -543,6 +715,7 @@ app.post('/mcp', handleMCP);         // Model Context Protocol
 - **Platform Agnostic**: VS Code, web, CLI support required
 - **MCP Integration**: Dynamic tRPC → MCP tool exposure via `meta()` decorators
 - **Parameter Design**: Avoid `.optional().default()` for user-controllable MCP parameters
+- **Skill Arguments**: Use `flag` field for command-line flags (not in `name` field) - see Agent Skills System section
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
@@ -577,3 +750,12 @@ NEVER proactively create documentation files (*.md) or README files. Only create
   - **Files Changed**: `package.json`, `src/services/APITokenManager.ts`, `.npmrc`, `scripts/safe-build.js`
   - **Requirements**: Node.js >=22.0.0 for tRPC compatibility
   - **Status**: GitHub installs now work reliably on all platforms with Python 3.8-3.13+
+- ✅ **COMPLETED**: Agent Skills System documentation and bug fixes
+  - **Documentation**: Comprehensive skills system guide added to CLAUDE.md
+  - **Built-in Skills**: file-handling, git-commit-helper, script-caller, agent-creator, skill-creator
+  - **Custom Skills**: Full guide for adding custom skills in consuming apps
+  - **Bug Fix 1**: Fixed skill argument flag handling (use `flag` field, not prefix in `name`)
+  - **Bug Fix 2**: Fixed UI line counting (trailing newline causing off-by-one error)
+  - **Files Changed**: `SKILL.md` (file-handling), `ChatHistory.tsx`, `BUGFIX_FILE_LIMIT.md`
+  - **Verification**: File limiting now works correctly (22 lines requested = 22 lines read)
+  - **Guidelines**: Documented best practices for flag arguments, positional args, and boolean flags

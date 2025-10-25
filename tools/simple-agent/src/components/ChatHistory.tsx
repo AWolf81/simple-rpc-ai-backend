@@ -171,8 +171,10 @@ function ToolExecutionBlock({ toolCall }: { toolCall: ToolCall }) {
 
   // Limit output to 4 lines max with ellipsis
   const lines = output.split('\n');
-  const displayOutput = lines.length > 4
-    ? lines.slice(0, 4).join('\n') + '\n... (' + (lines.length - 4) + ' more lines)'
+  // Filter out trailing empty line from split (if output ends with \n)
+  const nonEmptyLines = lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;
+  const displayOutput = nonEmptyLines.length > 4
+    ? nonEmptyLines.slice(0, 4).join('\n') + '\n... (' + (nonEmptyLines.length - 4) + ' more lines)'
     : output;
 
   const isSuccess = exitCode === undefined || exitCode === 0;
