@@ -1,0 +1,63 @@
+# Dockerfile for Safety Testing
+# Provides isolated environment for testing destructive commands safely
+
+FROM node:22-alpine
+
+# Install bash, git, and other tools for testing
+RUN apk add --no-cache \
+    bash \
+    git \
+    curl \
+    python3 \
+    py3-pip \
+    findutils \
+    grep \
+    sed \
+    coreutils
+
+# Create test user (non-root)
+RUN addgroup -g 1000 testuser && \
+    adduser -D -u 1000 -G testuser testuser
+
+# Create test directories with known structure
+RUN mkdir -p /test-workspace/safe-zone && \
+    mkdir -p /test-workspace/danger-zone && \
+    mkdir -p /test-workspace/protected && \
+    mkdir -p /test-workspace/temp
+
+# Create test files
+RUN echo "safe file 1" > /test-workspace/safe-zone/file1.txt && \
+    echo "safe file 2" > /test-workspace/safe-zone/file2.txt && \
+    echo "danger file" > /test-workspace/danger-zone/important.txt && \
+    echo "protected data" > /test-workspace/protected/critical.txt
+
+# Set ownership
+RUN chown -R testuser:testuser /test-workspace
+
+# Create workspace for app
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install pnpm
+RUN npm install -g pnpm@latest
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build the project
+RUN pnpm build
+
+# Switch to test user
+USER testuser
+
+# Set environment variables
+ENV NODE_ENV=test
+ENV LOG_LEVEL=debug
+
+# Default command runs safety tests
+CMD ["pnpm", "test", "test/agents/skills/safety/"]

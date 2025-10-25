@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  safety-test:
+    build:
+      context: ../../../..
+      dockerfile: test/agents/skills/safety/Dockerfile.safety-test
+    container_name: safety-test-env
+    volumes:
+      # Mount test results out
+      - ./test-results:/app/test-results
+      # Mount source for development
+      - ../../../../src:/app/src:ro
+      - ../../../../test:/app/test:ro
+    environment:
+      - NODE_ENV=test
+      - LOG_LEVEL=debug
+      - TEST_MODE=docker
+    # Resource limits for safety
+    mem_limit: 512m
+    cpus: 1
+    # No network access for isolated testing
+    network_mode: none
+    # Read-only root filesystem (except specific mounts)
+    read_only: false  # We need to test file operations
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=100m
+    security_opt:
+      - no-new-privileges:true
+    # Prevent privilege escalation
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID

@@ -82,6 +82,23 @@ export type SkillSource =
   | ZipSkillSource;
 
 /**
+ * Safety level for scripts
+ */
+export type SafetyLevel = 'low' | 'medium' | 'high' | 'critical';
+
+/**
+ * Safety configuration for scripts
+ */
+export interface ScriptSafetyConfig {
+  level: SafetyLevel;
+  requiresApproval: boolean;
+  blockPatterns?: string[];     // Regex patterns to block (never execute)
+  warnPatterns?: string[];      // Patterns that require extra confirmation
+  dangerousArgs?: string[];     // Specific arguments that are dangerous
+  maxTargets?: number;          // Max files/folders affected (for rm, mv)
+}
+
+/**
  * SKILL.md frontmatter metadata
  */
 export interface SkillMetadata {
@@ -93,6 +110,14 @@ export interface SkillMetadata {
   capabilities?: string[];        // Tags for skill matching
   scripts?: SkillScript[];        // Executable scripts
   allowedPaths?: string[];        // Paths scripts can access
+
+  // Safety configuration
+  requiresApproval?: boolean;     // Skill-level approval requirement
+  safetyChecks?: {
+    blockPatterns?: string[];     // Skill-level block patterns
+    warnPatterns?: string[];      // Skill-level warning patterns
+  };
+
   [key: string]: any;             // Additional custom metadata
 }
 
@@ -117,6 +142,10 @@ export interface SkillScript {
   allowedPaths?: string[];        // Override skill-level paths
   timeout?: number;               // Override default timeout
   args?: SkillScriptArgument[];   // Structured argument metadata
+
+  // Safety configuration
+  safety?: ScriptSafetyConfig;    // Full safety configuration
+  requiresApproval?: boolean;     // Shorthand for safety.requiresApproval
 }
 
 /**
@@ -264,6 +293,14 @@ export interface SkillLoaderConfig {
   validation: ValidationConfig;
   cacheDir?: string;              // Directory for downloaded/extracted skills
   maxConcurrentLoads?: number;    // Parallel loading limit
+
+  // Permission and approval configuration
+  permissions?: {
+    allow: string[];              // Allowed permission patterns
+    deny: string[];               // Denied permission patterns
+    ask: string[];                // Patterns requiring approval
+  };
+  approvalCallback?: (request: any) => Promise<{ approved: boolean; rememberChoice?: boolean }>;
 }
 
 /**

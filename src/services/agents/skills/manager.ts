@@ -13,12 +13,17 @@ import {
   ScriptExecutionRequest,
   ScriptExecutionResult,
   TokenMetrics,
-  SandboxConfig
+  SandboxConfig,
+  ScriptSafetyConfig
 } from './types';
 import { SkillLoader } from './loader';
 import { ScriptSandbox, DEFAULT_SANDBOX_CONFIG } from './sandbox';
 import { SandboxProviderFactory, type ISandboxProvider, type SandboxProviderConfig } from './sandbox-provider';
 import { validateSkillStructure, estimateTokens } from './parser';
+import { SafetyValidator } from './utils/safety-validator';
+import { ApprovalManager } from './utils/approval-manager';
+import { PermissionAllowlist } from './utils/permission-allowlist';
+import { _setGlobalSkillManager } from './utils/interactive-approval-callback';
 import { logger } from '../../../utils/logger';
 import path from 'path';
 
@@ -33,11 +38,20 @@ export class SkillManager {
   private config: SkillLoaderConfig;
   private initializationPromise?: Promise<void>; // Track initialization promise
   private initialized = false; // Track if initialization is complete
+  private approvalManager?: ApprovalManager; // Approval and permission system
 
   constructor(config: SkillLoaderConfig) {
     this.config = config;
     this.loader = new SkillLoader(config);
     this.sandbox = new ScriptSandbox(config.sandbox); // Legacy fallback
+
+    // Initialize approval system if configured
+    if (config.permissions || config.approvalCallback) {
+      this.approvalManager = new ApprovalManager(
+        config.permissions,
+        config.approvalCallback
+      );
+    }
   }
 
   /**
@@ -60,6 +74,9 @@ export class SkillManager {
     try {
       await this.initializationPromise;
       this.initialized = true;
+
+      // Set global skill manager reference for interactive approval callbacks
+      _setGlobalSkillManager(this);
     } finally {
       // Don't clear the promise so multiple calls return the same promise
     }
@@ -193,6 +210,55 @@ export class SkillManager {
 
     if (!scriptMeta) {
       throw new Error(`Script not found in skill metadata: ${request.scriptName}`);
+    }
+
+    // SAFETY VALIDATION
+    const safetyConfig: ScriptSafetyConfig | undefined = scriptMeta.safety ||
+      (scriptMeta.requiresApproval ? { level: 'medium', requiresApproval: true } : undefined);
+
+    const safetyValidation = SafetyValidator.validate(
+      request.scriptName,
+      request.args || [],
+      safetyConfig,
+      skill.metadata.safetyChecks
+    );
+
+    // Check if blocked by safety validator
+    if (safetyValidation.blocked) {
+      logger.error(`🚫 Script execution blocked: ${request.scriptName}`, {
+        reason: safetyValidation.reason
+      });
+      throw new Error(safetyValidation.reason || 'Script execution blocked by safety validator');
+    }
+
+    // Request approval if needed
+    if (safetyValidation.requiresApproval || skill.metadata.requiresApproval) {
+      if (this.approvalManager) {
+        const approved = await this.approvalManager.requestSkillExecutionApproval(
+          request.scriptName,
+          request.args || [],
+          safetyValidation,
+          request.cwd
+        );
+
+        if (!approved) {
+          logger.warn(`❌ Script execution denied by user: ${request.scriptName}`);
+          throw new Error(`Script execution denied: ${request.scriptName}`);
+        }
+
+        logger.info(`✅ Script execution approved: ${request.scriptName}`);
+      } else {
+        // No approval manager configured but approval required
+        throw new Error(
+          `Approval required for "${request.scriptName}" but no approval system configured.\n` +
+          SafetyValidator.formatApprovalPrompt(
+            request.scriptName,
+            request.args || [],
+            safetyValidation,
+            request.cwd
+          )
+        );
+      }
     }
 
     const allowedPaths = this.mergePathLists(

@@ -59,7 +59,7 @@ const server = createRpcAiServer({
         { type: 'local', path: './custom-skills/my-skill' }
       ],
       sandbox: {
-        allowedPaths: ['/workspace', '/tmp'],
+        allowedPaths: [process.env.PROJECT_ROOT || process.cwd(), '/tmp'],
         timeout: 30000,
         maxMemory: 512 * 1024 * 1024
       }
@@ -232,8 +232,8 @@ Current configuration surface:
 
 ```typescript
 sandbox: {
-  // Paths scripts can access
-  allowedPaths: ['/workspace', '/tmp'],
+  // Paths scripts can access (uses PROJECT_ROOT environment variable)
+  allowedPaths: [process.env.PROJECT_ROOT || process.cwd(), '/tmp'],
 
   // Script timeout (ms)
   timeout: 30000,
@@ -243,7 +243,8 @@ sandbox: {
 
   // Environment variables
   env: {
-    NODE_ENV: 'production'
+    NODE_ENV: 'production',
+    PROJECT_ROOT: process.env.PROJECT_ROOT || process.cwd()
   }
 }
 ```
@@ -253,6 +254,12 @@ Security features:
 - ✅ Timeout prevents infinite loops
 - ✅ Memory limits prevent resource exhaustion
 - ✅ Isolated process execution
+
+**Note on `PROJECT_ROOT`:**
+- Set the `PROJECT_ROOT` environment variable to define your project's root directory
+- Skills will have access to files within this directory
+- Defaults to `process.cwd()` if not set
+- Using `/workspace` is possible but not recommended to avoid confusion with the project root concept
 
 > Status: remote sandboxes are planned but not yet implemented or tested.
 

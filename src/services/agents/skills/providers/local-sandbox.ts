@@ -684,7 +684,7 @@ export class LocalSandboxProvider implements ISandboxProvider {
       }
 
       // Handle completion
-      child.on('exit', (code, signal) => {
+      child.on('exit', (code/*, signal*/) => {
         clearTimeout(timeout);
 
         resolve({

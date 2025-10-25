@@ -55,6 +55,18 @@ scripts:
         flag: --case-sensitive
         description: Enable case-sensitive search
         type: boolean
+  - path: scripts/write.ts
+    runtime: typescript
+    description: Write content to a file (creates directories if needed)
+    args:
+      - name: file-path
+        description: Path to file to write
+        type: string
+        required: true
+      - name: content
+        description: Content to write to file
+        type: string
+        required: true
   - path: scripts/search-files.ts
     runtime: typescript
     description: Search for files matching patterns

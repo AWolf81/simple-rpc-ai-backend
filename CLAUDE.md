@@ -677,9 +677,67 @@ const result = await client.agents.execute.mutate({
 - Network access is disabled unless explicitly allowed
 - Memory and timeout limits enforced
 
+### Skill Approval & Safety System
+
+The skills system includes comprehensive safety and approval mechanisms to prevent destructive operations:
+
+**Permission Allowlist** (Claude Code-style):
+```typescript
+const server = createRpcAiServer({
+  agents: {
+    skills: {
+      sources: [{ type: 'builtin', name: 'file-handling' }],
+      permissions: {
+        allow: [
+          'Bash(pnpm build:*)',
+          'Read(/project/**)',
+          'WebFetch(domain:github.com)'
+        ],
+        deny: ['Bash(rm -rf /)'],
+        ask: ['Bash(git push:*)']
+      },
+      approvalCallback: async (request) => ({
+        approved: true,
+        rememberChoice: false
+      })
+    }
+  }
+});
+```
+
+**Safety Features:**
+- **Critical Blocks**: Prevents `rm -rf /`, fork bombs, disk wiping, process attacks
+- **Warning Patterns**: Requires approval for recursive deletion, permission changes
+- **Network Safety**: POST/PUT/PATCH/DELETE require approval, GET is safe
+- **Skill-Level Safety**: Configure safety in SKILL.md
+- **Docker Testing**: Isolated environment for destructive command tests
+
+**Safety Levels:**
+```yaml
+scripts:
+  - path: scripts/dangerous.ts
+    safety:
+      level: critical  # low|medium|high|critical
+      requiresApproval: true
+      blockPatterns: ["rm.*critical"]
+      dangerousArgs: ["--force"]
+```
+
+**Testing:**
+```bash
+# Run safety tests in Docker (isolated)
+./scripts/test-safety-docker.sh
+
+# Or manually
+docker-compose -f test/agents/skills/safety/docker-compose.safety-test.yml up
+```
+
 **See also:**
-- [Agent Skills Documentation](docs/agents/README.md)
-- [Skill Testing Guide](examples/03-agents-basic/custom-skills/hello-world/SKILL.md)
+- [Approval System Usage Guide](docs/agents/APPROVAL_SYSTEM.md) - How to configure and use
+- [Technical Specification](specs/features/APPROVAL_SYSTEM.md) - Implementation details
+- [Safety Test Plan](specs/test_plan/safety_approval_system.md) - Testing guide
+- [Agent Skills Documentation](docs/agents/README.md) - Skills system overview
+- [Skill Testing Guide](examples/03-agents-basic/custom-skills/hello-world/SKILL.md) - Create custom skills
 
 ## Security & Development Guidelines
 
