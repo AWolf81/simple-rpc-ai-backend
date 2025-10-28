@@ -557,15 +557,97 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
         }
 
         // Add user response to conversation with clear instruction
-        const responseText = Array.isArray(input.response)
+        const rawResponse = Array.isArray(input.response)
           ? input.response.join(', ')
           : input.response;
 
-        const normalizedResponse = responseText.toString().trim().toLowerCase();
         const approvalKeywords = ['allow', 'yes', 'approved', 'approve', 'confirm', 'confirmed'];
         const alwaysKeywords = ["don't ask again", "don't ask", 'always', 'every time'];
-        const userApproved = approvalKeywords.some(keyword => normalizedResponse.includes(keyword));
-        const rememberPermanently = alwaysKeywords.some(keyword => normalizedResponse.includes(keyword));
+
+        let parsedChoice: string | undefined;
+        let parsedCustomResponse: string | undefined;
+
+        const collectFromPayload = (payload: unknown): void => {
+          if (!payload || typeof payload !== 'object') {
+            return;
+          }
+
+          const value = payload as Record<string, unknown>;
+
+          if (typeof value.choice === 'string') {
+            parsedChoice = value.choice;
+          } else if (typeof value.selection === 'string' && !parsedChoice) {
+            parsedChoice = value.selection;
+          }
+
+          if (typeof value.customResponse === 'string') {
+            parsedCustomResponse = value.customResponse;
+          } else if (typeof value.custom_response === 'string') {
+            parsedCustomResponse = value.custom_response;
+          }
+
+          if (value.json && typeof value.json === 'object') {
+            collectFromPayload(value.json);
+          }
+        };
+
+        if (typeof rawResponse === 'string') {
+          const trimmed = rawResponse.trim();
+          if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              collectFromPayload(parsed);
+            } catch (error) {
+              logger.debug('🔍 Failed to parse interaction response as JSON', { error });
+            }
+          }
+        }
+
+        const normalizedChoice = parsedChoice ? parsedChoice.toLowerCase() : '';
+        const responseSources = [
+          parsedChoice,
+          parsedCustomResponse,
+          typeof rawResponse === 'string' ? rawResponse : undefined
+        ].filter((value): value is string => typeof value === 'string');
+
+        let userApproved = approvalKeywords.some(keyword =>
+          responseSources.some(source => source.toLowerCase().includes(keyword))
+        );
+
+        let rememberPermanently = alwaysKeywords.some(keyword =>
+          normalizedChoice.includes(keyword) ||
+          (!parsedChoice && responseSources.some(source => source.toLowerCase().includes(keyword)))
+        );
+
+        const isCustomResponse = normalizedChoice.includes('custom response');
+        if (isCustomResponse) {
+          // Custom responses should be handled by the AI rather than auto-executed
+          userApproved = false;
+          rememberPermanently = false;
+        }
+
+        const responseSummaryParts: string[] = [];
+        if (parsedChoice) {
+          responseSummaryParts.push(parsedChoice);
+        }
+        if (parsedCustomResponse) {
+          responseSummaryParts.push(parsedCustomResponse);
+        }
+
+        const responseText = responseSummaryParts.length > 0
+          ? responseSummaryParts.join(' — ')
+          : typeof rawResponse === 'string'
+            ? rawResponse
+            : JSON.stringify(rawResponse);
+
+        logger.info('📝 RESUME: Parsed approval response', {
+          rawResponse,
+          parsedChoice,
+          parsedCustomResponse,
+          userApproved,
+          rememberPermanently
+        });
+
         const pending = state.pendingInteraction;
 
         let operationTarget: string | undefined;
@@ -589,7 +671,7 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
 
           logger.info(`🔄 Resuming with ${skillTools.length} tools (excluded user-interaction confirmation tools)`);
 
-          if (pending && userApproved) {
+          if (pending && (userApproved || rememberPermanently)) {
             const toolArgsData: Record<string, any> = pending.toolArguments || pending.toolCall?.arguments || {};
             const scriptArgs = Array.isArray(pending.scriptArgs) && pending.scriptArgs.length > 0
               ? pending.scriptArgs
@@ -606,41 +688,60 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
             }
 
             if (pending.skillId && pending.scriptName) {
-              logger.info(`🔁 Re-executing approved tool ${pending.scriptName} from skill ${pending.skillId}`);
-
-              skillManager.bypassApprovalFor(pending.scriptName, scriptArgs, {
+              const rememberOptions = {
                 skillId: pending.skillId,
                 persist: rememberPermanently,
                 applyToAllArgs: rememberPermanently
-              });
+              };
 
-              try {
-                const execResult = await skillManager.executeScript(pending.skillId, {
-                  scriptName: pending.scriptName,
-                  args: scriptArgs,
-                  stdin: pending.stdin,
-                  cwd: pending.cwd
-                });
+              skillManager.bypassApprovalFor(
+                pending.scriptName,
+                scriptArgs,
+                rememberOptions,
+                userApproved
+              );
 
-                toolExecuted = true;
-
-                if (execResult && typeof execResult === 'object' && (execResult as any).__interaction_required__) {
-                  throw new Error('Tool execution still requires interaction after approval');
+              if (userApproved) {
+                const originalToolName = pending.originalToolName || pending.toolName;
+                if (originalToolName) {
+                  const beforeCount = skillTools.length;
+                  skillTools = skillTools.filter(tool => tool.name !== originalToolName);
+                  const afterCount = skillTools.length;
+                  logger.info(
+                    `🚫 Removed tool '${originalToolName}' from resume context to prevent duplicate execution (${beforeCount}→${afterCount})`
+                  );
                 }
 
-                if (execResult.exitCode !== 0) {
-                  toolExecutionError = (execResult.stderr || '').trim() || `Exit code ${execResult.exitCode}`;
-                } else {
-                  const trimmedOutput = (execResult.stdout || '').trim();
-                  if (trimmedOutput) {
-                    toolExecutionOutput = trimmedOutput.length > 500
-                      ? `${trimmedOutput.slice(0, 500)} …`
-                      : trimmedOutput;
+                logger.info(`🔁 Re-executing approved tool ${pending.scriptName} from skill ${pending.skillId}`);
+
+                try {
+                  const execResult = await skillManager.executeScript(pending.skillId, {
+                    scriptName: pending.scriptName,
+                    args: scriptArgs,
+                    stdin: pending.stdin,
+                    cwd: pending.cwd
+                  });
+
+                  toolExecuted = true;
+
+                  if (execResult && typeof execResult === 'object' && (execResult as any).__interaction_required__) {
+                    throw new Error('Tool execution still requires interaction after approval');
                   }
+
+                  if (execResult.exitCode !== 0) {
+                    toolExecutionError = (execResult.stderr || '').trim() || `Exit code ${execResult.exitCode}`;
+                  } else {
+                    const trimmedOutput = (execResult.stdout || '').trim();
+                    if (trimmedOutput) {
+                      toolExecutionOutput = trimmedOutput.length > 500
+                        ? `${trimmedOutput.slice(0, 500)} …`
+                        : trimmedOutput;
+                    }
+                  }
+                } catch (error) {
+                  toolExecutionError = error instanceof Error ? error.message : String(error);
+                  logger.error(`❌ Failed to execute approved tool ${pending.scriptName}`, { error: toolExecutionError });
                 }
-              } catch (error) {
-                toolExecutionError = error instanceof Error ? error.message : String(error);
-                logger.error(`❌ Failed to execute approved tool ${pending.scriptName}`, { error: toolExecutionError });
               }
             } else {
               logger.warn('⚠️ Missing skillId or scriptName on pending interaction; cannot auto-execute tool.');
@@ -661,15 +762,15 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
             const outputDetails = toolExecutionOutput ? `\nTool output:\n${toolExecutionOutput}` : '';
             resumePrompt =
               `[SYSTEM] User approved the operation. "${toolLabel}" executed successfully${targetDetails}.${outputDetails}\n` +
-              `Provide a confirmation message to the user.`;
+              `The operation is complete—do not invoke any additional tools. Provide a confirmation message to the user summarizing the success.`;
           } else {
             resumePrompt =
               `[SYSTEM] User approved the operation. Confirm to the user that you will proceed and describe the next steps.`;
           }
         } else {
-          resumePrompt =
-            `[SYSTEM] User responded with: "${responseText}". The pending operation was not executed. ` +
-            `Acknowledge the response and offer alternatives if helpful.`;
+            resumePrompt =
+              `[SYSTEM] User responded with: "${responseText}". The pending operation was not executed. ` +
+              `Acknowledge the response and offer alternatives if helpful.`;
         }
 
         // Pass the resume prompt as a NEW prompt (this will add it as a user message)

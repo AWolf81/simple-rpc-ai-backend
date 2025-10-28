@@ -39,6 +39,8 @@ export class SkillManager {
   private initializationPromise?: Promise<void>; // Track initialization promise
   private initialized = false; // Track if initialization is complete
   private approvalManager?: ApprovalManager; // Approval and permission system
+  private recentExecutions = new Map<string, { timestamp: number; result: ScriptExecutionResult }>();
+  private static readonly DUPLICATE_EXECUTION_WINDOW_MS = 2000;
 
   constructor(config: SkillLoaderConfig) {
     this.config = config;
@@ -231,6 +233,26 @@ export class SkillManager {
       throw new Error(safetyValidation.reason || 'Script execution blocked by safety validator');
     }
 
+    const executionSignature = this.buildExecutionSignature(
+      skillId,
+      request.scriptName,
+      request.args,
+      request.stdin,
+      request.cwd
+    );
+    const cachedExecution = this.recentExecutions.get(executionSignature);
+    const now = Date.now();
+    if (
+      cachedExecution &&
+      now - cachedExecution.timestamp < SkillManager.DUPLICATE_EXECUTION_WINDOW_MS
+    ) {
+      logger.info(`♻️  Reusing cached result for ${request.scriptName}`, {
+        skillId,
+        args: request.args
+      });
+      return { ...cachedExecution.result };
+    }
+
     // Request approval if needed
     if (safetyValidation.requiresApproval || skill.metadata.requiresApproval) {
       console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
@@ -306,6 +328,13 @@ export class SkillManager {
     const sandboxOverrides = this.buildSandboxOverrides(allowedPaths, request.sandbox);
 
     // Execute script
+    const executionId = `${request.scriptName}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    logger.info(`[SKILL EXEC] Starting ${request.scriptName}`, {
+      executionId,
+      skillId,
+      args: request.args
+    });
+
     const result = await this.sandbox.execute({
       scriptPath,
       runtime: scriptMeta.runtime,
@@ -315,7 +344,20 @@ export class SkillManager {
       sandbox: sandboxOverrides
     });
 
+    logger.info(`[SKILL EXEC] Finished ${request.scriptName}`, {
+      executionId,
+      skillId,
+      exitCode: result.exitCode
+    });
+
     logger.debug(`📜 Executed script ${request.scriptName} from skill ${skillId}: exit ${result.exitCode}`);
+
+    const completedAt = Date.now();
+    this.recentExecutions.set(executionSignature, {
+      timestamp: completedAt,
+      result
+    });
+    this.pruneRecentExecutions(completedAt);
 
     return result;
   }
@@ -507,16 +549,20 @@ export class SkillManager {
       persist?: boolean;
       expiresInMs?: number;
       applyToAllArgs?: boolean;
-    }
+    },
+    approved: boolean = true
   ): void {
     if (!this.approvalManager) {
       logger.warn('⚠️  Cannot bypass approval - no approval manager configured');
       return;
     }
 
-    // Use the proper public method to remember the approval
-    this.approvalManager.rememberChoice(scriptName, args, true, options);
-    logger.info(`✅ Temporarily bypassed approval for: ${scriptName} ${args.join(' ')}`);
+    // Remember user decision so subsequent executions respect it
+    this.approvalManager.rememberChoice(scriptName, args, approved, options);
+    logger.info(
+      `${approved ? '✅' : '🚫'} Temporarily bypassed approval for: ${scriptName} ${args.join(' ')}`,
+      { approved }
+    );
   }
 
   /**
@@ -677,6 +723,27 @@ export class SkillManager {
     }
 
     return ordered.length > 0 ? ordered : [...DEFAULT_SANDBOX_CONFIG.allowedPaths];
+  }
+
+  private buildExecutionSignature(
+    skillId: string,
+    scriptName: string,
+    args?: unknown[],
+    stdin?: string,
+    cwd?: string
+  ): string {
+    const argsSegment = Array.isArray(args) ? JSON.stringify(args) : '';
+    const stdinSegment = stdin ? `stdin:${stdin}` : '';
+    const cwdSegment = cwd ? `cwd:${cwd}` : '';
+    return `${skillId}::${scriptName}::${argsSegment}::${stdinSegment}::${cwdSegment}`;
+  }
+
+  private pruneRecentExecutions(referenceTime: number): void {
+    for (const [signature, entry] of this.recentExecutions.entries()) {
+      if (referenceTime - entry.timestamp >= SkillManager.DUPLICATE_EXECUTION_WINDOW_MS) {
+        this.recentExecutions.delete(signature);
+      }
+    }
   }
 
   private buildSandboxOverrides(
