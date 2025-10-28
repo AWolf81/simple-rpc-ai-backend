@@ -199,6 +199,7 @@ export interface SandboxConfig {
   allowedPaths: string[];         // Paths scripts can access
   allowedReadPaths?: string[];    // Explicit read allowlist (defaults to allowedPaths)
   allowedWritePaths?: string[];   // Explicit write allowlist (defaults to allowedPaths)
+  cwdFilePath?: string;           // Path to temp file containing working directory
   timeout: number;                // Milliseconds (default: 30000)
   maxMemory: number;              // Bytes (default: 512MB)
   networkAccess: boolean;          // Enable network access when explicitly permitted
@@ -226,6 +227,7 @@ export interface ScriptExecutionRequest {
   stdin?: string;                 // Input data
   cwd?: string;                   // Working directory (must be in allowedPaths)
   sandbox?: Partial<SandboxConfig>; // Override sandbox settings
+  conversationId?: string;        // Conversation ID for approval tracking
 }
 
 /**

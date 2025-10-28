@@ -241,7 +241,10 @@ export function createAppRouter(
           requireVersion: skillsConfig.validation?.requireVersion || false
         },
         cacheDir: skillsConfig.cacheDir,
-        maxConcurrentLoads: skillsConfig.maxConcurrentLoads || 5
+        maxConcurrentLoads: skillsConfig.maxConcurrentLoads || 5,
+        // Pass through approval system configuration
+        approvalCallback: skillsConfig.approvalCallback,
+        permissions: skillsConfig.permissions
       });
 
       // Initialize skills asynchronously

@@ -42,7 +42,13 @@
     "noImplicitAny": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tools", "src/services/archived"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tools",
+    "src/services/archived",
+    "src/services/agents/skills/builtin/**/scripts/**/*.ts"
+  ],
   "ts-node": {
     "esm": true
   },

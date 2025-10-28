@@ -12,6 +12,7 @@ nav_order: 5
 <li><a href="#namespace-ai">ai</a></li>
 <li><a href="#namespace-mcp">mcp</a></li>
 <li><a href="#namespace-admin">admin</a></li>
+<li><a href="#namespace-agents">agents</a></li>
 <li><a href="#namespace-auth">auth</a></li>
 <li><a href="#namespace-billing">billing</a></li>
 <li><a href="#namespace-system">system</a></li>
@@ -3081,6 +3082,3446 @@ console.log(result);</code></pre></div>
         <div class="language-ts highlighter-rouge method-modal__code">
           <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-admin-status-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
           <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-admin-status-trpc-code" data-lang="ts">const result = await client.admin.status.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<h2 id="namespace-agents">Namespace agents</h2>
+
+## agents.addSkill
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.addSkill</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L386">src/trpc/routers/agents/index.ts:386</a></span></div></div>
+<div class="method-card__summary">Add a skill (AI Agent only)</div>
+<div class="method-card__description"><p>Add a skill (AI Agent only)</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-addskill" aria-haspopup="dialog" aria-controls="modal-agents-addskill" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-addskill-input" aria-expanded="false" aria-controls="schema-agents-addskill-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">id</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">name</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">description</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">level</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">union</span><span class="method-badge method-badge--meta">union</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">metadata</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">record</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">record</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">instructions</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">resources</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">scripts</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-addskill-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;id&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;name&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;description&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;level&quot;: {
+      &quot;type&quot;: &quot;ZodUnion&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;union&quot;,
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;ZodLiteral&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;literal&quot;
+        },
+        {
+          &quot;type&quot;: &quot;ZodLiteral&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;literal&quot;
+        },
+        {
+          &quot;type&quot;: &quot;ZodLiteral&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;literal&quot;
+        }
+      ]
+    },
+    &quot;metadata&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodRecord&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null
+      }
+    },
+    &quot;instructions&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;resources&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodArray&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;array&quot;,
+        &quot;items&quot;: {
+          &quot;type&quot;: &quot;String&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null
+        }
+      }
+    },
+    &quot;scripts&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodArray&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;array&quot;,
+        &quot;items&quot;: {
+          &quot;type&quot;: &quot;String&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null
+        }
+      }
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-addskill" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-addskill-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-addskill" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-addskill-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-addskill" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-addskill-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-addskill-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.addSkill&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-addskill-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-addskill-trpc-code" data-lang="ts">const result = await client.agents.addSkill.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.addTool
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.addTool</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L304">src/trpc/routers/agents/index.ts:304</a></span></div></div>
+<div class="method-card__summary">Add a tool</div>
+<div class="method-card__description"><p>Add a tool</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-addtool" aria-haspopup="dialog" aria-controls="modal-agents-addtool" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-addtool-input" aria-expanded="false" aria-controls="schema-agents-addtool-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">name</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">description</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field method-field--has-children">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">inputSchema</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">object</span></span>
+    </div>
+    
+    
+    <div class="method-field__children"><ul class="method-field-list method-field-list--nested"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">type</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">literal</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">properties</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">record</span><span class="method-badge method-badge--meta">record</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">required</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li></ul></div>
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-addtool-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;name&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;description&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;inputSchema&quot;: {
+      &quot;type&quot;: &quot;ZodObject&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;object&quot;,
+      &quot;properties&quot;: {
+        &quot;type&quot;: {
+          &quot;type&quot;: &quot;ZodLiteral&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;literal&quot;
+        },
+        &quot;properties&quot;: {
+          &quot;type&quot;: &quot;ZodRecord&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null
+        },
+        &quot;required&quot;: {
+          &quot;type&quot;: &quot;ZodOptional&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;optional&quot;: true,
+          &quot;innerType&quot;: {
+            &quot;type&quot;: &quot;ZodArray&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;jsType&quot;: &quot;array&quot;,
+            &quot;items&quot;: {
+              &quot;type&quot;: &quot;String&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null
+            }
+          }
+        }
+      }
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-addtool" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-addtool-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-addtool" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-addtool-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-addtool" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-addtool-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-addtool-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.addTool&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-addtool-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-addtool-trpc-code" data-lang="ts">const result = await client.agents.addTool.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.execute
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.execute</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L50">src/trpc/routers/agents/index.ts:50</a></span></div></div>
+<div class="method-card__summary">Execute an agent request</div>
+<div class="method-card__description"><p>Execute an agent request</p><p>Execute an AI agent request with SDK selection and skills support</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-execute" aria-haspopup="dialog" aria-controls="modal-agents-execute" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-execute-input" aria-expanded="false" aria-controls="schema-agents-execute-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">prompt</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">systemPrompt</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">messages</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field method-field--has-children">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">context</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">object</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    <div class="method-field__children"><ul class="method-field-list method-field-list--nested"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">userId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">sessionId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">config</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">record</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">record</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">tools</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">skills</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li></ul></div>
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">sdk</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">enum</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>ai-agent</code><code>openai</code></div></div>
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">model</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">provider</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">maxTokens</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">number</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">temperature</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">number</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">conversationId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-execute-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;prompt&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;systemPrompt&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;messages&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodArray&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;array&quot;,
+        &quot;items&quot;: {
+          &quot;type&quot;: &quot;String&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null
+        }
+      }
+    },
+    &quot;context&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodObject&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {
+          &quot;userId&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          },
+          &quot;sessionId&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          },
+          &quot;config&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodRecord&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null
+            }
+          },
+          &quot;tools&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodArray&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;array&quot;,
+              &quot;items&quot;: {
+                &quot;type&quot;: &quot;String&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null
+              }
+            }
+          },
+          &quot;skills&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodArray&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;array&quot;,
+              &quot;items&quot;: {
+                &quot;type&quot;: &quot;String&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null
+              }
+            }
+          }
+        }
+      }
+    },
+    &quot;sdk&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodEnum&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;enum&quot;,
+        &quot;enum&quot;: [
+          &quot;ai-agent&quot;,
+          &quot;openai&quot;
+        ]
+      }
+    },
+    &quot;model&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;provider&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;maxTokens&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodNumber&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;number&quot;
+      }
+    },
+    &quot;temperature&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodNumber&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;number&quot;
+      }
+    },
+    &quot;conversationId&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-execute" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-execute-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-execute" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-execute-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-execute" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-execute-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-execute-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.execute&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-execute-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-execute-trpc-code" data-lang="ts">const result = await client.agents.execute.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.executeStream
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-subscription">SUBSCRIPTION</span><code class="method-card__method">agents.executeStream</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L203">src/trpc/routers/agents/index.ts:203</a></span></div></div>
+<div class="method-card__summary">Execute an agent request with streaming</div>
+<div class="method-card__description"><p>Execute an agent request with streaming
+Returns text chunks as they are generated</p><p>Execute an AI agent request with streaming response</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-executestream" aria-haspopup="dialog" aria-controls="modal-agents-executestream" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-executestream-input" aria-expanded="false" aria-controls="schema-agents-executestream-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">prompt</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">systemPrompt</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">messages</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field method-field--has-children">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">context</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">object</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    <div class="method-field__children"><ul class="method-field-list method-field-list--nested"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">userId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">sessionId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">config</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">record</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">record</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">tools</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">skills</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li></ul></div>
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">sdk</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">enum</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>ai-agent</code><code>openai</code></div></div>
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">model</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">provider</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">maxTokens</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">number</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">temperature</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">number</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-executestream-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;prompt&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;systemPrompt&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;messages&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodArray&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;array&quot;,
+        &quot;items&quot;: {
+          &quot;type&quot;: &quot;String&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null
+        }
+      }
+    },
+    &quot;context&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodObject&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {
+          &quot;userId&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          },
+          &quot;sessionId&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          },
+          &quot;config&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodRecord&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null
+            }
+          },
+          &quot;tools&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodArray&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;array&quot;,
+              &quot;items&quot;: {
+                &quot;type&quot;: &quot;String&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null
+              }
+            }
+          },
+          &quot;skills&quot;: {
+            &quot;type&quot;: &quot;ZodOptional&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;optional&quot;: true,
+            &quot;innerType&quot;: {
+              &quot;type&quot;: &quot;ZodArray&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;array&quot;,
+              &quot;items&quot;: {
+                &quot;type&quot;: &quot;String&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null
+              }
+            }
+          }
+        }
+      }
+    },
+    &quot;sdk&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodEnum&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;enum&quot;,
+        &quot;enum&quot;: [
+          &quot;ai-agent&quot;,
+          &quot;openai&quot;
+        ]
+      }
+    },
+    &quot;model&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;provider&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;maxTokens&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodNumber&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;number&quot;
+      }
+    },
+    &quot;temperature&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodNumber&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;number&quot;
+      }
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-executestream" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-executestream-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-executestream" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-executestream-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-executestream" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-executestream-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-executestream-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.executeStream&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-executestream-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-executestream-trpc-code" data-lang="ts">const result = await client.agents.executeStream.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.getConfig
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.getConfig</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L287">src/trpc/routers/agents/index.ts:287</a></span></div></div>
+<div class="method-card__summary">Get agent configuration</div>
+<div class="method-card__description"><p>Get agent configuration</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-getconfig" aria-haspopup="dialog" aria-controls="modal-agents-getconfig" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-getconfig-input" aria-expanded="false" aria-controls="schema-agents-getconfig-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">No fields defined.</div>
+    <div class="method-section__schema" id="schema-agents-getconfig-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodOptional&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;optional&quot;: true,
+  &quot;innerType&quot;: {
+    &quot;type&quot;: &quot;ZodObject&quot;,
+    &quot;description&quot;: null,
+    &quot;_source&quot;: null,
+    &quot;jsType&quot;: &quot;object&quot;,
+    &quot;properties&quot;: {}
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-getconfig" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-getconfig-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-getconfig" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-getconfig-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-getconfig" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-getconfig-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-getconfig-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.getConfig&quot;,
+      &quot;params&quot;: {},
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-getconfig-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-getconfig-trpc-code" data-lang="ts">const result = await client.agents.getConfig.query();
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.getSkill
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.getSkill</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L471">src/trpc/routers/agents/index.ts:471</a></span></div></div>
+<div class="method-card__summary">Get skill details (AI Agent only)</div>
+<div class="method-card__description"><p>Get skill details (AI Agent only)</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-getskill" aria-haspopup="dialog" aria-controls="modal-agents-getskill" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-getskill-input" aria-expanded="false" aria-controls="schema-agents-getskill-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">skillId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-getskill-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;skillId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-getskill" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-getskill-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-getskill" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-getskill-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-getskill" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-getskill-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-getskill-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.getSkill&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-getskill-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-getskill-trpc-code" data-lang="ts">const result = await client.agents.getSkill.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.isSDKAvailable
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.isSDKAvailable</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L497">src/trpc/routers/agents/index.ts:497</a></span></div></div>
+<div class="method-card__summary">Check if SDK is available</div>
+<div class="method-card__description"><p>Check if SDK is available</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-issdkavailable" aria-haspopup="dialog" aria-controls="modal-agents-issdkavailable" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-issdkavailable-input" aria-expanded="false" aria-controls="schema-agents-issdkavailable-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">sdk</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">enum</span></span>
+    </div>
+    
+    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>ai-agent</code><code>openai</code></div></div>
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-issdkavailable-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;sdk&quot;: {
+      &quot;type&quot;: &quot;ZodEnum&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;enum&quot;,
+      &quot;enum&quot;: [
+        &quot;ai-agent&quot;,
+        &quot;openai&quot;
+      ]
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-issdkavailable" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-issdkavailable-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-issdkavailable" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-issdkavailable-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-issdkavailable" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-issdkavailable-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-issdkavailable-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.isSDKAvailable&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-issdkavailable-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-issdkavailable-trpc-code" data-lang="ts">const result = await client.agents.isSDKAvailable.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.listSDKs
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.listSDKs</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L267">src/trpc/routers/agents/index.ts:267</a></span></div></div>
+<div class="method-card__summary">List available SDKs</div>
+<div class="method-card__description"><p>List available SDKs</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-listsdks" aria-haspopup="dialog" aria-controls="modal-agents-listsdks" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-listsdks-input" aria-expanded="false" aria-controls="schema-agents-listsdks-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">No fields defined.</div>
+    <div class="method-section__schema" id="schema-agents-listsdks-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodOptional&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;optional&quot;: true,
+  &quot;innerType&quot;: {
+    &quot;type&quot;: &quot;ZodObject&quot;,
+    &quot;description&quot;: null,
+    &quot;_source&quot;: null,
+    &quot;jsType&quot;: &quot;object&quot;,
+    &quot;properties&quot;: {}
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-listsdks" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-listsdks-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-listsdks" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-listsdks-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-listsdks" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-listsdks-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-listsdks-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.listSDKs&quot;,
+      &quot;params&quot;: {},
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-listsdks-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-listsdks-trpc-code" data-lang="ts">const result = await client.agents.listSDKs.query();
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.listSkills
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.listSkills</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L439">src/trpc/routers/agents/index.ts:439</a></span></div></div>
+<div class="method-card__summary">List available skills (AI Agent only)</div>
+<div class="method-card__description"><p>List available skills (AI Agent only)</p><p>Get all available AI Agent agent skills with progressive disclosure metadata</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-listskills" aria-haspopup="dialog" aria-controls="modal-agents-listskills" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-listskills-input" aria-expanded="false" aria-controls="schema-agents-listskills-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">No fields defined.</div>
+    <div class="method-section__schema" id="schema-agents-listskills-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodOptional&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;optional&quot;: true,
+  &quot;innerType&quot;: {
+    &quot;type&quot;: &quot;ZodObject&quot;,
+    &quot;description&quot;: null,
+    &quot;_source&quot;: null,
+    &quot;jsType&quot;: &quot;object&quot;,
+    &quot;properties&quot;: {}
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-listskills" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-listskills-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-listskills" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-listskills-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-listskills" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-listskills-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-listskills-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.listSkills&quot;,
+      &quot;params&quot;: {},
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-listskills-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-listskills-trpc-code" data-lang="ts">const result = await client.agents.listSkills.query();
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.listTools
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.listTools</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L359">src/trpc/routers/agents/index.ts:359</a></span></div></div>
+<div class="method-card__summary">List available tools</div>
+<div class="method-card__description"><p>List available tools</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-listtools" aria-haspopup="dialog" aria-controls="modal-agents-listtools" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-listtools-input" aria-expanded="false" aria-controls="schema-agents-listtools-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">sdk</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">enum</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    <div class="method-field__enum"><span class="method-field__label">Allowed values</span><div class="method-field__enum-items"><code>ai-agent</code><code>openai</code></div></div>
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-listtools-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodOptional&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;optional&quot;: true,
+  &quot;innerType&quot;: {
+    &quot;type&quot;: &quot;ZodObject&quot;,
+    &quot;description&quot;: null,
+    &quot;_source&quot;: null,
+    &quot;jsType&quot;: &quot;object&quot;,
+    &quot;properties&quot;: {
+      &quot;sdk&quot;: {
+        &quot;type&quot;: &quot;ZodOptional&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;optional&quot;: true,
+        &quot;innerType&quot;: {
+          &quot;type&quot;: &quot;ZodEnum&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;enum&quot;,
+          &quot;enum&quot;: [
+            &quot;ai-agent&quot;,
+            &quot;openai&quot;
+          ]
+        }
+      }
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-listtools" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-listtools-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-listtools" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-listtools-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-listtools" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-listtools-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-listtools-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.listTools&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-listtools-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-listtools-trpc-code" data-lang="ts">const result = await client.agents.listTools.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.removeSkill
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.removeSkill</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L412">src/trpc/routers/agents/index.ts:412</a></span></div></div>
+<div class="method-card__summary">Remove a skill (AI Agent only)</div>
+<div class="method-card__description"><p>Remove a skill (AI Agent only)</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-removeskill" aria-haspopup="dialog" aria-controls="modal-agents-removeskill" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-removeskill-input" aria-expanded="false" aria-controls="schema-agents-removeskill-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">skillId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-removeskill-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;skillId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-removeskill" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-removeskill-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-removeskill" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-removeskill-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-removeskill" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-removeskill-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-removeskill-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.removeSkill&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-removeskill-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-removeskill-trpc-code" data-lang="ts">const result = await client.agents.removeSkill.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.removeTool
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.removeTool</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L339">src/trpc/routers/agents/index.ts:339</a></span></div></div>
+<div class="method-card__summary">Remove a tool</div>
+<div class="method-card__description"><p>Remove a tool</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-removetool" aria-haspopup="dialog" aria-controls="modal-agents-removetool" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-removetool-input" aria-expanded="false" aria-controls="schema-agents-removetool-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">name</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-removetool-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;name&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-removetool" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-removetool-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-removetool" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-removetool-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-removetool" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-removetool-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-removetool-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.removeTool&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-removetool-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-removetool-trpc-code" data-lang="ts">const result = await client.agents.removeTool.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.resume
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.resume</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L519">src/trpc/routers/agents/index.ts:519</a></span></div></div>
+<div class="method-card__summary">Resume agent execution after user interaction</div>
+<div class="method-card__description"><p>Resume agent execution after user interaction</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-resume" aria-haspopup="dialog" aria-controls="modal-agents-resume" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-resume-input" aria-expanded="false" aria-controls="schema-agents-resume-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">conversationId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">response</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">union</span><span class="method-badge method-badge--meta">union</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-resume-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;conversationId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;response&quot;: {
+      &quot;type&quot;: &quot;ZodUnion&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;union&quot;,
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;ZodString&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;string&quot;
+        },
+        {
+          &quot;type&quot;: &quot;ZodArray&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;array&quot;,
+          &quot;items&quot;: {
+            &quot;type&quot;: &quot;String&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null
+          }
+        }
+      ]
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-resume" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-resume-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-resume" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-resume-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-resume" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-resume-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-resume-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.resume&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-resume-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-resume-trpc-code" data-lang="ts">const result = await client.agents.resume.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.addSource
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.skills.addSource</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/skills.ts#L336">src/trpc/routers/agents/skills.ts:336</a></span></div></div>
+<div class="method-card__summary">Add a new skill source and load it</div>
+<div class="method-card__description"><p>Add a new skill source and load it</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-addsource" aria-haspopup="dialog" aria-controls="modal-agents-skills-addsource" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-addsource-input" aria-expanded="false" aria-controls="schema-agents-skills-addsource-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">source</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">union</span><span class="method-badge method-badge--meta">union</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-skills-addsource-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;source&quot;: {
+      &quot;type&quot;: &quot;ZodUnion&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;union&quot;,
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;ZodObject&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;object&quot;,
+          &quot;properties&quot;: {
+            &quot;type&quot;: {
+              &quot;type&quot;: &quot;ZodLiteral&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;literal&quot;
+            },
+            &quot;name&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          }
+        },
+        {
+          &quot;type&quot;: &quot;ZodObject&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;object&quot;,
+          &quot;properties&quot;: {
+            &quot;type&quot;: {
+              &quot;type&quot;: &quot;ZodLiteral&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;literal&quot;
+            },
+            &quot;url&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            },
+            &quot;path&quot;: {
+              &quot;type&quot;: &quot;ZodOptional&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;optional&quot;: true,
+              &quot;innerType&quot;: {
+                &quot;type&quot;: &quot;ZodString&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;string&quot;
+              }
+            },
+            &quot;ref&quot;: {
+              &quot;type&quot;: &quot;ZodOptional&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;optional&quot;: true,
+              &quot;innerType&quot;: {
+                &quot;type&quot;: &quot;ZodString&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;string&quot;
+              }
+            }
+          }
+        },
+        {
+          &quot;type&quot;: &quot;ZodObject&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;object&quot;,
+          &quot;properties&quot;: {
+            &quot;type&quot;: {
+              &quot;type&quot;: &quot;ZodLiteral&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;literal&quot;
+            },
+            &quot;package&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            },
+            &quot;version&quot;: {
+              &quot;type&quot;: &quot;ZodOptional&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;optional&quot;: true,
+              &quot;innerType&quot;: {
+                &quot;type&quot;: &quot;ZodString&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;string&quot;
+              }
+            },
+            &quot;path&quot;: {
+              &quot;type&quot;: &quot;ZodOptional&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;optional&quot;: true,
+              &quot;innerType&quot;: {
+                &quot;type&quot;: &quot;ZodString&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;string&quot;
+              }
+            }
+          }
+        },
+        {
+          &quot;type&quot;: &quot;ZodObject&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;object&quot;,
+          &quot;properties&quot;: {
+            &quot;type&quot;: {
+              &quot;type&quot;: &quot;ZodLiteral&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;literal&quot;
+            },
+            &quot;path&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          }
+        },
+        {
+          &quot;type&quot;: &quot;ZodObject&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;object&quot;,
+          &quot;properties&quot;: {
+            &quot;type&quot;: {
+              &quot;type&quot;: &quot;ZodLiteral&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;literal&quot;
+            },
+            &quot;url&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            }
+          }
+        },
+        {
+          &quot;type&quot;: &quot;ZodObject&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null,
+          &quot;jsType&quot;: &quot;object&quot;,
+          &quot;properties&quot;: {
+            &quot;type&quot;: {
+              &quot;type&quot;: &quot;ZodLiteral&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;literal&quot;
+            },
+            &quot;path&quot;: {
+              &quot;type&quot;: &quot;ZodString&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;jsType&quot;: &quot;string&quot;
+            },
+            &quot;autoExtract&quot;: {
+              &quot;type&quot;: &quot;ZodOptional&quot;,
+              &quot;description&quot;: null,
+              &quot;_source&quot;: null,
+              &quot;optional&quot;: true,
+              &quot;innerType&quot;: {
+                &quot;type&quot;: &quot;ZodBoolean&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;boolean&quot;
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-addsource" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-addsource-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-addsource" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-addsource-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-addsource" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-addsource-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-addsource-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.addSource&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-addsource-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-addsource-trpc-code" data-lang="ts">const result = await client.agents.skills.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.executeScript
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.skills.executeScript</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/skills.ts#L209">src/trpc/routers/agents/skills.ts:209</a></span></div></div>
+<div class="method-card__summary">Execute a script from a skill</div>
+<div class="method-card__description"><p>Execute a script from a skill</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-executescript" aria-haspopup="dialog" aria-controls="modal-agents-skills-executescript" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-executescript-input" aria-expanded="false" aria-controls="schema-agents-skills-executescript-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">skillId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">scriptName</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">args</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">stdin</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">cwd</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span><span class="method-badge method-badge--optional">optional</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">scriptInvocation</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">union</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">union</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-skills-executescript-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;skillId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    },
+    &quot;scriptName&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;args&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodArray&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;array&quot;,
+        &quot;items&quot;: {
+          &quot;type&quot;: &quot;String&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null
+        }
+      }
+    },
+    &quot;stdin&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;cwd&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodString&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;string&quot;
+      }
+    },
+    &quot;scriptInvocation&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodUnion&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;union&quot;,
+        &quot;oneOf&quot;: [
+          {
+            &quot;type&quot;: &quot;ZodObject&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;jsType&quot;: &quot;object&quot;,
+            &quot;properties&quot;: {
+              &quot;mode&quot;: {
+                &quot;type&quot;: &quot;ZodLiteral&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;literal&quot;
+              },
+              &quot;scriptPath&quot;: {
+                &quot;type&quot;: &quot;ZodString&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;string&quot;
+              },
+              &quot;runtime&quot;: {
+                &quot;type&quot;: &quot;ZodOptional&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;optional&quot;: true,
+                &quot;innerType&quot;: {
+                  &quot;type&quot;: &quot;ZodEnum&quot;,
+                  &quot;description&quot;: null,
+                  &quot;_source&quot;: null,
+                  &quot;jsType&quot;: &quot;enum&quot;,
+                  &quot;enum&quot;: [
+                    &quot;javascript&quot;,
+                    &quot;typescript&quot;,
+                    &quot;python&quot;
+                  ]
+                }
+              },
+              &quot;args&quot;: {
+                &quot;type&quot;: &quot;ZodOptional&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;optional&quot;: true,
+                &quot;innerType&quot;: {
+                  &quot;type&quot;: &quot;ZodArray&quot;,
+                  &quot;description&quot;: null,
+                  &quot;_source&quot;: null,
+                  &quot;jsType&quot;: &quot;array&quot;,
+                  &quot;items&quot;: {
+                    &quot;type&quot;: &quot;String&quot;,
+                    &quot;description&quot;: null,
+                    &quot;_source&quot;: null
+                  }
+                }
+              }
+            }
+          },
+          {
+            &quot;type&quot;: &quot;ZodObject&quot;,
+            &quot;description&quot;: null,
+            &quot;_source&quot;: null,
+            &quot;jsType&quot;: &quot;object&quot;,
+            &quot;properties&quot;: {
+              &quot;mode&quot;: {
+                &quot;type&quot;: &quot;ZodLiteral&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;literal&quot;
+              },
+              &quot;runtime&quot;: {
+                &quot;type&quot;: &quot;ZodEnum&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;enum&quot;,
+                &quot;enum&quot;: [
+                  &quot;javascript&quot;,
+                  &quot;typescript&quot;,
+                  &quot;python&quot;
+                ]
+              },
+              &quot;source&quot;: {
+                &quot;type&quot;: &quot;ZodString&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;jsType&quot;: &quot;string&quot;
+              },
+              &quot;args&quot;: {
+                &quot;type&quot;: &quot;ZodOptional&quot;,
+                &quot;description&quot;: null,
+                &quot;_source&quot;: null,
+                &quot;optional&quot;: true,
+                &quot;innerType&quot;: {
+                  &quot;type&quot;: &quot;ZodArray&quot;,
+                  &quot;description&quot;: null,
+                  &quot;_source&quot;: null,
+                  &quot;jsType&quot;: &quot;array&quot;,
+                  &quot;items&quot;: {
+                    &quot;type&quot;: &quot;String&quot;,
+                    &quot;description&quot;: null,
+                    &quot;_source&quot;: null
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-executescript" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-executescript-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-executescript" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-executescript-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-executescript" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-executescript-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-executescript-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.executeScript&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-executescript-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-executescript-trpc-code" data-lang="ts">const result = await client.agents.skills.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.get
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.skills.get</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts#L127">src/trpc/routers/agents/index.ts:127</a></span></div></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-get" aria-haspopup="dialog" aria-controls="modal-agents-skills-get" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-get-input" aria-expanded="false" aria-controls="schema-agents-skills-get-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">skillId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-skills-get-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;skillId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-get" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-get-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-get" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-get-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-get" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-get-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-get-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.get&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-get-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-get-trpc-code" data-lang="ts">const result = await client.agents.skills.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.list
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.skills.list</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts">src/trpc/routers/agents/index.ts</a></span></div></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-list" aria-haspopup="dialog" aria-controls="modal-agents-skills-list" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-list-input" aria-expanded="false" aria-controls="schema-agents-skills-list-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">No structured fields (any)</div>
+    <div class="method-section__schema" id="schema-agents-skills-list-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodOptional&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;optional&quot;: true,
+  &quot;innerType&quot;: {
+    &quot;type&quot;: &quot;ZodAny&quot;,
+    &quot;description&quot;: null,
+    &quot;_source&quot;: null,
+    &quot;jsType&quot;: &quot;any&quot;
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-list" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-list-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-list" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-list-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-list" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-list-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-list-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.list&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-list-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-list-trpc-code" data-lang="ts">const result = await client.agents.skills.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.loadResources
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.skills.loadResources</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/skills.ts#L178">src/trpc/routers/agents/skills.ts:178</a></span></div></div>
+<div class="method-card__summary">Load Level 3 resources for a skill</div>
+<div class="method-card__description"><p>Load Level 3 resources for a skill</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-loadresources" aria-haspopup="dialog" aria-controls="modal-agents-skills-loadresources" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-loadresources-input" aria-expanded="false" aria-controls="schema-agents-skills-loadresources-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">skillId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-skills-loadresources-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;skillId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-loadresources" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-loadresources-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-loadresources" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-loadresources-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-loadresources" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-loadresources-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-loadresources-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.loadResources&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-loadresources-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-loadresources-trpc-code" data-lang="ts">const result = await client.agents.skills.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.match
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.skills.match</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/skills.ts#L153">src/trpc/routers/agents/skills.ts:153</a></span></div></div>
+<div class="method-card__summary">Match skills by criteria</div>
+<div class="method-card__description"><p>Match skills by criteria</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-match" aria-haspopup="dialog" aria-controls="modal-agents-skills-match" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-match-input" aria-expanded="false" aria-controls="schema-agents-skills-match-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">capabilities</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">keywords</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--optional" title="Optional parameter"></span>
+      <span class="method-field__name">exclude</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">array</span><span class="method-badge method-badge--optional">optional</span><span class="method-badge method-badge--meta">array</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-skills-match-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;capabilities&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodArray&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;array&quot;,
+        &quot;items&quot;: {
+          &quot;type&quot;: &quot;String&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null
+        }
+      }
+    },
+    &quot;keywords&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodArray&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;array&quot;,
+        &quot;items&quot;: {
+          &quot;type&quot;: &quot;String&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null
+        }
+      }
+    },
+    &quot;exclude&quot;: {
+      &quot;type&quot;: &quot;ZodOptional&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;optional&quot;: true,
+      &quot;innerType&quot;: {
+        &quot;type&quot;: &quot;ZodArray&quot;,
+        &quot;description&quot;: null,
+        &quot;_source&quot;: null,
+        &quot;jsType&quot;: &quot;array&quot;,
+        &quot;items&quot;: {
+          &quot;type&quot;: &quot;String&quot;,
+          &quot;description&quot;: null,
+          &quot;_source&quot;: null
+        }
+      }
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-match" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-match-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-match" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-match-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-match" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-match-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-match-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.match&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-match-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-match-trpc-code" data-lang="ts">const result = await client.agents.skills.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.metrics
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.skills.metrics</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/skills.ts#L282">src/trpc/routers/agents/skills.ts:282</a></span></div></div>
+<div class="method-card__summary">Get token metrics for a skill</div>
+<div class="method-card__description"><p>Get token metrics for a skill</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-metrics" aria-haspopup="dialog" aria-controls="modal-agents-skills-metrics" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-metrics-input" aria-expanded="false" aria-controls="schema-agents-skills-metrics-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">skillId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-skills-metrics-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;skillId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-metrics" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-metrics-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-metrics" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-metrics-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-metrics" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-metrics-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-metrics-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.metrics&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-metrics-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-metrics-trpc-code" data-lang="ts">const result = await client.agents.skills.query({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.reload
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.skills.reload</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/skills.ts#L301">src/trpc/routers/agents/skills.ts:301</a></span></div></div>
+<div class="method-card__summary">Reload a specific skill</div>
+<div class="method-card__description"><p>Reload a specific skill</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-reload" aria-haspopup="dialog" aria-controls="modal-agents-skills-reload" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-reload-input" aria-expanded="false" aria-controls="schema-agents-skills-reload-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">skillId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-skills-reload-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;skillId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-reload" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-reload-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-reload" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-reload-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-reload" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-reload-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-reload-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.reload&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-reload-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-reload-trpc-code" data-lang="ts">const result = await client.agents.skills.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.reloadAll
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.skills.reloadAll</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/skills.ts#L320">src/trpc/routers/agents/skills.ts:320</a></span></div></div>
+<div class="method-card__summary">Reload all skills</div>
+<div class="method-card__description"><p>Reload all skills</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-reloadall" aria-haspopup="dialog" aria-controls="modal-agents-skills-reloadall" title="Invocation examples">⚡</button></div>
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-reloadall" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-reloadall-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-reloadall" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-reloadall-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-reloadall" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-reloadall-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-reloadall-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.reloadAll&quot;,
+      &quot;params&quot;: {},
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-reloadall-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-reloadall-trpc-code" data-lang="ts">const result = await client.agents.skills.mutate();
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.remove
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-mutation">MUTATION</span><code class="method-card__method">agents.skills.remove</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts">src/trpc/routers/agents/index.ts</a></span></div></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-remove" aria-haspopup="dialog" aria-controls="modal-agents-skills-remove" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-remove-input" aria-expanded="false" aria-controls="schema-agents-skills-remove-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">skillId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-skills-remove-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;skillId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-remove" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-remove-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-remove" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-remove-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-remove" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-remove-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-remove-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.remove&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-remove-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-remove-trpc-code" data-lang="ts">const result = await client.agents.skills.mutate({
+  /* ... */
+});
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.stats
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.skills.stats</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/skills.ts#L384">src/trpc/routers/agents/skills.ts:384</a></span></div></div>
+<div class="method-card__summary">Get skill system statistics</div>
+<div class="method-card__description"><p>Get skill system statistics</p></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-stats" aria-haspopup="dialog" aria-controls="modal-agents-skills-stats" title="Invocation examples">⚡</button></div>
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-stats" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-stats-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-stats" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-stats-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-stats" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-stats-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-stats-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.stats&quot;,
+      &quot;params&quot;: {},
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-stats-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-stats-trpc-code" data-lang="ts">const result = await client.agents.skills.query();
+console.log(result);</code></pre></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+## agents.skills.validate
+
+<div class="method-card">
+<div class="method-card__header"><div class="method-card__title"><span class="method-card__badge method-card__badge--type method-card__badge--type-query">QUERY</span><code class="method-card__method">agents.skills.validate</code></div><div class="method-card__meta"><span class="method-card__badge method-card__badge--auth">Public</span><span class="method-card__source"><a href="https://github.com/AWolf81/simple-rpc-ai-backend/blob/feat%2Fagent-abstraction/src/trpc/routers/agents/index.ts">src/trpc/routers/agents/index.ts</a></span></div></div>
+<div class="method-card__columns">
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📥</span>Input Parameters</div>
+    <div class="method-section__actions"><button class="method-section__action method-section__action--invoke" type="button" data-action="open-modal" data-target="modal-agents-skills-validate" aria-haspopup="dialog" aria-controls="modal-agents-skills-validate" title="Invocation examples">⚡</button><button class="method-section__action method-section__action--schema" type="button" data-action="toggle-schema" data-target="schema-agents-skills-validate-input" aria-expanded="false" aria-controls="schema-agents-skills-validate-input" title="Show full schema">{}</button></div>
+  </div>
+  <div class="method-section__body">
+    <ul class="method-field-list"><li class="method-field">
+    <div class="method-field__row">
+      <span class="method-field__indicator method-field__indicator--required" title="Required parameter"></span>
+      <span class="method-field__name">skillId</span>
+      <span class="method-field__badges"><span class="method-badge method-badge--type">string</span></span>
+    </div>
+    
+    
+    
+  </li></ul>
+    <div class="method-section__schema" id="schema-agents-skills-validate-input" hidden><pre><code class="language-json">{
+  &quot;type&quot;: &quot;ZodObject&quot;,
+  &quot;description&quot;: null,
+  &quot;_source&quot;: null,
+  &quot;jsType&quot;: &quot;object&quot;,
+  &quot;properties&quot;: {
+    &quot;skillId&quot;: {
+      &quot;type&quot;: &quot;ZodString&quot;,
+      &quot;description&quot;: null,
+      &quot;_source&quot;: null,
+      &quot;jsType&quot;: &quot;string&quot;
+    }
+  }
+}</code></pre></div>
+  </div>
+</div></div>
+<div class="method-card__column"><div class="method-section">
+  <div class="method-section__header">
+    <div class="method-section__title"><span class="method-section__icon">📤</span>Response</div>
+    
+  </div>
+  <div class="method-section__body">
+    <div class="method-field-empty">Not documented.</div>
+    
+  </div>
+</div></div>
+</div>
+</div>
+<div class="method-modal" id="modal-agents-skills-validate" hidden role="dialog" aria-modal="true" aria-labelledby="modal-agents-skills-validate-title">
+  <div class="method-modal__backdrop" data-action="close-modal" data-target="modal-agents-skills-validate" aria-hidden="true"></div>
+  <div class="method-modal__dialog">
+    <div class="method-modal__header">
+      <h4 class="method-modal__title" id="modal-agents-skills-validate-title">Invocation Examples</h4>
+      <button type="button" class="method-modal__close" data-action="close-modal" data-target="modal-agents-skills-validate" aria-label="Close">×</button>
+    </div>
+    <div class="method-modal__body">
+      <section class="method-modal__section">
+        <h5>cURL</h5>
+        <div class="language-bash highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy cURL" data-action="copy-code" data-target="modal-agents-skills-validate-curl-code"><span class="sr-only">Copy cURL</span></button>
+          <div class="highlight"><pre class="highlight language-bash"><code class="language-bash" id="modal-agents-skills-validate-curl-code" data-lang="bash">curl -X POST http://localhost:8000/rpc \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+      &quot;jsonrpc&quot;: &quot;2.0&quot;,
+      &quot;method&quot;: &quot;agents.skills.validate&quot;,
+      &quot;params&quot;: { /* ... */ },
+      &quot;id&quot;: &quot;request-1&quot;
+  }&#39;</code></pre></div>
+        </div>
+      </section>
+      <section class="method-modal__section">
+        <h5>tRPC Client</h5>
+        <div class="language-ts highlighter-rouge method-modal__code">
+          <button type="button" class="method-modal__copy" aria-label="Copy tRPC example" data-action="copy-code" data-target="modal-agents-skills-validate-trpc-code"><span class="sr-only">Copy tRPC example</span></button>
+          <div class="highlight"><pre class="highlight language-ts"><code class="language-ts" id="modal-agents-skills-validate-trpc-code" data-lang="ts">const result = await client.agents.skills.query({
   /* ... */
 });
 console.log(result);</code></pre></div>

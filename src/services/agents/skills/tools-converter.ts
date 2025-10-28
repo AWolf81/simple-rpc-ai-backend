@@ -83,6 +83,24 @@ export class SkillsToolConverter {
                 cwd
               });
 
+              // Check if result is ALREADY an interaction marker (from approval system)
+              if (result && typeof result === 'object' && (result as any).__interaction_required__) {
+                logger.info(`🔔 User interaction marker received from skill execution: ${toolName}`);
+                const marker = {
+                  ...result,
+                  toolName,
+                  originalToolName: (result as any).originalToolName || toolName,
+                  dialogToolName: (result as any).toolName || 'approval-dialog',
+                  toolArguments: toolArgs,
+                  scriptArgs,
+                  stdin,
+                  cwd,
+                  skillId: skill.id,
+                  scriptName: script.path
+                };
+                return marker;
+              }
+
               // Check for user interaction (exit code 42 + XML marker)
               if (result.exitCode === 0 && result.stdout) {
                 const xml = extractInteractionXML(result.stdout);
@@ -94,6 +112,14 @@ export class SkillsToolConverter {
                       __interaction_required__: true,
                       interaction,
                       toolName,
+                      originalToolName: toolName,
+                      dialogToolName: 'approval-dialog',
+                      toolArguments: toolArgs,
+                      scriptArgs,
+                      stdin,
+                      cwd,
+                      skillId: skill.id,
+                      scriptName: script.path,
                       originalResult: {
                         exitCode: result.exitCode,
                         stdout: result.stdout,

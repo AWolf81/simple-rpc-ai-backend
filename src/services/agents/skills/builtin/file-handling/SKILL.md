@@ -8,6 +8,7 @@ license: MIT
 capabilities:
   - file-read
   - file-write
+  - file-delete
   - file-search
   - directory-operations
 scripts:
@@ -65,6 +66,17 @@ scripts:
         required: true
       - name: content
         description: Content to write to file
+        type: string
+        required: true
+  - path: scripts/delete.ts
+    runtime: typescript
+    description: Delete a file
+    safety:
+      level: low
+      requiresApproval: true
+    args:
+      - name: file-path
+        description: Path to file to delete
         type: string
         required: true
   - path: scripts/search-files.ts

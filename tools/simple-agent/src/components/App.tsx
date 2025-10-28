@@ -13,11 +13,11 @@ import superjson from 'superjson';
 import { isSlashCommand, parseSlashCommand, executePlugin } from '../core/plugin-manager.js';
 import { FileProxy } from '../core/file-proxy.js';
 import { getHistoryManager } from '../core/history-manager.js';
-import { getLogHistory, subscribeToLogs, clearLogHistory } from '../../../../dist/utils/logger.js';
+import { getLogHistory, subscribeToLogs, clearLogHistory, logger } from '../../../../dist/utils/logger.js';
 
 // @TODO can we use types from simple-rpc-ai-backend?
 type Message = {
-  role: 'user' | 'assistant' | 'system' | 'error';
+  role: 'user' | 'assistant' | 'system' | 'error' | 'interaction';
   content: string;
   usage?: {
     promptTokens: number;
@@ -29,6 +29,7 @@ type Message = {
     arguments: any;
     result: any;
   }>;
+  interaction?: any;  // For interaction dialogs
 }
 
 type Skill = {
@@ -36,6 +37,7 @@ type Skill = {
   description: string;
   capabilities: string[];
   sourceType: string;
+  instructions?: string;  // SKILL.md body with guidelines
 };
 
 interface AppProps {
@@ -99,9 +101,39 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
       if (message) {
         setToolProgress(prev => {
           const last = prev[prev.length - 1];
+
+          // Skip duplicates
           if (last === message) {
             return prev;
           }
+
+          // If this is a completion message (✓), replace the corresponding in-progress message
+          if (message.startsWith('✓ ')) {
+            const lastIdx = prev.length - 1;
+            if (lastIdx >= 0) {
+              const lastMessage = prev[lastIdx];
+              // Check if the last message is an in-progress action (not already completed)
+              if (!lastMessage.startsWith('✓ ') && !lastMessage.startsWith('⚠️')) {
+                // Extract the core action/file from both messages
+                const completedAction = message.replace('✓ ', '').toLowerCase();
+                const inProgressAction = lastMessage.toLowerCase();
+
+                // Check if they match (e.g., "Reading file.txt" -> "✓ Read file.txt")
+                if (inProgressAction.includes(completedAction.replace(/^(read|wrote|deleted|ran|search) /, '')) ||
+                    (inProgressAction.startsWith('reading ') && completedAction.startsWith('read ')) ||
+                    (inProgressAction.startsWith('writing ') && completedAction.startsWith('wrote ')) ||
+                    (inProgressAction.startsWith('creating ') && completedAction.startsWith('wrote ')) ||
+                    (inProgressAction.startsWith('deleting ') && completedAction.startsWith('deleted ')) ||
+                    (inProgressAction.startsWith('looking for ') && completedAction.startsWith('search ')) ||
+                    (inProgressAction.startsWith('searching ') && completedAction.startsWith('search ')) ||
+                    (inProgressAction.startsWith('running ') && completedAction.startsWith('ran '))) {
+                  // Replace the last message
+                  return [...prev.slice(0, -1), message];
+                }
+              }
+            }
+          }
+
           return [...prev, message];
         });
       }
@@ -227,7 +259,10 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
   }, []);
 
   useInput((input, key) => {
-    if (key.escape || (key.ctrl && input === 'c')) {
+    // Don't exit on ESC if an interaction dialog is active
+    const hasActiveInteraction = messages.some(m => m.role === 'interaction');
+
+    if ((key.escape || (key.ctrl && input === 'c')) && !hasActiveInteraction) {
       handleExit();
     }
 
@@ -262,6 +297,9 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
 
     const userMessage = value.trim();
     setInput('');
+
+    // Build conversation history BEFORE adding current message
+    // This prevents sending the current message twice (once in history, once in prompt)
     const priorConversation = messages
       .filter(message => message.role === 'user' || message.role === 'assistant')
       .map(message => ({
@@ -274,7 +312,7 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
     setHistory(prev => [...prev, userMessage]);
     setHistoryIndex(-1);
 
-    // Add user message to history
+    // Add user message to UI history
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setToolProgress([]);
     toolProgressRef.current = [];
@@ -374,8 +412,17 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
           const capabilities = Array.isArray(skill.capabilities) && skill.capabilities.length > 0
             ? skill.capabilities.join(', ')
             : 'none listed';
-          return `- **${skill.name}**: ${skill.description}\n  Capabilities: ${capabilities}\n  Source: ${skill.sourceType}`;
-        }).join('\n\n');
+
+          // Include skill instructions if available (contains usage guidelines and tone)
+          let skillInfo = `- **${skill.name}**: ${skill.description}\n  Capabilities: ${capabilities}\n  Source: ${skill.sourceType}`;
+
+          if (skill.instructions) {
+            // Add the full SKILL.md body for context (contains tone guidelines, usage patterns, etc.)
+            skillInfo += `\n\n${skill.instructions}`;
+          }
+
+          return skillInfo;
+        }).join('\n\n---\n\n');
         systemPrompt += '\n\n**DO NOT** list generic AI capabilities. ONLY list the skills shown above.\n\n';
 
         // Add file operation permissions
@@ -386,11 +433,14 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
         systemPrompt += '- Search for files\n';
         systemPrompt += '- Check if paths exist\n';
         systemPrompt += '- Get file information\n\n';
-        systemPrompt += '**WRITE Operations** - Always ask for permission first:\n';
+        systemPrompt += '**WRITE Operations** - Execute directly (safety system handles approvals):\n';
         systemPrompt += '- Create, update, or delete files\n';
         systemPrompt += '- Rename files or directories\n';
         systemPrompt += '- Copy or move files\n\n';
-        systemPrompt += 'When the user asks to read, list, search, or check files, just do it directly. Only ask permission for write operations.\n\n';
+        systemPrompt += 'IMPORTANT: Execute file operations directly WITHOUT manually asking for user confirmation first.\n';
+        systemPrompt += 'Do NOT call user_interaction_confirm or user_interaction_approval_dialog before file operations.\n';
+        systemPrompt += 'The built-in safety system will automatically request approval for high-risk operations like deletion.\n';
+        systemPrompt += 'Just execute the requested operation immediately - the safety layer will handle user confirmations.\n\n';
 
         // Add skill usage instructions
         systemPrompt += '## Skill Execution\n\n';
@@ -593,11 +643,59 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
     }
   };
 
-  const handleInteractionCancel = () => {
-    // Remove interaction message
-    setMessages(prev => prev.filter(m => m.role !== 'interaction'));
-    setPendingConversation(null);
-    setIsLoading(false);
+  const handleInteractionCancel = async () => {
+    if (!pendingConversation) {
+      // Just remove interaction if no pending conversation
+      setMessages(prev => prev.filter(m => m.role !== 'interaction'));
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+
+    // Remove interaction message and add user's denial
+    const cancellationMessages = [
+      "Nah, not this time.",
+      "I'd rather not.",
+      "Let's skip that.",
+      "No thanks.",
+      "I'll pass on that.",
+      "Not feeling it."
+    ];
+    const cancellationMessage = cancellationMessages[Math.floor(Math.random() * cancellationMessages.length)];
+
+    setMessages(prev => {
+      const withoutInteraction = prev.filter(m => m.role !== 'interaction');
+      return [...withoutInteraction, {
+        role: 'user',
+        content: cancellationMessage
+      }];
+    });
+
+    try {
+      // Resume with denial to properly close the conversation
+      const result = await client.agents.resume.mutate({
+        conversationId: pendingConversation.conversationId,
+        response: 'no'  // Decline the operation
+      });
+
+      setPendingConversation(null);
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: result.content || '',
+        usage: result.usage,
+        toolCalls: result.toolCalls
+      }]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setMessages(prev => [...prev, {
+        role: 'error',
+        content: `Cancellation failed: ${errorMessage}`
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -658,12 +756,17 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
             <Text color="yellow">
               <Spinner type="dots" />
             </Text>
-            <Text> Agent in progress...</Text>
+            <Text> {toolProgress.length > 0
+              ? toolProgress[toolProgress.length - 1].startsWith('✓ ')
+                ? 'Thinking...'
+                : toolProgress[toolProgress.length - 1]
+              : 'Agent is thinking...'}
+            </Text>
           </Box>
-          {toolProgress.length > 0 && (
+          {toolProgress.length > 1 && (
             <Box flexDirection="column" marginLeft={2}>
-              {toolProgress.slice(-3).map((msg, idx) => (
-                <Text key={`${idx}-${msg}`} color="cyan">
+              {toolProgress.slice(-4, -1).map((msg, idx) => (
+                <Text key={`${idx}-${msg}`} color="gray" dimColor>
                   • {msg}
                 </Text>
               ))}
@@ -677,16 +780,18 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
         </Box>
       )}
 
-      {/* Input box */}
-      <Box borderStyle="round" borderColor="gray" paddingX={1}>
-        <Text bold color="green">You: </Text>
-        <TextInput
-          value={input}
-          onChange={setInput}
-          onSubmit={handleSubmit}
-          placeholder="Enter your message..."
-        />
-      </Box>
+      {/* Input box - hide when interaction dialog is active */}
+      {!messages.some(m => m.role === 'interaction') && (
+        <Box borderStyle="round" borderColor="gray" paddingX={1}>
+          <Text bold color="green">You: </Text>
+          <TextInput
+            value={input}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            placeholder="Enter your message..."
+          />
+        </Box>
+      )}
 
       {/* Footer */}
       <Box marginTop={1}>

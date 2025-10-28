@@ -66,7 +66,7 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
       }))
       .mutation(async ({ input }) => {
         // Convert skills to executable tools
-        let skillTools: any[] = [];
+        let skillTools: AgentTool[] = [];
 
         logger.info(`🎯 Agent execution request`);
         logger.info(`   SDK: ${input.sdk || 'ai-agent'}, Model: ${input.model || 'default'}`);
@@ -139,18 +139,40 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
           logger.info(`📝 Resuming conversation: ${convId}`);
         }
 
+        // Add current user prompt to conversation state
+        conversationManager.addMessage(convId, {
+          role: 'user',
+          content: input.prompt
+        });
+
         // Pass skill tools to agent execution via aiService.execute
         const result = await agentService.execute(agentRequest, skillTools);
 
         // Check for interaction requirement
         if ((result as any).type === 'interaction_required') {
           logger.info(`🔔 Interaction required - pausing conversation ${convId}`);
+          logger.info(`   DEBUG: result.toolName = ${(result as any).toolName}`);
+          logger.info(`   DEBUG: result.toolArguments = ${JSON.stringify((result as any).toolArguments)}`);
+          logger.info(`   DEBUG: result.originalToolName = ${(result as any).originalToolName}`);
 
-          // Save pending interaction in conversation state
+          // Save pending interaction in conversation state with actual tool arguments
+          // Note: toolName is the wrapper (e.g. "approval-dialog"), originalToolName is tracked separately
           conversationManager.pause(
             convId,
             (result as any).interaction,
-            { name: (result as any).toolName, arguments: {} }
+            {
+              name: (result as any).toolName,
+              arguments: (result as any).toolArguments || {}  // Use actual tool arguments
+            },
+            (result as any).originalToolName,  // Pass the original tool that triggered this (e.g. file_handling_delete)
+            {
+              skillId: (result as any).skillId,
+              scriptName: (result as any).scriptName,
+              scriptArgs: (result as any).scriptArgs,
+              stdin: (result as any).stdin,
+              cwd: (result as any).cwd,
+              toolArguments: (result as any).toolArguments || {}
+            }
           );
 
           return {
@@ -512,7 +534,11 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
         response: z.union([z.string(), z.array(z.string())])
       }))
       .mutation(async ({ input }) => {
-        logger.info(`🔄 Resuming conversation ${input.conversationId} with user response`);
+        logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        logger.info(`🔄 RESUME: Starting conversation resume`);
+        logger.info(`   Conversation ID: ${input.conversationId}`);
+        logger.info(`   User response: "${input.response}"`);
+        logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
         const state = conversationManager.get(input.conversationId);
 
@@ -530,28 +556,127 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
           });
         }
 
-        // Add user response to conversation
+        // Add user response to conversation with clear instruction
         const responseText = Array.isArray(input.response)
           ? input.response.join(', ')
           : input.response;
 
-        conversationManager.addMessage(input.conversationId, {
-          role: 'user',
-          content: `[User interaction response: ${responseText}]`
-        });
+        const normalizedResponse = responseText.toString().trim().toLowerCase();
+        const approvalKeywords = ['allow', 'yes', 'approved', 'approve', 'confirm', 'confirmed'];
+        const alwaysKeywords = ["don't ask again", "don't ask", 'always', 'every time'];
+        const userApproved = approvalKeywords.some(keyword => normalizedResponse.includes(keyword));
+        const rememberPermanently = alwaysKeywords.some(keyword => normalizedResponse.includes(keyword));
+        const pending = state.pendingInteraction;
+
+        let operationTarget: string | undefined;
+        let toolExecuted = false;
+        let toolExecutionError: string | null = null;
+        let toolExecutionOutput: string | null = null;
 
         // Resume execution with updated messages
-        // Build skill tools again
-        let skillTools: any[] = [];
+        // Build skill tools but EXCLUDE user-interaction tools to prevent re-confirmation
+        let skillTools: AgentTool[] = [];
         if (skillManager) {
           await skillManager.initialize();
           const converter = new SkillsToolConverter(skillManager);
-          skillTools = converter.convertSkillsToTools();
+          const allTools = converter.convertSkillsToTools();
+
+          // Filter out user-interaction approval/confirmation tools since user has already approved
+          skillTools = allTools.filter(tool =>
+            !tool.name.startsWith('user_interaction_confirm') &&
+            !tool.name.startsWith('user_interaction_approval_dialog')
+          );
+
+          logger.info(`🔄 Resuming with ${skillTools.length} tools (excluded user-interaction confirmation tools)`);
+
+          if (pending && userApproved) {
+            const toolArgsData: Record<string, any> = pending.toolArguments || pending.toolCall?.arguments || {};
+            const scriptArgs = Array.isArray(pending.scriptArgs) && pending.scriptArgs.length > 0
+              ? pending.scriptArgs
+              : Array.isArray(toolArgsData?.args)
+                ? toolArgsData.args.map((value: any) => String(value))
+                : (() => {
+                    const direct = toolArgsData['file-path'] ?? toolArgsData['filePath'] ?? toolArgsData['path'];
+                    return typeof direct === 'string' ? [direct] : [];
+                  })();
+
+            const directTarget = toolArgsData['file-path'] ?? toolArgsData['filePath'] ?? toolArgsData['path'];
+            if (typeof directTarget === 'string') {
+              operationTarget = directTarget;
+            }
+
+            if (pending.skillId && pending.scriptName) {
+              logger.info(`🔁 Re-executing approved tool ${pending.scriptName} from skill ${pending.skillId}`);
+
+              skillManager.bypassApprovalFor(pending.scriptName, scriptArgs, {
+                skillId: pending.skillId,
+                persist: rememberPermanently,
+                applyToAllArgs: rememberPermanently
+              });
+
+              try {
+                const execResult = await skillManager.executeScript(pending.skillId, {
+                  scriptName: pending.scriptName,
+                  args: scriptArgs,
+                  stdin: pending.stdin,
+                  cwd: pending.cwd
+                });
+
+                toolExecuted = true;
+
+                if (execResult && typeof execResult === 'object' && (execResult as any).__interaction_required__) {
+                  throw new Error('Tool execution still requires interaction after approval');
+                }
+
+                if (execResult.exitCode !== 0) {
+                  toolExecutionError = (execResult.stderr || '').trim() || `Exit code ${execResult.exitCode}`;
+                } else {
+                  const trimmedOutput = (execResult.stdout || '').trim();
+                  if (trimmedOutput) {
+                    toolExecutionOutput = trimmedOutput.length > 500
+                      ? `${trimmedOutput.slice(0, 500)} …`
+                      : trimmedOutput;
+                  }
+                }
+              } catch (error) {
+                toolExecutionError = error instanceof Error ? error.message : String(error);
+                logger.error(`❌ Failed to execute approved tool ${pending.scriptName}`, { error: toolExecutionError });
+              }
+            } else {
+              logger.warn('⚠️ Missing skillId or scriptName on pending interaction; cannot auto-execute tool.');
+            }
+          }
         }
 
+        let resumePrompt: string;
+        if (userApproved) {
+          if (toolExecutionError) {
+            const toolLabel = pending?.originalToolName || pending?.toolName || 'the requested tool';
+            resumePrompt =
+              `[SYSTEM] User approved the operation, but executing "${toolLabel}" failed with error: ${toolExecutionError}. ` +
+              `Explain the failure to the user and suggest next steps.`;
+          } else if (toolExecuted) {
+            const toolLabel = pending?.originalToolName || pending?.toolName || 'the requested tool';
+            const targetDetails = operationTarget ? ` for "${operationTarget}"` : '';
+            const outputDetails = toolExecutionOutput ? `\nTool output:\n${toolExecutionOutput}` : '';
+            resumePrompt =
+              `[SYSTEM] User approved the operation. "${toolLabel}" executed successfully${targetDetails}.${outputDetails}\n` +
+              `Provide a confirmation message to the user.`;
+          } else {
+            resumePrompt =
+              `[SYSTEM] User approved the operation. Confirm to the user that you will proceed and describe the next steps.`;
+          }
+        } else {
+          resumePrompt =
+            `[SYSTEM] User responded with: "${responseText}". The pending operation was not executed. ` +
+            `Acknowledge the response and offer alternatives if helpful.`;
+        }
+
+        // Pass the resume prompt as a NEW prompt (this will add it as a user message)
+        // This ensures the AI sees it as the latest instruction
         const agentRequest: AgentExecuteRequest = {
-          prompt: `The user responded: ${responseText}. Please continue based on their response.`,
-          messages: state.messages,
+          prompt: resumePrompt,
+          messages: state.messages, // Previous conversation history
           model: state.model,
           provider: state.provider,
           systemPrompt: state.systemPrompt,
@@ -570,7 +695,16 @@ export function createAgentRouter(config: AgentRouterConfig = {}): ReturnType<ty
           conversationManager.pause(
             input.conversationId,
             (result as any).interaction,
-            { name: (result as any).toolName, arguments: {} }
+            { name: (result as any).toolName, arguments: (result as any).toolArguments || {} },
+            (result as any).originalToolName,
+            {
+              skillId: (result as any).skillId,
+              scriptName: (result as any).scriptName,
+              scriptArgs: (result as any).scriptArgs,
+              stdin: (result as any).stdin,
+              cwd: (result as any).cwd,
+              toolArguments: (result as any).toolArguments || {}
+            }
           );
 
           return {

@@ -523,6 +523,7 @@ Read, write, search, and manage files safely within the project root. Includes:
 - `grep.ts` - Search for regex patterns with context
 - `search-files.ts` - Find files by glob patterns
 - `validate-path.ts` - Validate paths are safe and accessible
+- `delete.ts` - Delete files (requires user approval via user-interaction skill)
 
 **Note**: When defining script arguments with command-line flags, use the `flag` field:
 ```yaml
@@ -532,6 +533,12 @@ args:
     description: Max lines to read
     type: number
 ```
+
+**File Deletion Safety**: The `delete.ts` script requires approval before execution (`requiresApproval: true`). When a user requests file deletion, the agent will:
+1. Call `user_interaction_confirm` to ask for user permission
+2. Wait for user confirmation (yes/no)
+3. Only execute the deletion if approved
+4. Validate the file exists before attempting deletion
 
 #### **git-commit-helper**
 Generate descriptive commit messages by analyzing git diffs and following conventional commits format.
@@ -643,6 +650,53 @@ const result = await client.agents.execute.mutate({
 // Agent can now call: data_processor_process tool
 // With args: { "input-file": "users.csv", "format": "json" }
 ```
+
+### Working Directory Management
+
+The server uses a temporary file approach to communicate the working directory to skill scripts, supporting multiple parallel instances without environment pollution.
+
+**How it works:**
+1. Each simple-agent instance creates a temp file: `/tmp/simple-agent-{randomId}-cwd`
+2. File contains the absolute working directory path
+3. Server reads from temp file and sets subprocess `cwd` accordingly
+4. Cleanup happens automatically on server exit
+
+**Key Benefits:**
+- ✅ **Multiple parallel instances** - Each gets unique temp file
+- ✅ **No environment pollution** - No global `PROJECT_ROOT` variable
+- ✅ **Automatic cleanup** - Removed on server shutdown
+- ✅ **Simple** - Just a file with a path
+
+**Script Implementation:**
+```typescript
+// Skill scripts run with cwd set to project root
+const PROJECT_ROOT = process.cwd();  // No env var needed!
+const absolutePath = path.resolve(PROJECT_ROOT, './file.txt');
+```
+
+**Configuration:**
+```typescript
+import { CwdManager } from 'simple-rpc-ai-backend/tools/simple-agent/utils/cwd-manager';
+
+// Create CWD manager
+const cwdManager = new CwdManager('/home/user/project');
+cwdManager.initialize();
+
+const server = createRpcAiServer({
+  agents: {
+    skills: {
+      sandbox: {
+        cwdFilePath: cwdManager.getFilePath()  // Pass temp file path
+      }
+    }
+  }
+});
+
+// Cleanup on exit
+process.on('exit', () => cwdManager.cleanup());
+```
+
+**Inspired by:** Claude Code's temp file approach ([GH #8856](https://github.com/anthropics/claude-code/issues/8856))
 
 ### Skill Script Guidelines
 
@@ -882,3 +936,22 @@ NEVER proactively create documentation files (*.md) or README files. Only create
   - **Files Changed**: `SKILL.md` (file-handling), `ChatHistory.tsx`, `BUGFIX_FILE_LIMIT.md`
   - **Verification**: File limiting now works correctly (22 lines requested = 22 lines read)
   - **Guidelines**: Documented best practices for flag arguments, positional args, and boolean flags
+- ✅ **COMPLETED**: Fixed double approval issue for file deletion
+  - **Problem**: Agents were asking for permission twice - once manually, once via automatic safety system
+  - **Solution**: Updated main-agent AGENT.md to clarify automatic approval behavior
+  - **Key Changes**:
+    - Added "Security & Automatic Approvals" section to main-agent AGENT.md
+    - Enabled `requiresApproval: true` for file_handling_delete in SKILL.md
+    - Updated delete.ts with better error messages (shows requested path and resolved path)
+    - Documented file deletion safety workflow in CLAUDE.md
+  - **How It Works Now**: Agent calls file_handling_delete directly → Safety system shows approval dialog → User approves/denies → Deletion proceeds if approved
+  - **Files Changed**: `src/services/agents/builtin/main-agent/AGENT.md`, `src/services/agents/skills/builtin/file-handling/SKILL.md`, `src/services/agents/skills/builtin/file-handling/scripts/delete.ts`, `CLAUDE.md`
+  - **Result**: Single approval dialog for file deletions, no redundant permission requests
+- ✅ **COMPLETED**: Fixed duplicate tool call issue with server-side deduplication
+  - **Problem**: AI models sometimes generate multiple identical tool calls in a single response, causing duplicate approval dialogs
+  - **Solution**: Added deduplication logic in AIService tool execution loop (lines 651-670)
+  - **How It Works**: Filters tool calls by signature (`toolName:JSON(args)`) before execution, keeping only first occurrence
+  - **Benefits**: Single approval per unique tool call, no wasted API calls, works for all tools/providers
+  - **Files Changed**: `src/services/ai/ai-service.ts`, `docs/bugfixes/DUPLICATE_TOOL_CALLS.md`
+  - **Documentation**: Complete bug fix guide at [docs/bugfixes/DUPLICATE_TOOL_CALLS.md](docs/bugfixes/DUPLICATE_TOOL_CALLS.md)
+  - **Result**: Zero duplicate approvals, clean tool execution logs

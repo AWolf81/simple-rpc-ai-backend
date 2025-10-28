@@ -14,6 +14,7 @@ export function getDefaultSkillSources(projectRoot: string): SkillSource[] {
     { type: 'builtin', name: 'file-handling' },
     { type: 'builtin', name: 'git-commit-helper' },
     { type: 'builtin', name: 'script-caller' },
+    { type: 'builtin', name: 'user-interaction' },  // For approval dialogs
 
     // Example/local skills bundled with the repo
     { type: 'local', path: join(projectRoot, 'examples/03-agents-basic/custom-skills/hello-world') }

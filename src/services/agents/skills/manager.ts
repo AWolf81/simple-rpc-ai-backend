@@ -233,22 +233,56 @@ export class SkillManager {
 
     // Request approval if needed
     if (safetyValidation.requiresApproval || skill.metadata.requiresApproval) {
+      console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.error(`[SKILL MANAGER] Approval required for: ${request.scriptName}`);
+      console.error(`[SKILL MANAGER] Has approvalManager: ${!!this.approvalManager}`);
+
       if (this.approvalManager) {
-        const approved = await this.approvalManager.requestSkillExecutionApproval(
-          request.scriptName,
-          request.args || [],
-          safetyValidation,
-          request.cwd
-        );
+        console.error(`[SKILL MANAGER] Calling approvalManager.requestSkillExecutionApproval...`);
 
-        if (!approved) {
-          logger.warn(`❌ Script execution denied by user: ${request.scriptName}`);
-          throw new Error(`Script execution denied: ${request.scriptName}`);
+        try {
+          console.error(`[SKILL MANAGER] About to call requestSkillExecutionApproval`);
+          const approved = await this.approvalManager.requestSkillExecutionApproval(
+            request.scriptName,
+            request.args || [],
+            safetyValidation,
+            request.cwd,
+            request.conversationId,  // Pass conversation ID for approval tracking
+            skill.id
+          );
+          console.error(`[SKILL MANAGER] requestSkillExecutionApproval returned:`, approved);
+
+          if (!approved) {
+            logger.warn(`❌ Script execution denied by user: ${request.scriptName}`);
+            throw new Error(`Script execution denied: ${request.scriptName}`);
+          }
+
+          logger.info(`✅ Script execution approved: ${request.scriptName}`);
+        } catch (error: any) {
+          console.error(`[SKILL MANAGER] ❗ Caught error from approval!`);
+          console.error(`[SKILL MANAGER] Error:`, error);
+          console.error(`[SKILL MANAGER] Error type: ${typeof error}`);
+          console.error(`[SKILL MANAGER] Has __interaction_required__:`, error?.__interaction_required__);
+          console.error(`[SKILL MANAGER] Error keys:`, error ? Object.keys(error) : 'null');
+
+          // Check if this is an interaction marker being thrown up
+          if (error && typeof error === 'object' && error.__interaction_required__) {
+            console.error(`[SKILL MANAGER] ✅ Interaction marker caught from approval - returning as result`);
+            // Return the interaction marker as the script result
+            // Add the original tool name so conversation state can track what was approved
+            // This will be detected by AIService and trigger the interaction flow
+            return {
+              ...error,
+              originalToolName: `${skillId}_${request.scriptName.replace('scripts/', '').replace('.ts', '')}`
+            };
+          }
+          console.error(`[SKILL MANAGER] ❌ NOT an interaction marker - re-throwing`);
+          // Otherwise re-throw the error
+          throw error;
         }
-
-        logger.info(`✅ Script execution approved: ${request.scriptName}`);
       } else {
         // No approval manager configured but approval required
+        console.error(`[SKILL MANAGER] ERROR: No approval manager but approval required!`);
         throw new Error(
           `Approval required for "${request.scriptName}" but no approval system configured.\n` +
           SafetyValidator.formatApprovalPrompt(
@@ -462,6 +496,30 @@ export class SkillManager {
   }
 
   /**
+   * Temporarily bypass approval for a specific operation
+   * Used when resuming after user approval to prevent re-asking
+   */
+  bypassApprovalFor(
+    scriptName: string,
+    args: string[],
+    options?: {
+      skillId?: string;
+      persist?: boolean;
+      expiresInMs?: number;
+      applyToAllArgs?: boolean;
+    }
+  ): void {
+    if (!this.approvalManager) {
+      logger.warn('⚠️  Cannot bypass approval - no approval manager configured');
+      return;
+    }
+
+    // Use the proper public method to remember the approval
+    this.approvalManager.rememberChoice(scriptName, args, true, options);
+    logger.info(`✅ Temporarily bypassed approval for: ${scriptName} ${args.join(' ')}`);
+  }
+
+  /**
    * Add a new skill source and load it
    */
   async addSource(source: SkillSource): Promise<Skill> {
@@ -632,6 +690,11 @@ export class SkillManager {
     overrides.allowedPaths = this.mergePathLists(allowedPaths);
     overrides.allowedReadPaths = this.mergePathLists(overrides.allowedReadPaths, allowedPaths);
     overrides.allowedWritePaths = this.mergePathLists(overrides.allowedWritePaths, allowedPaths);
+
+    // Pass through cwdFilePath from base config if not overridden
+    if (!overrides.cwdFilePath && this.config.sandbox?.cwdFilePath) {
+      overrides.cwdFilePath = this.config.sandbox.cwdFilePath;
+    }
 
     return overrides;
   }

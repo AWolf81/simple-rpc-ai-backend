@@ -36,22 +36,50 @@ export function SelectDialog({
   options = [],
   multiSelect = false,
   onSubmit,
-  onCancel
+  onCancel,
+  enableAIInterpretation = false,
+  aiContext
 }: Omit<UserInteractionDialogProps, 'type'>) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [customMode, setCustomMode] = useState(false);
+  const [customText, setCustomText] = useState('');
 
   useInput((input, key) => {
+    // Custom text input mode for "Custom response" option
+    if (customMode) {
+      if (key.return && customText.trim()) {
+        onSubmit(JSON.stringify({ choice: 'Custom response', customResponse: customText }));
+      } else if (key.escape) {
+        setCustomMode(false);
+        setCustomText('');
+      } else if (key.backspace || key.delete) {
+        setCustomText(prev => prev.slice(0, -1));
+      } else if (input && !key.ctrl && !key.meta) {
+        setCustomText(prev => prev + input);
+      }
+      return;
+    }
+
+    // Selection mode
     if (key.upArrow) {
       setSelectedIndex(prev => Math.max(0, prev - 1));
     } else if (key.downArrow) {
       setSelectedIndex(prev => Math.min(options.length - 1, prev + 1));
     } else if (key.return) {
+      const selectedOption = options[selectedIndex];
+
+      // Check if this is "Custom response" option
+      if (selectedOption.toLowerCase().includes('custom')) {
+        setCustomMode(true);
+        return;
+      }
+
       if (multiSelect) {
         const selected = Array.from(selectedItems).map(i => options[i]);
-        onSubmit(selected);
+        onSubmit(JSON.stringify({ choice: selected.join(', ') }));
       } else {
-        onSubmit(options[selectedIndex]);
+        onSubmit(JSON.stringify({ choice: selectedOption }));
       }
     } else if (input === ' ' && multiSelect) {
       // Toggle selection in multi-select mode
@@ -68,6 +96,46 @@ export function SelectDialog({
       onCancel();
     }
   });
+
+  // Custom response input UI
+  if (customMode) {
+    return (
+      <Box flexDirection="column" paddingX={2} paddingY={1} borderStyle="round" borderColor="yellow">
+        <Box marginBottom={1}>
+          <Text bold color="yellow">🤖 Custom Response</Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text>{message}</Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>{'─'.repeat(60)}</Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>
+            Enter your custom response (AI will interpret):
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text color="yellow">&gt; </Text>
+          <Text>{customText}</Text>
+          <Text color="yellow">_</Text>
+        </Box>
+        {aiContext && (
+          <Box marginBottom={1}>
+            <Text dimColor>Context: {aiContext}</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <Text dimColor>{'─'.repeat(60)}</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>
+            Press <Text color="cyan">Enter</Text> to submit, <Text color="cyan">Esc</Text> to go back
+          </Text>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1} borderStyle="round" borderColor="cyan">

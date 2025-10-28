@@ -6,7 +6,8 @@
 
 import type { ApprovalRequest, ApprovalResponse } from './approval-manager';
 import type { SkillManager } from '../manager';
-import { SafetyValidator } from './safety-validator';
+// import { SafetyValidator } from './safety-validator';
+import { extractInteractionXML, parseInteractionXML } from './xml-interaction-parser';
 
 export interface InteractiveApprovalOptions {
   /**
@@ -17,12 +18,12 @@ export interface InteractiveApprovalOptions {
 
   /**
    * Custom options for approval dialog
-   * Default: ["Yes", "Yes (always ask)", "No", "Other"]
+   * Default: ["Allow", "Allow (don't ask again)", "Deny", "Custom response"]
    */
   approvalOptions?: string[];
 
   /**
-   * Allow custom rejection reasons
+   * Allow custom responses with AI interpretation
    * Default: true
    */
   allowCustomReason?: boolean;
@@ -56,31 +57,52 @@ export function createInteractiveApprovalCallback(
 ): (request: ApprovalRequest) => Promise<ApprovalResponse> {
   const {
     skillManager: providedSkillManager,
-    approvalOptions = ['Yes', 'Yes (always ask)', 'No', 'Other'],
+    approvalOptions = ['Allow', 'Allow (don\'t ask again)', 'Deny (don\'t ask again)', 'Deny', 'Custom response'],
     allowCustomReason = true,
     timeout = 0
   } = options;
 
   return async (request: ApprovalRequest): Promise<ApprovalResponse> => {
+    console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.error(`[APPROVAL] Callback invoked for: ${request.type}`);
+
     // Get skill manager (from provided option or global)
     const skillManager = providedSkillManager || _globalSkillManager;
 
+    console.error(`[APPROVAL] skillManager: ${!!skillManager} (provided: ${!!providedSkillManager}, global: ${!!_globalSkillManager})`);
+
     if (!skillManager) {
+      console.error('[APPROVAL] ERROR: No skillManager available!');
       throw new Error(
         'SkillManager not available. Either pass skillManager option or ensure ' +
         'the server has initialized the skills system.'
       );
     }
 
-    // Format the approval message
+    console.error('[APPROVAL] Executing user-interaction skill...');
+
+    // Format the approval message and title
     let message = '';
+    let title = '🤔 Confirm Action';  // Default user-friendly title
 
     if (request.type === 'skill-execution') {
       message = formatSkillExecutionMessage(request);
+
+      // Customize title based on operation type
+      const scriptName = request.scriptName || '';
+      if (scriptName.includes('delete.ts')) {
+        title = '🗑️  Confirm Deletion';
+      } else if (scriptName.includes('write.ts')) {
+        title = '✏️  Confirm File Write';
+      } else if (scriptName.includes('read.ts')) {
+        title = '📖 Confirm File Read';
+      }
     } else if (request.type === 'network-operation') {
       message = formatNetworkOperationMessage(request);
+      title = '🌐 Confirm Network Request';
     } else if (request.type === 'file-operation') {
       message = formatFileOperationMessage(request);
+      title = '📁 Confirm File Operation';
     } else {
       message = `Operation: ${request.command || 'Unknown'}\n`;
       if (request.safetyValidation?.warnings) {
@@ -92,7 +114,7 @@ export function createInteractiveApprovalCallback(
     const executePromise = skillManager.executeScript('user-interaction', {
       scriptName: 'scripts/approval-dialog.ts',
       args: [
-        '⚠️  Approval Required',
+        title,
         message,
         JSON.stringify(approvalOptions),
         ...(allowCustomReason ? ['--allow-custom'] : [])
@@ -112,17 +134,74 @@ export function createInteractiveApprovalCallback(
       result = await executePromise;
     }
 
-    // Parse result
-    const output = JSON.parse(result.stdout);
+    // Check if stdout contains XML interaction marker
+    // approval-dialog.ts outputs XML when user interaction is needed
+    if (result && result.stdout) {
+      const xml = extractInteractionXML(result.stdout);
+      if (xml) {
+        const interaction = parseInteractionXML(xml);
+        if (interaction) {
+          console.error('[APPROVAL] Interaction XML detected in approval dialog - creating marker');
+          // Create and return interaction marker
+          // This will be caught by ApprovalManager -> SkillManager -> AIService
+          return {
+            __interaction_required__: true,
+            interaction,
+            toolName: 'approval-dialog',
+            originalResult: result
+          } as any;
+        }
+      }
+    }
 
-    // Determine if we should remember the choice
-    // "Yes (always ask)" means we approve but DON'T remember
-    const rememberChoice = output.choice === 'Yes (always ask)' ? false : output.approved;
+    // Parse result as JSON for normal approval responses
+    let output: Record<string, any> = {};
+    try {
+      output = JSON.parse(result.stdout);
+    } catch (error) {
+      const trimmed = (result.stdout || '').trim();
+      if (trimmed.startsWith('{"choice"') || trimmed.startsWith('{\"choice\"')) {
+        try {
+          output = JSON.parse(trimmed.replace(/\\"/g, '"'));
+        } catch {
+          output = { choice: trimmed };
+        }
+      } else {
+        output = { choice: trimmed };
+      }
+    }
+
+    // Determine if we should remember the choice based on the option selected
+    const choice = (output.choice || output.selection || output.selected || output.json?.choice || output.json?.selection || '').toString();
+    const choiceLower = choice.toLowerCase();
+    const normalizedChoice = choiceLower.replace(/’/g, "'");
+
+    // Handle different response types:
+    // 1. "Allow (don't ask again)" = remember as approved
+    // 2. "Allow" = approved (no remember)
+    // 3. "Deny" = denied (no remember)
+    // 4. "Custom response" = needs AI interpretation (returned as custom text)
+
+    const rememberChoice = normalizedChoice.includes("don't ask again") ||
+                          normalizedChoice.includes("don't ask") ||
+                          normalizedChoice.includes('always');
+
+    const rememberScope: 'exact' | 'all' | undefined = rememberChoice ?
+      (normalizedChoice.includes('always') || normalizedChoice.includes("don't ask") ? 'all' : 'exact') :
+      undefined;
+
+    // Approved if choice contains "allow"
+    const approved = normalizedChoice.includes('allow');
+
+    // If custom response, include the custom text for AI interpretation
+    const customResponse = output.customResponse || output.json?.customResponse || '';
 
     return {
       requestId: request.id,
-      approved: output.approved,
+      approved,
       rememberChoice,
+      rememberScope,
+      customResponse: customResponse || undefined,  // Include custom text if provided
       timestamp: new Date()
     };
   };
@@ -132,30 +211,33 @@ export function createInteractiveApprovalCallback(
  * Format message for skill execution approval
  */
 function formatSkillExecutionMessage(request: ApprovalRequest): string {
-  const lines: string[] = [];
+  // Create user-friendly message based on the script being executed
+  const scriptName = request.scriptName || '';
+  const args = request.args || [];
 
-  lines.push(`Script: ${request.scriptName}`);
-
-  if (request.args && request.args.length > 0) {
-    lines.push(`Arguments: ${request.args.join(' ')}`);
+  // Map script names to user-friendly descriptions
+  if (scriptName.includes('delete.ts') && args.length > 0) {
+    const filePath = args[0];
+    return `Delete file: ${filePath}`;
   }
 
-  if (request.command) {
-    lines.push(`Command: ${request.command}`);
+  if (scriptName.includes('write.ts') && args.length > 0) {
+    const filePath = args[0];
+    return `Create or modify file: ${filePath}`;
   }
 
-  if (request.safetyValidation) {
-    lines.push(`Safety Level: ${request.safetyValidation.safetyLevel.toUpperCase()}`);
-
-    if (request.safetyValidation.warnings.length > 0) {
-      lines.push('\nWarnings:');
-      request.safetyValidation.warnings.forEach(w => {
-        lines.push(`  ${w}`);
-      });
-    }
+  if (scriptName.includes('read.ts') && args.length > 0) {
+    const filePath = args[0];
+    return `Read file: ${filePath}`;
   }
 
-  return lines.join('\n');
+  // For unknown operations, show more details but still user-friendly
+  const operation = scriptName.replace('scripts/', '').replace('.ts', '').replace(/-/g, ' ');
+  if (args.length > 0) {
+    return `${operation}: ${args.join(' ')}`;
+  }
+
+  return operation || 'Execute operation';
 }
 
 /**

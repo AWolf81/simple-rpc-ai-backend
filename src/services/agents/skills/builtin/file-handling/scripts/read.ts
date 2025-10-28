@@ -24,7 +24,7 @@ import readline from 'readline';
 import { createReadStream } from 'fs';
 
 const DEFAULT_MAX_SIZE = 10 * 1024 * 1024; // 10MB
-const PROJECT_ROOT = process.env.PROJECT_ROOT || process.cwd();
+const PROJECT_ROOT = process.cwd(); // Script runs with cwd set to project root
 const ALLOWED_PATHS = [PROJECT_ROOT, '/tmp'];
 
 function parseArgs() {

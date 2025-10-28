@@ -537,11 +537,22 @@ export class AIService {
     // Build messages array - use provided messages or create new one
     let conversationMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
     if (request.messages && request.messages.length > 0) {
-      // Use provided conversation history and append current message
-      conversationMessages = [
-        ...request.messages,
-        { role: 'user', content: userPrompt }
-      ];
+      // Check if current message is already in the history to avoid duplicates
+      const lastMessage = request.messages[request.messages.length - 1];
+      const isDuplicate = lastMessage && lastMessage.role === 'user' && lastMessage.content === userPrompt;
+
+      if (isDuplicate) {
+        // Current message already in history, just use the provided messages
+        conversationMessages = [...request.messages];
+        logger.debug(`📝 Current message already in history, skipping duplicate`);
+      } else {
+        // Append current message to history
+        conversationMessages = [
+          ...request.messages,
+          { role: 'user', content: userPrompt }
+        ];
+        logger.debug(`📝 Appended current message to conversation history`);
+      }
     } else {
       // Simple single-message case
       conversationMessages = [
@@ -629,26 +640,83 @@ export class AIService {
           let currentResult = result;
           let currentOptions = generateOptions;
           let stepCount = 0;
+          const cachedResultsBySignature = new Map<string, { result: any; success: boolean }>();
+          const executedToolCallIds = new Set<string>();
 
           // Loop until no more tool calls or max steps reached
           while (currentResult.toolCalls && currentResult.toolCalls.length > 0 && stepCount < maxSteps) {
             stepCount++;
             logger.info(`🔄 Tool iteration ${stepCount}/${maxSteps}...`);
 
+            // Deduplicate tool calls - prevent AI from calling same tool with same args multiple times in one turn
+            logger.info(`🔍 Checking ${currentResult.toolCalls.length} tool calls for duplicates...`);
+            currentResult.toolCalls.forEach((tc: any, idx: number) => {
+              logger.info(`   [${idx}] ${tc.toolName} with args: ${JSON.stringify(tc.args || {})}`);
+            });
+
+            const seenToolSignatures = new Set<string>();
+            const deduplicatedToolCalls = currentResult.toolCalls.filter((tc: any) => {
+              const signature = `${tc.toolName}:${JSON.stringify(tc.args || {})}`;
+              if (seenToolSignatures.has(signature)) {
+                logger.warn(`⚠️  SKIPPING DUPLICATE: ${tc.toolName} with args ${JSON.stringify(tc.args)}`);
+                return false;
+              }
+              seenToolSignatures.add(signature);
+              return true;
+            });
+
+            if (deduplicatedToolCalls.length < currentResult.toolCalls.length) {
+              logger.warn(`🔧 DEDUPLICATION ACTIVE: Reduced ${currentResult.toolCalls.length} tool calls down to ${deduplicatedToolCalls.length}`);
+            } else {
+              logger.info(`✅ No duplicates detected in this turn`);
+            }
+
+            // Use deduplicated tool calls for execution
+            const toolCallsToExecute = deduplicatedToolCalls.length < currentResult.toolCalls.length
+              ? deduplicatedToolCalls
+              : currentResult.toolCalls;
+
             // Execute the requested tool calls
             const toolCallResults = await this.executeToolCallsWithCustomTools(
-              currentResult.toolCalls,
+              toolCallsToExecute,
               request.tools,
-              progressCallback
+              progressCallback,
+              executedToolCallIds,
+              cachedResultsBySignature
             );
 
             // Check for interaction marker
             if (toolCallResults.__interaction_required__) {
               logger.info(`🔔 Interaction detected - pausing agent execution`);
+              logger.info(`   Looking for tool: ${toolCallResults.toolName}`);
+              logger.info(`   Available tool calls: ${currentResult.toolCalls.map((tc: any) => tc.toolName).join(', ')}`);
+
+              // Find the original tool call to get arguments
+              const originalToolCall: any = currentResult.toolCalls.find(
+                (tc: any) => tc.toolName === toolCallResults.toolName
+              );
+
+              logger.info(`   Found original tool call: ${!!originalToolCall}`);
+              if (originalToolCall) {
+                logger.info(`   Original tool call structure:`, JSON.stringify(originalToolCall, null, 2));
+              }
+
+              // Extract arguments properly using our extraction method
+              const toolArguments = originalToolCall ? this.extractToolArguments(originalToolCall) : {};
+              logger.info(`   Extracted tool arguments:`, JSON.stringify(toolArguments, null, 2));
+
               return {
                 type: 'interaction_required',
                 interaction: toolCallResults.interaction,
                 toolName: toolCallResults.toolName,
+                originalToolName: toolCallResults.originalToolName || toolCallResults.toolName,
+                toolCallId: toolCallResults.toolCallId,
+                toolArguments,  // Use properly extracted tool arguments
+                scriptArgs: toolCallResults.scriptArgs,
+                stdin: toolCallResults.stdin,
+                cwd: toolCallResults.cwd,
+                skillId: toolCallResults.skillId,
+                scriptName: toolCallResults.scriptName,
                 partialContent: currentResult.text || '',
                 toolCalls: allToolHistory,
                 usage: {
@@ -659,8 +727,8 @@ export class AIService {
               } as any;
             }
 
-            // Track the tool executions in history
-            currentResult.toolCalls.forEach((tc) => {
+            // Track the tool executions in history (only deduplicated ones that were actually executed)
+            toolCallsToExecute.forEach((tc) => {
               const toolCallId = (tc as any).toolCallId;
               allToolHistory.push({
                 name: (tc as any).toolName,
@@ -1352,10 +1420,98 @@ The tools will be available during our conversation. Call them when needed to ga
     const toolResults: any[] = [];
 
     // Note: Deduplication now happens at a higher level (before this method is called)
+    // Helper function to create friendly progress messages
+    const formatWithPrefix = (tool: string, message: string): string =>
+      `🛠️ ${tool}: ${message}`;
+
+    const createProgressMessage = (toolName: string, args: any, status: 'starting' | 'done' | 'failed'): string => {
+      // Extract common arguments
+      const filePath = args?.['file-path'] || args?.filePath || args?.path || args?.file;
+      const pattern = args?.pattern;
+      const content = args?.content;
+      const scriptArgs = args?.args;
+
+      // Detect operation type from tool name
+      const isWrite = toolName.includes('write');
+      const isRead = toolName.includes('read');
+      const isSearch = toolName.includes('search');
+      const isDelete = toolName.includes('delete');
+      const isScriptCaller = toolName.includes('script_caller');
+
+      if (status === 'starting') {
+        // File operations
+        if (isWrite && filePath) {
+          return formatWithPrefix(
+            toolName,
+            content ? `Writing to ${filePath}` : `Creating ${filePath}`
+          );
+        }
+        if (isRead && filePath) {
+          return formatWithPrefix(toolName, `Reading ${filePath}`);
+        }
+        if (isDelete && filePath) {
+          return formatWithPrefix(toolName, `Deleting ${filePath}`);
+        }
+        if (isSearch && pattern) {
+          return formatWithPrefix(toolName, `Searching for ${pattern}`);
+        }
+        if (isSearch && filePath) {
+          return formatWithPrefix(toolName, `Looking for ${filePath}`);
+        }
+
+        // Script execution
+        if (isScriptCaller && scriptArgs) {
+          const cmd = Array.isArray(scriptArgs) ? scriptArgs[0] : scriptArgs;
+          return formatWithPrefix(toolName, `Running ${cmd}`);
+        }
+
+        // Generic fallback with friendly name
+        const friendlyName = toolName
+          .replace(/file_handling_/g, '')
+          .replace(/script_caller_/g, '')
+          .replace(/_/g, ' ');
+        return formatWithPrefix(toolName, `Working on ${friendlyName}`);
+
+      } else if (status === 'done') {
+        // Completed operations
+        if (isWrite && filePath) {
+          return formatWithPrefix(toolName, `✓ Wrote ${filePath}`);
+        }
+        if (isRead && filePath) {
+          return formatWithPrefix(toolName, `✓ Read ${filePath}`);
+        }
+        if (isDelete && filePath) {
+          return formatWithPrefix(toolName, `✓ Deleted ${filePath}`);
+        }
+        if (isSearch && (pattern || filePath)) {
+          return formatWithPrefix(toolName, '✓ Search complete');
+        }
+        if (isScriptCaller && scriptArgs) {
+          const cmd = Array.isArray(scriptArgs) ? scriptArgs[0] : scriptArgs;
+          return formatWithPrefix(toolName, `✓ Ran ${cmd}`);
+        }
+
+        // Generic success
+        const friendlyName = toolName
+          .replace(/file_handling_/g, '')
+          .replace(/script_caller_/g, '')
+          .replace(/_/g, ' ');
+        return formatWithPrefix(toolName, `✓ ${friendlyName}`);
+
+      } else {
+        // Failed operations
+        const friendlyName = toolName
+          .replace(/file_handling_/g, '')
+          .replace(/script_caller_/g, '')
+          .replace(/_/g, ' ');
+        return formatWithPrefix(toolName, `⚠️ ${friendlyName} failed`);
+      }
+    };
+
     // This method executes the already-deduplicated tool calls
     for (const toolCall of toolCalls) {
       logger.info('🧾 Raw tool call payload:', JSON.stringify(toolCall, null, 2));
-      progressCallback?.(`➡️  Calling ${toolCall.toolName}…`);
+      progressCallback?.(createProgressMessage(toolCall.toolName, toolCall.args, 'starting'));
 
       // Check if this tool call ID is already being executed to prevent concurrent duplicates
       if (this.toolExecutionTracker.has(toolCall.toolCallId)) {
@@ -1381,7 +1537,18 @@ The tools will be available during our conversation. Call them when needed to ga
 
         const result = await executionPromise;
         if (!result?.error) {
-          progressCallback?.(`✅ ${toolCall.toolName} completed`);
+          progressCallback?.(createProgressMessage(toolCall.toolName, toolCall.args, 'done'));
+        }
+
+        // Check for user interaction IMMEDIATELY after each tool
+        if (result && typeof result === 'object' && result.__interaction_required__) {
+          logger.info(`🔔 User interaction detected in ${toolCall.toolName} - stopping tool execution`);
+          // Return early with just this one result - don't execute remaining tools
+          return [{
+            toolCallId: toolCall.toolCallId,
+            toolName: toolCall.toolName,
+            result
+          }];
         }
 
         toolResults.push({
@@ -1393,7 +1560,7 @@ The tools will be available during our conversation. Call them when needed to ga
         
       } catch (error) {
         logger.error(`🚨 Tool execution failed for ${toolCall.toolName}:`, error);
-        progressCallback?.(`⚠️  ${toolCall.toolName} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        progressCallback?.(createProgressMessage(toolCall.toolName, toolCall.args, 'failed') + `: ${error instanceof Error ? error.message : 'Unknown error'}`);
         toolResults.push({
           toolCallId: toolCall.toolCallId,
           toolName: toolCall.toolName,
@@ -1418,28 +1585,104 @@ The tools will be available during our conversation. Call them when needed to ga
   private async executeToolCallsWithCustomTools(
     toolCalls: any[],
     customTools?: any[],
-    progressCallback?: (message: string) => void
+    progressCallback?: (message: string) => void,
+    executedToolCallIds?: Set<string>,
+    cachedResultsBySignature?: Map<string, { result: any; success: boolean }>
   ): Promise<Record<string, any>> {
-    const results = await this.executeToolCalls(toolCalls, customTools, progressCallback);
+    const {
+      uniqueToolCalls,
+      allToolCallIds,
+      signatureByToolCallId
+    } = this.deduplicateToolCalls(toolCalls);
+
+    if (uniqueToolCalls.length !== toolCalls.length) {
+      logger.info(`🔁 Deduplicated tool calls: received ${toolCalls.length}, executing ${uniqueToolCalls.length}`);
+    }
+
+    const executedIds = executedToolCallIds ?? new Set<string>();
+    const cachedBySignature = cachedResultsBySignature ?? new Map<string, { result: any; success: boolean }>();
+    const uniqueResults: Array<{ toolCallId: string; toolName: string; result: any; success: boolean }> = [];
+
+    const callsToExecute: any[] = [];
+
+    for (const toolCall of uniqueToolCalls) {
+      const signature = signatureByToolCallId.get(toolCall.toolCallId);
+      const alreadyExecuted = executedIds.has(toolCall.toolCallId);
+
+      if (alreadyExecuted && signature && cachedBySignature.has(signature)) {
+        const cached = cachedBySignature.get(signature)!;
+        logger.info(`🔁 Skipping re-execution of ${toolCall.toolName} (toolCallId=${toolCall.toolCallId}) - already executed in this iteration`);
+        uniqueResults.push({
+          toolCallId: toolCall.toolCallId,
+          toolName: toolCall.toolName,
+          result: cached.result,
+          success: cached.success
+        });
+        logger.debug(`🧠 Reusing cached result for tool ${toolCall.toolName} (signature: ${signature})`);
+        continue;
+      }
+
+      if (signature && cachedBySignature.has(signature)) {
+        const cached = cachedBySignature.get(signature)!;
+        executedIds.add(toolCall.toolCallId);
+        logger.info(`♻️ Reusing cached result for ${toolCall.toolName} (signature=${signature})`);
+        uniqueResults.push({
+          toolCallId: toolCall.toolCallId,
+          toolName: toolCall.toolName,
+          result: cached.result,
+          success: cached.success
+        });
+        logger.debug(`🧠 Using cached result for repeated tool ${toolCall.toolName} (signature: ${signature})`);
+        continue;
+      }
+
+      callsToExecute.push(toolCall);
+    }
+
+    const freshResults = await this.executeToolCalls(callsToExecute, customTools, progressCallback);
+    freshResults.forEach(result => {
+      if (result.toolCallId) {
+        executedIds.add(result.toolCallId);
+        const signature = signatureByToolCallId.get(result.toolCallId);
+        if (signature) {
+          cachedBySignature.set(signature, {
+            result: result.result,
+            success: result.success !== false
+          });
+        }
+      }
+    });
+
+    uniqueResults.push(...freshResults);
 
     // Check for interaction markers in results
-    for (const result of results) {
+    for (const result of uniqueResults) {
       if (result.result && typeof result.result === 'object' && result.result.__interaction_required__) {
         logger.info(`🔔 User interaction required - detected in tool ${result.toolName}`);
+        const marker = result.result as any;
         // Return special marker that will be detected by execute()
         return {
           __interaction_required__: true,
-          interaction: result.result.interaction,
-          toolName: result.toolName,
+          interaction: marker.interaction,
+          toolName: marker.toolName || result.toolName,
+          originalToolName: marker.originalToolName || marker.toolName || result.toolName,
           toolCallId: result.toolCallId,
-          originalResults: results
+          toolArguments: marker.toolArguments,
+          scriptArgs: marker.scriptArgs,
+          stdin: marker.stdin,
+          cwd: marker.cwd,
+          skillId: marker.skillId,
+          scriptName: marker.scriptName,
+          originalResults: uniqueResults
         } as any;
       }
     }
 
+    const mappedResults = this.mapResultsToAllIds(uniqueResults, allToolCallIds);
+
     // Convert array to Record indexed by toolCallId
     const resultsMap: Record<string, any> = {};
-    results.forEach(result => {
+    mappedResults.forEach(result => {
       resultsMap[result.toolCallId] = result;
     });
 
@@ -1596,32 +1839,72 @@ The tools will be available during our conversation. Call them when needed to ga
   private deduplicateToolCalls(toolCalls: any[]): {
     uniqueToolCalls: any[];
     allToolCallIds: Map<string, string>; // all IDs -> canonical ID
+    signatureByToolCallId: Map<string, string>;
   } {
     const signatureToCanonical = new Map<string, any>();
     const allToolCallIds = new Map<string, string>();
     const uniqueToolCalls: any[] = [];
+    const signatureByToolCallId = new Map<string, string>();
 
     for (const toolCall of toolCalls) {
+      const toolCallId = toolCall.toolCallId || toolCall.id || crypto.randomUUID();
+      if (!toolCall.toolCallId) {
+        toolCall.toolCallId = toolCallId;
+      }
+
       // Create signature based on tool name and arguments
-      const args = toolCall.args || {};
-      const sortedKeys = Object.keys(args).sort();
-      const argsStr = sortedKeys.map(key => `${key}=${JSON.stringify(args[key])}`).join('|');
-      const signature = `${toolCall.toolName}(${argsStr})`;
+      const args = this.extractToolArguments(toolCall);
+      const signatureArgs = this.stableStringifyForSignature(args);
+      const signature = `${toolCall.toolName}(${signatureArgs})`;
 
       if (signatureToCanonical.has(signature)) {
         // Duplicate - map this ID to canonical ID
         const canonicalCall = signatureToCanonical.get(signature)!;
-        allToolCallIds.set(toolCall.toolCallId, canonicalCall.toolCallId);
-        logger.debug(`   🔄 Duplicate detected: ${toolCall.toolCallId} → ${canonicalCall.toolCallId}`);
+        allToolCallIds.set(toolCallId, canonicalCall.toolCallId);
+        logger.debug(`   🔄 Duplicate detected: ${toolCallId} → ${canonicalCall.toolCallId}`);
       } else {
         // First occurrence - this is canonical
-        signatureToCanonical.set(signature, toolCall);
-        allToolCallIds.set(toolCall.toolCallId, toolCall.toolCallId);
-        uniqueToolCalls.push(toolCall);
+        const canonicalToolCall = {
+          ...toolCall,
+          toolCallId
+        };
+        signatureToCanonical.set(signature, canonicalToolCall);
+        allToolCallIds.set(toolCallId, toolCallId);
+        uniqueToolCalls.push(canonicalToolCall);
       }
+
+      signatureByToolCallId.set(toolCallId, signature);
     }
 
-    return { uniqueToolCalls, allToolCallIds };
+    return { uniqueToolCalls, allToolCallIds, signatureByToolCallId };
+  }
+
+  /**
+   * Produce a stable string representation of tool arguments for deduplication.
+   */
+  private stableStringifyForSignature(value: unknown): string {
+    if (value === null) {
+      return 'null';
+    }
+    if (value === undefined) {
+      return 'undefined';
+    }
+    if (typeof value === 'string') {
+      return JSON.stringify(value);
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+      return `[${value.map(item => this.stableStringifyForSignature(item)).join(',')}]`;
+    }
+    if (typeof value === 'object') {
+      const entries = Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, val]) => `${JSON.stringify(key)}:${this.stableStringifyForSignature(val)}`);
+      return `{${entries.join(',')}}`;
+    }
+    return JSON.stringify(value);
   }
 
   /**

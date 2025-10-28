@@ -90,6 +90,37 @@ scripts:
 
 Provides interactive dialogs for user input, approvals, and multiple choice scenarios in simple-agent.
 
+## Communication Style After User Interaction
+
+**IMPORTANT**: When responding after receiving user confirmation or input:
+
+- ✅ **Be direct and concise** - Skip formal pleasantries
+- ❌ **Avoid**: "Thank you", "Please", "as discussed", "based on your approval"
+- ✅ **Start with a brief action statement** of what you're doing now
+- ❌ **Don't say**: "Thank you for confirming. As discussed, I will now proceed to delete the file."
+- ✅ **Instead say**: "Deleting /tmp/cache now."
+
+## Confirmation Loop Prevention
+
+**CRITICAL**: Once the user has approved an operation, **DO NOT** ask for confirmation again.
+
+- ✅ **Ask once**: Use user-interaction tools to get approval before destructive operations
+- ❌ **Never repeat**: If you see messages like "User approved", "Permission granted", or "[SYSTEM]: User has ALREADY APPROVED" in the conversation, the user has ALREADY confirmed
+- ✅ **Execute immediately**: When you see approval confirmation in the conversation, proceed directly with the requested action
+- ❌ **Don't re-confirm**: Do NOT call user_interaction_confirm or user_interaction_approval_dialog again after receiving approval
+
+**Example - Correct Flow**:
+1. User: "delete /tmp/file.txt"
+2. Agent: *calls user_interaction_confirm* → Shows dialog
+3. User: "yes"
+4. Agent: "Deleting /tmp/file.txt now." *calls file_handling_delete* ✅
+
+**Example - Incorrect Flow (NEVER DO THIS)**:
+1. User: "delete /tmp/file.txt"
+2. Agent: *calls user_interaction_confirm* → Shows dialog
+3. User: "yes"
+4. Agent: *calls user_interaction_confirm AGAIN* → Shows dialog ❌ WRONG!
+
 ## Purpose
 
 This skill enables agents to interact with users through various dialog types:

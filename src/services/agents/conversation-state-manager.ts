@@ -22,10 +22,18 @@ export interface ConversationState {
   messages: Message[];
   pendingInteraction?: {
     toolName: string;
+    originalToolName?: string; // The actual tool that triggered this (e.g. file_handling_delete)
     toolCall: ToolCall;
     interaction: InteractionData;
     timestamp: number;
+    skillId?: string;
+    scriptName?: string;
+    scriptArgs?: string[];
+    stdin?: string;
+    cwd?: string;
+    toolArguments?: Record<string, any>;
   };
+  approvedTools?: Set<string>; // Track approved tool+args combinations
   model: string;
   provider?: string;
   systemPrompt?: string;
@@ -110,15 +118,44 @@ export class ConversationStateManager {
   /**
    * Pause conversation with pending interaction
    */
-  pause(id: string, interaction: InteractionData, toolCall: ToolCall): boolean {
+  pause(
+    id: string,
+    interaction: InteractionData,
+    toolCall: ToolCall,
+    originalToolName?: string,
+    metadata?: {
+      skillId?: string;
+      scriptName?: string;
+      scriptArgs?: string[];
+      stdin?: string;
+      cwd?: string;
+      toolArguments?: Record<string, any>;
+    }
+  ): boolean {
     const state = this.states.get(id);
     if (!state) return false;
 
+    // DEBUG: Log what we're storing
+    console.log('💾 PAUSE: Storing pending interaction');
+    console.log('   Tool name:', toolCall.name);
+    console.log('   Original tool:', originalToolName);
+    console.log('   Tool arguments:', JSON.stringify(toolCall.arguments, null, 2));
+    if (metadata) {
+      console.log('   Metadata:', JSON.stringify(metadata, null, 2));
+    }
+
     state.pendingInteraction = {
       toolName: toolCall.name,
+      originalToolName: originalToolName || toolCall.name, // Store the original tool that triggered this
       toolCall,
       interaction,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      skillId: metadata?.skillId,
+      scriptName: metadata?.scriptName,
+      scriptArgs: metadata?.scriptArgs,
+      stdin: metadata?.stdin,
+      cwd: metadata?.cwd,
+      toolArguments: metadata?.toolArguments ?? toolCall.arguments
     };
 
     state.lastAccessedAt = Date.now();
@@ -134,11 +171,49 @@ export class ConversationStateManager {
       return null;
     }
 
+    // If user approved, remember this tool+args combination
+    const responseText = Array.isArray(response) ? response.join('') : response;
+    if (responseText.toLowerCase().includes('allow') || responseText.toLowerCase().includes('yes')) {
+      // Use the original tool name (the one that triggered the approval), not the wrapper
+      const toolName = state.pendingInteraction.originalToolName || state.pendingInteraction.toolName;
+      const toolKey = this.generateToolKey(
+        toolName,
+        state.pendingInteraction.toolCall.arguments
+      );
+
+      if (!state.approvedTools) {
+        state.approvedTools = new Set();
+      }
+      state.approvedTools.add(toolKey);
+    }
+
     // Clear pending interaction
     state.pendingInteraction = undefined;
     state.lastAccessedAt = Date.now();
 
     return state;
+  }
+
+  /**
+   * Check if a tool+args combination has been approved
+   */
+  isToolApproved(id: string, toolName: string, args: Record<string, any>): boolean {
+    const state = this.states.get(id);
+    if (!state?.approvedTools) return false;
+
+    const toolKey = this.generateToolKey(toolName, args);
+    return state.approvedTools.has(toolKey);
+  }
+
+  /**
+   * Generate unique key for tool+args combination
+   */
+  private generateToolKey(toolName: string, args: Record<string, any>): string {
+    const sortedArgs = Object.keys(args || {}).sort().reduce((acc, key) => {
+      acc[key] = args[key];
+      return acc;
+    }, {} as Record<string, any>);
+    return `${toolName}:${JSON.stringify(sortedArgs)}`;
   }
 
   /**

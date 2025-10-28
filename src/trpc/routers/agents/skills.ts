@@ -94,6 +94,7 @@ export function createSkillsRouter(skillManager?: SkillManager) {
               version: skill.metadata.version,
               author: skill.metadata.author,
               capabilities: skill.metadata.capabilities,
+              instructions: skill.instructions, // Include SKILL.md body for agent context
               level: (skill.resources ? 3 : (skill.instructions ? 2 : 1)) as 1 | 2 | 3,
               level1Tokens: skill.level1Tokens,
               level2Tokens: skill.level2Tokens,

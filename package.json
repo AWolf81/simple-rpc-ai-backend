@@ -219,6 +219,7 @@
     "js-yaml": "^4.1.0",
     "json-rpc-2.0": "^1.7.1",
     "jsonwebtoken": "^9.0.2",
+    "micromatch": "^4.0.8",
     "openid-client": "^6.7.1",
     "pg": "^8.16.3",
     "redis": "^5.7.0",

@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs/promises';
 
 const execFileAsync = promisify(execFile);
-const PROJECT_ROOT = process.env.PROJECT_ROOT || process.cwd();
+const PROJECT_ROOT = process.cwd(); // Script runs with cwd set to project root
 const ALLOWED_ROOTS = [PROJECT_ROOT, '/tmp'];
 
 async function main() {

@@ -176,6 +176,13 @@ export class AIAgentAdapter implements IAgentAdapter {
           type: 'interaction_required',
           interaction: (result as any).interaction,
           toolName: (result as any).toolName,
+          toolArguments: (result as any).toolArguments,  // CRITICAL: Pass through tool arguments for approval bypass
+          originalToolName: (result as any).originalToolName,  // CRITICAL: Pass through original tool name
+          skillId: (result as any).skillId,
+          scriptName: (result as any).scriptName,
+          scriptArgs: (result as any).scriptArgs,
+          stdin: (result as any).stdin,
+          cwd: (result as any).cwd,
           partialContent: (result as any).partialContent || '',
           requestId,
           provider: 'anthropic',
@@ -188,7 +195,6 @@ export class AIAgentAdapter implements IAgentAdapter {
       const skillsTriggered = this.detectTriggeredSkills(result.content);
 
       return {
-        type: 'completed',
         content: result.content,
         usage: {
           promptTokens: result.usage.promptTokens,

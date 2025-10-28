@@ -8,6 +8,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs/promises';
+import { existsSync, readFileSync } from 'fs';
 import {
   SandboxConfig,
   ScriptExecutionRequest,
@@ -66,6 +67,17 @@ export class ScriptSandbox {
     // Merge sandbox config
     let sandbox: SandboxConfig = { ...this.config, ...request.sandbox };
 
+    // Read projectRoot from cwdFilePath if provided
+    if (sandbox.cwdFilePath && !sandbox.projectRoot) {
+      try {
+        if (existsSync(sandbox.cwdFilePath)) {
+          sandbox.projectRoot = readFileSync(sandbox.cwdFilePath, 'utf-8').trim();
+        }
+      } catch (error) {
+        logger.warn(`Failed to read cwdFilePath ${sandbox.cwdFilePath}:`, error);
+      }
+    }
+
     // Validate script path
     this.validateScriptPath(request.scriptPath, sandbox);
 
@@ -83,12 +95,14 @@ export class ScriptSandbox {
     // Prepare environment
     const env = this.prepareEnvironment(sandbox);
 
-    // Execute script
+    // Execute script with proper working directory
+    const effectiveCwd = request.cwd || sandbox.projectRoot || path.dirname(request.scriptPath);
+
     const result = await this.executeProcess(
       runtimeCmd.command,
       runtimeCmd.args.concat(request.args || []),
       {
-        cwd: request.cwd || path.dirname(request.scriptPath),
+        cwd: effectiveCwd,
         env,
         timeout: sandbox.timeout,
         maxMemory: sandbox.maxMemory,

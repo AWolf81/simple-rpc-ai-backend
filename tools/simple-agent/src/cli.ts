@@ -15,7 +15,7 @@ import React from 'react';
 import { render } from 'ink';
 import { Command } from 'commander';
 import App from './components/App.js';
-import { startServer } from './core/server.js';
+import { startServer, stopServer } from './core/server.js';
 import {
   loadConfig,
   validateConfig,
@@ -108,7 +108,8 @@ program
 
         if (!isRunning) {
           // ⚠️  No server found on port ${port}, starting internal server on port 8001...
-          server = await startServer();
+          const workspaceDir = options.workspace || process.cwd();
+          server = await startServer(workspaceDir);
           serverUrl = 'http://localhost:8001';
         } else {
           console.log(`✅ Connected to existing server on port ${port}`);
@@ -193,10 +194,10 @@ program
     // Wait for the Ink app to exit, then cleanup
     await waitUntilExit();
 
-    // Cleanup server if we started it
+    // Cleanup server if we started it (also cleans up CWD temp file)
     if (server && typeof server.stop === 'function') {
       console.log('🛑 Shutting down server...');
-      await server.stop();
+      await stopServer();
     }
 
     process.exit(0);
@@ -227,7 +228,8 @@ program
         const isRunning = await checkServerHealth(serverUrl);
 
         if (!isRunning) {
-          server = await startServer();
+          const workspaceDir = process.cwd();
+          server = await startServer(workspaceDir);
           serverUrl = 'http://localhost:8001';
         }
       }
@@ -246,7 +248,7 @@ program
     console.log(result.content);
 
     if (server && typeof server.stop === 'function') {
-      await server.stop();
+      await stopServer();
     }
     process.exit(0);
   });

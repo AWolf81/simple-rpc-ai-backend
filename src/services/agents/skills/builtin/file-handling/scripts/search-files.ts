@@ -11,8 +11,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-// Use project root from environment or fall back to current working directory
-const PROJECT_ROOT = process.env.PROJECT_ROOT || process.cwd();
+// Script runs with cwd set to project root
+const PROJECT_ROOT = process.cwd();
 const ALLOWED_PATHS = [PROJECT_ROOT, '/tmp'];
 
 async function main() {

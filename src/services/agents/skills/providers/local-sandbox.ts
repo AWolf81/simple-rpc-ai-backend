@@ -13,7 +13,7 @@
 
 import { spawn } from 'child_process';
 import path from 'path';
-import { mkdtempSync, writeFileSync } from 'fs';
+import { mkdtempSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import type {
   ISandboxProvider,
@@ -201,11 +201,13 @@ export class LocalSandboxProvider implements ISandboxProvider {
 
     const monitor = sandbox.monitorViolations ? this.startViolationMonitor() : null;
 
+    const effectiveCwd = request.cwd || sandbox.projectRoot || path.dirname(request.scriptPath);
+
     const result = await this.executeProcess(
       security.command,
       security.args,
       {
-        cwd: request.cwd || sandbox.projectRoot || path.dirname(request.scriptPath),
+        cwd: effectiveCwd,
         env: security.env,
         timeout: sandbox.timeout,
         maxMemory: sandbox.maxMemory,
@@ -258,6 +260,21 @@ export class LocalSandboxProvider implements ISandboxProvider {
       environmentVars.PWD = process.cwd();
     }
 
+    // Read projectRoot from cwdFilePath if provided
+    let projectRoot = overrides?.projectRoot ?? base.projectRoot;
+    const cwdFilePath = overrides?.cwdFilePath ?? base.cwdFilePath;
+
+    if (cwdFilePath && !projectRoot) {
+      try {
+        if (existsSync(cwdFilePath)) {
+          projectRoot = readFileSync(cwdFilePath, 'utf-8').trim();
+          logger.debug(`📂 Read projectRoot from ${cwdFilePath}: ${projectRoot}`);
+        }
+      } catch (error) {
+        logger.warn(`Failed to read cwdFilePath ${cwdFilePath}:`, error);
+      }
+    }
+
     const nodePermissionFlags = getNodePermissionFlags();
 
     const allowedEnvVars = new Set(
@@ -274,6 +291,7 @@ export class LocalSandboxProvider implements ISandboxProvider {
       allowedPaths: dedupe(allowedPaths),
       allowedReadPaths: dedupe(allowedReadPaths),
       allowedWritePaths: dedupe(allowedWritePaths),
+      cwdFilePath,
       timeout: overrides?.timeout ?? base.timeout,
       maxMemory: overrides?.maxMemory ?? base.maxMemory,
       networkAccess: overrides?.networkAccess ?? base.networkAccess ?? false,
@@ -284,7 +302,8 @@ export class LocalSandboxProvider implements ISandboxProvider {
       allowedEnvVars: Array.from(allowedEnvVars),
       monitorViolations: overrides?.monitorViolations ?? base.monitorViolations ?? false,
       environmentVars,
-      enforceNodePermissions: overrides?.enforceNodePermissions ?? base.enforceNodePermissions ?? Boolean(nodePermissionFlags)
+      enforceNodePermissions: overrides?.enforceNodePermissions ?? base.enforceNodePermissions ?? Boolean(nodePermissionFlags),
+      projectRoot
     };
   }
 
