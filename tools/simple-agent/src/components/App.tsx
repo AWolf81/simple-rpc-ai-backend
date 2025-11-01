@@ -78,6 +78,65 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
     toolProgressRef.current = toolProgress;
   }, [toolProgress]);
 
+  const extractApprovalFields = (value: any): { choice?: string; customResponse?: string } => {
+    if (!value || typeof value !== 'object') {
+      return {};
+    }
+
+    if (typeof value.choice === 'string') {
+      return {
+        choice: value.choice,
+        customResponse: typeof value.customResponse === 'string' ? value.customResponse : undefined
+      };
+    }
+
+    if (typeof value.selection === 'string') {
+      return { choice: value.selection };
+    }
+
+    if (typeof value.selected === 'string') {
+      return { choice: value.selected };
+    }
+
+    if (value.json && typeof value.json === 'object') {
+      return extractApprovalFields(value.json);
+    }
+
+    return {};
+  };
+
+  const formatInteractionResponse = (value: string | string[]): string => {
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '';
+    }
+
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const { choice, customResponse } = extractApprovalFields(parsed);
+
+        if (choice && customResponse) {
+          return `${choice} — ${customResponse}`;
+        }
+        if (choice) {
+          return choice;
+        }
+        if (customResponse) {
+          return customResponse;
+        }
+      } catch {
+        // Ignore JSON parse errors and fall back to the raw value
+      }
+    }
+
+    return trimmed;
+  };
+
   // Create tRPC client with superjson transformer (must match server)
   const trpcUrl = serverUrl.includes('trpc') ? serverUrl : `${serverUrl}/trpc`;
   const client = createTypedAIClient({
@@ -590,11 +649,14 @@ export default function App({ serverUrl, model, provider, server, enableFileProx
     // Remove interaction message, add user response
     setMessages(prev => {
       const withoutInteraction = prev.filter(m => m.role !== 'interaction');
-      const responseText = Array.isArray(response) ? response.join(', ') : response;
-      return [...withoutInteraction, {
-        role: 'user',
-        content: responseText
-      }];
+      const responseText = formatInteractionResponse(response);
+      return [
+        ...withoutInteraction,
+        {
+          role: 'user',
+          content: responseText
+        }
+      ];
     });
 
     try {

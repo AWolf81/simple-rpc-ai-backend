@@ -173,9 +173,26 @@ if (!method || typeof method !== 'string') {
 
 **Estimated Effort**: 1 day
 
+#### 8. **Tool Execution Cache Design**
+**Status**: =6 Temporary  
+**Location**: `src/services/agents/skills/manager.ts`, `src/trpc/routers/agents/index.ts`  
+**Impact**: Duplicate destructive operations, confusing approval UX  
+
+**Issues**:
+- Current duplicate-prevention relies on a short-lived in-memory cache
+- Cache signatures are not persisted or scoped to conversations/toolCallIds
+- Resume flow still replays tool calls when cache misses, leading to second deletes and noisy logs
+
+**Fix Required**:
+- Replace stopgap cache with a deterministic execution ledger keyed by conversation + toolCallId
+- Surface cached results explicitly to the AI layer so it can summarize without re-invoking skills
+- Extend regression tests for remembered allow/deny plus resume behavior
+
+**Estimated Effort**: 2 days
+
 ### =� **Low Priority Issues**
 
-#### 8. **Unused Client Code**
+#### 9. **Unused Client Code**
 **Status**: =� Dead code  
 **Location**: `src/client/` directory  
 **Impact**: Bundle size and confusion  
@@ -188,7 +205,7 @@ if (!method || typeof method !== 'string') {
 
 **Estimated Effort**: 10 minutes
 
-#### 9. **Example Code Inconsistencies**
+#### 10. **Example Code Inconsistencies**
 **Status**: =� Minor  
 **Location**: `examples/` directory  
 **Impact**: Developer experience  
@@ -205,7 +222,7 @@ if (!method || typeof method !== 'string') {
 
 **Estimated Effort**: 1 day
 
-#### 10. **Missing Test Coverage**
+#### 11. **Missing Test Coverage**
 **Status**: =� Incomplete  
 **Location**: Multiple test files  
 **Impact**: Quality assurance  
