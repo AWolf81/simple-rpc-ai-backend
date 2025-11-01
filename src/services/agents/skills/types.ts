@@ -228,6 +228,7 @@ export interface ScriptExecutionRequest {
   cwd?: string;                   // Working directory (must be in allowedPaths)
   sandbox?: Partial<SandboxConfig>; // Override sandbox settings
   conversationId?: string;        // Conversation ID for approval tracking
+  skipApproval?: boolean;         // Skip approval checks (for internal/system calls)
 }
 
 /**

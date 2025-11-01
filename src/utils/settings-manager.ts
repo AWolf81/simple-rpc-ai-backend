@@ -46,7 +46,7 @@ const DEFAULT_SETTINGS: AgentSettings = {
   version: '1.0.0',
   approvalPermissions: [],
   preferences: {
-    autoApproveReadOperations: false,
+    autoApproveReadOperations: true,  // Auto-approve reads by default for better UX
     confirmDestructiveActions: true
   },
   permissions: {}

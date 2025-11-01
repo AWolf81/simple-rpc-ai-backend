@@ -111,6 +111,8 @@ export function createInteractiveApprovalCallback(
     }
 
     // Execute approval dialog
+    // IMPORTANT: skipApproval: true prevents circular dependency
+    // (approval callback calling user-interaction which would trigger approval again)
     const executePromise = skillManager.executeScript('user-interaction', {
       scriptName: 'scripts/approval-dialog.ts',
       args: [
@@ -118,7 +120,8 @@ export function createInteractiveApprovalCallback(
         message,
         JSON.stringify(approvalOptions),
         ...(allowCustomReason ? ['--allow-custom'] : [])
-      ]
+      ],
+      skipApproval: true  // Prevent circular approval loop
     });
 
     let result;

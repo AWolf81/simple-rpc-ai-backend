@@ -734,7 +734,7 @@ export class AIService {
                 name: (tc as any).toolName,
                 arguments: this.extractToolArguments(tc),
                 result: toolCallResults[toolCallId]?.result || {}
-              });
+              } as any);
             });
 
             logger.info(`✅ Tool execution completed: ${allToolHistory.length} total tool call(s) executed`);
@@ -1733,12 +1733,12 @@ The tools will be available during our conversation. Call them when needed to ga
             result = await fallbackTool.execute(parsedArgs);
           } else {
             logger.warn(`⚠️  Numeric tool index "${toolCall.toolName}" did not map to a known tool. Available tools: ${availableCustomTools.join(', ') || 'none'}`);
-            result = { error: 'MCP service not available' };
+            result = { error: `Invalid tool: '${toolCall.toolName}' not found. Available tools: ${availableCustomTools.join(', ') || 'none'}` };
           }
         } else {
           // No MCP service available / tool not found
           logger.warn(`⚠️  Custom tool not found: ${toolCall.toolName}. Available tools: ${availableCustomTools.join(', ') || 'none'}`);
-          result = { error: 'MCP service not available' };
+          result = { error: `Invalid tool: '${toolCall.toolName}' not found. Available tools: ${availableCustomTools.join(', ') || 'none'}` };
         }
       }
       
@@ -2062,18 +2062,39 @@ The tools will be available during our conversation. Call them when needed to ga
     });
 
     // Build UIMessages with tool invocations that include results
-    const toolInvocations = initialResult.toolCalls.map((tc: any) => {
-      const args = this.extractToolArguments(tc);
-      const result = toolCallResults[tc.toolCallId];
+    const shouldHideInvocation = (toolName: unknown, formattedResult: unknown): boolean => {
+      if (typeof toolName === 'string') {
+        const normalized = toolName.toLowerCase();
+        if (normalized === 'approval' || normalized === 'result') {
+          return true;
+        }
+      }
 
-      return {
-        state: 'result' as const,
-        toolCallId: tc.toolCallId,
-        toolName: tc.toolName,
-        args: args !== undefined ? args : {},
-        result: result !== undefined ? result : null
-      };
-    });
+      if (formattedResult == null) {
+        return false;
+      }
+
+      const resultText = typeof formattedResult === 'string'
+        ? formattedResult
+        : JSON.stringify(formattedResult);
+
+      return /mcp service not available/i.test(resultText);
+    };
+
+    const toolInvocations = initialResult.toolCalls
+      .map((tc: any) => {
+        const args = this.extractToolArguments(tc);
+        const result = toolCallResults[tc.toolCallId];
+
+        return {
+          state: 'result' as const,
+          toolCallId: tc.toolCallId,
+          toolName: tc.toolName,
+          args: args !== undefined ? args : {},
+          result: result !== undefined ? result : null
+        };
+      })
+      .filter(inv => !shouldHideInvocation(inv.toolName, inv.result));
 
     // Add assistant message with tool results to accumulate conversation history
     const assistantWithToolResults: any = {
@@ -2089,28 +2110,29 @@ The tools will be available during our conversation. Call them when needed to ga
 
     // ALSO add a user message that explicitly describes the tool results
     // This helps models that don't properly handle toolInvocations
-    const toolResultsSummary = toolInvocations.map(inv => {
-      const resultText = typeof inv.result === 'string'
-        ? inv.result.substring(0, 1000)  // Limit length
-        : JSON.stringify(inv.result).substring(0, 1000);
-      return `Tool ${inv.toolName} returned:\n${resultText}`;
-    }).join('\n\n');
-
-    const userPromptWithResults: Omit<UIMessage, 'id'> = {
-      role: 'user' as const,
-      parts: [
-        {
-          type: 'text' as const,
-          text: `The tool(s) have been executed. Here are the results:\n\n${toolResultsSummary}\n\nIMPORTANT: Use these tool results to complete the original task. If the results show file paths or partial information, call additional tools as needed to fully answer the question. Do not just acknowledge the tool execution - use the information to provide a complete answer.`
-        }
-      ]
-    };
-
     const uiMessages: Array<Omit<UIMessage, 'id'>> = [
       ...normalizedExisting,
-      assistantWithToolResults,
-      userPromptWithResults  // Add explicit results message
+      assistantWithToolResults
     ];
+
+    if (toolInvocations.length > 0) {
+      const toolResultsSummary = toolInvocations.map(inv => {
+        const resultText = typeof inv.result === 'string'
+          ? inv.result.substring(0, 1000)  // Limit length
+          : JSON.stringify(inv.result).substring(0, 1000);
+        return `Tool ${inv.toolName} returned:\n${resultText}`;
+      }).join('\n\n');
+
+      uiMessages.push({
+        role: 'user' as const,
+        parts: [
+          {
+            type: 'text' as const,
+            text: `The tool(s) have been executed. Here are the results:\n\n${toolResultsSummary}\n\nIMPORTANT: Use these tool results to complete the original task. If the results show file paths or partial information, call additional tools as needed to fully answer the question. Do not just acknowledge the tool execution - use the information to provide a complete answer.`
+          }
+        ]
+      });
+    }
 
     // Convert UIMessages to ModelMessages for AI SDK
     let modelMessages;
@@ -2149,7 +2171,7 @@ The tools will be available during our conversation. Call them when needed to ga
     executionConfig: any,
     toolCalls?: any[],
     toolResults?: any[],
-    toolHistory?: Array<{ name: string; arguments: any; result: any }>,
+    toolHistory?: Array<{ toolCallId?: string; name: string; arguments: any; result: any }>,
     progressMessages?: string[]
   ): ExecuteResult {
     const promptTokens = result.usage.inputTokens ?? (result.usage as any).promptTokens ?? 0;
@@ -2159,13 +2181,66 @@ The tools will be available during our conversation. Call them when needed to ga
     // Format tool executions if present
     let formattedToolCalls: Array<{ name: string; arguments: any; result: any }> | undefined;
     if (toolHistory && toolHistory.length > 0) {
-      formattedToolCalls = toolHistory;
+      const deduped = new Map<string, { name: string; arguments: any; result: any }>();
+      toolHistory.forEach(entry => {
+        const key = entry.toolCallId || JSON.stringify({
+          name: entry.name,
+          arguments: entry.arguments
+        });
+
+        deduped.set(key, {
+          name: entry.name,
+          arguments: entry.arguments,
+          result: entry.result
+        });
+      });
+
+      formattedToolCalls = Array.from(deduped.values());
     } else if (toolCalls && toolResults) {
       formattedToolCalls = toolCalls.map((tc, index) => ({
         name: tc.toolName,
         arguments: this.extractToolArguments(tc),
         result: toolResults[index]?.result || {}
       }));
+    }
+
+    const shouldHideToolCall = (name: unknown, result: unknown): boolean => {
+      if (typeof name === 'string') {
+        const normalized = name.toLowerCase();
+        if (normalized === 'approval' || normalized === 'result' || normalized === 'call') {
+          return true;
+        }
+      }
+
+      if (result == null) {
+        return false;
+      }
+
+      const resultText = typeof result === 'string'
+        ? result
+        : JSON.stringify(result);
+
+      return /mcp service not available/i.test(resultText);
+    };
+
+    if (formattedToolCalls) {
+      formattedToolCalls = formattedToolCalls.filter(call => !shouldHideToolCall(call.name, call.result));
+
+      const seenSignatures = new Set<string>();
+      formattedToolCalls = formattedToolCalls.filter(call => {
+        const signature = JSON.stringify({
+          name: call.name,
+          args: call.arguments,
+          result: call.result
+        });
+
+        if (seenSignatures.has(signature)) {
+          return false;
+        }
+
+        seenSignatures.add(signature);
+        return true;
+      });
     }
 
     return {

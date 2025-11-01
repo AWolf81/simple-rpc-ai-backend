@@ -253,67 +253,52 @@ export class SkillManager {
       return { ...cachedExecution.result };
     }
 
-    // Request approval if needed
-    if (safetyValidation.requiresApproval || skill.metadata.requiresApproval) {
+    // Always check with approval manager - it will handle policies, preferences, and remembered choices
+    // UNLESS skipApproval is explicitly set (for internal/system calls like user-interaction dialogs)
+    if (this.approvalManager && !request.skipApproval) {
       console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      console.error(`[SKILL MANAGER] Approval required for: ${request.scriptName}`);
-      console.error(`[SKILL MANAGER] Has approvalManager: ${!!this.approvalManager}`);
+      console.error(`[SKILL MANAGER] Checking approval for: ${request.scriptName}`);
+      console.error(`[SKILL MANAGER] Calling approvalManager.requestSkillExecutionApproval...`);
 
-      if (this.approvalManager) {
-        console.error(`[SKILL MANAGER] Calling approvalManager.requestSkillExecutionApproval...`);
-
-        try {
-          console.error(`[SKILL MANAGER] About to call requestSkillExecutionApproval`);
-          const approved = await this.approvalManager.requestSkillExecutionApproval(
-            request.scriptName,
-            request.args || [],
-            safetyValidation,
-            request.cwd,
-            request.conversationId,  // Pass conversation ID for approval tracking
-            skill.id
-          );
-          console.error(`[SKILL MANAGER] requestSkillExecutionApproval returned:`, approved);
-
-          if (!approved) {
-            logger.warn(`❌ Script execution denied by user: ${request.scriptName}`);
-            throw new Error(`Script execution denied: ${request.scriptName}`);
-          }
-
-          logger.info(`✅ Script execution approved: ${request.scriptName}`);
-        } catch (error: any) {
-          console.error(`[SKILL MANAGER] ❗ Caught error from approval!`);
-          console.error(`[SKILL MANAGER] Error:`, error);
-          console.error(`[SKILL MANAGER] Error type: ${typeof error}`);
-          console.error(`[SKILL MANAGER] Has __interaction_required__:`, error?.__interaction_required__);
-          console.error(`[SKILL MANAGER] Error keys:`, error ? Object.keys(error) : 'null');
-
-          // Check if this is an interaction marker being thrown up
-          if (error && typeof error === 'object' && error.__interaction_required__) {
-            console.error(`[SKILL MANAGER] ✅ Interaction marker caught from approval - returning as result`);
-            // Return the interaction marker as the script result
-            // Add the original tool name so conversation state can track what was approved
-            // This will be detected by AIService and trigger the interaction flow
-            return {
-              ...error,
-              originalToolName: `${skillId}_${request.scriptName.replace('scripts/', '').replace('.ts', '')}`
-            };
-          }
-          console.error(`[SKILL MANAGER] ❌ NOT an interaction marker - re-throwing`);
-          // Otherwise re-throw the error
-          throw error;
-        }
-      } else {
-        // No approval manager configured but approval required
-        console.error(`[SKILL MANAGER] ERROR: No approval manager but approval required!`);
-        throw new Error(
-          `Approval required for "${request.scriptName}" but no approval system configured.\n` +
-          SafetyValidator.formatApprovalPrompt(
-            request.scriptName,
-            request.args || [],
-            safetyValidation,
-            request.cwd
-          )
+      try {
+        console.error(`[SKILL MANAGER] About to call requestSkillExecutionApproval`);
+        const approved = await this.approvalManager.requestSkillExecutionApproval(
+          request.scriptName,
+          request.args || [],
+          safetyValidation,
+          request.cwd,
+          request.conversationId,  // Pass conversation ID for approval tracking
+          skill.id
         );
+        console.error(`[SKILL MANAGER] requestSkillExecutionApproval returned:`, approved);
+
+        if (!approved) {
+          logger.warn(`❌ Script execution denied by user: ${request.scriptName}`);
+          throw new Error(`Action denied by user security settings. Do not retry this operation. Please explain to the user that their security settings blocked: ${request.scriptName}`);
+        }
+
+        logger.info(`✅ Script execution approved: ${request.scriptName}`);
+      } catch (error: any) {
+        console.error(`[SKILL MANAGER] ❗ Caught error from approval!`);
+        console.error(`[SKILL MANAGER] Error:`, error);
+        console.error(`[SKILL MANAGER] Error type: ${typeof error}`);
+        console.error(`[SKILL MANAGER] Has __interaction_required__:`, error?.__interaction_required__);
+        console.error(`[SKILL MANAGER] Error keys:`, error ? Object.keys(error) : 'null');
+
+        // Check if this is an interaction marker being thrown up
+        if (error && typeof error === 'object' && error.__interaction_required__) {
+          console.error(`[SKILL MANAGER] ✅ Interaction marker caught from approval - returning as result`);
+          // Return the interaction marker as the script result
+          // Add the original tool name so conversation state can track what was approved
+          // This will be detected by AIService and trigger the interaction flow
+          return {
+            ...error,
+            originalToolName: `${skillId}_${request.scriptName.replace('scripts/', '').replace('.ts', '')}`
+          };
+        }
+        console.error(`[SKILL MANAGER] ❌ NOT an interaction marker - re-throwing`);
+        // Otherwise re-throw the error
+        throw error;
       }
     }
 

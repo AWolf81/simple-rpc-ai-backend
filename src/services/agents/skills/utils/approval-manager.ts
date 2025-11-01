@@ -488,6 +488,13 @@ export class ApprovalManager {
       return 'prompt';
     }
 
+    // Check autoApproveReadOperations preference
+    const preferences = this.settingsManager.getPreferences();
+    if (action === 'read' && preferences.autoApproveReadOperations === false) {
+      logger.info(`🔒 Read operation requires approval (autoApproveReadOperations: false): ${scriptName}`);
+      return 'prompt';
+    }
+
     const decision = this.settingsManager.evaluateFileSystemPermission(action, targetPath);
     if (decision === 'allow') {
       return 'allow';
