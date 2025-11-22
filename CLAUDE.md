@@ -46,10 +46,17 @@ import { createTypedAIClient } from 'simple-rpc-ai-backend';
 import { httpBatchLink } from '@trpc/client';
 
 const client = createTypedAIClient({
-  links: [httpBatchLink({ url: 'http://localhost:8000/trpc', headers: { authorization: `Bearer ${token}` } })]
+  links: [httpBatchLink({
+    url: 'http://localhost:8000/trpc',
+    headers: { authorization: `Bearer ${token}` }
+  })]
 });
 
+// All namespaces fully typed - IntelliSense works perfectly
 await client.ai.generateText.mutate({ content, systemPrompt });
+await client.system.health.query();
+await client.mcp.listTools.query();
+await client.user.getVirtualBalance.query();
 ```
 
 ### Custom MCP Tools
