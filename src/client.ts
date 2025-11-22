@@ -18,7 +18,6 @@
 import { JSONRPCClient } from 'json-rpc-2.0';
 import { createTRPCProxyClient, type CreateTRPCClientOptions } from '@trpc/client';
 import type { AppRouter } from './trpc/root.js';
-import type { AIRouterType } from './trpc/routers/ai';
 
 export interface ClientOptions {
   timeout?: number;
@@ -273,27 +272,29 @@ export class AIClient extends RPCClient {
 
 /**
  * Create a typed tRPC client with automatic type inference
- * Provides easy access to AI router procedures with proper typing
- * 
+ * Provides full access to all router namespaces with proper typing
+ *
  * Usage:
  * ```typescript
+ * import { createTypedAIClient } from 'simple-rpc-ai-backend';
+ * import { httpBatchLink } from '@trpc/client';
+ *
  * const client = createTypedAIClient({
- *   links: [httpBatchLink({ url: 'http://localhost:8000/trpc' })]
+ *   links: [httpBatchLink({
+ *     url: 'http://localhost:8000/trpc',
+ *     headers: { authorization: `Bearer ${token}` }
+ *   })]
  * });
- * 
- * // Fully typed without any casts
- * const result = await client.ai.generateText.mutate({ content: "test", systemPrompt: "You are helpful" });
- * const health = await client.ai.health.query();
+ *
+ * // All namespaces fully typed:
+ * await client.ai.generateText.mutate({ content: "test", systemPrompt: "You are helpful" });
+ * await client.system.health.query();
+ * await client.mcp.listTools.query();
+ * await client.user.getVirtualBalance.query();
  * ```
  */
 export function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient>[0]) {
-  const client = createTRPCProxyClient<AppRouter>(config);
-  
-  // Create a typed wrapper that preserves procedure methods
-  // This ensures TypeScript can properly infer .query() vs .mutate()
-  return {
-    ai: client.ai as unknown as AIRouterType
-  };
+  return createTRPCProxyClient<AppRouter>(config);
 }
 
 /**
