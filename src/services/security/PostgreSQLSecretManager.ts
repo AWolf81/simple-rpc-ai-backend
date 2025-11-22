@@ -7,8 +7,11 @@
 
 import * as winston from 'winston';
 import { Client } from 'pg';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes, createHash, scrypt } from 'crypto';
+import { promisify } from 'util';
 import { redactEmail } from '../../utils/redact';
+
+const scryptAsync = promisify(scrypt);
 
 export interface PostgreSQLConfig {
   host: string;
@@ -17,6 +20,7 @@ export interface PostgreSQLConfig {
   user: string;
   password: string;
   ssl?: boolean;
+  encryptionSalt?: string;
 }
 
 export interface SecretRecord {
@@ -41,6 +45,8 @@ export class PostgreSQLSecretManager {
   private client: Client;
   private logger: winston.Logger;
   private masterKey: Buffer;
+  private encryptionKey: string;
+  private encryptionSalt: Buffer;
 
   constructor(config: PostgreSQLConfig, encryptionKey: string, logger?: winston.Logger) {
     this.client = new Client({
@@ -61,8 +67,22 @@ export class PostgreSQLSecretManager {
       transports: [new winston.transports.Console()]
     });
 
-    // Derive encryption key
-    this.masterKey = Buffer.from(encryptionKey, 'utf8').subarray(0, 32);
+    // Store encryption key and salt for async derivation
+    this.encryptionKey = encryptionKey;
+
+    // Use provided salt or generate a default one (for backward compatibility)
+    // IMPORTANT: In production, always provide a strong random salt via config
+    if (config.encryptionSalt) {
+      this.encryptionSalt = Buffer.from(config.encryptionSalt, 'hex');
+    } else {
+      // Fallback to deterministic salt for backward compatibility
+      // WARNING: This is less secure than a random salt
+      this.encryptionSalt = Buffer.from('default-salt-change-in-production', 'utf8').subarray(0, 32);
+      this.logger.warn('Using default encryption salt - configure encryptionSalt for production use');
+    }
+
+    // Master key will be derived asynchronously in initialize()
+    this.masterKey = Buffer.alloc(32); // Placeholder
   }
 
   /**
@@ -70,6 +90,9 @@ export class PostgreSQLSecretManager {
    */
   async initialize(): Promise<void> {
     try {
+      // Derive master key using scrypt (memory-hard KDF)
+      await this.deriveMasterKey();
+
       await this.client.connect();
       await this.createSchema();
       this.logger.info('PostgreSQLSecretManager initialized successfully');
@@ -346,9 +369,14 @@ export class PostgreSQLSecretManager {
 
   // Private helper methods
 
+  /**
+   * Generate secure, consistent user ID from email using SHA-256
+   * Prevents predictable IDs and ensures proper user isolation
+   */
   private getUserId(email: string): string {
-    // Generate consistent user ID from email
-    return email.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    return createHash('sha256')
+      .update(email.toLowerCase().trim())
+      .digest('hex');
   }
 
   /**
@@ -397,6 +425,22 @@ export class PostgreSQLSecretManager {
         error: error.message 
       });
       // Don't throw - audit logging failure shouldn't block the main operation
+    }
+  }
+
+  /**
+   * Derive master encryption key using scrypt (memory-hard KDF)
+   * This prevents rainbow table attacks and ensures strong key derivation
+   */
+  private async deriveMasterKey(): Promise<void> {
+    try {
+      // Use scrypt for key derivation - more secure than simple truncation
+      // N=16384, r=8, p=1 are recommended parameters for interactive use
+      this.masterKey = await scryptAsync(this.encryptionKey, this.encryptionSalt, 32) as Buffer;
+      this.logger.info('Master encryption key derived successfully using scrypt');
+    } catch (error: any) {
+      this.logger.error('Failed to derive master key', { error: error.message });
+      throw error;
     }
   }
 
