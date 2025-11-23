@@ -16,9 +16,8 @@
  */
 
 import { JSONRPCClient } from 'json-rpc-2.0';
-import { createTRPCProxyClient, type CreateTRPCClientOptions } from '@trpc/client';
+import { createTRPCProxyClient, type CreateTRPCClientOptions, type TRPCClient } from '@trpc/client';
 import type { AppRouter } from './trpc/root';
-import type { AIRouterType } from './trpc/routers/ai';
 
 export interface ClientOptions {
   timeout?: number;
@@ -267,36 +266,76 @@ export class AIClient extends RPCClient {
 
 /**
  * tRPC Client Support
- * 
+ *
  * Simple, type-safe tRPC client with automatic type inference
  */
 
 /**
- * Create a typed tRPC client with automatic type inference
- * Provides easy access to AI router procedures with proper typing
- * 
- * Usage:
+ * Properly typed tRPC client with full AppRouter type safety
+ *
+ * This type includes all namespaces with full autocomplete and type checking:
+ * - ai: AI generation with system prompt protection
+ * - auth: Authentication and session management
+ * - system: Server health and capabilities
+ * - user: User profile and settings
+ * - billing: Usage tracking and billing
+ * - admin: Administrative operations
+ * - mcp: Model Context Protocol integration
+ *
+ * @example
  * ```typescript
- * const client = createTypedAIClient({
+ * import { createTypedAIClient, type TypedAIClient } from 'simple-rpc-ai-backend';
+ * import { httpBatchLink } from '@trpc/client';
+ *
+ * const client: TypedAIClient = createTypedAIClient({
  *   links: [httpBatchLink({ url: 'http://localhost:8000/trpc' })]
  * });
- * 
- * // Fully typed without any casts
- * const result = await client.ai.generateText.mutate({ content: "test", systemPrompt: "You are helpful" });
- * const health = await client.ai.health.query();
+ *
+ * // ✅ Full TypeScript autocomplete and type safety
+ * await client.ai.generateText.mutate({ content: "test", systemPrompt: "..." });
+ * await client.auth.storeUserKey.mutate({ provider: "anthropic", apiKey: "..." });
+ * await client.system.health.query();
  * ```
  */
-export function createTypedAIClient(config: Parameters<typeof createTRPCProxyClient>[0]) {
-  const client = createTRPCProxyClient<AppRouter>(config);
-  
-  // Create a typed wrapper that preserves procedure methods
-  // This ensures TypeScript can properly infer .query() vs .mutate()
-  return {
-    ai: client.ai as unknown as AIRouterType
-  };
-}
+export type TypedAIClient = TRPCClient<AppRouter>;
 
 /**
- * Type alias for the typed AI client
+ * Create a typed tRPC client with automatic type inference
+ *
+ * Returns a fully typed client with all router namespaces (ai, auth, system, user, billing, admin, mcp)
+ * and complete TypeScript autocomplete for all procedures.
+ *
+ * @param config - tRPC client configuration including links and optional transformer
+ * @returns Fully typed tRPC client with all namespaces
+ *
+ * @example
+ * ```typescript
+ * import { createTypedAIClient } from 'simple-rpc-ai-backend';
+ * import { httpBatchLink } from '@trpc/client';
+ *
+ * const client = createTypedAIClient({
+ *   links: [httpBatchLink({
+ *     url: 'http://localhost:8000/trpc',
+ *     headers: { authorization: `Bearer ${token}` }
+ *   })]
+ * });
+ *
+ * // ✅ Full type safety, no 'as any' casts needed
+ * await client.ai.generateText.mutate({
+ *   content: "Hello",
+ *   systemPrompt: "You are helpful"
+ * });
+ *
+ * await client.auth.storeUserKey.mutate({
+ *   provider: "anthropic",
+ *   apiKey: "sk-ant-..."
+ * });
+ *
+ * await client.system.health.query();
+ * ```
  */
-export type TypedAIClient = ReturnType<typeof createTypedAIClient>;
+export function createTypedAIClient(
+  config: Parameters<typeof createTRPCProxyClient<AppRouter>>[0]
+): TypedAIClient {
+  return createTRPCProxyClient<AppRouter>(config);
+}
