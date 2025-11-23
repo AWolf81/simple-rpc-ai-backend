@@ -31,6 +31,12 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Install Claude Code CLI
+      - name: Install Claude Code
+        run: |
+          curl -fsSL https://storage.googleapis.com/anthropic-cloud/claude-code/install.sh | sh
+          echo "$HOME/.claude/bin" >> $GITHUB_PATH
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
