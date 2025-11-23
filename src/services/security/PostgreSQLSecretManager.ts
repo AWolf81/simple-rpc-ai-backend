@@ -7,8 +7,35 @@
 
 import * as winston from 'winston';
 import { Client } from 'pg';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes, createHash, scrypt } from 'crypto';
+import { promisify } from 'util';
 import { redactEmail } from '../../utils/redact';
+
+// Type for scrypt with options (Node.js 12+)
+type ScryptFunction = (
+  password: string | Buffer,
+  salt: string | Buffer,
+  keylen: number,
+  options?: {
+    N?: number;
+    r?: number;
+    p?: number;
+    maxmem?: number;
+  }
+) => Promise<Buffer>;
+
+const scryptAsync = promisify(scrypt) as ScryptFunction;
+
+export interface ScryptOptions {
+  /** CPU/memory cost parameter (default: 16384) */
+  N?: number;
+  /** Block size parameter (default: 8) */
+  r?: number;
+  /** Parallelization parameter (default: 1) */
+  p?: number;
+  /** Key length in bytes (default: 32) */
+  keylen?: number;
+}
 
 export interface PostgreSQLConfig {
   host: string;
@@ -17,6 +44,22 @@ export interface PostgreSQLConfig {
   user: string;
   password: string;
   ssl?: boolean;
+  /**
+   * Encryption salt (hex-encoded, 32 bytes minimum)
+   * REQUIRED in production - will throw error if missing
+   * Generate with: crypto.randomBytes(32).toString('hex')
+   */
+  encryptionSalt?: string;
+  /**
+   * Scrypt parameters for key derivation
+   * Higher values = more secure but slower
+   */
+  scryptOptions?: ScryptOptions;
+  /**
+   * Enable backward compatibility for old user IDs
+   * Set to true when migrating from old string-based IDs to SHA-256
+   */
+  enableLegacyUserIds?: boolean;
 }
 
 export interface SecretRecord {
@@ -41,6 +84,11 @@ export class PostgreSQLSecretManager {
   private client: Client;
   private logger: winston.Logger;
   private masterKey: Buffer;
+  private encryptionKey: string;
+  private encryptionSalt: Buffer;
+  private scryptOptions: Required<ScryptOptions>;
+  private enableLegacyUserIds: boolean;
+  private initialized: boolean = false;
 
   constructor(config: PostgreSQLConfig, encryptionKey: string, logger?: winston.Logger) {
     this.client = new Client({
@@ -61,8 +109,75 @@ export class PostgreSQLSecretManager {
       transports: [new winston.transports.Console()]
     });
 
-    // Derive encryption key
-    this.masterKey = Buffer.from(encryptionKey, 'utf8').subarray(0, 32);
+    // Store encryption key for async derivation
+    this.encryptionKey = encryptionKey;
+
+    // Configure scrypt parameters (with sensible defaults)
+    this.scryptOptions = {
+      N: config.scryptOptions?.N ?? 16384,
+      r: config.scryptOptions?.r ?? 8,
+      p: config.scryptOptions?.p ?? 1,
+      keylen: config.scryptOptions?.keylen ?? 32
+    };
+
+    // Configure legacy user ID support for migration
+    this.enableLegacyUserIds = config.enableLegacyUserIds ?? false;
+    if (this.enableLegacyUserIds) {
+      this.logger.warn('Legacy user ID support enabled - migrate data and disable for production');
+    }
+
+    // Validate and configure encryption salt
+    this.validateAndSetSalt(config.encryptionSalt);
+
+    // Master key will be derived asynchronously in initialize()
+    this.masterKey = Buffer.alloc(32); // Placeholder
+  }
+
+  /**
+   * Validate and set encryption salt with production safety checks
+   */
+  private validateAndSetSalt(saltHex?: string): void {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (!saltHex) {
+      if (isProduction) {
+        throw new Error(
+          'CRITICAL SECURITY ERROR: encryptionSalt is REQUIRED in production environment. ' +
+          'Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+        );
+      }
+
+      // Fallback to deterministic salt for development only
+      this.encryptionSalt = Buffer.from('default-salt-change-in-production', 'utf8').subarray(0, 32);
+      this.logger.warn(
+        'SECURITY WARNING: Using default encryption salt. ' +
+        'Generate production salt with: crypto.randomBytes(32).toString(\'hex\')'
+      );
+      return;
+    }
+
+    // Validate salt format (must be hex-encoded)
+    if (!/^[0-9a-fA-F]+$/.test(saltHex)) {
+      throw new Error(
+        'Invalid encryptionSalt format: must be hex-encoded string. ' +
+        'Generate with: crypto.randomBytes(32).toString(\'hex\')'
+      );
+    }
+
+    // Validate salt length (minimum 32 bytes = 64 hex characters)
+    const saltBuffer = Buffer.from(saltHex, 'hex');
+    if (saltBuffer.length < 32) {
+      throw new Error(
+        `Invalid encryptionSalt length: ${saltBuffer.length} bytes (minimum 32 required). ` +
+        'Generate with: crypto.randomBytes(32).toString(\'hex\')'
+      );
+    }
+
+    this.encryptionSalt = saltBuffer;
+    this.logger.info('Encryption salt configured successfully', {
+      saltLength: saltBuffer.length,
+      isProduction
+    });
   }
 
   /**
@@ -70,8 +185,13 @@ export class PostgreSQLSecretManager {
    */
   async initialize(): Promise<void> {
     try {
+      // Derive master key using scrypt (memory-hard KDF)
+      await this.deriveMasterKey();
+
       await this.client.connect();
       await this.createSchema();
+
+      this.initialized = true;
       this.logger.info('PostgreSQLSecretManager initialized successfully');
     } catch (error: any) {
       this.logger.error('Failed to initialize PostgreSQLSecretManager', { error: error.message });
@@ -80,9 +200,24 @@ export class PostgreSQLSecretManager {
   }
 
   /**
+   * Ensure manager is initialized before operations
+   * Prevents race conditions and data corruption
+   */
+  private ensureInitialized(): void {
+    if (!this.initialized) {
+      throw new Error(
+        'PostgreSQLSecretManager not initialized. ' +
+        'Call initialize() before performing operations.'
+      );
+    }
+  }
+
+  /**
    * Store user API key with encryption and isolation
    */
   async storeUserKey(email: string, provider: string, apiKey: string): Promise<SecretOperationResult> {
+    this.ensureInitialized();
+
     try {
       const userId = this.getUserId(email);
       const secretKey = `${provider}_api_key`;
@@ -123,19 +258,38 @@ export class PostgreSQLSecretManager {
 
   /**
    * Retrieve user API key with decryption
+   * Supports legacy user IDs during migration
    */
   async getUserKey(email: string, provider: string): Promise<{ success: boolean; apiKey?: string; error?: string }> {
+    this.ensureInitialized();
+
     try {
       const userId = this.getUserId(email);
       const secretKey = `${provider}_api_key`;
-      
-      const query = `
-        SELECT encrypted_value FROM user_secrets 
+
+      let query = `
+        SELECT encrypted_value FROM user_secrets
         WHERE user_id = $1 AND secret_key = $2
       `;
-      
-      const result = await this.client.query(query, [userId, secretKey]);
-      
+
+      let result = await this.client.query(query, [userId, secretKey]);
+
+      // Try legacy user ID if enabled and no result with new ID
+      if (result.rows.length === 0 && this.enableLegacyUserIds) {
+        const legacyUserId = this.getLegacyUserId(email);
+        this.logger.info('Attempting legacy user ID lookup', { email: redactEmail(email), provider });
+        result = await this.client.query(query, [legacyUserId, secretKey]);
+
+        // If found with legacy ID, migrate to new ID
+        if (result.rows.length > 0) {
+          this.logger.warn('Found data with legacy user ID - migrating to SHA-256', {
+            email: redactEmail(email),
+            provider
+          });
+          await this.migrateLegacyUserId(email, provider, legacyUserId, userId);
+        }
+      }
+
       if (result.rows.length === 0) {
         await this.logSecretAccess(email, 'RETRIEVE_KEY', false, provider, `No ${provider} API key found for user`);
         return {
@@ -170,6 +324,8 @@ export class PostgreSQLSecretManager {
    * Get all configured providers for a user
    */
   async getUserProviders(email: string): Promise<{ success: boolean; providers?: string[]; error?: string }> {
+    this.ensureInitialized();
+
     try {
       const userId = this.getUserId(email);
       
@@ -204,6 +360,8 @@ export class PostgreSQLSecretManager {
    * Delete user API key
    */
   async deleteUserKey(email: string, provider: string): Promise<SecretOperationResult> {
+    this.ensureInitialized();
+
     try {
       const userId = this.getUserId(email);
       const secretKey = `${provider}_api_key`;
@@ -247,6 +405,8 @@ export class PostgreSQLSecretManager {
    * Validate user API key format
    */
   async validateUserKey(email: string, provider: string): Promise<{ success: boolean; valid?: boolean; error?: string }> {
+    this.ensureInitialized();
+
     try {
       const keyResult = await this.getUserKey(email, provider);
       
@@ -346,9 +506,60 @@ export class PostgreSQLSecretManager {
 
   // Private helper methods
 
+  /**
+   * Generate secure, consistent user ID from email using SHA-256
+   * Prevents predictable IDs and ensures proper user isolation
+   */
   private getUserId(email: string): string {
-    // Generate consistent user ID from email
+    return createHash('sha256')
+      .update(email.toLowerCase().trim())
+      .digest('hex');
+  }
+
+  /**
+   * Generate legacy user ID (for backward compatibility during migration)
+   * This is the old insecure method - only used when enableLegacyUserIds is true
+   */
+  private getLegacyUserId(email: string): string {
     return email.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+  }
+
+  /**
+   * Migrate user data from legacy user ID to SHA-256 user ID
+   * Updates the user_id in-place while preserving all other data
+   */
+  private async migrateLegacyUserId(
+    email: string,
+    provider: string,
+    legacyUserId: string,
+    newUserId: string
+  ): Promise<void> {
+    try {
+      const secretKey = `${provider}_api_key`;
+
+      // Update user_id to new SHA-256 value
+      const query = `
+        UPDATE user_secrets
+        SET user_id = $1, updated_at = NOW()
+        WHERE user_id = $2 AND secret_key = $3
+      `;
+
+      await this.client.query(query, [newUserId, legacyUserId, secretKey]);
+
+      this.logger.info('Successfully migrated user ID to SHA-256', {
+        email: redactEmail(email),
+        provider,
+        legacyUserId: legacyUserId.substring(0, 10) + '...',
+        newUserId: newUserId.substring(0, 10) + '...'
+      });
+    } catch (error: any) {
+      this.logger.error('Failed to migrate legacy user ID', {
+        email: redactEmail(email),
+        provider,
+        error: error.message
+      });
+      throw error;
+    }
   }
 
   /**
@@ -397,6 +608,42 @@ export class PostgreSQLSecretManager {
         error: error.message 
       });
       // Don't throw - audit logging failure shouldn't block the main operation
+    }
+  }
+
+  /**
+   * Derive master encryption key using scrypt (memory-hard KDF)
+   * This prevents rainbow table attacks and ensures strong key derivation
+   */
+  private async deriveMasterKey(): Promise<void> {
+    try {
+      // Use scrypt for key derivation with configurable parameters
+      // Node.js scrypt uses options object: { N, r, p, maxmem }
+      const options = {
+        N: this.scryptOptions.N,
+        r: this.scryptOptions.r,
+        p: this.scryptOptions.p,
+        maxmem: 128 * this.scryptOptions.N * this.scryptOptions.r * 2 // Calculate required memory
+      };
+
+      this.masterKey = await scryptAsync(
+        this.encryptionKey,
+        this.encryptionSalt,
+        this.scryptOptions.keylen,
+        options
+      );
+
+      this.logger.info('Master encryption key derived successfully using scrypt', {
+        scryptParams: {
+          N: this.scryptOptions.N,
+          r: this.scryptOptions.r,
+          p: this.scryptOptions.p,
+          keylen: this.scryptOptions.keylen
+        }
+      });
+    } catch (error: any) {
+      this.logger.error('Failed to derive master key', { error: error.message });
+      throw error;
     }
   }
 
