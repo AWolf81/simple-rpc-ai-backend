@@ -38,6 +38,9 @@ jobs:
           # Use API key authentication (not OAuth token)
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
+          # Use built-in GitHub token (no setup needed)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
           # Enable visual progress tracking with comment updates
           track_progress: true
 
